@@ -1,4 +1,4 @@
-"""TRITIUM-SC - Security Camera Intelligence Platform.
+"""TRITIUM-SC - Security Central - Intelligence Platform.
 
 Main FastAPI application.
 """
@@ -80,7 +80,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="TRITIUM-SC",
-    description="Security Camera Intelligence Platform",
+    description="Security Central - Intelligence Platform",
     version="0.1.0",
     lifespan=lifespan,
 )

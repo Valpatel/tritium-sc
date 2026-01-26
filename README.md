@@ -9,7 +9,7 @@
 
 <div align="center">
 
-**[ SECURITY CAMERA INTELLIGENCE PLATFORM ]**
+**[ SECURITY CENTRAL - INTELLIGENCE PLATFORM ]**
 
 `▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀`
 
@@ -31,7 +31,7 @@
 │                                                                             │
 │   ╔═══════════════════════════════════════════════════════════════════╗    │
 │   ║                    T R I T I U M - S C                            ║    │
-│   ║            SECURITY CAMERA INTELLIGENCE PLATFORM                  ║    │
+│   ║            SECURITY CENTRAL INTELLIGENCE PLATFORM                  ║    │
 │   ╚═══════════════════════════════════════════════════════════════════╝    │
 │                                                                             │
 │   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌───────────┐  │
@@ -364,5 +364,7 @@ MIT License - See [LICENSE](LICENSE) for details.
 **Built with 🔋 TRITIUM power**
 
 *Designed for privacy-conscious homeowners who want AI-powered security without cloud dependencies.*
+
+*Cameras today. Door sensors, motion detectors, and smart locks tomorrow.*
 
 </div>
