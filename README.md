@@ -22,7 +22,9 @@
 [![YOLO](https://img.shields.io/badge/YOLO-v8-05ffa1?style=flat-square)](https://ultralytics.com)
 [![License](https://img.shields.io/badge/license-MIT-fcee0a?style=flat-square)](LICENSE)
 
+For educational purposes only with toy/pretend weapon systems.
 </div>
+
 
 ---
 
