@@ -5,11 +5,15 @@
 # SECRETS & CONFIG
 # ==================
 .env
-.env.*
-*.env
+.env.local
+.env.production
+.env.*.local
 config.local.*
 secrets/
 credentials/
+
+# Allow .env.example (template for users)
+!.env.example
 
 # ==================
 # VIDEO RECORDINGS
