@@ -1,4 +1,8 @@
-"""Thumbnail extraction and storage for detected objects."""
+"""Thumbnail extraction and storage for detected objects.
+
+Critical for safety: Generates CLIP embeddings for person re-identification.
+This enables tracking the same individual across multiple appearances.
+"""
 
 import hashlib
 from dataclasses import dataclass
@@ -9,6 +13,23 @@ from typing import Optional
 import cv2
 import numpy as np
 from loguru import logger
+
+# Lazy load embedding generator to avoid import errors when CLIP not installed
+_embedding_generator = None
+
+
+def get_embedding_generator():
+    """Get or create the singleton embedding generator."""
+    global _embedding_generator
+    if _embedding_generator is None:
+        try:
+            from app.ai.embeddings import EmbeddingGenerator
+            _embedding_generator = EmbeddingGenerator()
+            logger.info("CLIP embedding generator initialized for person re-identification")
+        except Exception as e:
+            logger.warning(f"CLIP not available, embeddings will be zeros: {e}")
+            _embedding_generator = False  # Mark as failed, don't retry
+    return _embedding_generator if _embedding_generator else None
 
 
 @dataclass
@@ -130,6 +151,19 @@ class ThumbnailExtractor:
             save_path = self.output_dir / category / f"{thumbnail_id}.jpg"
             cv2.imwrite(str(save_path), thumbnail_img)
 
+            # Generate CLIP embedding for re-identification
+            # CRITICAL for safety: This enables finding the same person across appearances
+            embedding = None
+            if category == "person" or det.confidence > 0.7:
+                # Prioritize people, but also embed high-confidence vehicles
+                generator = get_embedding_generator()
+                if generator:
+                    try:
+                        embedding = generator.embed_image(thumbnail_img)
+                        logger.debug(f"Generated embedding for {det.class_name} ({thumbnail_id})")
+                    except Exception as e:
+                        logger.warning(f"Failed to generate embedding: {e}")
+
             thumbnails.append(ObjectThumbnail(
                 thumbnail_id=thumbnail_id,
                 target_type=det.class_name,
@@ -140,6 +174,7 @@ class ThumbnailExtractor:
                 bbox=(x1, y1, x2, y2),
                 confidence=det.confidence,
                 thumbnail_path=str(save_path),
+                embedding=embedding,
             ))
 
         return thumbnails

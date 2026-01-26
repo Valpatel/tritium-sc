@@ -92,6 +92,9 @@
                     <button class="btn btn-cyber" onclick="switchView('player')" id="btn-player">PLAYER</button>
                     <button class="btn btn-cyber" onclick="switchView('3d')" id="btn-3d">3D VIEW</button>
                     <button class="btn btn-cyber" onclick="switchView('zones')" id="btn-zones">ZONES</button>
+                    <button class="btn btn-cyber" onclick="switchView('targets')" id="btn-targets">TARGETS</button>
+                    <button class="btn btn-cyber" onclick="switchView('assets')" id="btn-assets">ASSETS</button>
+                    <button class="btn btn-cyber" onclick="switchView('analytics')" id="btn-analytics">ANALYTICS</button>
                     <div style="flex: 1;"></div>
                     <select id="grid-size" class="input" style="width: auto; padding: var(--space-xs) var(--space-md);">
                         <option value="1">1x1</option>
@@ -123,6 +126,9 @@
                             <div class="time-display">
                                 <span id="current-time">00:00:00</span> / <span id="duration">00:00:00</span>
                             </div>
+                            <button class="btn btn-cyber active" id="btn-toggle-annotations" onclick="toggleAnnotations()" title="Toggle detection boxes (A)">
+                                ◻ DETECTIONS
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -180,6 +186,269 @@
                     </div>
                 </div>
 
+                <!-- Targets View (People/Vehicle Gallery) -->
+                <div class="view-content hidden" id="view-targets">
+                    <div class="targets-container" style="display: flex; flex-direction: column; height: 100%; padding: var(--space-md); gap: var(--space-md);">
+                        <!-- Target Type Tabs and Filters -->
+                        <div class="panel" style="padding: var(--space-md);">
+                            <div style="display: flex; align-items: center; gap: var(--space-md); flex-wrap: wrap;">
+                                <div class="target-tabs" style="display: flex; gap: var(--space-sm);">
+                                    <button class="btn btn-cyber active" onclick="setTargetType('people')" id="btn-target-people">
+                                        <span style="margin-right: 4px;">👤</span> PEOPLE
+                                    </button>
+                                    <button class="btn btn-cyber" onclick="setTargetType('vehicles')" id="btn-target-vehicles">
+                                        <span style="margin-right: 4px;">🚗</span> VEHICLES
+                                    </button>
+                                </div>
+                                <div style="flex: 1;"></div>
+                                <div class="target-filters" style="display: flex; gap: var(--space-sm); align-items: center;">
+                                    <select id="target-channel-filter" class="input" style="width: auto; padding: var(--space-xs) var(--space-sm);">
+                                        <option value="">All Channels</option>
+                                    </select>
+                                    <input type="date" id="target-date-filter" class="input" style="width: auto; padding: var(--space-xs) var(--space-sm);">
+                                    <button class="btn btn-cyber" onclick="loadTargets()" style="padding: var(--space-xs) var(--space-sm);">REFRESH</button>
+                                </div>
+                                <div class="target-stats" style="font-size: 0.8rem;">
+                                    <span id="target-count" class="text-cyan">0</span> targets
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Target Gallery Grid -->
+                        <div class="panel" style="flex: 1; overflow-y: auto; padding: var(--space-md);">
+                            <div id="target-gallery" class="target-gallery" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-md);">
+                                <!-- Target cards populated by JavaScript -->
+                                <div class="empty-state" id="targets-empty">
+                                    <div class="empty-state-icon">🔍</div>
+                                    <div class="empty-state-title">NO TARGETS FOUND</div>
+                                    <div class="empty-state-message">
+                                        Run AI analysis on videos to detect people and vehicles.<br>
+                                        Select a channel and date, then click "Analyze" in the sidebar.
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Load More -->
+                            <div id="target-load-more" style="text-align: center; padding: var(--space-md); display: none;">
+                                <button class="btn btn-cyber" onclick="loadMoreTargets()">LOAD MORE</button>
+                            </div>
+                        </div>
+
+                        <!-- Target Detail Panel (shown when target selected) -->
+                        <div id="target-detail-panel" class="panel" style="display: none; padding: var(--space-md);">
+                            <div style="display: flex; gap: var(--space-md);">
+                                <div id="target-detail-image" style="width: 200px; height: 200px; background: #1a1a2e; display: flex; align-items: center; justify-content: center;">
+                                    <img id="target-detail-img" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                                </div>
+                                <div style="flex: 1;">
+                                    <h3 id="target-detail-title" class="text-cyan" style="margin: 0 0 var(--space-sm) 0;">Target Details</h3>
+                                    <div id="target-detail-info" style="font-size: 0.85rem; line-height: 1.6;">
+                                        <!-- Populated by JS -->
+                                    </div>
+                                    <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm);">
+                                        <button class="btn btn-cyber" onclick="labelTarget()">LABEL</button>
+                                        <button class="btn btn-cyber" onclick="findSimilar()">FIND SIMILAR</button>
+                                        <button class="btn btn-cyber" onclick="closeTargetDetail()" style="margin-left: auto;">CLOSE</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Assets View (Autonomous Units) -->
+                <div class="view-content hidden" id="view-assets">
+                    <div class="assets-container" style="display: grid; grid-template-columns: 350px 1fr; height: 100%; gap: var(--space-md); padding: var(--space-md);">
+                        <!-- Asset List Panel -->
+                        <div class="panel" style="overflow-y: auto; display: flex; flex-direction: column;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
+                                <span class="text-cyan" style="font-weight: bold;">OPERATIONAL ASSETS</span>
+                                <button class="btn btn-cyber" onclick="showAddAssetModal()" style="padding: 4px 8px; font-size: 0.7rem;">+ REGISTER</button>
+                            </div>
+                            <div id="asset-list" class="asset-list" style="flex: 1; overflow-y: auto;">
+                                <!-- Assets populated by JavaScript -->
+                            </div>
+                            <div class="asset-summary" style="border-top: 1px solid rgba(0, 240, 255, 0.2); padding-top: var(--space-sm); margin-top: var(--space-sm);">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.75rem;">
+                                    <span>Total: <span id="asset-total" class="text-cyan">0</span></span>
+                                    <span>Active: <span id="asset-active" class="text-green">0</span></span>
+                                    <span>Offline: <span id="asset-offline" class="text-magenta">0</span></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Asset Detail / Control Panel -->
+                        <div class="panel" style="display: flex; flex-direction: column; overflow: hidden;">
+                            <!-- Asset Header -->
+                            <div id="asset-detail-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
+                                <div>
+                                    <span id="asset-detail-name" class="text-cyan" style="font-size: 1.2rem; font-weight: bold;">SELECT AN ASSET</span>
+                                    <span id="asset-detail-status" class="badge" style="margin-left: 8px;">--</span>
+                                </div>
+                                <div id="asset-detail-actions" style="display: none;">
+                                    <button class="btn btn-cyber" onclick="recallAsset()" style="margin-right: 4px;">RECALL</button>
+                                    <button class="btn btn-cyber" onclick="emergencyStop()" style="background: rgba(255, 42, 109, 0.2);">E-STOP</button>
+                                </div>
+                            </div>
+
+                            <!-- Asset Info Grid -->
+                            <div id="asset-detail-info" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-sm); margin-bottom: var(--space-md);">
+                                <div class="stat-box">
+                                    <div class="stat-label">BATTERY</div>
+                                    <div class="stat-value" id="asset-battery">--%</div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-label">ORDNANCE</div>
+                                    <div class="stat-value" id="asset-ammo">--%</div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-label">POSITION</div>
+                                    <div class="stat-value" id="asset-position">--</div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-label">HEADING</div>
+                                    <div class="stat-value" id="asset-heading">--°</div>
+                                </div>
+                            </div>
+
+                            <!-- Camera Feed / Map -->
+                            <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); min-height: 300px;">
+                                <div class="panel" style="background: #0a0a0f; position: relative;">
+                                    <div style="position: absolute; top: 4px; left: 8px; font-size: 0.65rem; color: var(--cyan);">ONBOARD CAMERA</div>
+                                    <div id="asset-camera-feed" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                                        <span class="text-muted">No feed available</span>
+                                    </div>
+                                </div>
+                                <div class="panel" style="background: #0a0a0f; position: relative;">
+                                    <div style="position: absolute; top: 4px; left: 8px; font-size: 0.65rem; color: var(--cyan);">TACTICAL MAP</div>
+                                    <canvas id="asset-map-canvas" style="width: 100%; height: 100%;"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Task Assignment -->
+                            <div style="margin-top: var(--space-md); border-top: 1px solid rgba(0, 240, 255, 0.2); padding-top: var(--space-md);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+                                    <span class="text-magenta" style="font-weight: bold;">TASK ASSIGNMENT</span>
+                                    <span id="asset-current-task" class="text-muted">No active task</span>
+                                </div>
+                                <div class="task-buttons" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-sm);">
+                                    <button class="btn btn-cyber task-btn" onclick="assignTask('patrol')" data-task="patrol">
+                                        <span>🔄</span> PATROL
+                                    </button>
+                                    <button class="btn btn-cyber task-btn" onclick="assignTask('track')" data-task="track">
+                                        <span>🎯</span> TRACK
+                                    </button>
+                                    <button class="btn btn-cyber task-btn" onclick="assignTask('engage')" data-task="engage">
+                                        <span>⚡</span> ENGAGE
+                                    </button>
+                                    <button class="btn btn-cyber task-btn" onclick="assignTask('loiter')" data-task="loiter">
+                                        <span>📍</span> LOITER
+                                    </button>
+                                    <button class="btn btn-cyber task-btn" onclick="assignTask('investigate')" data-task="investigate">
+                                        <span>🔍</span> INVESTIGATE
+                                    </button>
+                                    <button class="btn btn-cyber task-btn" onclick="assignTask('recall')" data-task="recall">
+                                        <span>🏠</span> RECALL
+                                    </button>
+                                    <button class="btn btn-cyber task-btn" onclick="assignTask('rearm')" data-task="rearm">
+                                        <span>🔋</span> REARM
+                                    </button>
+                                    <button class="btn btn-cyber task-btn" onclick="cancelCurrentTask()" style="background: rgba(255, 42, 109, 0.15);">
+                                        <span>✖</span> CANCEL
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analytics View -->
+                <div class="view-content hidden" id="view-analytics">
+                    <div class="analytics-container" style="display: flex; flex-direction: column; height: 100%; padding: var(--space-md); gap: var(--space-md); overflow-y: auto;">
+                        <!-- Analytics Header -->
+                        <div class="panel" style="padding: var(--space-md);">
+                            <div style="display: flex; align-items: center; gap: var(--space-md); flex-wrap: wrap;">
+                                <h2 class="text-cyan" style="margin: 0;">DETECTION ANALYTICS</h2>
+                                <div style="flex: 1;"></div>
+                                <div style="display: flex; gap: var(--space-sm); align-items: center;">
+                                    <label class="text-muted" style="font-size: 0.75rem;">PERIOD:</label>
+                                    <select id="analytics-days" class="input" style="width: auto; padding: var(--space-xs) var(--space-sm);" onchange="loadAnalytics()">
+                                        <option value="7" selected>7 Days</option>
+                                        <option value="14">14 Days</option>
+                                        <option value="30">30 Days</option>
+                                    </select>
+                                    <button class="btn btn-cyber" onclick="loadAnalytics()">REFRESH</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stats Summary -->
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-md);">
+                            <div class="panel stat-box" style="padding: var(--space-lg);">
+                                <div class="stat-label">TOTAL DETECTIONS</div>
+                                <div class="stat-value text-cyan" id="analytics-total" style="font-size: 2rem;">0</div>
+                            </div>
+                            <div class="panel stat-box" style="padding: var(--space-lg);">
+                                <div class="stat-label">PEOPLE DETECTED</div>
+                                <div class="stat-value text-magenta" id="analytics-people" style="font-size: 2rem;">0</div>
+                            </div>
+                            <div class="panel stat-box" style="padding: var(--space-lg);">
+                                <div class="stat-label">VEHICLES DETECTED</div>
+                                <div class="stat-value text-yellow" id="analytics-vehicles" style="font-size: 2rem;">0</div>
+                            </div>
+                            <div class="panel stat-box" style="padding: var(--space-lg);">
+                                <div class="stat-label">PEAK HOUR</div>
+                                <div class="stat-value text-green" id="analytics-peak" style="font-size: 2rem;">--</div>
+                            </div>
+                        </div>
+
+                        <!-- Charts Row -->
+                        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-md);">
+                            <!-- Daily Chart -->
+                            <div class="panel" style="padding: var(--space-md);">
+                                <div class="text-muted" style="margin-bottom: var(--space-sm); font-size: 0.75rem;">DAILY DETECTIONS</div>
+                                <div id="analytics-daily-chart" style="height: 200px; display: flex; align-items: flex-end; gap: 4px; background: rgba(0,0,0,0.3); padding: var(--space-sm); border-radius: 4px;">
+                                    <!-- Bars generated by JS -->
+                                </div>
+                                <div id="analytics-daily-labels" style="display: flex; justify-content: space-between; font-size: 0.6rem; color: var(--text-muted); margin-top: 4px;"></div>
+                            </div>
+
+                            <!-- Hourly Distribution -->
+                            <div class="panel" style="padding: var(--space-md);">
+                                <div class="text-muted" style="margin-bottom: var(--space-sm); font-size: 0.75rem;">HOURLY DISTRIBUTION</div>
+                                <div id="analytics-hourly-chart" style="height: 200px; display: flex; align-items: flex-end; gap: 2px; background: rgba(0,0,0,0.3); padding: var(--space-sm); border-radius: 4px;">
+                                    <!-- Bars generated by JS -->
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.6rem; color: var(--text-muted); margin-top: 4px;">
+                                    <span>00</span>
+                                    <span>06</span>
+                                    <span>12</span>
+                                    <span>18</span>
+                                    <span>24</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recent Targets -->
+                        <div class="panel" style="padding: var(--space-md);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+                                <span class="text-magenta" style="font-weight: bold;">RECENT TARGETS (TODAY)</span>
+                                <button class="btn btn-cyber" onclick="switchView('targets')" style="padding: 4px 8px; font-size: 0.7rem;">VIEW ALL →</button>
+                            </div>
+                            <div id="analytics-recent-targets" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: var(--space-sm); max-height: 200px; overflow-y: auto;">
+                                <!-- Recent targets populated by JS -->
+                            </div>
+                        </div>
+
+                        <!-- Channel Breakdown -->
+                        <div class="panel" style="padding: var(--space-md);">
+                            <div class="text-muted" style="margin-bottom: var(--space-sm); font-size: 0.75rem;">DETECTIONS BY CHANNEL</div>
+                            <div id="analytics-channels" style="display: flex; flex-wrap: wrap; gap: var(--space-md);">
+                                <!-- Channel stats populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Video List (when a date is selected) -->
                 <div class="view-content hidden" id="view-list">
                     <div class="video-list" id="video-list">
@@ -228,16 +497,32 @@
 
         <!-- Notifications Container -->
         <div class="notification-container" id="notifications"></div>
+
+        <!-- Controls Hint Button -->
+        <button class="controls-hint" onclick="tritiumInput.toggleHelp()" title="Show Controls (? or SELECT)">
+            <kbd>?</kbd> CONTROLS
+        </button>
+
+        <!-- Gamepad Connection Indicator -->
+        <div class="gamepad-indicator" id="gamepad-indicator">
+            <span class="icon">🎮</span>
+            <span class="text">Gamepad Connected</span>
+        </div>
     </div>
 
     <!-- Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
     <!-- Application Scripts -->
     <script src="/static/js/app.js"></script>
+    <script src="/static/js/input.js"></script>
     <script src="/static/js/grid.js"></script>
     <script src="/static/js/player.js"></script>
     <script src="/static/js/zone-editor.js"></script>
     <script src="/static/js/zones.js"></script>
+    <script src="/static/js/targets.js"></script>
+    <script src="/static/js/assets.js"></script>
+    <script src="/static/js/analytics.js"></script>
 </body>
 </html>

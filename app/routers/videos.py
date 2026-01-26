@@ -438,3 +438,251 @@ async def list_recent_videos(channel: Optional[int] = None, limit: int = 10):
     # Sort by timestamp (most recent first) and limit
     videos.sort(key=lambda v: v.timestamp or datetime.min, reverse=True)
     return videos[:limit]
+
+
+# =============================================================================
+# VIDEO ANNOTATION OVERLAY - Detection data for playback
+# =============================================================================
+
+class VideoDetection(BaseModel):
+    """Single detection in a video frame."""
+    frame: int
+    time_ms: int
+    class_name: str
+    confidence: float
+    bbox: list[int]  # [x1, y1, x2, y2]
+    track_id: Optional[int] = None
+    thumbnail_id: Optional[str] = None
+
+
+class VideoDetectionsResponse(BaseModel):
+    """All detections for a video file."""
+    video: str
+    channel: int
+    date: str
+    fps: float
+    frame_count: int
+    detections: list[VideoDetection]
+    detection_count: int
+
+
+@router.get("/detections/{channel}/{date}/{filename}", response_model=VideoDetectionsResponse)
+async def get_video_detections(channel: int, date: str, filename: str):
+    """Get all detections for a video file for annotation overlay.
+
+    Returns frame-by-frame detection data that the frontend can use
+    to render bounding boxes on top of video playback.
+
+    The frontend should:
+    1. Load this data when video starts playing
+    2. For each video frame, find detections where frame matches
+    3. Draw bounding boxes with class labels
+    4. Support toggling annotations on/off
+    """
+    import json
+    import cv2
+
+    # Validate inputs
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+        raise HTTPException(status_code=400, detail="Invalid date format")
+
+    if not filename.endswith(".mp4"):
+        raise HTTPException(status_code=400, detail="Invalid file type")
+
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    channel_dir = find_channel_dir(channel)
+    if not channel_dir:
+        raise HTTPException(status_code=404, detail="Channel not found")
+
+    date_dir = find_date_dir(channel_dir, date)
+    if not date_dir:
+        raise HTTPException(status_code=404, detail="Date not found")
+
+    video_path = date_dir / filename
+    if not video_path.exists():
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    # Get video info
+    cap = cv2.VideoCapture(str(video_path))
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
+
+    # Check for cached analysis results in multiple locations
+    detections = []
+
+    # Priority 1: Check dedicated detections cache
+    detections_cache_dir = settings.recordings_path / ".cache" / "detections"
+    detections_cache_path = detections_cache_dir / f"{channel}_{date}_{filename}.json"
+
+    if detections_cache_path.exists():
+        with open(detections_cache_path) as f:
+            cached = json.load(f)
+            detections = [VideoDetection(**d) for d in cached.get("detections", [])]
+
+    # Priority 2: Check AI analysis cache (includes frame_detections)
+    if not detections:
+        ai_cache_dir = settings.recordings_path / ".cache" / "ai"
+        # Filename format: fragment_XX_YYYYMMDDHHMMSS.json
+        video_stem = filename.replace(".mp4", "")
+        ai_cache_path = ai_cache_dir / f"{video_stem}.json"
+
+        if ai_cache_path.exists():
+            with open(ai_cache_path) as f:
+                ai_data = json.load(f)
+                frame_detections = ai_data.get("frame_detections", [])
+
+                for fd in frame_detections:
+                    frame_num = fd.get("frame_number", 0)
+                    for det in fd.get("detections", []):
+                        bbox = det.get("bbox", [0, 0, 0, 0])
+                        detections.append(VideoDetection(
+                            frame=frame_num,
+                            time_ms=int((frame_num / fps) * 1000),
+                            class_name=det.get("class_name", "unknown"),
+                            confidence=det.get("confidence", 0),
+                            bbox=bbox,
+                            track_id=det.get("track_id"),
+                            thumbnail_id=None,
+                        ))
+
+    # Priority 3: Check in-memory analysis tasks
+    if not detections:
+        from app.routers.ai import analysis_tasks
+        task_id = f"analysis_{channel}_{date}"
+
+        if task_id in analysis_tasks and analysis_tasks[task_id].get("status") == "complete":
+            result = analysis_tasks[task_id].get("result", {})
+
+            for event in result.get("events", []):
+                if "detections" in event:
+                    for det in event["detections"]:
+                        frame_num = det.get("frame", 0)
+                        detections.append(VideoDetection(
+                            frame=frame_num,
+                            time_ms=int((frame_num / fps) * 1000),
+                            class_name=det.get("class_name", "unknown"),
+                            confidence=det.get("confidence", 0),
+                            bbox=det.get("bbox", [0, 0, 0, 0]),
+                            track_id=det.get("track_id"),
+                            thumbnail_id=det.get("thumbnail_id"),
+                        ))
+
+    # Cache detections if found
+    if detections and not detections_cache_path.exists():
+        detections_cache_dir.mkdir(parents=True, exist_ok=True)
+        with open(detections_cache_path, "w") as f:
+            json.dump({
+                "video": filename,
+                "detections": [d.model_dump() for d in detections],
+            }, f)
+
+    return VideoDetectionsResponse(
+        video=filename,
+        channel=channel,
+        date=date,
+        fps=fps,
+        frame_count=frame_count,
+        detections=detections,
+        detection_count=len(detections),
+    )
+
+
+@router.post("/analyze/{channel}/{date}/{filename}")
+async def analyze_video_for_annotations(channel: int, date: str, filename: str):
+    """Run AI analysis on a single video and cache detections for annotation overlay.
+
+    This is useful when you want to review specific footage with bounding boxes
+    but the video hasn't been analyzed yet.
+
+    CRITICAL FOR SAFETY: Enables on-demand analysis for reviewing footage.
+    """
+    import json
+    import cv2
+    from loguru import logger
+
+    # Validate inputs
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+        raise HTTPException(status_code=400, detail="Invalid date format")
+
+    if not filename.endswith(".mp4"):
+        raise HTTPException(status_code=400, detail="Invalid file type")
+
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    channel_dir = find_channel_dir(channel)
+    if not channel_dir:
+        raise HTTPException(status_code=404, detail="Channel not found")
+
+    date_dir = find_date_dir(channel_dir, date)
+    if not date_dir:
+        raise HTTPException(status_code=404, detail="Date not found")
+
+    video_path = date_dir / filename
+    if not video_path.exists():
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    try:
+        from app.ai.analyzer import VideoAnalyzer
+
+        logger.info(f"Starting on-demand analysis for {filename}")
+
+        # Run analysis
+        analyzer = VideoAnalyzer()
+        analysis = analyzer.analyze_video(str(video_path))
+
+        # Get video FPS
+        cap = cv2.VideoCapture(str(video_path))
+        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+        cap.release()
+
+        # Convert frame_detections to VideoDetection format
+        detections = []
+        for fd in analysis.frame_detections:
+            frame_num = fd.frame_number
+            for det in fd.detections:
+                detections.append(VideoDetection(
+                    frame=frame_num,
+                    time_ms=int((frame_num / fps) * 1000),
+                    class_name=det.class_name,
+                    confidence=det.confidence,
+                    bbox=list(det.bbox),
+                    track_id=getattr(det, 'track_id', None),
+                    thumbnail_id=None,
+                ))
+
+        # Cache the detections
+        cache_dir = settings.recordings_path / ".cache" / "detections"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_path = cache_dir / f"{channel}_{date}_{filename}.json"
+
+        with open(cache_path, "w") as f:
+            json.dump({
+                "video": filename,
+                "detections": [d.model_dump() for d in detections],
+            }, f)
+
+        # Also save to AI cache with frame_detections
+        ai_cache_dir = settings.recordings_path / ".cache" / "ai"
+        ai_cache_dir.mkdir(parents=True, exist_ok=True)
+        video_stem = filename.replace(".mp4", "")
+        ai_cache_path = ai_cache_dir / f"{video_stem}.json"
+
+        with open(ai_cache_path, "w") as f:
+            json.dump(analysis.to_dict(include_detections=True), f)
+
+        logger.info(f"Analysis complete: {len(detections)} detections found")
+
+        return {
+            "status": "success",
+            "video": filename,
+            "detection_count": len(detections),
+            "message": f"Analyzed {filename}, found {len(detections)} detections",
+        }
+
+    except Exception as e:
+        logger.error(f"Analysis failed for {filename}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

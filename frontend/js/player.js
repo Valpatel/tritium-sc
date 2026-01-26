@@ -1,6 +1,9 @@
 /**
- * SENTINEL - Video Player
+ * TRITIUM - Video Player
  * Enhanced video playback with timeline and controls
+ *
+ * CRITICAL FEATURE: Annotation overlay for reviewing detections
+ * Allows toggling bounding boxes on/off during playback
  */
 
 // Player state
@@ -11,6 +14,10 @@ const playerState = {
     volume: 1,
     muted: false,
     playbackRate: 1,
+    // Annotation overlay state
+    showAnnotations: true,
+    detections: [],  // Frame-by-frame detection data
+    currentVideoInfo: null,  // {channel, date, filename, fps}
 };
 
 // DOM elements
@@ -51,11 +58,7 @@ function initPlayerEvents() {
         playerElements.durationDisplay.textContent = formatDuration(video.duration);
     });
 
-    video.addEventListener('timeupdate', () => {
-        playerState.currentTime = video.currentTime;
-        updateTimeDisplay();
-        updateProgress();
-    });
+    video.addEventListener('timeupdate', onVideoTimeUpdate);
 
     video.addEventListener('play', () => {
         playerState.playing = true;
@@ -156,9 +159,9 @@ function formatDuration(seconds) {
  * Play next video in list
  */
 function playNextVideo() {
-    const state = SENTINEL.state;
+    const state = TRITIUM.state;
     if (state.selectedVideo !== null && state.selectedVideo < state.videos.length - 1) {
-        SENTINEL.playVideo(state.selectedVideo + 1);
+        TRITIUM.playVideo(state.selectedVideo + 1);
     }
 }
 
@@ -166,9 +169,9 @@ function playNextVideo() {
  * Play previous video in list
  */
 function playPreviousVideo() {
-    const state = SENTINEL.state;
+    const state = TRITIUM.state;
     if (state.selectedVideo !== null && state.selectedVideo > 0) {
-        SENTINEL.playVideo(state.selectedVideo - 1);
+        TRITIUM.playVideo(state.selectedVideo - 1);
     }
 }
 
@@ -178,7 +181,7 @@ function playPreviousVideo() {
 function setPlaybackRate(rate) {
     playerState.playbackRate = rate;
     playerElements.video.playbackRate = rate;
-    SENTINEL.showNotification('SPEED', `${rate}x`, 'info');
+    TRITIUM.showNotification('SPEED', `${rate}x`, 'info');
 }
 
 /**
@@ -209,7 +212,7 @@ function toggleFullscreen() {
  */
 function handlePlayerKeyboard(e) {
     // Only handle if player view is active
-    if (SENTINEL.state.currentView !== 'player') return;
+    if (TRITIUM.state.currentView !== 'player') return;
 
     // Don't handle if typing in input
     if (e.target.tagName === 'INPUT') return;
@@ -257,6 +260,11 @@ function handlePlayerKeyboard(e) {
             toggleFullscreen();
             break;
 
+        case 'a':
+            // Toggle annotation overlay (detection bounding boxes)
+            toggleAnnotations();
+            break;
+
         case 'n':
             playNextVideo();
             break;
@@ -301,7 +309,7 @@ function adjustVolume(delta) {
     const video = playerElements.video;
     video.volume = Math.max(0, Math.min(1, video.volume + delta));
     playerState.volume = video.volume;
-    SENTINEL.showNotification('VOLUME', `${Math.round(video.volume * 100)}%`, 'info');
+    TRITIUM.showNotification('VOLUME', `${Math.round(video.volume * 100)}%`, 'info');
 }
 
 /**
@@ -311,7 +319,7 @@ function toggleMute() {
     const video = playerElements.video;
     video.muted = !video.muted;
     playerState.muted = video.muted;
-    SENTINEL.showNotification('AUDIO', video.muted ? 'MUTED' : 'UNMUTED', 'info');
+    TRITIUM.showNotification('AUDIO', video.muted ? 'MUTED' : 'UNMUTED', 'info');
 }
 
 /**
@@ -337,6 +345,317 @@ function clearTimelineEvents() {
     document.getElementById('timeline-events').innerHTML = '';
 }
 
+// =============================================================================
+// ANNOTATION OVERLAY - Detection bounding boxes on video
+// =============================================================================
+
+/**
+ * Load detection data for current video
+ */
+async function loadVideoDetections(channel, date, filename) {
+    try {
+        const response = await fetch(`/api/videos/detections/${channel}/${date}/${filename}`);
+        if (!response.ok) {
+            console.log('[PLAYER] No detections available for this video');
+            playerState.detections = [];
+            updateAnnotationButton(false, true);  // No detections, show analyze option
+            return;
+        }
+
+        const data = await response.json();
+        playerState.detections = data.detections || [];
+        playerState.currentVideoInfo = {
+            channel,
+            date,
+            filename,
+            fps: data.fps || 30,
+        };
+
+        console.log(`[PLAYER] Loaded ${playerState.detections.length} detections for annotation overlay`);
+
+        // Update button state based on detection availability
+        if (playerState.detections.length === 0) {
+            updateAnnotationButton(false, true);  // No detections, show analyze option
+        } else {
+            updateAnnotationButton(true, false);  // Has detections
+        }
+
+        // Mark detection points on timeline
+        updateTimelineWithDetections();
+
+    } catch (e) {
+        console.log('[PLAYER] Could not load detections:', e.message);
+        playerState.detections = [];
+        updateAnnotationButton(false, true);
+    }
+}
+
+/**
+ * Update annotation button state
+ */
+function updateAnnotationButton(hasDetections, showAnalyzeOption) {
+    const btn = document.getElementById('btn-toggle-annotations');
+    if (!btn) return;
+
+    if (hasDetections) {
+        btn.textContent = '◻ DETECTIONS';
+        btn.onclick = toggleAnnotations;
+        btn.classList.add('active');
+        btn.title = 'Toggle detection boxes (A)';
+    } else if (showAnalyzeOption) {
+        btn.textContent = '⟳ ANALYZE';
+        btn.onclick = analyzeCurrentVideo;
+        btn.classList.remove('active');
+        btn.title = 'Run AI analysis on this video';
+    }
+}
+
+/**
+ * Trigger on-demand analysis for current video
+ */
+async function analyzeCurrentVideo() {
+    if (!playerState.currentVideoInfo) {
+        const state = TRITIUM.state;
+        if (!state.selectedChannel || !state.selectedDate || !state.videos[state.selectedVideo]) {
+            TRITIUM.showNotification('ERROR', 'No video selected', 'error');
+            return;
+        }
+        playerState.currentVideoInfo = {
+            channel: state.selectedChannel,
+            date: state.selectedDate,
+            filename: state.videos[state.selectedVideo].filename,
+        };
+    }
+
+    const { channel, date, filename } = playerState.currentVideoInfo;
+
+    TRITIUM.showNotification('ANALYZING', 'Running AI detection...', 'info');
+
+    const btn = document.getElementById('btn-toggle-annotations');
+    if (btn) {
+        btn.textContent = '⏳ ANALYZING...';
+        btn.disabled = true;
+    }
+
+    try {
+        const response = await fetch(`/api/videos/analyze/${channel}/${date}/${filename}`, {
+            method: 'POST',
+        });
+
+        if (!response.ok) {
+            throw new Error('Analysis failed');
+        }
+
+        const result = await response.json();
+        TRITIUM.showNotification('COMPLETE', `Found ${result.detection_count} detections`, 'success');
+
+        // Reload detections
+        await loadVideoDetections(channel, date, filename);
+
+    } catch (e) {
+        TRITIUM.showNotification('ERROR', 'Analysis failed: ' + e.message, 'error');
+        updateAnnotationButton(false, true);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+        }
+    }
+}
+
+/**
+ * Update timeline with detection markers
+ */
+function updateTimelineWithDetections() {
+    clearTimelineEvents();
+
+    if (!playerState.detections.length || !playerState.duration) return;
+
+    // Group detections by approximate time (every 5 seconds)
+    const groups = {};
+    for (const det of playerState.detections) {
+        const timeKey = Math.floor(det.time_ms / 5000) * 5;
+        if (!groups[timeKey]) {
+            groups[timeKey] = { person: 0, vehicle: 0 };
+        }
+        if (det.class_name === 'person') {
+            groups[timeKey].person++;
+        } else if (['car', 'truck', 'bus', 'motorcycle'].includes(det.class_name)) {
+            groups[timeKey].vehicle++;
+        }
+    }
+
+    // Add markers for each group
+    for (const [timeKey, counts] of Object.entries(groups)) {
+        const timeSec = parseInt(timeKey);
+        const type = counts.person > 0 ? 'person' : 'vehicle';
+        addTimelineEvent(timeSec, type);
+    }
+}
+
+/**
+ * Get detections for current frame
+ */
+function getCurrentFrameDetections() {
+    if (!playerState.detections.length || !playerState.currentVideoInfo) {
+        return [];
+    }
+
+    const currentTimeMs = playerState.currentTime * 1000;
+    const fps = playerState.currentVideoInfo.fps || 30;
+    const frameTolerance = 1000 / fps;  // One frame worth of time
+
+    return playerState.detections.filter(det => {
+        return Math.abs(det.time_ms - currentTimeMs) < frameTolerance * 2;
+    });
+}
+
+/**
+ * Render annotation overlay on video
+ */
+function renderAnnotationOverlay() {
+    if (!playerState.showAnnotations) {
+        hideAnnotationOverlay();
+        return;
+    }
+
+    const detections = getCurrentFrameDetections();
+    let overlay = document.getElementById('annotation-overlay');
+
+    // Create overlay canvas if it doesn't exist
+    if (!overlay) {
+        overlay = createAnnotationOverlay();
+    }
+
+    if (!overlay) return;
+
+    const video = playerElements.video;
+    const ctx = overlay.getContext('2d');
+
+    // Clear previous frame
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+    if (detections.length === 0) return;
+
+    // Calculate scale factors
+    const scaleX = overlay.width / video.videoWidth;
+    const scaleY = overlay.height / video.videoHeight;
+
+    // Draw each detection
+    for (const det of detections) {
+        const [x1, y1, x2, y2] = det.bbox;
+        const x = x1 * scaleX;
+        const y = y1 * scaleY;
+        const w = (x2 - x1) * scaleX;
+        const h = (y2 - y1) * scaleY;
+
+        // Color based on class
+        const color = det.class_name === 'person' ? '#ff2a6d' : '#fcee0a';
+
+        // Draw bounding box
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, w, h);
+
+        // Draw label background
+        const label = `${det.class_name} ${Math.round(det.confidence * 100)}%`;
+        ctx.font = '12px JetBrains Mono, monospace';
+        const textWidth = ctx.measureText(label).width;
+
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y - 18, textWidth + 8, 18);
+
+        // Draw label text
+        ctx.fillStyle = '#000';
+        ctx.fillText(label, x + 4, y - 5);
+
+        // Draw track ID if available
+        if (det.track_id) {
+            ctx.fillStyle = color;
+            ctx.font = '10px JetBrains Mono, monospace';
+            ctx.fillText(`ID:${det.track_id}`, x + 2, y + h - 4);
+        }
+    }
+}
+
+/**
+ * Create the annotation overlay canvas
+ */
+function createAnnotationOverlay() {
+    const video = playerElements.video;
+    if (!video) return null;
+
+    const wrapper = video.closest('.player-wrapper');
+    if (!wrapper) return null;
+
+    // Create canvas
+    const canvas = document.createElement('canvas');
+    canvas.id = 'annotation-overlay';
+    canvas.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 10;
+    `;
+
+    // Match video dimensions
+    canvas.width = video.videoWidth || 1920;
+    canvas.height = video.videoHeight || 1080;
+
+    wrapper.style.position = 'relative';
+    wrapper.appendChild(canvas);
+
+    return canvas;
+}
+
+/**
+ * Hide/remove annotation overlay
+ */
+function hideAnnotationOverlay() {
+    const overlay = document.getElementById('annotation-overlay');
+    if (overlay) {
+        const ctx = overlay.getContext('2d');
+        ctx.clearRect(0, 0, overlay.width, overlay.height);
+    }
+}
+
+/**
+ * Toggle annotation visibility
+ */
+function toggleAnnotations() {
+    playerState.showAnnotations = !playerState.showAnnotations;
+
+    if (playerState.showAnnotations) {
+        renderAnnotationOverlay();
+        TRITIUM.showNotification('ANNOTATIONS', 'Detections visible', 'info');
+    } else {
+        hideAnnotationOverlay();
+        TRITIUM.showNotification('ANNOTATIONS', 'Detections hidden', 'info');
+    }
+
+    // Update toggle button state
+    const btn = document.getElementById('btn-toggle-annotations');
+    if (btn) {
+        btn.classList.toggle('active', playerState.showAnnotations);
+    }
+}
+
+/**
+ * Update annotation overlay on video time update
+ */
+function onVideoTimeUpdate() {
+    playerState.currentTime = playerElements.video.currentTime;
+    updateTimeDisplay();
+    updateProgress();
+
+    // Render annotations for current frame
+    if (playerState.showAnnotations && playerState.detections.length > 0) {
+        renderAnnotationOverlay();
+    }
+}
+
 // Export functions
 window.togglePlay = togglePlay;
 window.seekTo = seekTo;
@@ -346,3 +665,11 @@ window.setPlaybackRate = setPlaybackRate;
 window.toggleFullscreen = toggleFullscreen;
 window.addTimelineEvent = addTimelineEvent;
 window.clearTimelineEvents = clearTimelineEvents;
+window.skip = skip;
+window.adjustVolume = adjustVolume;
+window.toggleMute = toggleMute;
+// Annotation overlay exports
+window.loadVideoDetections = loadVideoDetections;
+window.toggleAnnotations = toggleAnnotations;
+window.renderAnnotationOverlay = renderAnnotationOverlay;
+window.analyzeCurrentVideo = analyzeCurrentVideo;

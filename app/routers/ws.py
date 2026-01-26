@@ -148,3 +148,36 @@ async def broadcast_camera_status(camera_id: int, status: str):
             "timestamp": datetime.utcnow().isoformat(),
         }
     )
+
+
+async def broadcast_asset_update(asset_data: dict):
+    """Broadcast asset status/position update."""
+    await manager.broadcast(
+        {
+            "type": "asset_update",
+            "data": asset_data,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+    )
+
+
+async def broadcast_task_update(task_data: dict):
+    """Broadcast task status update."""
+    await manager.broadcast(
+        {
+            "type": "task_update",
+            "data": task_data,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+    )
+
+
+async def broadcast_detection(detection_data: dict):
+    """Broadcast new detection (person/vehicle)."""
+    await manager.broadcast(
+        {
+            "type": "detection",
+            "data": detection_data,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+    )

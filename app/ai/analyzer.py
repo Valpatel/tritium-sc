@@ -84,8 +84,15 @@ class VideoAnalysis:
     # Key frames
     key_frames: list[int] = field(default_factory=list)
 
-    def to_dict(self) -> dict:
-        return {
+    def to_dict(self, include_detections: bool = True) -> dict:
+        """Convert to dictionary for caching.
+
+        Args:
+            include_detections: If True, include frame-by-frame detections.
+                                This is essential for annotation overlay but
+                                increases file size significantly.
+        """
+        result = {
             "video_path": self.video_path,
             "duration": self.duration,
             "fps": self.fps,
@@ -102,6 +109,32 @@ class VideoAnalysis:
             "key_frames": self.key_frames,
             "zone_events_triggered": self.zone_events_triggered,
         }
+
+        # Include frame-level detections for annotation overlay
+        # CRITICAL FOR SAFETY: Allows reviewing footage with bounding boxes
+        if include_detections and self.frame_detections:
+            result["frame_detections"] = [
+                {
+                    "frame_number": int(fd.frame_number),
+                    "timestamp": float(fd.timestamp) if fd.timestamp else 0.0,
+                    "detections": [
+                        {
+                            "class_name": str(det.class_name),
+                            "confidence": float(det.confidence),
+                            "bbox": [int(x) for x in det.bbox],
+                            "center": [int(x) for x in det.center],
+                            "area": int(det.area),
+                            "track_id": int(getattr(det, 'track_id', 0)) if getattr(det, 'track_id', None) is not None else None,
+                        }
+                        for det in fd.detections
+                    ],
+                    "people_count": int(fd.people_count),
+                    "vehicle_count": int(fd.vehicle_count),
+                }
+                for fd in self.frame_detections
+            ]
+
+        return result
 
 
 class VideoAnalyzer:

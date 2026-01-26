@@ -230,12 +230,12 @@ async function loadZoneEvents(zoneId) {
  */
 function startZoneDrawing() {
     if (!selectedCameraForZones) {
-        showNotification('Select a camera first', 'warning');
+        showNotification('WARNING', 'Select a camera first', 'warning');
         return;
     }
 
     if (!zoneEditor) {
-        showNotification('Zone editor not initialized', 'error');
+        showNotification('ERROR', 'Zone editor not initialized', 'error');
         return;
     }
 
@@ -259,32 +259,85 @@ async function initZoneEditorForCamera(cameraId) {
 
     // Try to load a preview image
     try {
-        // Get most recent video for this channel
-        const response = await fetch(`/api/videos?channel=${cameraId}&limit=1`);
-        if (response.ok) {
-            const videos = await response.json();
-            if (videos.length > 0) {
-                // Use video thumbnail as background
-                const thumbnailUrl = `/api/videos/thumbnail?path=${encodeURIComponent(videos[0].path)}`;
-                img.src = thumbnailUrl;
-                img.style.display = 'block';
-                img.onload = () => {
-                    // Initialize zone editor once image loads
-                    if (zoneEditor) {
-                        zoneEditor.destroy();
+        // Get most recent date for this channel
+        const datesResponse = await fetch(`/api/videos/channels/${cameraId}/dates`);
+        if (datesResponse.ok) {
+            const dates = await datesResponse.json();
+            if (dates.length > 0) {
+                const mostRecentDate = dates[0].date;
+                // Get videos for that date
+                const videosResponse = await fetch(`/api/videos/channels/${cameraId}/dates/${mostRecentDate}`);
+                if (videosResponse.ok) {
+                    const videos = await videosResponse.json();
+                    if (videos.length > 0) {
+                        // Use video thumbnail as background
+                        const thumbnailUrl = `/api/videos/thumbnail/${cameraId}/${mostRecentDate}/${videos[0].filename}`;
+                        img.src = thumbnailUrl;
+                        img.style.display = 'block';
+                        img.onload = () => {
+                            // Initialize zone editor once image loads
+                            if (zoneEditor) {
+                                zoneEditor.destroy();
+                            }
+                            zoneEditor = new ZoneEditor('zone-editor-container', cameraId);
+                            window.zoneEditor = zoneEditor;
+                        };
+                        img.onerror = () => {
+                            // Still initialize editor with a placeholder
+                            console.warn('Could not load thumbnail, using placeholder');
+                            img.style.display = 'none';
+                            initZoneEditorWithPlaceholder(cameraId);
+                        };
+                        return;
                     }
-                    zoneEditor = new ZoneEditor('zone-editor-container', cameraId);
-                };
+                }
             }
         }
+        // No videos found, init with placeholder
+        initZoneEditorWithPlaceholder(cameraId);
     } catch (e) {
         console.error('Failed to load camera preview:', e);
+        initZoneEditorWithPlaceholder(cameraId);
     }
 
     // Update zone list for this camera
     updateZoneListPanel();
 
     // Reset draw button
+    document.getElementById('btn-draw-zone').textContent = '+ DRAW';
+    document.getElementById('btn-draw-zone').disabled = false;
+}
+
+/**
+ * Initialize zone editor with a placeholder background
+ */
+function initZoneEditorWithPlaceholder(cameraId) {
+    const container = document.getElementById('zone-editor-container');
+    const img = document.getElementById('zone-background-image');
+
+    // Show a placeholder grid pattern
+    img.src = 'data:image/svg+xml,' + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+            <defs>
+                <pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse">
+                    <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#1a1a2e" stroke-width="1"/>
+                </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="#0a0a0f"/>
+            <rect width="100%" height="100%" fill="url(#grid)"/>
+            <text x="960" y="540" text-anchor="middle" fill="#00f0ff" font-family="monospace" font-size="24">CH${cameraId} - ZONE EDITOR</text>
+            <text x="960" y="580" text-anchor="middle" fill="#555" font-family="monospace" font-size="14">No preview available - draw zones on grid</text>
+        </svg>
+    `);
+    img.style.display = 'block';
+
+    if (zoneEditor) {
+        zoneEditor.destroy();
+    }
+    zoneEditor = new ZoneEditor('zone-editor-container', cameraId);
+    window.zoneEditor = zoneEditor;
+
+    updateZoneListPanel();
     document.getElementById('btn-draw-zone').textContent = '+ DRAW';
     document.getElementById('btn-draw-zone').disabled = false;
 }
@@ -302,21 +355,7 @@ function getZoneTypeColor(zoneType) {
     return colors[zoneType] || 'var(--cyan)';
 }
 
-/**
- * Hook into app.js view switching
- */
-const originalSwitchView = window.switchView;
-window.switchView = function(viewName) {
-    // Call original if it exists
-    if (originalSwitchView) {
-        originalSwitchView(viewName);
-    }
-
-    // Initialize zones view
-    if (viewName === 'zones') {
-        initZonesView();
-    }
-};
+// Note: View switching is handled by app.js which calls initZonesView() and initZoneEditorForCamera()
 
 /**
  * Hook into camera selection for zones

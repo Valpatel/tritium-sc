@@ -308,9 +308,23 @@ async def run_analysis(
                         if not save_path.exists():
                             cv2.imwrite(str(save_path), crop)
 
-                            # Add to vector store (without embedding for now)
+                            # Generate CLIP embedding for visual re-identification
+                            # CRITICAL FOR SAFETY: This enables finding the same person
+                            # across multiple appearances (e.g., stalker detection)
+                            embedding = [0.0] * 512  # Default placeholder
+                            try:
+                                from app.ai.embeddings import EmbeddingGenerator
+                                # Use singleton pattern to avoid reloading model
+                                if not hasattr(generate_embedding, '_generator'):
+                                    generate_embedding._generator = EmbeddingGenerator()
+                                embedding = generate_embedding._generator.embed_image(crop)
+                                logger.debug(f"Generated embedding for {thumb_id}")
+                            except Exception as emb_err:
+                                logger.warning(f"Could not generate embedding: {emb_err}")
+
+                            # Add to vector store with real embedding
                             vector_store.add(
-                                embedding=[0.0] * 512,  # Placeholder
+                                embedding=embedding,
                                 metadata={
                                     "thumbnail_id": thumb_id,
                                     "target_type": class_name,

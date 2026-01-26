@@ -110,6 +110,115 @@ function handleWebSocketMessage(message) {
         case 'camera_status':
             updateCameraStatus(message.camera_id, message.status);
             break;
+        case 'asset_update':
+            handleAssetUpdate(message.data);
+            break;
+        case 'task_update':
+            handleTaskUpdate(message.data);
+            break;
+        case 'detection':
+            handleNewDetection(message.data);
+            break;
+    }
+}
+
+/**
+ * Handle real-time asset updates
+ */
+function handleAssetUpdate(data) {
+    console.log('[ASSET]', data);
+    // Update assets view if open
+    if (state.currentView === 'assets' && typeof loadAssets !== 'undefined') {
+        loadAssets();
+    }
+    // Update 3D view markers
+    if (state.currentView === '3d' && typeof loadAssetsIn3D !== 'undefined') {
+        loadAssetsIn3D();
+    }
+}
+
+/**
+ * Handle task status updates
+ */
+function handleTaskUpdate(data) {
+    console.log('[TASK]', data);
+    const status = data.status || 'unknown';
+    const taskType = data.task_type || 'TASK';
+    const assetId = data.asset_id || 'UNIT';
+
+    if (status === 'completed') {
+        showNotification('TASK COMPLETE', `${assetId}: ${taskType} finished`, 'success');
+        playSound('complete');
+    } else if (status === 'failed') {
+        showNotification('TASK FAILED', `${assetId}: ${taskType} failed`, 'error');
+        playSound('alert');
+    } else if (status === 'active') {
+        showNotification('TASK STARTED', `${assetId}: ${taskType} initiated`, 'info');
+    }
+
+    // Refresh assets if view is open
+    if (state.currentView === 'assets' && typeof loadAssets !== 'undefined') {
+        loadAssets();
+    }
+}
+
+/**
+ * Handle new detection (person/vehicle)
+ */
+function handleNewDetection(data) {
+    console.log('[DETECTION]', data);
+    const type = data.target_type || 'object';
+    const channel = data.channel || '?';
+    const label = data.label || '';
+
+    // Only notify for labeled/high-confidence detections
+    if (data.confidence > 0.8 || label) {
+        const displayLabel = label || type.toUpperCase();
+        showNotification('DETECTION', `CH${channel}: ${displayLabel}`, 'info');
+    }
+
+    // Add to event list
+    addEventToList({
+        timestamp: data.timestamp || new Date().toISOString(),
+        type: type,
+    });
+
+    // Update 3D view if open
+    if (state.currentView === '3d' && typeof loadDetectionsIn3D !== 'undefined') {
+        loadDetectionsIn3D();
+    }
+}
+
+/**
+ * Play notification sounds
+ */
+function playSound(type) {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        if (type === 'alert') {
+            oscillator.frequency.value = 880;
+            oscillator.type = 'square';
+            gainNode.gain.value = 0.1;
+        } else if (type === 'complete') {
+            oscillator.frequency.value = 660;
+            oscillator.type = 'sine';
+            gainNode.gain.value = 0.08;
+        } else {
+            oscillator.frequency.value = 440;
+            oscillator.type = 'sine';
+            gainNode.gain.value = 0.05;
+        }
+
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.15);
+    } catch (e) {
+        // Audio not available
     }
 }
 
@@ -202,6 +311,11 @@ async function loadChannels() {
         // Update NVR status display
         updateNvrStatus(discoveryStatus);
 
+        // Reload 3D view if initialized
+        if (typeof reloadThreeJS !== 'undefined') {
+            reloadThreeJS();
+        }
+
     } catch (error) {
         showNotification('ERROR', 'Failed to load channels', 'error');
         showEmptyState('Failed to connect to API');
@@ -222,6 +336,12 @@ function updateNvrStatus(status) {
 }
 
 async function scanNvr() {
+    const scanBtn = document.querySelector('[onclick="scanNvr()"]');
+    if (scanBtn) {
+        scanBtn.disabled = true;
+        scanBtn.innerHTML = '<span class="spinner"></span> SCAN';
+    }
+
     showNotification('SCANNING', 'Discovering cameras from NVR...', 'info');
     try {
         const result = await apiPost('/discovery/register', {});
@@ -229,6 +349,11 @@ async function scanNvr() {
         await loadChannels();
     } catch (error) {
         showNotification('ERROR', 'NVR scan failed', 'error');
+    } finally {
+        if (scanBtn) {
+            scanBtn.disabled = false;
+            scanBtn.textContent = 'SCAN';
+        }
     }
 }
 
@@ -319,21 +444,26 @@ function renderVideoList() {
         return;
     }
 
-    elements.videoList.innerHTML = state.videos.map((video, index) => `
-        <div class="video-list-item ${state.selectedVideo === index ? 'active' : ''}"
-             onclick="playVideo(${index})">
-            <div class="video-thumbnail">
-                ${video.timestamp ? formatTime(video.timestamp) : '--:--'}
-            </div>
-            <div class="video-info">
-                <div class="video-filename">${video.filename}</div>
-                <div class="video-meta">
-                    <span>${formatFileSize(video.size)}</span>
-                    <span>${video.timestamp ? new Date(video.timestamp).toLocaleTimeString() : ''}</span>
+    elements.videoList.innerHTML = state.videos.map((video, index) => {
+        const thumbnailUrl = `/api/videos/thumbnail/${state.selectedChannel}/${state.selectedDate}/${video.filename}`;
+        return `
+            <div class="video-list-item ${state.selectedVideo === index ? 'active' : ''}"
+                 onclick="playVideo(${index})">
+                <div class="video-thumbnail">
+                    <img src="${thumbnailUrl}" alt="${video.filename}" loading="lazy"
+                         onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 160 90%22><rect fill=%22%231a1a2e%22 width=%22160%22 height=%2290%22/><text x=%2280%22 y=%2245%22 text-anchor=%22middle%22 fill=%22%2300f0ff%22 font-size=%2212%22>📹</text></svg>';">
+                    <span class="video-time-overlay">${video.timestamp ? formatTime(video.timestamp) : '--:--'}</span>
+                </div>
+                <div class="video-info">
+                    <div class="video-filename">${video.filename}</div>
+                    <div class="video-meta">
+                        <span>${formatFileSize(video.size)}</span>
+                        <span>${video.timestamp ? new Date(video.timestamp).toLocaleTimeString() : ''}</span>
+                    </div>
                 </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function updateDayTimeline() {
@@ -383,6 +513,12 @@ function playVideo(index) {
 
     switchView('player');
     showNotification('PLAYING', video.filename, 'info');
+
+    // Load detection data for annotation overlay
+    // CRITICAL: Enables reviewing footage with bounding boxes visible
+    if (typeof loadVideoDetections === 'function') {
+        loadVideoDetections(state.selectedChannel, state.selectedDate, video.filename);
+    }
 }
 
 // View Management
@@ -416,6 +552,26 @@ function switchView(view) {
         if (state.selectedChannel && typeof initZoneEditorForCamera !== 'undefined') {
             initZoneEditorForCamera(state.selectedChannel);
         }
+    }
+
+    // Initialize targets view if needed
+    if (view === 'targets' && typeof initTargetsView !== 'undefined') {
+        initTargetsView();
+    }
+
+    // Initialize assets view if needed
+    if (view === 'assets' && typeof initAssetsView !== 'undefined') {
+        initAssetsView();
+    }
+
+    // Initialize analytics view if needed
+    if (view === 'analytics' && typeof initAnalyticsView !== 'undefined') {
+        initAnalyticsView();
+    }
+
+    // Notify input manager of view change
+    if (typeof tritiumInput !== 'undefined' && tritiumInput.setView) {
+        tritiumInput.setView(view);
     }
 }
 
@@ -498,7 +654,7 @@ function executeCommand(command) {
 function initKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
         // Don't trigger if typing in input
-        if (e.target.tagName === 'INPUT') return;
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
         switch (e.key) {
             case '1':
@@ -525,14 +681,124 @@ function initKeyboardShortcuts() {
             case 'z':
                 switchView('zones');
                 break;
+            case 't':
+                switchView('targets');
+                break;
+            case 'a':
+                switchView('assets');
+                break;
+            case 'n':
+                switchView('analytics');
+                break;
             case '/':
                 e.preventDefault();
                 elements.commandInput.focus();
                 break;
             case 'Escape':
                 elements.commandInput.blur();
+                closeAllModals();
+                break;
+            case '?':
+                e.preventDefault();
+                showKeyboardHelp();
                 break;
         }
+    });
+}
+
+/**
+ * Close all open modals
+ */
+function closeAllModals() {
+    const modals = document.querySelectorAll('.modal-overlay');
+    modals.forEach(m => m.remove());
+
+    // Close target detail
+    if (typeof closeTargetDetail === 'function') closeTargetDetail();
+
+    // Close detection context menu
+    if (typeof closeDetectionContextMenu === 'function') closeDetectionContextMenu();
+}
+
+/**
+ * Show keyboard shortcuts help
+ */
+function showKeyboardHelp() {
+    // Remove existing
+    const existing = document.getElementById('keyboard-help-modal');
+    if (existing) {
+        existing.remove();
+        return;
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'keyboard-help-modal';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content neon-box" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 class="text-cyan">KEYBOARD SHORTCUTS</h3>
+                <button onclick="document.getElementById('keyboard-help-modal').remove()" class="btn btn-sm">&times;</button>
+            </div>
+            <div class="modal-body" style="display: grid; gap: 8px;">
+                <div class="shortcut-section">
+                    <div class="text-muted" style="margin-bottom: 4px; font-size: 0.7rem;">VIEWS</div>
+                    <div class="shortcut-row"><kbd>G</kbd> Grid View</div>
+                    <div class="shortcut-row"><kbd>P</kbd> Player View</div>
+                    <div class="shortcut-row"><kbd>D</kbd> 3D Property View</div>
+                    <div class="shortcut-row"><kbd>Z</kbd> Zones View</div>
+                    <div class="shortcut-row"><kbd>T</kbd> Targets Gallery</div>
+                    <div class="shortcut-row"><kbd>A</kbd> Assets Control</div>
+                    <div class="shortcut-row"><kbd>N</kbd> Analytics</div>
+                </div>
+                <div class="shortcut-section" style="margin-top: 8px;">
+                    <div class="text-muted" style="margin-bottom: 4px; font-size: 0.7rem;">GRID SIZE</div>
+                    <div class="shortcut-row"><kbd>1</kbd> Single Camera</div>
+                    <div class="shortcut-row"><kbd>2</kbd> 2x2 Grid</div>
+                    <div class="shortcut-row"><kbd>3</kbd> 3x3 Grid</div>
+                </div>
+                <div class="shortcut-section" style="margin-top: 8px;">
+                    <div class="text-muted" style="margin-bottom: 4px; font-size: 0.7rem;">OTHER</div>
+                    <div class="shortcut-row"><kbd>/</kbd> Focus Search</div>
+                    <div class="shortcut-row"><kbd>ESC</kbd> Close/Cancel</div>
+                    <div class="shortcut-row"><kbd>?</kbd> This Help</div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Add styles
+    const style = document.createElement('style');
+    style.id = 'keyboard-help-style';
+    style.textContent = `
+        .shortcut-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 4px 0;
+        }
+        .shortcut-row kbd {
+            background: rgba(0, 240, 255, 0.15);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--cyan);
+            min-width: 30px;
+            text-align: center;
+        }
+    `;
+
+    if (!document.getElementById('keyboard-help-style')) {
+        document.head.appendChild(style);
+    }
+
+    document.body.appendChild(modal);
+
+    // Close on click outside
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
     });
 }
 
@@ -626,3 +892,26 @@ window.TRITIUM = {
     switchView,
     showNotification,
 };
+
+// Also expose showNotification globally for easy access
+window.showNotification = showNotification;
+
+// Expose switchView globally for input system
+window.switchView = switchView;
+
+/**
+ * Update gamepad indicator visibility
+ */
+function updateGamepadIndicator(connected) {
+    const indicator = document.getElementById('gamepad-indicator');
+    if (indicator) {
+        indicator.classList.toggle('connected', connected);
+        indicator.classList.toggle('disconnected', !connected);
+        const text = indicator.querySelector('.text');
+        if (text) {
+            text.textContent = connected ? 'Gamepad Connected' : 'Gamepad Disconnected';
+        }
+    }
+}
+
+window.updateGamepadIndicator = updateGamepadIndicator;

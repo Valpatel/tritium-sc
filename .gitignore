@@ -121,3 +121,9 @@ yarn.lock
 scratchpad/
 test_videos/
 sample_data/
+
+# ==================
+# SENSITIVE DOCS
+# ==================
+# Real-world safety mission docs - never commit
+sensitive-docs/

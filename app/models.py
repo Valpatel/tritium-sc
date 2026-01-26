@@ -115,3 +115,95 @@ class Setting(Base):
 
     key: Mapped[str] = mapped_column(String(100), primary_key=True)
     value: Mapped[str] = mapped_column(Text)
+
+
+class Asset(Base):
+    """Autonomous operational assets (ground/aerial units).
+
+    Assets are controllable units that can be tasked with various operations
+    like patrol, tracking, engagement, etc.
+    """
+
+    __tablename__ = "assets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    asset_id: Mapped[str] = mapped_column(String(50), unique=True, index=True)  # e.g., "UNIT-01"
+    name: Mapped[str] = mapped_column(String(100))  # e.g., "Perimeter Guardian Alpha"
+    asset_type: Mapped[str] = mapped_column(String(50))  # ground, aerial, fixed
+    asset_class: Mapped[str] = mapped_column(String(50))  # patrol, interceptor, observation, transport
+    status: Mapped[str] = mapped_column(String(50), default="standby")  # standby, active, tasked, returning, maintenance, offline
+    battery_level: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # 0-100
+    ammo_level: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # 0-100 (for units with effectors)
+    position_x: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # Property-relative X
+    position_y: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # Property-relative Y
+    heading: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # 0-360 degrees
+    speed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # Current speed
+    home_x: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # Home/charging position
+    home_y: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    capabilities: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON: ["patrol", "track", "engage"]
+    connection_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # Control endpoint
+    camera_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # Onboard camera stream
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_heartbeat: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        default=datetime.utcnow, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+    # Relationships
+    tasks: Mapped[list["AssetTask"]] = relationship(back_populates="asset")
+    telemetry: Mapped[list["AssetTelemetry"]] = relationship(back_populates="asset")
+
+
+class AssetTask(Base):
+    """Tasks assigned to assets.
+
+    Task types:
+    - PATROL: Follow waypoints in loop
+    - TRACK: Follow a specific target
+    - ENGAGE: Move to and engage target
+    - LOITER: Hold position, observe
+    - RECALL: Return to home/base
+    - REARM: Return for resupply
+    - INVESTIGATE: Go to location, report
+    """
+
+    __tablename__ = "asset_tasks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    task_id: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id"), index=True)
+    task_type: Mapped[str] = mapped_column(String(50))  # patrol, track, engage, loiter, recall, rearm, investigate
+    priority: Mapped[int] = mapped_column(Integer, default=5)  # 1 (highest) - 10 (lowest)
+    status: Mapped[str] = mapped_column(String(50), default="pending")  # pending, active, completed, cancelled, failed
+    target_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # person, vehicle, zone
+    target_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # ID of target
+    waypoints_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON: [[x,y], [x,y], ...]
+    parameters_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Task-specific params
+    started_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    result: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Outcome description
+    created_at: Mapped[datetime] = mapped_column(
+        default=datetime.utcnow, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+    # Relationships
+    asset: Mapped["Asset"] = relationship(back_populates="tasks")
+
+
+class AssetTelemetry(Base):
+    """Asset telemetry/position history."""
+
+    __tablename__ = "asset_telemetry"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id"), index=True)
+    timestamp: Mapped[datetime] = mapped_column(index=True)
+    position_x: Mapped[float] = mapped_column(Float)
+    position_y: Mapped[float] = mapped_column(Float)
+    heading: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    speed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    battery_level: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    # Relationships
+    asset: Mapped["Asset"] = relationship(back_populates="telemetry")

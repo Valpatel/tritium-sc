@@ -659,8 +659,8 @@
 }
 
 .video-thumbnail {
-    width: 120px;
-    height: 68px;
+    width: 160px;
+    height: 90px;
     background: var(--cyber-gray);
     border: 1px solid rgba(0, 240, 255, 0.2);
     display: flex;
@@ -668,6 +668,27 @@
     justify-content: center;
     color: var(--cyber-light-gray);
     font-size: 0.625rem;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.video-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.video-time-overlay {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    background: rgba(10, 10, 15, 0.8);
+    color: var(--cyber-cyan);
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 2px;
+    font-family: var(--font-mono);
 }
 
 .video-info {
@@ -798,4 +819,353 @@
     gap: var(--space-sm);
     padding: var(--space-md);
     border-top: 1px solid rgba(0, 240, 255, 0.2);
+}
+
+/* ========================================
+   Loading Spinner
+   ======================================== */
+.spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(0, 240, 255, 0.3);
+    border-top-color: var(--cyber-cyan);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 4px;
+}
+
+.spinner-lg {
+    width: 24px;
+    height: 24px;
+    border-width: 3px;
+}
+
+/* Loading overlay */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(10, 10, 15, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+}
+
+.loading-text {
+    color: var(--cyber-cyan);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-top: var(--space-sm);
+}
+
+/* Button states */
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+button:disabled:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+/* Status badges */
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 0.65rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    border-radius: 2px;
+    letter-spacing: 1px;
+}
+
+.badge-success { background: var(--cyber-green); color: #000; }
+.badge-warning { background: var(--cyber-yellow); color: #000; }
+.badge-danger { background: var(--cyber-magenta); color: #fff; }
+.badge-info { background: var(--cyber-cyan); color: #000; }
+
+/* ========================================
+   Gamepad/Keyboard Focus System
+   ======================================== */
+
+/* Focus ring for gamepad/keyboard navigation */
+.gamepad-focus {
+    outline: 2px solid var(--cyber-cyan) !important;
+    outline-offset: 2px;
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.5), inset 0 0 10px rgba(0, 240, 255, 0.1) !important;
+    position: relative;
+    z-index: 10;
+}
+
+.gamepad-focus::after {
+    content: "";
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    right: -4px;
+    bottom: -4px;
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    pointer-events: none;
+    animation: focus-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes focus-pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.8; }
+}
+
+/* Focus styles for specific elements */
+.channel-item.gamepad-focus,
+.date-item.gamepad-focus,
+.video-list-item.gamepad-focus {
+    background: rgba(0, 240, 255, 0.15);
+    border-left-color: var(--cyber-cyan);
+}
+
+.video-cell.gamepad-focus {
+    border-color: var(--cyber-cyan);
+}
+
+.btn-cyber.gamepad-focus {
+    background: rgba(0, 240, 255, 0.2);
+    border-color: var(--cyber-cyan);
+    color: var(--cyber-cyan);
+}
+
+/* Target card focus */
+.target-card.gamepad-focus {
+    transform: scale(1.05);
+    border-color: var(--cyber-cyan);
+}
+
+/* Asset item focus */
+.asset-item.gamepad-focus {
+    background: rgba(0, 240, 255, 0.15);
+    border-color: var(--cyber-cyan);
+}
+
+/* Zone item focus */
+.zone-item.gamepad-focus {
+    background: rgba(0, 240, 255, 0.15);
+    border-left: 3px solid var(--cyber-cyan);
+}
+
+/* Task button focus */
+.task-btn.gamepad-focus {
+    background: rgba(0, 240, 255, 0.25);
+    transform: scale(1.05);
+}
+
+/* Stat box focus */
+.stat-box.gamepad-focus {
+    border-color: var(--cyber-cyan);
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+}
+
+/* ========================================
+   Controls Overlay
+   ======================================== */
+
+/* Controls hint button */
+.controls-hint {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 1000;
+    background: rgba(10, 10, 15, 0.8);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    color: var(--cyber-cyan);
+    padding: 6px 12px;
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.controls-hint:hover {
+    background: rgba(0, 240, 255, 0.1);
+    border-color: var(--cyber-cyan);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+}
+
+.controls-hint kbd {
+    background: rgba(0, 240, 255, 0.15);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 3px;
+    padding: 2px 5px;
+    font-size: 0.65rem;
+}
+
+/* Controls overlay modal */
+#controls-overlay {
+    backdrop-filter: blur(5px);
+}
+
+#controls-overlay .modal {
+    background: rgba(10, 10, 15, 0.95);
+    border: 1px solid var(--cyber-cyan);
+    box-shadow: 0 0 30px rgba(0, 240, 255, 0.2);
+}
+
+/* Control rows */
+.control-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.control-row kbd {
+    background: rgba(0, 240, 255, 0.15);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--cyber-cyan);
+    min-width: 35px;
+    text-align: center;
+}
+
+/* Gamepad button indicator */
+.gp-btn {
+    background: rgba(5, 255, 161, 0.15);
+    border: 1px solid rgba(5, 255, 161, 0.3);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--cyber-green);
+    min-width: 35px;
+    text-align: center;
+    display: inline-block;
+}
+
+.control-group {
+    margin-bottom: 12px;
+}
+
+/* Gamepad connection indicator */
+.gamepad-indicator {
+    position: fixed;
+    bottom: 60px;
+    right: 10px;
+    z-index: 900;
+    background: rgba(10, 10, 15, 0.9);
+    border: 1px solid var(--cyber-green);
+    padding: 6px 12px;
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    color: var(--cyber-green);
+    display: none;
+    align-items: center;
+    gap: 8px;
+}
+
+.gamepad-indicator.connected {
+    display: flex;
+    animation: slideIn 0.3s ease;
+}
+
+.gamepad-indicator .icon {
+    font-size: 1rem;
+}
+
+.gamepad-indicator.disconnected {
+    border-color: var(--cyber-magenta);
+    color: var(--cyber-magenta);
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* ========================================
+   Sidebar Collapse
+   ======================================== */
+
+.sidebar.collapsed {
+    width: 50px;
+    overflow: hidden;
+}
+
+.sidebar.collapsed .sidebar-section {
+    padding: 8px;
+}
+
+.sidebar.collapsed .section-title,
+.sidebar.collapsed .channel-name,
+.sidebar.collapsed .channel-meta,
+.sidebar.collapsed .date-item span:first-child,
+.sidebar.collapsed .date-count {
+    display: none;
+}
+
+.sidebar.collapsed .channel-item {
+    padding: 8px;
+    justify-content: center;
+}
+
+/* ========================================
+   Tree List (for sidebar zones, events)
+   ======================================== */
+
+.tree-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.8rem;
+}
+
+.tree-list li {
+    padding: 6px 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-left: 2px solid transparent;
+}
+
+.tree-list li:hover {
+    background: rgba(0, 240, 255, 0.05);
+}
+
+.tree-list li.active {
+    background: rgba(0, 240, 255, 0.1);
+    border-left-color: var(--cyber-cyan);
+}
+
+/* Status indicators */
+.status {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 2px;
+}
+
+.status-online {
+    color: var(--cyber-green);
+}
+
+.status-offline {
+    color: var(--cyber-magenta);
+}
+
+.status-warning {
+    color: var(--cyber-yellow);
 }
