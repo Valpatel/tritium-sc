@@ -109,13 +109,13 @@ TRITIUM-SC enables autonomous response through **Asset Tasking**—command and c
 ║                                                                          ║
 ║   ASSET TYPES                        TASK TYPES                          ║
 ║   ═══════════                        ══════════                          ║
-║   🚗 GROUND    Patrol vehicles       🔄 PATROL     Follow waypoints      ║
-║   🚁 AERIAL    Observation drones    🎯 TRACK      Follow target         ║
-║   📡 FIXED     Stationary sensors    ⚡ ENGAGE     Intercept target      ║
-║                                      📍 LOITER     Hold position         ║
+║   🚗 GROUND    Patrol vehicles       🔄 PATROL       Follow waypoints    ║
+║   🚁 AERIAL    Observation drones    🎯 TRACK        Follow target       ║
+║   📡 FIXED     Stationary sensors    ⚡ ENGAGE       Intercept target    ║
+║                                      📍 LOITER       Hold position loop  ║
 ║   ASSET CLASSES                      🔍 INVESTIGATE  Scout location      ║
-║   ═════════════                      🏠 RECALL     Return to base        ║
-║   • Patrol      (perimeter)          🔋 REARM      Resupply/recharge     ║
+║   ═════════════                      🏠 RECALL       Return to base      ║
+║   • Patrol      (perimeter)          🔋 REARM        Resupply/recharge   ║
 ║   • Interceptor (rapid response)                                         ║
 ║   • Observation (reconnaissance)     PRIORITY LEVELS                     ║
 ║   • Transport   (logistics)          ═══════════════                     ║
