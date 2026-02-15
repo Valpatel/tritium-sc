@@ -1169,3 +1169,355 @@ button:disabled:hover {
 .status-warning {
     color: var(--cyber-yellow);
 }
+
+/* ========================================
+   Amy AI Commander Dashboard
+   ======================================== */
+
+.amy-dashboard {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: var(--space-md);
+    gap: var(--space-md);
+    overflow: hidden;
+}
+
+.amy-top-row {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: var(--space-md);
+    min-height: 0;
+    flex: 1;
+}
+
+.amy-bottom-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-md);
+    min-height: 0;
+    flex: 1;
+}
+
+/* Panels */
+.amy-panel {
+    background: var(--cyber-dark);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.amy-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+    flex-shrink: 0;
+}
+
+.amy-panel-title {
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--cyber-cyan);
+    font-weight: 600;
+}
+
+/* Video Panel */
+.amy-video-container {
+    flex: 1;
+    background: var(--cyber-void);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.amy-video-feed {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.amy-no-feed {
+    text-align: center;
+    color: rgba(0, 240, 255, 0.3);
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+}
+
+.amy-no-feed-icon {
+    font-size: 3rem;
+    margin-bottom: var(--space-md);
+    opacity: 0.4;
+}
+
+.amy-no-feed-sub {
+    font-size: 0.65rem;
+    margin-top: var(--space-xs);
+    color: rgba(0, 240, 255, 0.2);
+}
+
+.amy-video-node {
+    font-size: 0.65rem;
+    color: var(--cyber-green);
+    letter-spacing: 1px;
+}
+
+/* Status Panel */
+.amy-status-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+}
+
+.amy-stat {
+    text-align: center;
+}
+
+.amy-stat-label {
+    font-size: 0.6rem;
+    color: var(--cyber-light-gray);
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+}
+
+.amy-stat-value {
+    font-size: 0.85rem;
+    color: var(--cyber-cyan);
+    font-weight: 600;
+}
+
+/* Mood color classes */
+.amy-mood-curious { color: var(--cyber-yellow); }
+.amy-mood-alert { color: var(--cyber-magenta); }
+.amy-mood-calm { color: var(--cyber-green); }
+.amy-mood-neutral { color: var(--cyber-cyan); }
+.amy-mood-engaged { color: #b388ff; }
+
+/* State badge */
+.amy-state-badge {
+    font-size: 0.6rem;
+    padding: 2px 8px;
+    border-radius: 2px;
+    letter-spacing: 1px;
+    font-weight: bold;
+    background: rgba(0, 240, 255, 0.15);
+    color: var(--cyber-cyan);
+}
+
+.amy-state-idle { background: rgba(5, 255, 161, 0.15); color: var(--cyber-green); }
+.amy-state-thinking { background: rgba(252, 238, 10, 0.15); color: var(--cyber-yellow); }
+.amy-state-speaking { background: rgba(179, 136, 255, 0.15); color: #b388ff; }
+.amy-state-listening { background: rgba(0, 240, 255, 0.15); color: var(--cyber-cyan); }
+.amy-state-acting { background: rgba(255, 42, 109, 0.15); color: var(--cyber-magenta); }
+.amy-state-offline { background: rgba(45, 45, 68, 0.5); color: var(--cyber-light-gray); }
+
+/* Nodes Section */
+.amy-nodes-section, .amy-commands-section {
+    padding: var(--space-sm) var(--space-md);
+    border-top: 1px solid rgba(0, 240, 255, 0.1);
+}
+
+.amy-section-label {
+    font-size: 0.6rem;
+    color: var(--cyber-light-gray);
+    letter-spacing: 2px;
+    margin-bottom: var(--space-sm);
+}
+
+.amy-nodes-list {
+    font-size: 0.75rem;
+}
+
+.amy-node-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 3px 0;
+}
+
+.amy-node-id {
+    color: var(--cyber-green);
+    font-weight: 600;
+    min-width: 80px;
+}
+
+.amy-node-name {
+    color: rgba(255, 255, 255, 0.7);
+    flex: 1;
+}
+
+.amy-node-caps {
+    font-size: 0.6rem;
+    color: var(--cyber-yellow);
+    letter-spacing: 1px;
+}
+
+/* Command Grid */
+.amy-command-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-xs);
+}
+
+.amy-cmd {
+    font-size: 0.65rem !important;
+    padding: 4px 8px !important;
+    letter-spacing: 1px;
+}
+
+/* Thoughts Stream */
+.amy-thoughts-panel {
+    overflow: hidden;
+}
+
+.amy-thoughts-stream {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-sm);
+    font-size: 0.75rem;
+    line-height: 1.5;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 240, 255, 0.3) transparent;
+}
+
+.amy-thought-placeholder {
+    color: rgba(0, 240, 255, 0.2);
+    text-align: center;
+    padding: var(--space-lg);
+    font-style: italic;
+}
+
+.amy-thought {
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(0, 240, 255, 0.05);
+    display: flex;
+    gap: var(--space-sm);
+    align-items: baseline;
+}
+
+.amy-thought-time {
+    color: var(--cyber-light-gray);
+    font-size: 0.6rem;
+    min-width: 65px;
+    flex-shrink: 0;
+}
+
+.amy-thought-label {
+    font-size: 0.55rem;
+    letter-spacing: 1px;
+    font-weight: 600;
+    min-width: 70px;
+    flex-shrink: 0;
+}
+
+.amy-thought-text {
+    color: rgba(255, 255, 255, 0.8);
+    word-break: break-word;
+}
+
+/* Thought type colors */
+.amy-thought-thought .amy-thought-label { color: var(--cyber-yellow); }
+.amy-thought-thought .amy-thought-text { color: rgba(252, 238, 10, 0.7); }
+.amy-thought-speech .amy-thought-label { color: #b388ff; }
+.amy-thought-transcript .amy-thought-label { color: var(--cyber-cyan); }
+.amy-thought-observation .amy-thought-label { color: var(--cyber-green); }
+.amy-thought-action .amy-thought-label { color: var(--cyber-magenta); }
+.amy-thought-deep_look .amy-thought-label { color: #ff9800; }
+
+/* Sensorium */
+.amy-sense-chat-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.amy-sensorium-section {
+    flex: 0 0 auto;
+    border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+}
+
+.amy-sensorium-text {
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.75rem;
+    color: rgba(0, 240, 255, 0.5);
+    line-height: 1.5;
+    max-height: 100px;
+    overflow-y: auto;
+}
+
+.amy-people-count {
+    font-size: 0.6rem;
+    color: var(--cyber-green);
+}
+
+/* Chat */
+.amy-chat-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.amy-chat-log {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-sm);
+    font-size: 0.75rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 240, 255, 0.3) transparent;
+}
+
+.amy-chat-msg {
+    padding: 3px 0;
+    display: flex;
+    gap: var(--space-sm);
+    align-items: baseline;
+}
+
+.amy-chat-speaker {
+    font-size: 0.6rem;
+    font-weight: bold;
+    letter-spacing: 1px;
+    min-width: 30px;
+}
+
+.amy-chat-amy .amy-chat-speaker { color: #b388ff; }
+.amy-chat-user .amy-chat-speaker { color: var(--cyber-cyan); }
+.amy-chat-system .amy-chat-speaker { color: var(--cyber-magenta); }
+
+.amy-chat-time {
+    font-size: 0.55rem;
+    color: var(--cyber-light-gray);
+    min-width: 55px;
+}
+
+.amy-chat-text {
+    color: rgba(255, 255, 255, 0.8);
+    word-break: break-word;
+}
+
+.amy-chat-input-row {
+    display: flex;
+    gap: var(--space-sm);
+    padding: var(--space-sm);
+    border-top: 1px solid rgba(0, 240, 255, 0.15);
+}
+
+.amy-chat-input {
+    flex: 1;
+    font-size: 0.8rem !important;
+}
+
+.amy-thought-count {
+    font-size: 0.6rem;
+    color: var(--cyber-light-gray);
+    background: rgba(0, 240, 255, 0.1);
+    padding: 1px 6px;
+    border-radius: 2px;
+}

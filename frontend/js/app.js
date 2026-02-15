@@ -119,6 +119,12 @@ function handleWebSocketMessage(message) {
         case 'detection':
             handleNewDetection(message.data);
             break;
+        default:
+            // Forward amy_* messages to Amy dashboard
+            if (message.type && message.type.startsWith('amy_') && typeof handleAmyEvent !== 'undefined') {
+                handleAmyEvent(message.type, message.data, message.timestamp);
+            }
+            break;
     }
 }
 
@@ -569,6 +575,11 @@ function switchView(view) {
         initAnalyticsView();
     }
 
+    // Initialize Amy view if needed
+    if (view === 'amy' && typeof initAmyView !== 'undefined') {
+        initAmyView();
+    }
+
     // Notify input manager of view change
     if (typeof tritiumInput !== 'undefined' && tritiumInput.setView) {
         tritiumInput.setView(view);
@@ -689,6 +700,9 @@ function initKeyboardShortcuts() {
                 break;
             case 'n':
                 switchView('analytics');
+                break;
+            case 'y':
+                switchView('amy');
                 break;
             case '/':
                 e.preventDefault();

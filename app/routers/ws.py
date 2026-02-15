@@ -181,3 +181,45 @@ async def broadcast_detection(detection_data: dict):
             "timestamp": datetime.utcnow().isoformat(),
         }
     )
+
+
+# --- Amy event bridge ---
+
+async def broadcast_amy_event(event_type: str, data: dict):
+    """Broadcast an Amy event to all WebSocket clients."""
+    await manager.broadcast(
+        {
+            "type": f"amy_{event_type}",
+            "data": data,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+    )
+
+
+def start_amy_event_bridge(amy_commander, loop: asyncio.AbstractEventLoop):
+    """Start a daemon thread that forwards Amy EventBus events to WebSocket.
+
+    This bridges Amy's threaded EventBus to FastAPI's async WebSocket system.
+
+    Args:
+        amy_commander: Amy's Commander instance
+        loop: The asyncio event loop to push events into
+    """
+    import threading
+
+    sub = amy_commander.event_bus.subscribe()
+
+    def bridge_loop():
+        while True:
+            try:
+                msg = sub.get(timeout=60)
+                event_type = msg.get("type", "unknown")
+                data = msg.get("data", {})
+                asyncio.run_coroutine_threadsafe(
+                    broadcast_amy_event(event_type, data), loop
+                )
+            except Exception:
+                continue
+
+    thread = threading.Thread(target=bridge_loop, daemon=True, name="amy-ws-bridge")
+    thread.start()

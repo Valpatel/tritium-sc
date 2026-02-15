@@ -20,6 +20,7 @@ from app.routers.ai import router as ai_router
 from app.routers.search import router as search_router
 from app.routers.zones import router as zones_router
 from app.routers.assets import router as assets_router
+from amy.router import router as amy_router
 
 
 @asynccontextmanager
@@ -70,11 +71,42 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Auto-discovery failed: {e}")
 
+    # Start Amy AI Commander
+    amy_instance = None
+    amy_thread = None
+    if settings.amy_enabled:
+        try:
+            import threading
+            from amy import create_amy
+
+            logger.info("Initializing Amy AI Commander...")
+            amy_instance = create_amy(settings)
+            amy_thread = threading.Thread(target=amy_instance.run, daemon=True, name="amy")
+            amy_thread.start()
+            app.state.amy = amy_instance
+            logger.info("Amy AI Commander started")
+
+            # Bridge Amy events to WebSocket
+            import asyncio
+            from app.routers.ws import start_amy_event_bridge
+            start_amy_event_bridge(amy_instance, asyncio.get_event_loop())
+            logger.info("Amy event bridge started")
+        except Exception as e:
+            logger.warning(f"Amy AI Commander failed to start: {e}")
+            app.state.amy = None
+    else:
+        app.state.amy = None
+
     logger.info("=" * 60)
     logger.info("  TRITIUM-SC ONLINE")
     logger.info("=" * 60)
 
     yield
+
+    # Shutdown Amy
+    if amy_instance is not None:
+        logger.info("Shutting down Amy...")
+        amy_instance.shutdown()
 
     logger.info("TRITIUM-SC shutting down...")
 
@@ -105,6 +137,7 @@ app.include_router(ai_router)
 app.include_router(search_router)
 app.include_router(zones_router)
 app.include_router(assets_router)
+app.include_router(amy_router)
 
 # Static files
 frontend_path = Path(__file__).parent.parent / "frontend"

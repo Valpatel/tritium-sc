@@ -95,6 +95,7 @@
                     <button class="btn btn-cyber" onclick="switchView('targets')" id="btn-targets">TARGETS</button>
                     <button class="btn btn-cyber" onclick="switchView('assets')" id="btn-assets">ASSETS</button>
                     <button class="btn btn-cyber" onclick="switchView('analytics')" id="btn-analytics">ANALYTICS</button>
+                    <button class="btn btn-cyber" onclick="switchView('amy')" id="btn-amy">AMY</button>
                     <div style="flex: 1;"></div>
                     <select id="grid-size" class="input" style="width: auto; padding: var(--space-xs) var(--space-md);">
                         <option value="1">1x1</option>
@@ -449,6 +450,11 @@
                     </div>
                 </div>
 
+                <!-- Amy AI Commander View -->
+                <div class="view-content hidden" id="view-amy">
+                    <!-- Populated by amy.js -->
+                </div>
+
                 <!-- Video List (when a date is selected) -->
                 <div class="view-content hidden" id="view-list">
                     <div class="video-list" id="video-list">
@@ -524,5 +530,6 @@
     <script src="/static/js/targets.js"></script>
     <script src="/static/js/assets.js"></script>
     <script src="/static/js/analytics.js"></script>
+    <script src="/static/js/amy.js"></script>
 </body>
 </html>

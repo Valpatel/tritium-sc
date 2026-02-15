@@ -42,6 +42,16 @@ class Settings(BaseSettings):
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = "llava:13b"
 
+    # Amy AI Commander
+    amy_enabled: bool = True
+    amy_camera_device: str | None = None    # auto-detect BCC950
+    amy_deep_model: str = "llava:7b"
+    amy_chat_model: str = "gemma3:4b"
+    amy_whisper_model: str = "large-v3"
+    amy_tts_enabled: bool = True
+    amy_wake_word: str = "amy"
+    amy_think_interval: float = 8.0
+
     # Detection settings
     motion_threshold: float = 25.0
     detection_confidence: float = 0.5

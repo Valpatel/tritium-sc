@@ -2,7 +2,9 @@
 
 ## Project Overview
 
-TRITIUM-SC (Security Central) is a cyberpunk-themed security camera intelligence platform that combines AI-powered detection with a futuristic Three.js + CYBERCORE CSS interface. Inspired by Frigate and Viseron, it features motion-first detection, YOLO inference, and comprehensive event search.
+TRITIUM-SC is a Nerf war battlespace management platform with an autonomous AI Commander (Amy). Inspired by Masanobu Fukuoka's "One-Straw Revolution" — this is a garden of diverse digital life where AI flourishes naturally and machines act independently, not a fortress of centralized control.
+
+Amy is an autonomous consciousness with 4 cognitive layers (reflex → instinct → awareness → deliberation). She sees through cameras, hears through mics, thinks in continuous inner monologue, and acts when she decides to. Assets (Nerf turrets, rovers) are independent agents.
 
 ## Tech Stack
 
@@ -15,27 +17,30 @@ TRITIUM-SC (Security Central) is a cyberpunk-themed security camera intelligence
 ## Key Directories
 
 ```
-sec-cameras/
+tritium-sc/
+├── amy/                    # AMY — AI Commander (autonomous consciousness)
+│   ├── commander.py       # Main orchestrator, event loop
+│   ├── sensorium.py       # L3 awareness: temporal sensor fusion
+│   ├── thinking.py        # L4 deliberation: inner monologue
+│   ├── nodes/             # Distributed sensor nodes (BCC950, IP cam, virtual)
+│   ├── router.py          # FastAPI: /api/amy/*
+│   └── (agent, listener, speaker, vision, motor, memory, tools, lua_motor)
 ├── app/                    # FastAPI backend
-│   ├── routers/           # API endpoints
+│   ├── routers/           # API endpoints + WebSocket + Amy event bridge
 │   ├── ai/                # Detection pipeline (YOLO, tracker, embeddings)
 │   ├── zones/             # Zone management and alerting
 │   ├── discovery/         # NVR auto-discovery
 │   └── models.py          # SQLAlchemy models
 ├── frontend/              # Static frontend (no build step)
-│   ├── index.html         # Main SPA shell
+│   ├── index.html         # Main SPA shell (8 views incl. AMY)
 │   ├── js/                # Modular JavaScript
 │   │   ├── app.js        # Main app, view switching, shortcuts
+│   │   ├── amy.js        # Amy dashboard (thoughts, video, chat)
 │   │   ├── input.js      # Input handling (keyboard + gamepad)
-│   │   ├── grid.js       # 3D property view (Three.js)
-│   │   ├── player.js     # Video playback
-│   │   ├── zones.js      # Zone management UI
-│   │   ├── targets.js    # Detection gallery
-│   │   ├── assets.js     # Autonomous unit control
-│   │   └── analytics.js  # Detection statistics
+│   │   └── (grid, player, zones, targets, assets, analytics)
 │   └── css/
 │       ├── cybercore.css # CYBERCORE CSS framework
-│       └── tritium.css   # Custom styles
+│       └── tritium.css   # Custom + Amy panel styles
 ├── docs/                  # Documentation
 ├── tests/                 # Test suite
 └── channel_*/            # Recorded footage by channel/date
@@ -55,20 +60,22 @@ sec-cameras/
 
 | File | Purpose |
 |------|---------|
-| `app/main.py` | FastAPI app entry point, lifespan, routes |
-| `app/config.py` | Pydantic settings from environment |
+| `amy/commander.py` | Amy AI Commander — main orchestrator, event loop |
+| `amy/sensorium.py` | L3 awareness: temporal sensor fusion + narrative |
+| `amy/thinking.py` | L4 deliberation: inner monologue via fast LLM |
+| `amy/nodes/base.py` | Abstract SensorNode (camera, mic, PTZ, speaker) |
+| `amy/nodes/bcc950.py` | BCC950 PTZ camera + mic + speaker node |
+| `amy/router.py` | /api/amy/* — status, thoughts SSE, chat, commands |
+| `app/main.py` | FastAPI app entry point, lifespan, Amy startup |
+| `app/config.py` | Pydantic settings (app + Amy config) |
 | `app/models.py` | SQLAlchemy models (Camera, Event, Zone, Asset, etc.) |
 | `app/database.py` | Async database setup, FTS5 tables |
-| `app/routers/videos.py` | Video browsing, streaming, thumbnails |
-| `app/routers/ai.py` | AI analysis endpoints |
-| `app/routers/zones.py` | Zone CRUD and event queries |
-| `app/routers/search.py` | Full-text search, analytics |
+| `app/routers/ws.py` | WebSocket broadcast + Amy event bridge |
 | `app/routers/assets.py` | Autonomous asset management |
 | `app/ai/detector.py` | YOLO detection wrapper |
-| `app/ai/tracker.py` | ByteTrack object tracking |
 | `frontend/js/app.js` | Main app state, WebSocket, keyboard shortcuts |
+| `frontend/js/amy.js` | Amy dashboard (thoughts, video, sensorium, chat) |
 | `frontend/js/input.js` | Gamepad/keyboard unified input system |
-| `frontend/js/grid.js` | Three.js 3D property visualization |
 
 ## Environment Variables
 
@@ -108,17 +115,22 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 - `GET /api/cameras` - List registered cameras
 - `GET /api/videos/channels` - List channels with recordings
-- `GET /api/videos/channels/{ch}/dates` - Dates with recordings
 - `GET /api/videos/stream/{ch}/{date}/{file}` - Stream video
 - `POST /api/ai/analyze` - Run AI analysis on video
 - `GET /api/search/query` - Full-text search events
 - `GET /api/zones` - List zones
-- `WS /ws/live` - WebSocket for real-time updates
+- `GET /api/amy/status` - Amy state, mood, nodes
+- `GET /api/amy/thoughts` - SSE stream of consciousness
+- `GET /api/amy/sensorium` - Temporal narrative + mood
+- `POST /api/amy/chat` - Talk to Amy
+- `POST /api/amy/command` - Send Lua action
+- `GET /api/amy/nodes/{id}/video` - MJPEG from camera node
+- `WS /ws/live` - WebSocket for real-time updates + Amy events
 
 ## Keyboard Shortcuts
 
 Press `?` in the UI for full list. Main shortcuts:
-- `G/P/D/Z/T/A/N` - Switch views (Grid, Player, 3D, Zones, Targets, Assets, aNalytics)
+- `G/P/D/Z/T/A/N/Y` - Switch views (Grid, Player, 3D, Zones, Targets, Assets, aNalytics, amY)
 - `1/2/3` - Grid size
 - `/` - Focus search
 - `ESC` - Close modals
