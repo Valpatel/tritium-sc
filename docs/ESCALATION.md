@@ -30,13 +30,13 @@ two-layer response: fast automatic reactions plus strategic AI decisions.
 flowchart LR
     SIM[SimulationEngine<br>10Hz tick] -->|sim_telemetry| TT[TargetTracker]
     YOLO[VisionThread<br>YOLO detections] -->|update_from_detection| TT
-    TT -->|get_all\n2Hz poll| TC[ThreatClassifier]
+    TT -->|get_all 2Hz poll| TC[ThreatClassifier]
     TC -->|threat_escalation<br>zone_violation| EB[EventBus]
     EB -->|subscribe| AD[AutoDispatcher]
     EB -->|thinking context| AMY[ThinkingThread]
     AD -->|set waypoints| SIM
     AD -->|amy_dispatch<br>auto_dispatch_speech| EB
-    AMY -->|dispatch\nescalate\nclear_threat| SIM
+    AMY -->|dispatch / escalate / clear_threat| SIM
     EB -->|WebSocket| FE[Frontend]
     EB -->|MQTT| DIST[Distributed Nodes]
 ```
@@ -237,14 +237,15 @@ configurable per operational posture.
 
 ## File Organization
 
-Currently a single file: `amy/escalation.py` containing both ThreatClassifier
-and AutoDispatcher.
+Canonical location: `tracking/escalation.py` containing both ThreatClassifier
+and AutoDispatcher. A backward-compatible stub at `amy/escalation.py`
+re-exports for existing imports.
 
-**Recommendation**: Keep it as-is. The two classes are tightly coupled (the
-dispatcher exists only because the classifier exists), the file is ~400 lines,
-and splitting into a package adds import complexity without meaningful
-separation of concerns. If a third component is added (e.g., behavioral
-analyzer), then split into `amy/escalation/` package.
+The two classes are tightly coupled (the dispatcher exists only because the
+classifier exists), the file is ~500 lines, and splitting into a package
+adds import complexity without meaningful separation of concerns. If a third
+component is added (e.g., behavioral analyzer), split into
+`tracking/escalation/` package.
 
 ## Configuration
 

@@ -7,76 +7,63 @@ TRITIUM-SC is a three-layer system: a **browser frontend** renders the tactical 
 Real sensors and simulated units coexist on the same event bus, same APIs, same tactical map. Amy does not distinguish between them.
 
 ```mermaid
-graph TB
-    subgraph "Browser"
-        WAR[War Room Canvas]
-        AMY_UI[Amy Dashboard]
-        ASSETS[Assets View]
-        MAP3D[3D Tactical Map]
-    end
-
-    subgraph "FastAPI Server"
-        WS[WebSocket Bridge]
-        API[REST API]
-
-        subgraph "Amy Commander"
-            THINK[Thinking Loop]
-            SENSE[Sensorium]
-            VISION[Vision Thread]
-            LISTEN[Listener - VAD+STT]
-            SPEAK[Speaker - TTS]
-            MOTOR[Motor Thread]
-            MEM[Memory v3]
-            AGENT[Chat Agent]
-        end
-
-        subgraph "Battlespace"
-            SIM[Simulation Engine 10Hz]
-            TRACK[Target Tracker]
-            CLASS[Threat Classifier 2Hz]
-            DISP[Auto Dispatcher]
-            AMBIENT[Ambient Spawner]
-        end
-
-        BUS[Event Bus]
-        MQTT[MQTT Bridge]
-    end
-
-    subgraph "External Devices"
-        CAM[BCC950 PTZ Camera]
-        MIC[USB Microphone]
+flowchart LR
+    subgraph EXT["External Devices"]
+        CAM[BCC950 PTZ]
+        MIC[USB Mic]
         ROBOT[MQTT Robots]
         SENSOR[MQTT Sensors]
     end
 
-    WAR -->|WebSocket| WS
-    AMY_UI -->|WebSocket| WS
-    ASSETS -->|REST| API
-    MAP3D -->|WebSocket| WS
+    subgraph SERVER["FastAPI Server"]
+        direction TB
+        MQTT[MQTT Bridge]
+        BUS[EventBus]
 
-    WS --> BUS
-    API --> TRACK
-    API --> SIM
+        subgraph AMY["Amy Commander"]
+            VISION[Vision + YOLO]
+            LISTEN[Listener VAD+STT]
+            THINK[Thinking Loop]
+            SENSE[Sensorium]
+            SPEAK[Speaker TTS]
+        end
 
-    THINK --> BUS
-    SENSE --> TRACK
+        subgraph BATTLE["Battlespace"]
+            SIM[SimEngine 10Hz]
+            TRACK[TargetTracker]
+            CLASS[ThreatClassifier]
+            DISP[AutoDispatcher]
+        end
+
+        WS[WebSocket Bridge]
+    end
+
+    subgraph UI["Browser"]
+        WAR[War Room]
+        DASH[Amy Dashboard]
+        VIEWS[Other Views]
+    end
+
+    CAM --> VISION
+    MIC --> LISTEN
+    ROBOT <-->|telemetry / commands| MQTT
+    SENSOR -->|events| MQTT
+
+    MQTT --> BUS
     VISION --> BUS
     LISTEN --> THINK
-    SPEAK --> CAM
-    MOTOR --> CAM
-
+    THINK --> BUS
+    SENSE --> TRACK
     SIM --> BUS
+    BUS --> TRACK
     CLASS --> TRACK
     DISP --> SIM
     DISP --> MQTT
-    AMBIENT --> SIM
-    TRACK --> BUS
+    BUS --> WS
 
-    MQTT --> ROBOT
-    MQTT --> SENSOR
-    CAM --> VISION
-    MIC --> LISTEN
-    BUS --> MQTT
+    WS -->|WebSocket| WAR
+    WS -->|WebSocket| DASH
+    WS -->|WebSocket| VIEWS
 ```
 
 ## Boot Sequence
@@ -258,19 +245,20 @@ Amy runs multiple daemon threads coordinated through the EventBus:
 |------|---------|
 | `app/main.py` | FastAPI lifespan, boot sequence |
 | `amy/commander.py` | Commander, VisionThread, AudioThread |
-| `amy/event_bus.py` | EventBus — thread-safe pub/sub for all internal events |
+| `comms/event_bus.py` | EventBus — thread-safe pub/sub for all internal events |
 | `amy/thinking.py` | ThinkingThread, GoalStack |
 | `amy/sensorium.py` | Temporal sensor fusion, narrative |
-| `amy/target_tracker.py` | Unified real+virtual target registry |
-| `amy/escalation.py` | ThreatClassifier, AutoDispatcher |
-| `amy/mqtt_bridge.py` | MQTT broker bridge |
-| `amy/simulation/engine.py` | SimulationEngine (10Hz tick loop) |
-| `amy/simulation/target.py` | SimulationTarget dataclass |
-| `amy/simulation/ambient.py` | AmbientSpawner (neutral targets) |
-| `amy/simulation/loader.py` | TritiumLevelFormat parser |
+| `tracking/tracker.py` | Unified real+virtual target registry |
+| `tracking/escalation.py` | ThreatClassifier, AutoDispatcher |
+| `comms/mqtt_bridge.py` | MQTT broker bridge |
+| `simulation/engine.py` | SimulationEngine (10Hz tick loop) |
+| `simulation/target.py` | SimulationTarget dataclass |
+| `simulation/ambient.py` | AmbientSpawner (neutral targets) |
+| `simulation/loader.py` | TritiumLevelFormat parser |
+| `geo/reference.py` | WGS84 coordinate reference + transforms |
+| `sensors/perception.py` | Layered frame analysis (L0-L2) |
 | `app/routers/ws.py` | WebSocket bridge + TelemetryBatcher |
 | `frontend/js/war.js` | War Room canvas renderer |
-| `frontend/js/assets.js` | Target state + tactical map |
 
 ## Related Documentation
 

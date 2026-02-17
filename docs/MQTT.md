@@ -11,17 +11,17 @@ and Amy's in-process `EventBus` + `TargetTracker`.
 
 ```mermaid
 flowchart LR
-    subgraph External Devices
+    subgraph "External Devices"
         R[Robot / Rover]
         C[IP Camera]
         S[PIR Sensor]
     end
 
-    subgraph MQTT Broker
+    subgraph "MQTT Broker"
         B[(Mosquitto)]
     end
 
-    subgraph TRITIUM Server
+    subgraph "TRITIUM Server"
         MB[MQTTBridge]
         EB[EventBus]
         TT[TargetTracker]
@@ -271,27 +271,21 @@ vision thread — all threads, not asyncio).
 keyword arguments. Both the bridge and the robot template use the v1 API.
 Pin to `<2.0.0` until a migration is done.
 
-### Why the bridge lives in `amy/`
+### Package location: `comms/mqtt_bridge.py`
 
-The `MQTTBridge` lives in `amy/mqtt_bridge.py` because:
+The `MQTTBridge` lives in the `comms/` package alongside `EventBus`:
 
-1. **Its primary consumers are Amy subsystems.** The bridge writes to
-   `TargetTracker` and `EventBus`, both of which are Amy internals.
-   The `AutoDispatcher` in `amy/escalation.py` calls bridge publish
-   methods directly.
+1. **Communication infrastructure, not AI consciousness.** The bridge
+   translates between MQTT wire protocol and internal data structures.
+   Amy orchestrates it but does not own it — the bridge would exist
+   even without Amy (e.g., for a headless sensor aggregator).
 
-2. **It is created and owned by Amy's lifecycle.** The bridge is
-   instantiated in `app/main.py` lifespan, attached to the Commander
-   instance (`amy_instance.mqtt_bridge`), and shut down with Amy.
+2. **Clean dependency direction.** `comms/` depends on `tracking/`
+   (TargetTracker) for data injection. `amy/` depends on `comms/`
+   (EventBus) for pub/sub. No circular imports.
 
-3. **Moving it to `app/` would create a circular dependency.** The bridge
-   imports `EventBus` (defined in `amy/event_bus.py`, re-exported via
-   `amy.commander`) and `TargetTracker` from `amy.target_tracker`. If it
-   lived in `app/`, those would become cross-package imports with unclear
-   ownership.
-
-The bridge is an **adapter** between the MQTT world and Amy's internal
-world. It belongs with the internal world it adapts into.
+3. **Backward-compatible stub.** `amy/mqtt_bridge.py` re-exports from
+   `comms.mqtt_bridge` so existing imports continue to work.
 
 ### Reconnection Behavior
 

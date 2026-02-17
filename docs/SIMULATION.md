@@ -2,7 +2,7 @@
 
 The simulation engine drives virtual targets across the tactical map at 10 Hz. It spawns hostile intruders, friendly units (rovers, drones, turrets), and ambient neighborhood activity (neighbors, cars, dogs, cats, delivery people). All simulated targets flow through the same TargetTracker and EventBus as real YOLO detections.
 
-Source: `amy/simulation/` package
+Source: `simulation/` package (canonical), `amy/simulation/` (backward-compat stubs)
 
 ## Target Lifecycle
 
@@ -76,30 +76,30 @@ graph TB
 
     subgraph "Data Sources"
         LAYOUT[TritiumLevelFormat JSON]
-        API[REST API /api/amy/simulation/spawn]
-        LUA[Lua dispatch/patrol actions]
+        API["REST API /spawn"]
+        LUA[Lua dispatch/patrol]
     end
 
     subgraph "Consumers"
         BUS[EventBus]
-        BRIDGE[Commander._sim_bridge_loop]
+        BRIDGE["_sim_bridge_loop"]
         TT[TargetTracker]
         TC[ThreatClassifier]
-        WS[WebSocket -> Frontend]
+        WS["WebSocket to Frontend"]
     end
 
-    LAYOUT -->|load_layout()| TARGETS
-    API -->|spawn_hostile()| TARGETS
+    LAYOUT -->|load_layout| TARGETS
+    API -->|spawn_hostile| TARGETS
     LUA -->|set waypoints| TARGETS
 
-    TICK -->|target.tick(0.1)| TARGETS
+    TICK -->|tick dt=0.1| TARGETS
     TICK -->|publish sim_telemetry| BUS
-    HS -->|spawn_hostile() every 30-120s| TARGETS
-    AS -->|spawn random neutral every 15-45s| TARGETS
+    HS -->|spawn hostile 30-120s| TARGETS
+    AS -->|spawn neutral 15-45s| TARGETS
 
     BUS -->|subscribe| BRIDGE
-    BRIDGE -->|update_from_simulation()| TT
-    TT -->|get_all() at 2Hz| TC
+    BRIDGE -->|update_from_simulation| TT
+    TT -->|get_all at 2Hz| TC
     BUS -->|TelemetryBatcher| WS
 ```
 
