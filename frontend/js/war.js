@@ -408,6 +408,15 @@ function render() {
     cam.y += (cam.targetY - cam.y) * 0.1;
     cam.zoom += (cam.targetZoom - cam.zoom) * 0.1;
 
+    // Delta time for physics
+    const now = performance.now();
+    const dt = warState._lastFrameTime ? Math.min((now - warState._lastFrameTime) / 1000, 0.05) : 0.016;
+    warState._lastFrameTime = now;
+
+    // Update combat systems
+    if (typeof warCombatUpdateProjectiles === 'function') warCombatUpdateProjectiles(dt);
+    if (typeof warCombatUpdateEffects === 'function') warCombatUpdateEffects(dt);
+
     // 3D renderer path
     if (warState.use3D && typeof updateWar3D === 'function') {
         updateWar3D();
@@ -431,8 +440,17 @@ function render() {
     drawZones(ctx);
     drawTargets(ctx);
     drawSelectionIndicators(ctx);
+    drawWeaponRanges(ctx);
     drawDispatchArrows(ctx);
+    // Combat: projectiles over map, under HUD
+    if (typeof warCombatDrawProjectiles === 'function') {
+        warCombatDrawProjectiles(ctx, worldToScreen);
+    }
     drawEffects(ctx);
+    // Combat: hit/elimination effects
+    if (typeof warCombatDrawEffects === 'function') {
+        warCombatDrawEffects(ctx, worldToScreen, canvas.width, canvas.height);
+    }
     drawBoxSelect(ctx);
     drawPlacingGhost(ctx);
     // Editor overlays (FOV cones, ghost, selection) — drawn over targets
@@ -553,64 +571,65 @@ function drawTarget(ctx, tid, t) {
         ctx.setLineDash([]);
     }
 
-    // Shape by alliance
-    if (alliance === 'friendly') {
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(sp.x, sp.y, radius, 0, Math.PI * 2);
-        ctx.fill();
-    } else if (alliance === 'hostile') {
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.moveTo(sp.x, sp.y - radius);
-        ctx.lineTo(sp.x + radius, sp.y);
-        ctx.lineTo(sp.x, sp.y + radius);
-        ctx.lineTo(sp.x - radius, sp.y);
-        ctx.closePath();
-        ctx.fill();
-    } else if (alliance === 'neutral') {
-        ctx.fillStyle = color;
-        ctx.globalAlpha = 0.6;
-        ctx.beginPath();
-        ctx.arc(sp.x, sp.y, radius * 0.8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1.0;
+    // Use improved combat shapes if available
+    if (typeof warCombatDrawTargetShape === 'function') {
+        warCombatDrawTargetShape(ctx, sp, radius, t, alliance, warState.cam.zoom);
     } else {
-        // Unknown: square
-        ctx.fillStyle = color;
-        const half = radius * 0.8;
-        ctx.fillRect(sp.x - half, sp.y - half, half * 2, half * 2);
-    }
+        // Fallback: basic shapes
+        if (alliance === 'friendly') {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(sp.x, sp.y, radius, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (alliance === 'hostile') {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(sp.x, sp.y - radius);
+            ctx.lineTo(sp.x + radius, sp.y);
+            ctx.lineTo(sp.x, sp.y + radius);
+            ctx.lineTo(sp.x - radius, sp.y);
+            ctx.closePath();
+            ctx.fill();
+        } else if (alliance === 'neutral') {
+            ctx.fillStyle = color;
+            ctx.globalAlpha = 0.6;
+            ctx.beginPath();
+            ctx.arc(sp.x, sp.y, radius * 0.8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+        } else {
+            ctx.fillStyle = color;
+            const half = radius * 0.8;
+            ctx.fillRect(sp.x - half, sp.y - half, half * 2, half * 2);
+        }
 
-    // Heading line: heading 0 = north (+y), clockwise (compass bearing)
-    // Convert to math angle: math_angle = 90 - heading
-    if (t.heading !== undefined && t.heading !== null) {
-        const rad = (90 - t.heading) * Math.PI / 180;
-        const lineLen = radius * 2.2;
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(sp.x, sp.y);
-        // Screen Y is inverted, so subtract sin to point up for north
-        ctx.lineTo(sp.x + Math.cos(rad) * lineLen, sp.y - Math.sin(rad) * lineLen);
-        ctx.stroke();
-    }
+        // Heading line (fallback only; combat shapes draw their own)
+        if (t.heading !== undefined && t.heading !== null) {
+            const rad = (90 - t.heading) * Math.PI / 180;
+            const lineLen = radius * 2.2;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(sp.x, sp.y);
+            ctx.lineTo(sp.x + Math.cos(rad) * lineLen, sp.y - Math.sin(rad) * lineLen);
+            ctx.stroke();
+        }
 
-    // Neutralized overlay: X mark and faded rendering
-    const isNeutralized = (t.status || '').toLowerCase() === 'neutralized';
-    if (isNeutralized) {
-        ctx.globalAlpha = 0.35;
-        // Draw X over target
-        const xSize = radius * 1.2;
-        ctx.strokeStyle = '#ff2a6d';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(sp.x - xSize, sp.y - xSize);
-        ctx.lineTo(sp.x + xSize, sp.y + xSize);
-        ctx.moveTo(sp.x + xSize, sp.y - xSize);
-        ctx.lineTo(sp.x - xSize, sp.y + xSize);
-        ctx.stroke();
-        ctx.globalAlpha = 1.0;
+        // Neutralized overlay (fallback)
+        const isNeutralized = (t.status || '').toLowerCase() === 'neutralized';
+        if (isNeutralized) {
+            ctx.globalAlpha = 0.35;
+            const xSize = radius * 1.2;
+            ctx.strokeStyle = '#ff2a6d';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(sp.x - xSize, sp.y - xSize);
+            ctx.lineTo(sp.x + xSize, sp.y + xSize);
+            ctx.moveTo(sp.x + xSize, sp.y - xSize);
+            ctx.lineTo(sp.x - xSize, sp.y + xSize);
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+        }
     }
 
     // Threat level ring (escalation indicator)
@@ -621,14 +640,12 @@ function drawTarget(ctx, tid, t) {
         ctx.strokeStyle = threatColor;
         ctx.lineWidth = 2;
         ctx.setLineDash([3, 3]);
-        // Animated rotation
         const rotOffset = (Date.now() / 1000) * 2;
         ctx.beginPath();
         ctx.arc(sp.x, sp.y, ringRadius, rotOffset, rotOffset + Math.PI * 1.5);
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Threat label
         if (warState.cam.zoom > 0.8) {
             ctx.fillStyle = threatColor;
             ctx.font = `bold ${Math.max(7, 8 * Math.min(warState.cam.zoom, 2))}px "JetBrains Mono", monospace`;
@@ -638,21 +655,25 @@ function drawTarget(ctx, tid, t) {
     }
 
     // Label
+    const isNeutralized = (t.status || '').toLowerCase() === 'neutralized'
+        || (t.status || '').toLowerCase() === 'eliminated';
     const name = t.name || tid;
     ctx.fillStyle = isNeutralized ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.8)';
     ctx.font = `${Math.max(9, 11 * Math.min(warState.cam.zoom, 2))}px "JetBrains Mono", monospace`;
     ctx.textAlign = 'center';
     ctx.fillText(name, sp.x, sp.y - radius - 4);
 
-    // "NEUTRALIZED" label
+    // "NEUTRALIZED" / "ELIMINATED" label
     if (isNeutralized && warState.cam.zoom > 0.6) {
         ctx.fillStyle = 'rgba(255, 42, 109, 0.6)';
         ctx.font = `bold ${Math.max(8, 9 * Math.min(warState.cam.zoom, 2))}px "JetBrains Mono", monospace`;
         ctx.fillText('NEUTRALIZED', sp.x, sp.y + radius + 14);
     }
 
-    // Battery bar for friendlies
-    if (alliance === 'friendly' && t.battery !== undefined) {
+    // Health bar (combat module draws better one; fallback to battery bar)
+    if (typeof warCombatDrawHealthBar === 'function' && t.health !== undefined) {
+        warCombatDrawHealthBar(ctx, sp.x, sp.y, t.health, t.max_health || 100, alliance, radius);
+    } else if (alliance === 'friendly' && t.battery !== undefined) {
         const barW = radius * 3;
         const barH = 3;
         const bx = sp.x - barW / 2;
@@ -685,6 +706,18 @@ function drawSelectionIndicators(ctx) {
         ctx.arc(sp.x, sp.y, radius + 4, 0, Math.PI * 2);
         ctx.stroke();
         ctx.shadowBlur = 0;
+    }
+}
+
+function drawWeaponRanges(ctx) {
+    if (typeof warCombatDrawWeaponRange !== 'function') return;
+    const targets = getTargets();
+    for (const tid of warState.selectedTargets) {
+        const t = targets[tid];
+        if (!t) continue;
+        const alliance = (t.alliance || '').toLowerCase();
+        if (alliance !== 'friendly') continue;
+        warCombatDrawWeaponRange(ctx, worldToScreen, t, warState.cam.zoom);
     }
 }
 
@@ -1748,14 +1781,86 @@ function warHandleTargetNeutralized(data) {
     warPlaySound('neutralized');
     warState.stats.kills++;
 
-    // Visual flash at position
+    // Visual flash at position (legacy effect)
     if (data.position) {
         addEffect('neutralized', data.position.x, data.position.y);
+    }
+
+    // Combat module: dramatic elimination effect
+    if (typeof warCombatAddEliminationEffect === 'function') {
+        warCombatAddEliminationEffect(data);
+    }
+
+    // HUD: kill feed entry
+    if (typeof warHudAddKillFeedEntry === 'function') {
+        warHudAddKillFeedEntry(data);
     }
 
     // Gamepad rumble for tactile feedback
     if (typeof tritiumInput !== 'undefined' && tritiumInput.gamepadHandler) {
         tritiumInput.gamepadHandler.vibrate(200, 0.4, 0.6);
+    }
+}
+
+// ============================================================
+// Game combat WebSocket event handlers
+// ============================================================
+
+function warHandleProjectileFired(data) {
+    if (typeof warCombatAddProjectile === 'function') warCombatAddProjectile(data);
+}
+
+function warHandleProjectileHit(data) {
+    if (typeof warCombatAddHitEffect === 'function') warCombatAddHitEffect(data);
+}
+
+function warHandleTargetEliminated(data) {
+    if (typeof warCombatAddEliminationEffect === 'function') warCombatAddEliminationEffect(data);
+    if (typeof warHudAddKillFeedEntry === 'function') warHudAddKillFeedEntry(data);
+    warPlaySound('neutralized');
+    warState.stats.kills++;
+    const name = data.hostile_name || data.victim_name || data.target_id || 'target';
+    warAddAlert(`ELIMINATED: ${name}`, 'dispatch');
+}
+
+function warHandleWaveStart(data) {
+    if (typeof warHudShowWaveBanner === 'function') {
+        warHudShowWaveBanner(data.wave_number, data.wave_name, data.hostile_count);
+    }
+    warAddAlert(`WAVE ${data.wave_number}: ${data.hostile_count || '?'} hostiles incoming`, 'hostile');
+    warPlaySound('hostile');
+}
+
+function warHandleWaveComplete(data) {
+    if (typeof warHudShowWaveComplete === 'function') {
+        warHudShowWaveComplete(data.wave_number, data.kills, data.score_bonus);
+    }
+    warAddAlert(`WAVE ${data.wave_number} COMPLETE`, 'dispatch');
+}
+
+function warHandleGameState(data) {
+    if (typeof warHudUpdateGameState === 'function') warHudUpdateGameState(data);
+}
+
+function warHandleKillStreak(data) {
+    if (typeof warCombatAddKillStreakEffect === 'function') warCombatAddKillStreakEffect(data);
+}
+
+function warHandleGameOver(data) {
+    if (typeof warHudShowGameOver === 'function') {
+        warHudShowGameOver(data.result, data.final_score, data.waves_completed, data.total_kills);
+    }
+}
+
+function warHandleAmyAnnouncement(data) {
+    if (typeof warHudShowAmyAnnouncement === 'function') {
+        warHudShowAmyAnnouncement(data.text, data.category);
+    }
+}
+
+function warHandleCountdown(data) {
+    if (typeof warHudShowCountdown === 'function') {
+        warHudShowCountdown(data.seconds || 5);
     }
 }
 
@@ -2121,6 +2226,17 @@ window.warHandleAmyThought = warHandleAmyThought;
 window.warHandleSimTelemetry = warHandleSimTelemetry;
 window.warHandleTargetNeutralized = warHandleTargetNeutralized;
 window.selectPaletteItem = selectPaletteItem;
+// Game combat event handlers
+window.warHandleProjectileFired = warHandleProjectileFired;
+window.warHandleProjectileHit = warHandleProjectileHit;
+window.warHandleTargetEliminated = warHandleTargetEliminated;
+window.warHandleWaveStart = warHandleWaveStart;
+window.warHandleWaveComplete = warHandleWaveComplete;
+window.warHandleGameState = warHandleGameState;
+window.warHandleKillStreak = warHandleKillStreak;
+window.warHandleGameOver = warHandleGameOver;
+window.warHandleAmyAnnouncement = warHandleAmyAnnouncement;
+window.warHandleCountdown = warHandleCountdown;
 // Exposed for gamepad input handler
 window.warState = warState;
 window.setWarMode = setWarMode;

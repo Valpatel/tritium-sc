@@ -2825,3 +2825,310 @@ button:disabled:hover {
     background: rgba(0, 240, 255, 0.08);
     color: rgba(255, 255, 255, 0.7);
 }
+
+/* ============================================================
+   War Room: Game HUD
+   ============================================================ */
+
+/* Countdown overlay */
+.war-countdown {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Orbitron', monospace;
+    font-size: 120px;
+    font-weight: 700;
+    color: #ff2a6d;
+    text-shadow: 0 0 40px rgba(255, 42, 109, 0.6), 0 0 80px rgba(255, 42, 109, 0.3);
+    z-index: 50;
+    pointer-events: none;
+}
+.war-countdown.active {
+    display: flex;
+}
+.war-countdown-pulse {
+    animation: war-countdown-pulse 0.8s ease-out;
+}
+.war-countdown-engage {
+    color: #00f0ff;
+    text-shadow: 0 0 40px rgba(0, 240, 255, 0.6), 0 0 80px rgba(0, 240, 255, 0.3);
+    animation: war-countdown-engage 1.0s ease-out;
+}
+@keyframes war-countdown-pulse {
+    0% { transform: scale(1.5); opacity: 0; }
+    20% { transform: scale(1.0); opacity: 1; }
+    100% { transform: scale(0.95); opacity: 0.8; }
+}
+@keyframes war-countdown-engage {
+    0% { transform: scale(0.5); opacity: 0; }
+    30% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1.0); opacity: 0; }
+}
+
+/* Wave banner */
+.war-wave-banner {
+    position: absolute;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 42, 109, 0.9);
+    color: #fff;
+    padding: 12px 40px;
+    text-align: center;
+    z-index: 40;
+    pointer-events: none;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.war-wave-banner.war-wave-complete {
+    background: rgba(5, 255, 161, 0.85);
+    color: #000;
+}
+.war-wave-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+}
+.war-wave-complete-text {
+    color: #000;
+}
+.war-wave-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    margin-top: 4px;
+    opacity: 0.8;
+}
+.war-wave-slide-in {
+    animation: war-wave-in 0.4s ease-out forwards;
+}
+.war-wave-slide-out {
+    animation: war-wave-out 0.4s ease-in forwards;
+}
+@keyframes war-wave-in {
+    from { transform: translateX(-50%) translateY(-60px); opacity: 0; }
+    to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+@keyframes war-wave-out {
+    from { transform: translateX(-50%) translateY(0); opacity: 1; }
+    to { transform: translateX(-50%) translateY(-60px); opacity: 0; }
+}
+
+/* Kill feed */
+.war-kill-feed {
+    position: absolute;
+    bottom: 270px;
+    right: 12px;
+    width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    pointer-events: none;
+    z-index: 30;
+}
+.war-kill-entry {
+    background: rgba(10, 10, 20, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 4px 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    animation: war-kill-in 0.25s ease-out;
+    border-radius: 2px;
+}
+.war-kill-arrow {
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 0.6rem;
+}
+@keyframes war-kill-in {
+    from { transform: translateX(30px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* Score display */
+.war-score {
+    position: absolute;
+    top: 40px;
+    right: 12px;
+    background: rgba(10, 10, 20, 0.9);
+    border: 1px solid rgba(0, 240, 255, 0.25);
+    padding: 8px 14px;
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 30;
+    min-width: 140px;
+}
+.war-score-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    font-family: 'JetBrains Mono', monospace;
+}
+.war-score-label {
+    font-size: 0.6rem;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.4);
+}
+.war-score-value {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #00f0ff;
+}
+.war-score-kills {
+    color: #ff2a6d;
+}
+
+/* BEGIN WAR button */
+.war-begin-btn {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Orbitron', monospace;
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: 4px;
+    color: #ff2a6d;
+    background: rgba(255, 42, 109, 0.1);
+    border: 2px solid #ff2a6d;
+    padding: 18px 48px;
+    cursor: pointer;
+    z-index: 45;
+    transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
+    animation: war-begin-pulse 2s ease-in-out infinite;
+}
+.war-begin-btn:hover {
+    background: rgba(255, 42, 109, 0.25);
+    box-shadow: 0 0 30px rgba(255, 42, 109, 0.5), 0 0 60px rgba(255, 42, 109, 0.2);
+    transform: translate(-50%, -50%) scale(1.05);
+}
+@keyframes war-begin-pulse {
+    0%, 100% { box-shadow: 0 0 15px rgba(255, 42, 109, 0.3); }
+    50% { box-shadow: 0 0 30px rgba(255, 42, 109, 0.6), 0 0 60px rgba(255, 42, 109, 0.2); }
+}
+
+/* Game Over overlay */
+.war-game-over {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(5, 5, 10, 0.92);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 55;
+}
+.war-gameover-fade-in {
+    animation: war-gameover-in 0.6s ease-out;
+}
+@keyframes war-gameover-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+.war-gameover-content {
+    text-align: center;
+}
+.war-gameover-result {
+    font-family: 'Orbitron', monospace;
+    font-size: 4rem;
+    font-weight: 700;
+    letter-spacing: 8px;
+    margin-bottom: 8px;
+    text-shadow: 0 0 40px currentColor;
+}
+.war-gameover-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.2rem;
+    letter-spacing: 6px;
+    margin-bottom: 40px;
+    opacity: 0.7;
+}
+.war-gameover-stats {
+    display: flex;
+    gap: 50px;
+    justify-content: center;
+    margin-bottom: 40px;
+}
+.war-gameover-stat {
+    text-align: center;
+}
+.war-gameover-stat-value {
+    font-family: 'Orbitron', monospace;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #00f0ff;
+}
+.war-gameover-stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 3px;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: 4px;
+}
+.war-gameover-btn {
+    font-family: 'Orbitron', monospace;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 3px;
+    color: #00f0ff;
+    background: rgba(0, 240, 255, 0.1);
+    border: 2px solid #00f0ff;
+    padding: 14px 40px;
+    cursor: pointer;
+    transition: background 0.2s, box-shadow 0.2s;
+}
+.war-gameover-btn:hover {
+    background: rgba(0, 240, 255, 0.2);
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+}
+
+/* Amy announcement toast (enhanced) */
+.war-announcement {
+    position: absolute;
+    top: 48px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10, 10, 20, 0.9);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    padding: 8px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
+    max-width: 500px;
+    text-align: center;
+    border-radius: 4px;
+    z-index: 35;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+.war-announce-wave {
+    font-size: 1rem;
+    border-color: rgba(255, 42, 109, 0.5);
+    background: rgba(255, 42, 109, 0.15);
+}
+.war-announce-kill {
+    font-size: 0.8rem;
+    border-color: rgba(5, 255, 161, 0.4);
+}
+.war-announce-tactical {
+    font-size: 0.75rem;
+}
+.war-announce-countdown {
+    font-size: 1.2rem;
+    font-family: 'Orbitron', monospace;
+}
+.war-announce-victory {
+    font-size: 1.5rem;
+    font-family: 'Orbitron', monospace;
+    color: #05ffa1;
+    border-color: #05ffa1;
+}

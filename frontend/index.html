@@ -485,6 +485,13 @@
                         <div id="war-amy-panel" style="position: absolute; top: 60px; right: 12px; width: 280px; pointer-events: auto;"></div>
                         <div id="war-alert-log" style="position: absolute; bottom: 12px; right: 12px; width: 300px; max-height: 250px; pointer-events: auto; overflow-y: auto;"></div>
                         <div id="war-setup-palette" style="position: absolute; top: 60px; left: 12px; width: 220px; pointer-events: auto; display: none;"></div>
+                        <!-- Game HUD overlays -->
+                        <div id="war-countdown" class="war-countdown" style="display:none"></div>
+                        <div id="war-wave-banner" class="war-wave-banner" style="display:none"></div>
+                        <div id="war-kill-feed" class="war-kill-feed"></div>
+                        <div id="war-score" class="war-score" style="display:none"></div>
+                        <button id="war-begin-btn" class="war-begin-btn" style="display:none">BEGIN WAR</button>
+                        <div id="war-game-over" class="war-game-over" style="display:none"></div>
                     </div>
                 </div>
 
@@ -569,7 +576,9 @@
     <script src="/static/js/geo.js?v=1"></script>
     <script src="/static/js/war3d.js?v=1"></script>
     <script src="/static/js/war-editor.js?v=1"></script>
-    <script src="/static/js/war.js?v=5"></script>
+    <script src="/static/js/war-combat.js?v=1"></script>
+    <script src="/static/js/war-hud.js?v=1"></script>
+    <script src="/static/js/war.js?v=6"></script>
 
     <!-- Level Editor (games-common modules) -->
     <script src="/static/common/js/editor/AssetRegistry.js"></script>
