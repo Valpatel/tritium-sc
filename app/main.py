@@ -27,6 +27,7 @@ from app.routers.scenarios import router as scenarios_router
 from app.routers.tts import router as tts_router
 from app.routers.targets_unified import router as targets_unified_router
 from app.routers.geo import router as geo_router
+from app.routers.game import router as game_router
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +191,12 @@ def _shutdown_subsystems(amy_instance, sim_engine, mqtt_bridge, app: FastAPI) ->
             logger.info("Stopping auto-dispatcher...")
             dispatcher.stop()
 
+    # 1.5. Announcer
+    announcer = getattr(app, "state", None) and getattr(app.state, "announcer", None)
+    if announcer is not None:
+        logger.info("Stopping war announcer...")
+        announcer.stop()
+
     # 2. MQTT bridge
     if mqtt_bridge is not None:
         logger.info("Stopping MQTT bridge...")
@@ -291,6 +298,20 @@ async def lifespan(app: FastAPI):
             # Threat escalation
             _start_escalation(amy_instance, sim_engine, mqtt_bridge)
 
+            # War announcer (subscribes to game events on EventBus)
+            if sim_engine is not None:
+                try:
+                    from amy.announcer import WarAnnouncer
+                    announcer = WarAnnouncer(
+                        amy_instance.event_bus,
+                        speaker=getattr(amy_instance, "speaker", None),
+                    )
+                    announcer.start()
+                    app.state.announcer = announcer
+                    logger.info("War announcer started")
+                except Exception as e:
+                    logger.warning(f"War announcer failed to start: {e}")
+
         except Exception as e:
             logger.warning(f"Amy AI Commander failed to start: {e}")
             app.state.amy = None
@@ -338,6 +359,7 @@ app.include_router(scenarios_router)
 app.include_router(tts_router)
 app.include_router(targets_unified_router)
 app.include_router(geo_router)
+app.include_router(game_router)
 
 # Static files
 frontend_path = Path(__file__).parent.parent / "frontend"

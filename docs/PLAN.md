@@ -154,15 +154,27 @@ COMPLETE (Phase 0-3)      PHASE 4 (Active)         FUTURE (Phase 5+)
 - [x] HUD panels: mode indicator, Amy speech toast, alert log, unit info
 - [x] WebSocket integration: live target updates from sim_telemetry_batch
 - [ ] Fog of war: areas outside sensor coverage dimmed
-- [ ] Engagement visualization: firing arcs, hit indicators
 - [ ] Minimap with alert markers
 - [ ] Operator can suggest, Amy can override (One-Straw philosophy)
+- [x] Combat system: projectiles, damage, health, weapon stats per unit type
+- [x] Game mode: setup → countdown → 10 waves → victory/defeat
+- [x] Unit AI: turret auto-aim, drone strafing, rover engage, kid nerf tactics
+- [x] Amy war announcer: Smash TV / Unreal Tournament style commentary
+- [x] Kill feed, wave banners, score display, kill streak effects
+- [x] BEGIN WAR button, countdown sequence, game over screens
+- [x] Non-combatants: civilians walk through battle (don't shoot them!)
+- [x] Health bars, projectile trails, explosion effects, particle system
 
-### Phase 5: Hardware Integration [FUTURE]
+### Phase 5: Hardware Integration + ROS2 [FUTURE]
+- [ ] **ROS2 integration**: Nav2 navigation stack for real rovers/drones
+- [ ] ROS2 ↔ MQTT bridge (ros2_mqtt_bridge or custom node)
+- [ ] ROS2 robot template: `examples/ros2-robot/` with Nav2, SLAM, AMCL
+- [ ] Robot description (URDF) for Nerf-equipped rover and drone
+- [ ] Gazebo simulation for hardware-in-the-loop testing
 - [ ] N real cameras on mesh network
-- [ ] Real Nerf turret servo control (pan/tilt/fire)
-- [ ] Real rover with motor control + onboard camera (reference: `examples/robot-template/`)
-- [ ] Drone integration (MAVLink or similar)
+- [ ] Real Nerf turret servo control (pan/tilt/fire via ROS2 joint controllers)
+- [ ] Real rover with motor control + onboard camera (ROS2 + Nav2)
+- [ ] Drone integration (PX4/MAVLink via MAVROS2)
 - [ ] Mesh radio for field communication
 - [ ] Battery and health monitoring for real assets
 

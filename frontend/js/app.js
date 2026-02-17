@@ -208,6 +208,54 @@ function handleWebSocketMessage(message) {
                 warHandleModeChange(message.data);
             }
             break;
+
+        // --- Game combat events ---
+        case 'amy_game_state_change':
+            if (message.data && typeof warHandleGameState === 'function') {
+                warHandleGameState(message.data);
+            }
+            break;
+        case 'amy_projectile_fired':
+            if (message.data && typeof warHandleProjectileFired === 'function') {
+                warHandleProjectileFired(message.data);
+            }
+            break;
+        case 'amy_projectile_hit':
+            if (message.data && typeof warHandleProjectileHit === 'function') {
+                warHandleProjectileHit(message.data);
+            }
+            break;
+        case 'amy_target_eliminated':
+            if (message.data && typeof warHandleTargetEliminated === 'function') {
+                warHandleTargetEliminated(message.data);
+            }
+            break;
+        case 'amy_wave_start':
+            if (message.data && typeof warHandleWaveStart === 'function') {
+                warHandleWaveStart(message.data);
+            }
+            break;
+        case 'amy_wave_complete':
+            if (message.data && typeof warHandleWaveComplete === 'function') {
+                warHandleWaveComplete(message.data);
+            }
+            break;
+        case 'amy_game_over':
+            if (message.data && typeof warHandleGameOver === 'function') {
+                warHandleGameOver(message.data);
+            }
+            break;
+        case 'amy_kill_streak':
+            if (message.data && typeof warHandleKillStreak === 'function') {
+                warHandleKillStreak(message.data);
+            }
+            break;
+        case 'amy_announcement':
+            if (message.data && typeof warHandleAmyAnnouncement === 'function') {
+                warHandleAmyAnnouncement(message.data);
+            }
+            break;
+
         default:
             // amy_* events are delivered via the dedicated SSE stream
             // in amy.js (connectAmyThoughts) — not forwarded here to

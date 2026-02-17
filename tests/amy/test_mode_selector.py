@@ -260,6 +260,7 @@ class TestThinkingModeContext:
             thoughts="none",
             goals="no goals",
             time_of_day="morning",
+            war_mode="",
         )
         assert "SIMULATION MODE" in system
         assert "simulated targets" in system
@@ -280,6 +281,7 @@ class TestThinkingModeContext:
             thoughts="none",
             goals="no goals",
             time_of_day="morning",
+            war_mode="",
         )
         assert "LIVE SENSORS" in system
         assert "real cameras" in system
