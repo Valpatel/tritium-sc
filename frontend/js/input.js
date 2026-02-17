@@ -42,7 +42,7 @@ const GAMEPAD_AXES = {
 };
 
 // View order for LB/RB navigation
-const VIEW_ORDER = ['grid', 'player', '3d', 'zones', 'targets', 'assets', 'analytics'];
+const VIEW_ORDER = ['grid', 'player', '3d', 'zones', 'targets', 'assets', 'analytics', 'war'];
 
 // =============================================================================
 // FOCUS MANAGER
@@ -588,41 +588,33 @@ class TritiumInputManager {
         switch (action) {
             // Navigation
             case 'nav_up':
-                if (TRITIUM?.state?.currentView === 'player') {
-                    // Volume up in player view
-                    if (typeof adjustVolume === 'function') {
-                        adjustVolume(0.1);
-                    }
+                if (TRITIUM?.state?.currentView === 'war') {
+                    this.warCyclePrev();
+                } else if (TRITIUM?.state?.currentView === 'player') {
+                    if (typeof adjustVolume === 'function') adjustVolume(0.1);
                 } else {
                     this.focusManager.moveFocus('up');
                 }
                 break;
             case 'nav_down':
-                if (TRITIUM?.state?.currentView === 'player') {
-                    // Volume down in player view
-                    if (typeof adjustVolume === 'function') {
-                        adjustVolume(-0.1);
-                    }
+                if (TRITIUM?.state?.currentView === 'war') {
+                    this.warCycleNext();
+                } else if (TRITIUM?.state?.currentView === 'player') {
+                    if (typeof adjustVolume === 'function') adjustVolume(-0.1);
                 } else {
                     this.focusManager.moveFocus('down');
                 }
                 break;
             case 'nav_left':
                 if (TRITIUM?.state?.currentView === 'player') {
-                    // Seek backward 10s in player view
-                    if (typeof skip === 'function') {
-                        skip(-10);
-                    }
+                    if (typeof skip === 'function') skip(-10);
                 } else {
                     this.focusManager.moveFocus('left');
                 }
                 break;
             case 'nav_right':
                 if (TRITIUM?.state?.currentView === 'player') {
-                    // Seek forward 10s in player view
-                    if (typeof skip === 'function') {
-                        skip(10);
-                    }
+                    if (typeof skip === 'function') skip(10);
                 } else {
                     this.focusManager.moveFocus('right');
                 }
@@ -630,25 +622,43 @@ class TritiumInputManager {
 
             // Actions
             case 'confirm':
-                // Special handling for player view - play/pause takes priority
-                if (TRITIUM?.state?.currentView === 'player') {
+                if (TRITIUM?.state?.currentView === 'war') {
+                    this.warSelectNearest();
+                    this.gamepadHandler.vibrate(50, 0.2, 0.1);
+                } else if (TRITIUM?.state?.currentView === 'player') {
                     if (typeof togglePlay === 'function') {
                         togglePlay();
                         this.gamepadHandler.vibrate(50, 0.2, 0.1);
                         break;
                     }
+                } else {
+                    this.focusManager.activateCurrent();
+                    this.gamepadHandler.vibrate(50, 0.2, 0.1);
                 }
-                this.focusManager.activateCurrent();
-                this.gamepadHandler.vibrate(50, 0.2, 0.1);
                 break;
             case 'back':
-                this.handleBack();
+                if (TRITIUM?.state?.currentView === 'war') {
+                    if (typeof warState !== 'undefined') {
+                        warState.selectedTargets = [];
+                        if (typeof updateUnitInfo === 'function') updateUnitInfo();
+                    }
+                } else {
+                    this.handleBack();
+                }
                 break;
             case 'context':
-                this.handleContext();
+                if (TRITIUM?.state?.currentView === 'war') {
+                    this.warCycleModes();
+                } else {
+                    this.handleContext();
+                }
                 break;
             case 'secondary':
-                this.handleSecondary();
+                if (TRITIUM?.state?.currentView === 'war') {
+                    if (typeof centerOnSelected === 'function') centerOnSelected();
+                } else {
+                    this.handleSecondary();
+                }
                 break;
 
             // View navigation
@@ -679,9 +689,13 @@ class TritiumInputManager {
                 this.handlePageDown();
                 break;
 
-            // 3D camera control
+            // Camera control (3D + War Room)
             case 'camera_move':
-                this.handle3DCameraMove(data);
+                if (TRITIUM?.state?.currentView === 'war') {
+                    this.handleWarCameraMove(data);
+                } else {
+                    this.handle3DCameraMove(data);
+                }
                 break;
         }
     }
@@ -879,19 +893,18 @@ class TritiumInputManager {
      */
     handlePageUp() {
         const view = TRITIUM?.state?.currentView;
-        if (view === 'player') {
-            // Jump backward 1 minute using player function
-            if (typeof skip === 'function') {
-                skip(-60);
+        if (view === 'war') {
+            if (typeof warState !== 'undefined') {
+                warState.cam.targetZoom = Math.max(0.3, warState.cam.targetZoom * 0.85);
             }
+        } else if (view === 'player') {
+            if (typeof skip === 'function') skip(-60);
         } else if (view === '3d') {
-            // Zoom out in 3D view
             if (typeof controls !== 'undefined' && controls) {
                 controls.dollyOut(1.2);
                 controls.update();
             }
         } else {
-            // Scroll up
             const viewContent = document.querySelector('.view-content:not(.hidden)');
             if (viewContent) {
                 viewContent.scrollTop -= viewContent.clientHeight * 0.8;
@@ -904,19 +917,18 @@ class TritiumInputManager {
      */
     handlePageDown() {
         const view = TRITIUM?.state?.currentView;
-        if (view === 'player') {
-            // Jump forward 1 minute using player function
-            if (typeof skip === 'function') {
-                skip(60);
+        if (view === 'war') {
+            if (typeof warState !== 'undefined') {
+                warState.cam.targetZoom = Math.min(5.0, warState.cam.targetZoom * 1.15);
             }
+        } else if (view === 'player') {
+            if (typeof skip === 'function') skip(60);
         } else if (view === '3d') {
-            // Zoom in in 3D view
             if (typeof controls !== 'undefined' && controls) {
                 controls.dollyIn(1.2);
                 controls.update();
             }
         } else {
-            // Scroll down
             const viewContent = document.querySelector('.view-content:not(.hidden)');
             if (viewContent) {
                 viewContent.scrollTop += viewContent.clientHeight * 0.8;
@@ -939,6 +951,80 @@ class TritiumInputManager {
             controls.rotateLeft(azimuthAngle);
             controls.rotateUp(polarAngle);
         }
+    }
+
+    /**
+     * War Room: pan camera from left stick
+     */
+    handleWarCameraMove(data) {
+        if (!data || typeof warState === 'undefined') return;
+        const panSpeed = 0.5 / warState.cam.zoom;
+        warState.cam.targetX += data.x * panSpeed;
+        warState.cam.targetY -= data.y * panSpeed;
+    }
+
+    /**
+     * War Room: select the nearest target to camera center
+     */
+    warSelectNearest() {
+        if (typeof warState === 'undefined' || typeof getTargets !== 'function') return;
+        const targets = getTargets();
+        const cam = warState.cam;
+        let closest = null;
+        let closestDist = Infinity;
+        for (const [tid, t] of Object.entries(targets)) {
+            const pos = typeof getTargetPosition === 'function' ? getTargetPosition(t) : { x: t.x, y: t.y };
+            if (pos.x === undefined) continue;
+            const dx = pos.x - cam.x;
+            const dy = pos.y - cam.y;
+            const dist = dx * dx + dy * dy;
+            if (dist < closestDist) {
+                closestDist = dist;
+                closest = tid;
+            }
+        }
+        if (closest) {
+            warState.selectedTargets = [closest];
+            if (typeof updateUnitInfo === 'function') updateUnitInfo();
+        }
+    }
+
+    /**
+     * War Room: cycle targets forward (D-pad down)
+     */
+    warCycleNext() {
+        if (typeof cycleTargets === 'function') cycleTargets();
+    }
+
+    /**
+     * War Room: cycle targets backward (D-pad up)
+     */
+    warCyclePrev() {
+        if (typeof warState === 'undefined' || typeof getTargets !== 'function') return;
+        const targets = getTargets();
+        const keys = Object.keys(targets);
+        if (keys.length === 0) return;
+        warState.cycleIndex = (warState.cycleIndex - 1 + keys.length) % keys.length;
+        const tid = keys[warState.cycleIndex];
+        warState.selectedTargets = [tid];
+        const t = targets[tid];
+        if (t) {
+            const pos = typeof getTargetPosition === 'function' ? getTargetPosition(t) : { x: t.x, y: t.y };
+            warState.cam.targetX = pos.x;
+            warState.cam.targetY = pos.y;
+        }
+        if (typeof updateUnitInfo === 'function') updateUnitInfo();
+    }
+
+    /**
+     * War Room: cycle through modes (X button)
+     */
+    warCycleModes() {
+        if (typeof warState === 'undefined' || typeof setWarMode !== 'function') return;
+        const modes = ['observe', 'tactical', 'setup'];
+        const idx = modes.indexOf(warState.mode);
+        const next = modes[(idx + 1) % modes.length];
+        setWarMode(next);
     }
 
     /**
@@ -1063,6 +1149,25 @@ class TritiumInputManager {
                     <div class="control-row"><kbd>Dbl-Click</kbd> View Camera</div>
                 </div>
             `,
+            'war': `
+                <div class="control-group" style="margin-top: 10px;">
+                    <div class="text-muted" style="font-size: 0.7rem; margin-bottom: 4px;">WAR ROOM</div>
+                    <div class="control-row"><kbd>O</kbd> Observe Mode</div>
+                    <div class="control-row"><kbd>T</kbd> Tactical Mode</div>
+                    <div class="control-row"><kbd>S</kbd> Setup Mode</div>
+                    <div class="control-row"><kbd>Click</kbd> Select Target</div>
+                    <div class="control-row"><kbd>Shift+Click</kbd> Add to Selection</div>
+                    <div class="control-row"><kbd>Right-Click</kbd> Dispatch Selected</div>
+                    <div class="control-row"><kbd>Drag</kbd> Box Select Friendlies</div>
+                    <div class="control-row"><kbd>Mid/Alt+Drag</kbd> Pan Camera</div>
+                    <div class="control-row"><kbd>Scroll</kbd> Zoom (cursor-centered)</div>
+                    <div class="control-row"><kbd>Dbl-Click</kbd> Center + Zoom Target</div>
+                    <div class="control-row"><kbd>Tab</kbd> Cycle Targets</div>
+                    <div class="control-row"><kbd>Space</kbd> Center on Selection</div>
+                    <div class="control-row"><kbd>Delete</kbd> Remove (Setup)</div>
+                    <div class="control-row"><kbd>Minimap Click</kbd> Pan to Location</div>
+                </div>
+            `,
         };
 
         return globalControls + (viewSpecific[view] || '');
@@ -1145,6 +1250,18 @@ class TritiumInputManager {
                     <div class="control-row"><span class="gp-btn">D-Pad</span> Navigate Stats</div>
                     <div class="control-row"><span class="gp-btn">A</span> Drill Down</div>
                     <div class="control-row"><span class="gp-btn">LB/RB</span> Change Period</div>
+                </div>
+            `,
+            'war': `
+                <div class="control-group" style="margin-top: 10px;">
+                    <div class="text-muted" style="font-size: 0.7rem; margin-bottom: 4px;">WAR ROOM</div>
+                    <div class="control-row"><span class="gp-btn">L-Stick</span> Pan Camera</div>
+                    <div class="control-row"><span class="gp-btn">A</span> Select Nearest Target</div>
+                    <div class="control-row"><span class="gp-btn">B</span> Deselect All</div>
+                    <div class="control-row"><span class="gp-btn">Y</span> Center on Selection</div>
+                    <div class="control-row"><span class="gp-btn">X</span> Cycle Modes</div>
+                    <div class="control-row"><span class="gp-btn">LT/RT</span> Zoom Out/In</div>
+                    <div class="control-row"><span class="gp-btn">D-Pad</span> Cycle Targets</div>
                 </div>
             `,
         };

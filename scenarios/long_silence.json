@@ -1,0 +1,17 @@
+{
+  "name": "long_silence",
+  "description": "Extended silence. Amy should think and remain calm without talking to herself excessively.",
+  "duration": 40.0,
+  "time_scale": 0.5,
+  "think_interval": 4.0,
+  "ambient_type": "silence",
+  "people": [],
+  "events": [
+    {"time": 10.0, "kind": "wait"},
+    {"time": 20.0, "kind": "wait"},
+    {"time": 30.0, "kind": "wait"}
+  ],
+  "expected": [
+    {"time_window": [0, 40], "action_type": "think", "weight": 1.0}
+  ]
+}

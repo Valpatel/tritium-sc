@@ -1,4 +1,4 @@
-"""API routers for SENTINEL."""
+"""API routers for TRITIUM-SC."""
 
 from app.routers.cameras import router as cameras_router
 from app.routers.videos import router as videos_router

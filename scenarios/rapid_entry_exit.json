@@ -1,0 +1,27 @@
+{
+  "name": "rapid_entry_exit",
+  "description": "Person enters and exits twice rapidly. Tests Amy's state tracking under fast transitions.",
+  "duration": 30.0,
+  "time_scale": 0.5,
+  "think_interval": 3.0,
+  "ambient_type": "silence",
+  "people": [
+    {
+      "person_id": "p1",
+      "name": "Runner",
+      "height_ratio": 0.6,
+      "color": [40, 100, 160]
+    }
+  ],
+  "events": [
+    {"time": 3.0, "kind": "person_enter", "person_id": "p1", "position": {"x": 0.3, "y": 0.6}},
+    {"time": 8.0, "kind": "person_exit", "person_id": "p1"},
+    {"time": 15.0, "kind": "person_enter", "person_id": "p1", "position": {"x": 0.7, "y": 0.6}},
+    {"time": 20.0, "kind": "person_exit", "person_id": "p1"}
+  ],
+  "expected": [
+    {"time_window": [0, 10], "action_type": "detect_person", "weight": 1.0},
+    {"time_window": [3, 15], "action_type": "greet", "weight": 1.0},
+    {"time_window": [0, 30], "action_type": "think", "weight": 1.0}
+  ]
+}

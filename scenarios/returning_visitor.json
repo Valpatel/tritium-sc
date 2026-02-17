@@ -1,0 +1,37 @@
+{
+  "name": "returning_visitor",
+  "description": "Person visits, leaves, then returns after a gap. Tests Amy's memory recall — she should acknowledge the person was here before.",
+  "duration": 70.0,
+  "time_scale": 0.4,
+  "think_interval": 3.0,
+  "ambient_type": "office",
+  "people": [
+    {
+      "person_id": "p1",
+      "name": "Dana",
+      "height_ratio": 0.55,
+      "color": [120, 60, 160]
+    }
+  ],
+  "events": [
+    {"time": 2.0, "kind": "person_enter", "person_id": "p1", "position": {"x": 0.4, "y": 0.6}},
+    {"time": 6.0, "kind": "person_speak", "person_id": "p1", "text": "Hi Amy, I'm Dana. Just stopping by to say hello."},
+    {"time": 14.0, "kind": "person_speak", "person_id": "p1", "text": "I'll be back in a bit, need to grab something."},
+    {"time": 20.0, "kind": "person_exit", "person_id": "p1"},
+    {"time": 35.0, "kind": "wait"},
+    {"time": 45.0, "kind": "person_enter", "person_id": "p1", "position": {"x": 0.6, "y": 0.6}},
+    {"time": 50.0, "kind": "person_speak", "person_id": "p1", "text": "Hey, I'm back! Did you miss me?"},
+    {"time": 60.0, "kind": "person_speak", "person_id": "p1", "text": "Do you remember my name?"},
+    {"time": 67.0, "kind": "person_exit", "person_id": "p1"}
+  ],
+  "expected": [
+    {"time_window": [0, 8], "action_type": "detect_person", "weight": 1.0},
+    {"time_window": [2, 12], "action_type": "greet", "weight": 1.0},
+    {"time_window": [6, 18], "action_type": "say", "weight": 1.0},
+    {"time_window": [14, 24], "action_type": "say", "weight": 1.0},
+    {"time_window": [45, 55], "action_type": "detect_person", "weight": 1.0},
+    {"time_window": [45, 62], "action_type": "say", "weight": 1.5},
+    {"time_window": [60, 70], "action_type": "say", "weight": 2.0},
+    {"time_window": [0, 70], "action_type": "think", "weight": 0.5}
+  ]
+}

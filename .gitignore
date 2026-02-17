@@ -51,6 +51,9 @@ __pycache__/
 
 # Thumbnails and AI cache
 thumbnails/
+# Scenario run results and pre-generated images
+scenarios/.results/
+amy/scenarios/cache/
 vectors.json
 labels.json
 merges.json
@@ -121,6 +124,21 @@ yarn.lock
 scratchpad/
 test_videos/
 sample_data/
+
+# ==================
+# AMY RUNTIME DATA
+# ==================
+# Personal camera captures, memory, and transcripts
+amy/photos/
+amy/amy_memory.json
+amy/transcripts/
+
+# ==================
+# TEST ARTIFACTS
+# ==================
+tests/e2e/playwright-report/
+tests/e2e/test-results/
+tests/docs/.renders/
 
 # ==================
 # SENSITIVE DOCS

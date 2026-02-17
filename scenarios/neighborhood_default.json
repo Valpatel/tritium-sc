@@ -1,0 +1,130 @@
+{
+  "format": "TritiumLevelFormat",
+  "version": 1,
+  "meta": {
+    "name": "Cul-de-Sac Neighborhood",
+    "description": "Default neighborhood layout: one residential block (~60m x 60m). Two north-south streets at x=-10 and x=+10, two east-west streets at y=-10 and y=+10. Houses fill the four quadrants between streets. Amy's position is the property at center (0,0).",
+    "scale": "1 unit = 1 meter",
+    "map_bounds": [-30, 30],
+    "author": "tritium-sc"
+  },
+  "objects": [
+    {
+      "type": "patrol_rover",
+      "name": "Rover Alpha",
+      "position": {"x": -10.0, "y": 0.0, "z": 10.0},
+      "properties": {
+        "name": "Rover Alpha",
+        "patrol_waypoints": [
+          {"x": -10.0, "z": 10.0},
+          {"x": 10.0, "z": 10.0},
+          {"x": 10.0, "z": -10.0},
+          {"x": -10.0, "z": -10.0}
+        ]
+      }
+    },
+    {
+      "type": "sentry_turret",
+      "name": "Turret North",
+      "position": {"x": 0.0, "y": 0.0, "z": 12.0},
+      "properties": {
+        "name": "Turret North"
+      }
+    },
+    {
+      "type": "sentry_turret",
+      "name": "Turret South",
+      "position": {"x": 0.0, "y": 0.0, "z": -12.0},
+      "properties": {
+        "name": "Turret South"
+      }
+    },
+    {
+      "type": "scout_drone",
+      "name": "Drone Overwatch",
+      "position": {"x": 5.0, "y": 5.0, "z": 0.0},
+      "properties": {
+        "name": "Drone Overwatch",
+        "patrol_waypoints": [
+          {"x": -20.0, "z": 20.0},
+          {"x": 20.0, "z": 20.0},
+          {"x": 20.0, "z": -20.0},
+          {"x": -20.0, "z": -20.0}
+        ]
+      }
+    },
+    {
+      "type": "interceptor_bot",
+      "name": "Interceptor Bravo",
+      "position": {"x": 8.0, "y": 0.0, "z": -5.0},
+      "properties": {
+        "name": "Interceptor Bravo"
+      }
+    },
+    {
+      "type": "ptz_camera",
+      "name": "Amy PTZ Camera",
+      "position": {"x": 0.0, "y": 3.0, "z": 0.0},
+      "properties": {
+        "name": "Amy PTZ Camera",
+        "fov": 120,
+        "ptz": true
+      }
+    },
+    {
+      "type": "security_camera",
+      "name": "Front Door Cam",
+      "position": {"x": 0.0, "y": 2.5, "z": 5.0},
+      "properties": {
+        "name": "Front Door Cam"
+      }
+    },
+    {
+      "type": "security_camera",
+      "name": "Back Yard Cam",
+      "position": {"x": 0.0, "y": 2.5, "z": -8.0},
+      "properties": {
+        "name": "Back Yard Cam"
+      }
+    },
+    {
+      "type": "activity_zone",
+      "name": "Front Yard",
+      "position": {"x": 0.0, "y": 0.0, "z": 8.0},
+      "properties": {
+        "name": "Front Yard",
+        "radius": 8.0,
+        "alert_level": "low"
+      }
+    },
+    {
+      "type": "restricted_area",
+      "name": "Back Porch",
+      "position": {"x": 0.0, "y": 0.0, "z": -5.0},
+      "properties": {
+        "name": "Back Porch",
+        "radius": 4.0,
+        "alert_level": "high"
+      }
+    },
+    {
+      "type": "entry_exit_zone",
+      "name": "Driveway",
+      "position": {"x": 5.0, "y": 0.0, "z": 10.0},
+      "properties": {
+        "name": "Driveway",
+        "radius": 3.0
+      }
+    },
+    {
+      "type": "patrol_waypoint",
+      "name": "NW Corner Watch",
+      "position": {"x": -20.0, "y": 0.0, "z": 20.0}
+    },
+    {
+      "type": "patrol_waypoint",
+      "name": "SE Corner Watch",
+      "position": {"x": 20.0, "y": 0.0, "z": -20.0}
+    }
+  ]
+}

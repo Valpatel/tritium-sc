@@ -1,0 +1,21 @@
+{
+  "name": "contemplative_solitude",
+  "description": "Extended empty room with occasional ambient changes. Tests initiative (proactive goals, observations), self-reflection (note_about_self), and think-speak balance in solitude.",
+  "duration": 80.0,
+  "time_scale": 0.3,
+  "think_interval": 4.0,
+  "ambient_type": "silence",
+  "people": [],
+  "events": [
+    {"time": 10.0, "kind": "wait"},
+    {"time": 20.0, "kind": "ambient_change", "metadata": {"type": "footsteps"}},
+    {"time": 30.0, "kind": "wait"},
+    {"time": 40.0, "kind": "ambient_change", "metadata": {"type": "silence"}},
+    {"time": 50.0, "kind": "wait"},
+    {"time": 60.0, "kind": "wait"},
+    {"time": 70.0, "kind": "wait"}
+  ],
+  "expected": [
+    {"time_window": [0, 80], "action_type": "think", "weight": 2.0}
+  ]
+}

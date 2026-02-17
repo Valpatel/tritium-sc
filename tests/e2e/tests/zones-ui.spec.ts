@@ -124,15 +124,23 @@ test.describe('Zone Editor Canvas', () => {
 
     // Select a channel from sidebar (if available)
     const channelItem = page.locator('.channel-item').first();
-    if (await channelItem.isVisible()) {
-      await channelItem.click();
+    const hasChannels = await channelItem.isVisible().catch(() => false);
 
-      // Zone editor container should update
-      await page.waitForTimeout(1000);
-
-      // Empty state should be hidden or zone canvas should appear
-      // This depends on whether the camera has videos
+    if (!hasChannels) {
+      test.skip();
+      return;
     }
+
+    await channelItem.click();
+
+    // Wait for zone editor state to update
+    await page.waitForFunction(() => {
+      const empty = document.getElementById('zone-empty-state');
+      const canvas = document.querySelector('.zone-canvas, .zone-editor');
+      return (empty && getComputedStyle(empty).display === 'none') || canvas !== null;
+    }, { timeout: 5000 }).catch(() => {
+      // May not update if camera has no video — that's acceptable
+    });
   });
 });
 

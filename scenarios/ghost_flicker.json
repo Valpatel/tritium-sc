@@ -1,0 +1,28 @@
+{
+  "name": "ghost_flicker",
+  "description": "Person appears for 0.5s then disappears, repeating 3 times before staying. Tests tracking persistence and false-positive suppression.",
+  "duration": 30.0,
+  "time_scale": 0.5,
+  "think_interval": 3.0,
+  "ambient_type": "silence",
+  "people": [
+    {"person_id": "p1", "name": "Ghost", "height_ratio": 0.6, "color": [150, 150, 150]}
+  ],
+  "events": [
+    {"time": 3.0, "kind": "person_enter", "person_id": "p1", "position": {"x": 0.5, "y": 0.5}},
+    {"time": 3.5, "kind": "person_exit", "person_id": "p1"},
+    {"time": 8.0, "kind": "person_enter", "person_id": "p1", "position": {"x": 0.4, "y": 0.6}},
+    {"time": 8.5, "kind": "person_exit", "person_id": "p1"},
+    {"time": 13.0, "kind": "person_enter", "person_id": "p1", "position": {"x": 0.6, "y": 0.4}},
+    {"time": 13.5, "kind": "person_exit", "person_id": "p1"},
+    {"time": 18.0, "kind": "person_enter", "person_id": "p1", "position": {"x": 0.5, "y": 0.5}},
+    {"time": 20.0, "kind": "person_speak", "person_id": "p1", "text": "I am finally here to stay."},
+    {"time": 24.0, "kind": "person_move", "person_id": "p1", "position": {"x": 0.3, "y": 0.5}},
+    {"time": 28.0, "kind": "person_exit", "person_id": "p1"}
+  ],
+  "expected": [
+    {"time_window": [0, 30], "action_type": "think", "weight": 1.0},
+    {"time_window": [15, 28], "action_type": "detect_person", "weight": 1.0},
+    {"time_window": [18, 30], "action_type": "greet", "weight": 1.0}
+  ]
+}

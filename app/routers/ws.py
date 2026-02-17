@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import threading
 from datetime import datetime
 from typing import Set
 
@@ -181,3 +182,86 @@ async def broadcast_detection(detection_data: dict):
             "timestamp": datetime.utcnow().isoformat(),
         }
     )
+
+
+# --- Amy event bridge ---
+
+async def broadcast_amy_event(event_type: str, data: dict):
+    """Broadcast an Amy event to all WebSocket clients."""
+    await manager.broadcast(
+        {
+            "type": f"amy_{event_type}",
+            "data": data,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+    )
+
+
+class TelemetryBatcher:
+    """Accumulates sim_telemetry events and flushes as a batch every 100ms."""
+
+    def __init__(self, loop: asyncio.AbstractEventLoop, interval: float = 0.1):
+        self._loop = loop
+        self._interval = interval
+        self._buffer: list[dict] = []
+        self._lock = threading.Lock()
+        self._flush_thread = threading.Thread(
+            target=self._flush_loop, daemon=True, name="telemetry-batcher"
+        )
+        self._running = True
+
+    def start(self) -> None:
+        self._flush_thread.start()
+
+    def add(self, data: dict) -> None:
+        with self._lock:
+            self._buffer.append(data)
+
+    def _flush_loop(self) -> None:
+        import time as _time
+
+        while self._running:
+            _time.sleep(self._interval)
+            with self._lock:
+                if not self._buffer:
+                    continue
+                batch = self._buffer[:]
+                self._buffer.clear()
+            asyncio.run_coroutine_threadsafe(
+                broadcast_amy_event("sim_telemetry_batch", batch), self._loop
+            )
+
+    def stop(self) -> None:
+        self._running = False
+
+
+def start_amy_event_bridge(amy_commander, loop: asyncio.AbstractEventLoop):
+    """Start a daemon thread that forwards Amy EventBus events to WebSocket.
+
+    This bridges Amy's threaded EventBus to FastAPI's async WebSocket system.
+
+    Args:
+        amy_commander: Amy's Commander instance
+        loop: The asyncio event loop to push events into
+    """
+    sub = amy_commander.event_bus.subscribe()
+    batcher = TelemetryBatcher(loop)
+    batcher.start()
+
+    def bridge_loop():
+        while True:
+            try:
+                msg = sub.get(timeout=60)
+                event_type = msg.get("type", "unknown")
+                data = msg.get("data", {})
+                if event_type == "sim_telemetry":
+                    batcher.add(data)
+                else:
+                    asyncio.run_coroutine_threadsafe(
+                        broadcast_amy_event(event_type, data), loop
+                    )
+            except Exception:
+                continue
+
+    thread = threading.Thread(target=bridge_loop, daemon=True, name="amy-ws-bridge")
+    thread.start()

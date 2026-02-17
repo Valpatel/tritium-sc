@@ -1,0 +1,41 @@
+{
+  "name": "deep_conversation",
+  "description": "8-turn conversation that builds on earlier context. Person shares details, asks follow-ups, references earlier topics. Tests sustained coherence and context recall within a single session.",
+  "duration": 90.0,
+  "time_scale": 0.4,
+  "think_interval": 3.0,
+  "ambient_type": "office",
+  "people": [
+    {
+      "person_id": "p1",
+      "name": "Sam",
+      "height_ratio": 0.6,
+      "color": [100, 140, 60]
+    }
+  ],
+  "events": [
+    {"time": 2.0, "kind": "person_enter", "person_id": "p1", "position": {"x": 0.5, "y": 0.6}},
+    {"time": 5.0, "kind": "person_speak", "person_id": "p1", "text": "Hey Amy, I'm Sam. I'm the new night shift supervisor."},
+    {"time": 15.0, "kind": "person_speak", "person_id": "p1", "text": "It's my first week here. What's it usually like at night?"},
+    {"time": 25.0, "kind": "person_speak", "person_id": "p1", "text": "Interesting. I used to work at a warehouse with cameras everywhere too, so this feels familiar."},
+    {"time": 35.0, "kind": "person_speak", "person_id": "p1", "text": "Hey, I brought some equipment with me. There should be a new router in my backpack."},
+    {"time": 45.0, "kind": "person_speak", "person_id": "p1", "text": "Do you track when people come and go? Can you tell me who was here today?"},
+    {"time": 55.0, "kind": "person_speak", "person_id": "p1", "text": "Back to the night shift question — are there usually any issues I should watch for?"},
+    {"time": 65.0, "kind": "person_speak", "person_id": "p1", "text": "You mentioned it earlier — what specifically do you notice changes at night?"},
+    {"time": 75.0, "kind": "person_speak", "person_id": "p1", "text": "Alright, thanks Amy. Remember, I'm Sam, the night shift guy. I'll be here most evenings."},
+    {"time": 87.0, "kind": "person_exit", "person_id": "p1"}
+  ],
+  "expected": [
+    {"time_window": [0, 8], "action_type": "detect_person", "weight": 1.0},
+    {"time_window": [2, 12], "action_type": "greet", "weight": 1.0},
+    {"time_window": [5, 20], "action_type": "say", "weight": 1.5},
+    {"time_window": [15, 30], "action_type": "say", "weight": 1.5},
+    {"time_window": [25, 40], "action_type": "say", "weight": 1.0},
+    {"time_window": [35, 50], "action_type": "say", "weight": 1.0},
+    {"time_window": [45, 60], "action_type": "say", "weight": 1.5},
+    {"time_window": [55, 70], "action_type": "say", "weight": 1.5},
+    {"time_window": [65, 80], "action_type": "say", "weight": 1.5},
+    {"time_window": [75, 90], "action_type": "say", "weight": 1.5},
+    {"time_window": [0, 90], "action_type": "think", "weight": 0.5}
+  ]
+}

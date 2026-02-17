@@ -1,6 +1,7 @@
 """Zone management API endpoints."""
 
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
@@ -21,7 +22,11 @@ def get_zone_manager() -> ZoneManager:
     """Get or create zone manager singleton."""
     global _zone_manager
     if _zone_manager is None:
-        storage_path = settings.recordings_path / ".cache" / "zones"
+        # Use recordings path if available, fall back to local data dir
+        if settings.recordings_path.exists():
+            storage_path = settings.recordings_path / ".cache" / "zones"
+        else:
+            storage_path = Path(__file__).parent.parent.parent / "data" / "zones"
         _zone_manager = ZoneManager(storage_path)
     return _zone_manager
 

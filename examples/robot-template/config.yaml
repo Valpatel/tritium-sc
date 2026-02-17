@@ -1,0 +1,34 @@
+robot_id: "rover-alpha"
+robot_name: "Rover Alpha"
+asset_type: "rover"
+site_id: "home"
+home_position:
+  x: 0
+  y: 0
+
+mqtt:
+  broker: "localhost"
+  port: 1883
+  username: ""
+  password: ""
+
+hardware:
+  mode: "simulated"
+  motor_left_forward: 17
+  motor_left_backward: 27
+  motor_right_forward: 22
+  motor_right_backward: 23
+  turret_pan_pin: 12
+  turret_tilt_pin: 13
+  trigger_pin: 24
+
+telemetry:
+  interval: 0.5
+  battery_pin: null
+
+camera:
+  enabled: false
+  device: 0
+  yolo_model: "yolov8n.pt"
+  detection_interval: 1.0
+  publish_frames: false

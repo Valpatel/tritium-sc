@@ -55,8 +55,10 @@ test.describe('TRITIUM-SC Dashboard', () => {
   });
 
   test('should load camera channels', async ({ page }) => {
-    // Wait for channels to load (give API time)
-    await page.waitForTimeout(2000);
+    // Wait for channels API response or timeout gracefully
+    await page.waitForResponse(
+      resp => resp.url().includes('/api/cameras') && resp.status() === 200
+    ).catch(() => { /* cameras endpoint may not exist in test env */ });
 
     // Channel list should exist
     await expect(page.locator('#channel-list')).toBeVisible();

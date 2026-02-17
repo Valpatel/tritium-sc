@@ -9,7 +9,14 @@
     "test:debug": "playwright test --debug",
     "test:report": "playwright show-report",
     "test:zones": "playwright test zones.spec.ts",
-    "test:dashboard": "playwright test dashboard.spec.ts"
+    "test:dashboard": "playwright test dashboard.spec.ts",
+    "test:scenarios": "playwright test scenarios-ui.spec.ts scenarios-api.spec.ts",
+    "test:scenarios-run": "playwright test scenarios-run.spec.ts",
+    "test:nav": "playwright test navigation.spec.ts",
+    "test:chaos": "playwright test scenarios-chaos.spec.ts",
+    "test:tts": "playwright test tts.spec.ts",
+    "test:scoring": "playwright test scenarios-scoring.spec.ts",
+    "test:all": "playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.40.0"

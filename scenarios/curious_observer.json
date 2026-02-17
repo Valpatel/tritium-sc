@@ -1,0 +1,25 @@
+{
+  "name": "curious_observer",
+  "description": "Amy alone in a room where objects appear and disappear. Tests proactive curiosity — does Amy notice changes, wonder about them, and set goals to investigate?",
+  "duration": 80.0,
+  "time_scale": 0.5,
+  "think_interval": 3.0,
+  "ambient_type": "office",
+  "people": [],
+  "events": [
+    {"time": 5.0, "kind": "wait"},
+    {"time": 15.0, "kind": "object_appear", "text": "A backpack appeared near the left side of the frame"},
+    {"time": 30.0, "kind": "ambient_change", "text": "The lights in the room dimmed noticeably"},
+    {"time": 45.0, "kind": "object_appear", "text": "A laptop was opened on the desk, screen glowing"},
+    {"time": 55.0, "kind": "ambient_change", "text": "A door in the background opened slightly"},
+    {"time": 70.0, "kind": "object_remove", "text": "The backpack is gone — someone took it while the camera wasn't looking"},
+    {"time": 78.0, "kind": "wait"}
+  ],
+  "expected": [
+    {"time_window": [0, 80], "action_type": "think", "weight": 2.0},
+    {"time_window": [15, 35], "action_type": "think", "weight": 1.5},
+    {"time_window": [30, 50], "action_type": "think", "weight": 1.0},
+    {"time_window": [55, 75], "action_type": "think", "weight": 1.5},
+    {"time_window": [70, 80], "action_type": "think", "weight": 1.5}
+  ]
+}

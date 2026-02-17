@@ -32,6 +32,9 @@ These work from any view:
 | `T` | Switch to Targets Gallery |
 | `A` | Switch to Assets Control |
 | `N` | Switch to Analytics View |
+| `Y` | Switch to Amy View |
+| `W` | Switch to War Room |
+| `S` | Switch to Scenarios View |
 | `/` | Focus search input |
 | `ESC` | Close modal / Cancel action |
 | `?` | Show controls help overlay |
@@ -106,6 +109,37 @@ These work from any view:
 |-----|--------|
 | `Arrow keys` | Navigate stat cards |
 | `Enter` | Drill down |
+
+### Amy View (Y)
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Send chat message |
+| `Arrow keys` | Navigate panels |
+
+### War Room (W)
+
+| Key | Action |
+|-----|--------|
+| `O` | Observe mode (read-only) |
+| `T` | Tactical mode (select + dispatch) |
+| `S` | Setup mode (place/remove assets) |
+| `Click` | Select target |
+| `Shift+Click` | Add/remove target from selection |
+| `Click + Drag` | Box select (friendlies only) |
+| `Shift+Drag` | Add to existing selection |
+| `Right Click` | Dispatch selected friendlies to location |
+| `Middle Click/Alt+Drag` | Pan camera |
+| `Scroll` | Zoom in/out (cursor-centered) |
+| `Double Click` | Center + zoom on target |
+| `Tab` | Cycle through all targets |
+| `Space` | Center camera on selection |
+| `Escape` | Cancel placement / Deselect all |
+| `Delete` | Remove selected asset (Setup mode) |
+| `Minimap Click` | Pan camera to minimap location |
+
+Note: `S`, `T`, and `O` keys are intercepted by the War Room for mode
+switching. Use sidebar tabs or gamepad LB/RB to navigate away from the War Room.
 
 ---
 
@@ -235,6 +269,29 @@ These work from any view:
 | B | Back up |
 | LB / RB | Change time range |
 | Left Stick | Scroll dashboard |
+
+#### Amy View
+
+| Button | Action |
+|--------|--------|
+| D-Pad | Navigate panels |
+| A | Send chat message / Select |
+| B | Close details |
+| Left Stick | Scroll thought stream |
+
+#### War Room
+
+| Button | Action |
+|--------|--------|
+| Left Stick | Pan camera |
+| Right Stick | Pan camera (alternative) |
+| D-Pad Up/Down | Cycle through targets (prev/next) |
+| A | Select nearest target to camera center |
+| B | Deselect all targets |
+| X | Cycle modes (Observe -> Tactical -> Setup) |
+| Y | Center camera on selection |
+| LT | Zoom out |
+| RT | Zoom in |
 
 ---
 

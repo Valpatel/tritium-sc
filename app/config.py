@@ -33,14 +33,42 @@ class Settings(BaseSettings):
     # go2rtc integration (Phase 2)
     go2rtc_url: str = "http://localhost:1984"
 
-    # MQTT (Phase 4)
+    # MQTT distributed bus
+    mqtt_enabled: bool = False
     mqtt_host: str = "localhost"
     mqtt_port: int = 1883
-    mqtt_topic_prefix: str = "tritium"
+    mqtt_site_id: str = "home"
+    mqtt_username: str = ""
+    mqtt_password: str = ""
 
     # Ollama (Phase 5)
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = "llava:13b"
+
+    # Geo engine
+    geo_cache_dir: str = "~/.cache/tritium-sc"
+
+    # Geo reference — real-world origin for the local coordinate system.
+    # Set from geocoding or manually.  All simulation/target coordinates
+    # are meters from this point.  (0, 0) local = (lat, lng) real.
+    map_center_lat: float = 0.0
+    map_center_lng: float = 0.0
+    map_center_alt: float = 0.0  # meters above sea level
+
+    # Simulation engine
+    simulation_enabled: bool = True
+    simulation_layout: str = ""
+    simulation_mode: str = "sim"  # "sim" or "live" — controls Amy's tactical data source
+
+    # Amy AI Commander
+    amy_enabled: bool = True
+    amy_camera_device: str | None = None    # auto-detect BCC950
+    amy_deep_model: str = "llava:7b"
+    amy_chat_model: str = "gemma3:4b"
+    amy_whisper_model: str = "large-v3"
+    amy_tts_enabled: bool = True
+    amy_wake_word: str = "amy"
+    amy_think_interval: float = 8.0
 
     # Detection settings
     motion_threshold: float = 25.0

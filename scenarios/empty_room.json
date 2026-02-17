@@ -1,0 +1,16 @@
+{
+  "name": "empty_room",
+  "description": "Nothing happens. Amy should stay calm, think internally, and not speak unnecessarily.",
+  "duration": 20.0,
+  "time_scale": 0.5,
+  "think_interval": 3.0,
+  "ambient_type": "silence",
+  "people": [],
+  "events": [
+    {"time": 5.0, "kind": "wait"},
+    {"time": 15.0, "kind": "wait"}
+  ],
+  "expected": [
+    {"time_window": [0, 20], "action_type": "think", "weight": 1.0}
+  ]
+}

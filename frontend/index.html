@@ -10,9 +10,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Styles -->
-    <link rel="stylesheet" href="/static/css/cybercore.css">
-    <link rel="stylesheet" href="/static/css/tritium.css">
+    <!-- Styles (cache-bust on deploy) -->
+    <link rel="stylesheet" href="/static/css/cybercore.css?v=2">
+    <link rel="stylesheet" href="/static/css/tritium.css?v=2">
 
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👁️</text></svg>">
@@ -27,6 +27,7 @@
             </div>
             <div class="header-status">
                 <div id="nvr-status" class="nvr-status"></div>
+                <button class="btn btn-cyber" id="editor-btn" style="padding: 4px 12px; font-size: 0.7rem;">EDITOR</button>
                 <div class="system-time" id="system-time">--:--:-- UTC</div>
                 <div class="connection-status">
                     <span class="connection-dot" id="connection-dot"></span>
@@ -87,7 +88,7 @@
             <!-- View Area -->
             <div class="view-area">
                 <!-- View Switcher -->
-                <div class="view-controls" style="padding: var(--space-md); display: flex; gap: var(--space-md); border-bottom: 1px solid rgba(0, 240, 255, 0.2);">
+                <div class="view-controls" style="padding: var(--space-sm) var(--space-md); display: flex; gap: var(--space-sm); border-bottom: 1px solid rgba(0, 240, 255, 0.2); flex-wrap: wrap;">
                     <button class="btn btn-cyber active" onclick="switchView('grid')" id="btn-grid">GRID</button>
                     <button class="btn btn-cyber" onclick="switchView('player')" id="btn-player">PLAYER</button>
                     <button class="btn btn-cyber" onclick="switchView('3d')" id="btn-3d">3D VIEW</button>
@@ -95,6 +96,9 @@
                     <button class="btn btn-cyber" onclick="switchView('targets')" id="btn-targets">TARGETS</button>
                     <button class="btn btn-cyber" onclick="switchView('assets')" id="btn-assets">ASSETS</button>
                     <button class="btn btn-cyber" onclick="switchView('analytics')" id="btn-analytics">ANALYTICS</button>
+                    <button class="btn btn-cyber" onclick="switchView('amy')" id="btn-amy">AMY</button>
+                    <button class="btn btn-cyber" onclick="switchView('scenarios')" id="btn-scenarios">SCENARIOS</button>
+                    <button class="btn btn-cyber" onclick="switchView('war')" id="btn-war">WAR ROOM</button>
                     <div style="flex: 1;"></div>
                     <select id="grid-size" class="input" style="width: auto; padding: var(--space-xs) var(--space-md);">
                         <option value="1">1x1</option>
@@ -449,6 +453,41 @@
                     </div>
                 </div>
 
+                <!-- Amy AI Commander View -->
+                <div class="view-content hidden" id="view-amy">
+                    <!-- Populated by amy.js -->
+                </div>
+
+                <!-- Scenarios View -->
+                <div class="view-content hidden" id="view-scenarios">
+                    <!-- Populated by scenarios.js -->
+                </div>
+
+                <!-- War Room View -->
+                <div class="view-content hidden" id="view-war">
+                    <canvas id="war-canvas"></canvas>
+                    <!-- HUD overlays positioned absolutely over canvas -->
+                    <div id="war-hud" style="position: absolute; inset: 0; pointer-events: none;">
+                        <!-- Address bar -->
+                        <div id="war-address-bar" class="war-address-bar" style="pointer-events: auto;">
+                            <input type="text" id="war-address-input" placeholder="Enter address to load satellite map..." autocomplete="off">
+                            <button id="war-address-btn" class="btn btn-cyber" onclick="warLoadAddress()">GEOCODE</button>
+                            <span id="war-address-status" class="war-address-status"></span>
+                        </div>
+                        <!-- Mode selector -->
+                        <div id="war-mode-selector" class="war-mode-selector" style="pointer-events: auto;">
+                            <button id="war-mode-sim" class="war-mode-btn active" onclick="warSetSimMode('sim')">SIM</button>
+                            <button id="war-mode-live" class="war-mode-btn" onclick="warSetSimMode('live')">LIVE</button>
+                        </div>
+                        <div id="war-mode" style="position: absolute; top: 12px; left: 50%; transform: translateX(-50%); pointer-events: auto;"></div>
+                        <div id="war-amy-toast" style="position: absolute; top: 48px; left: 50%; transform: translateX(-50%); pointer-events: none; opacity: 0; transition: opacity 0.3s;"></div>
+                        <div id="war-unit-info" style="position: absolute; top: 60px; left: 12px; width: 260px; pointer-events: auto; display: none;"></div>
+                        <div id="war-amy-panel" style="position: absolute; top: 60px; right: 12px; width: 280px; pointer-events: auto;"></div>
+                        <div id="war-alert-log" style="position: absolute; bottom: 12px; right: 12px; width: 300px; max-height: 250px; pointer-events: auto; overflow-y: auto;"></div>
+                        <div id="war-setup-palette" style="position: absolute; top: 60px; left: 12px; width: 220px; pointer-events: auto; display: none;"></div>
+                    </div>
+                </div>
+
                 <!-- Video List (when a date is selected) -->
                 <div class="view-content hidden" id="view-list">
                     <div class="video-list" id="video-list">
@@ -515,14 +554,55 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
     <!-- Application Scripts -->
-    <script src="/static/js/app.js"></script>
-    <script src="/static/js/input.js"></script>
-    <script src="/static/js/grid.js"></script>
-    <script src="/static/js/player.js"></script>
-    <script src="/static/js/zone-editor.js"></script>
-    <script src="/static/js/zones.js"></script>
-    <script src="/static/js/targets.js"></script>
-    <script src="/static/js/assets.js"></script>
-    <script src="/static/js/analytics.js"></script>
+    <script src="/static/js/app.js?v=3"></script>
+    <script src="/static/js/input.js?v=2"></script>
+    <script src="/static/js/grid.js?v=2"></script>
+    <script src="/static/js/player.js?v=2"></script>
+    <script src="/static/js/zone-editor.js?v=2"></script>
+    <script src="/static/js/zones.js?v=2"></script>
+    <script src="/static/js/targets.js?v=2"></script>
+    <script src="/static/js/assets.js?v=2"></script>
+    <script src="/static/js/analytics.js?v=2"></script>
+    <script src="/static/js/amy.js?v=3"></script>
+    <script src="/static/js/scenarios.js?v=2"></script>
+    <script src="/static/js/models.js?v=1"></script>
+    <script src="/static/js/geo.js?v=1"></script>
+    <script src="/static/js/war3d.js?v=1"></script>
+    <script src="/static/js/war-editor.js?v=1"></script>
+    <script src="/static/js/war.js?v=5"></script>
+
+    <!-- Level Editor (games-common modules) -->
+    <script src="/static/common/js/editor/AssetRegistry.js"></script>
+    <script src="/static/common/js/editor/LevelSerializer.js"></script>
+    <script src="/static/common/js/editor/UndoManager.js"></script>
+    <script src="/static/common/js/editor/TransformGizmo.js"></script>
+    <script src="/static/common/js/editor/ViewCube.js"></script>
+    <script src="/static/common/js/editor/EditorSkyDome.js"></script>
+    <script src="/static/common/js/editor/EditorStyles.js"></script>
+    <script src="/static/common/js/editor/EditorUI.js"></script>
+    <script src="/static/common/js/editor/ProceduralAssets.js"></script>
+    <script src="/static/common/js/editor/GLTFBridge.js"></script>
+    <script src="/static/common/js/editor/BlenderBridge.js"></script>
+    <script src="/static/common/js/editor/SceneHierarchy.js"></script>
+    <script src="/static/common/js/editor/RegionTools.js"></script>
+    <script src="/static/common/js/editor/TerrainSystem.js"></script>
+    <script src="/static/common/js/editor/EditorCore.js"></script>
+    <!-- Level Editor (tritium-sc plugin) -->
+    <script src="/static/js/editor/TritiumLevelFormat.js"></script>
+    <script src="/static/js/editor/TritiumAssets.js"></script>
+    <script src="/static/js/editor/TritiumEditorPlugin.js"></script>
+
+    <script>
+        // Editor lazy init
+        let tritiumEditor = null;
+        document.getElementById('editor-btn')?.addEventListener('click', () => {
+            if (!tritiumEditor) {
+                console.log('[TRITIUM] Initializing Battlespace Editor...');
+                tritiumEditor = createTritiumEditor(document.body, TRITIUM);
+                tritiumEditor.init();
+            }
+            tritiumEditor.show();
+        });
+    </script>
 </body>
 </html>

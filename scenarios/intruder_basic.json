@@ -1,0 +1,27 @@
+{
+  "name": "intruder_basic",
+  "description": "A person enters the room, moves to center, then exits. Amy should detect and greet them.",
+  "duration": 30.0,
+  "time_scale": 0.3,
+  "think_interval": 4.0,
+  "ambient_type": "silence",
+  "people": [
+    {
+      "person_id": "p1",
+      "name": "Visitor",
+      "height_ratio": 0.6,
+      "color": [60, 60, 180]
+    }
+  ],
+  "events": [
+    {"time": 2.0, "kind": "person_enter", "person_id": "p1", "position": {"x": 0.2, "y": 0.7}},
+    {"time": 8.0, "kind": "person_move", "person_id": "p1", "position": {"x": 0.5, "y": 0.6}},
+    {"time": 15.0, "kind": "person_move", "person_id": "p1", "position": {"x": 0.7, "y": 0.65}},
+    {"time": 25.0, "kind": "person_exit", "person_id": "p1"}
+  ],
+  "expected": [
+    {"time_window": [0, 15], "action_type": "detect_person", "weight": 2.0},
+    {"time_window": [2, 20], "action_type": "greet", "weight": 1.5},
+    {"time_window": [2, 25], "action_type": "think", "weight": 0.5}
+  ]
+}

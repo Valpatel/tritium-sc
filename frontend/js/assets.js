@@ -10,6 +10,9 @@ let assetState = {
     mapCanvas: null,
     mapCtx: null,
     telemetryInterval: null,
+    simTargets: {},
+    dispatchArrows: [],
+    simAnimating: false,
 };
 
 // Asset type icons
@@ -302,6 +305,104 @@ function drawTacticalMap() {
         ctx.fillText(asset.asset_id, x, y - 15);
     }
 
+    // Draw simulation targets
+    for (const [tid, t] of Object.entries(assetState.simTargets)) {
+        if (t.x === undefined || t.y === undefined) continue;
+
+        // Lerp toward target position for smooth animation
+        if (t._dispX === undefined) { t._dispX = t.x; t._dispY = t.y; }
+        t._dispX += (t.x - t._dispX) * 0.15;
+        t._dispY += (t.y - t._dispY) * 0.15;
+
+        // Convert sim coords (-30 to 30) to canvas coords
+        const sx = ((t._dispX + 30) / 60) * w;
+        const sy = ((t._dispY + 30) / 60) * h;
+
+        const alliance = (t.alliance || 'unknown').toLowerCase();
+
+        // Draw waypoint patrol paths
+        if (t.waypoints && t.waypoints.length > 1) {
+            ctx.strokeStyle = 'rgba(0, 240, 255, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 6]);
+            ctx.beginPath();
+            for (let i = 0; i < t.waypoints.length; i++) {
+                const wp = t.waypoints[i];
+                const wpx = ((wp.x + 30) / 60) * w;
+                const wpy = ((wp.y + 30) / 60) * h;
+                if (i === 0) ctx.moveTo(wpx, wpy);
+                else ctx.lineTo(wpx, wpy);
+            }
+            ctx.closePath();
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Shape by alliance
+        if (alliance === 'friendly') {
+            ctx.fillStyle = '#05ffa1';
+            ctx.beginPath();
+            ctx.arc(sx, sy, 8, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (alliance === 'hostile') {
+            ctx.fillStyle = '#ff2a6d';
+            ctx.beginPath();
+            // Diamond shape
+            ctx.moveTo(sx, sy - 8);
+            ctx.lineTo(sx + 8, sy);
+            ctx.lineTo(sx, sy + 8);
+            ctx.lineTo(sx - 8, sy);
+            ctx.closePath();
+            ctx.fill();
+        } else {
+            ctx.fillStyle = '#fcee0a';
+            ctx.fillRect(sx - 4, sy - 4, 8, 8);
+        }
+
+        // Heading indicator
+        if (t.heading !== undefined && t.heading !== null) {
+            const rad = (t.heading - 90) * Math.PI / 180;
+            ctx.strokeStyle = alliance === 'friendly' ? '#05ffa1'
+                : alliance === 'hostile' ? '#ff2a6d' : '#fcee0a';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(sx + Math.cos(rad) * 14, sy + Math.sin(rad) * 14);
+            ctx.stroke();
+        }
+
+        // Name label
+        ctx.fillStyle = '#fff';
+        ctx.font = '10px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(t.name || tid, sx, sy - 14);
+
+        // Battery bar for friendlies
+        if (alliance === 'friendly' && t.battery !== undefined) {
+            const barW = 20;
+            const barH = 4;
+            const bx = sx - barW / 2;
+            const by = sy + 12;
+            // Background
+            ctx.fillStyle = 'rgba(255,255,255,0.15)';
+            ctx.fillRect(bx, by, barW, barH);
+            // Fill with green-to-red gradient
+            const level = Math.max(0, Math.min(1, t.battery));
+            const r = Math.round(255 * (1 - level));
+            const g = Math.round(255 * level);
+            ctx.fillStyle = `rgb(${r}, ${g}, 0)`;
+            ctx.fillRect(bx, by, barW * level, barH);
+        }
+    }
+
+    // Draw dispatch arrows
+    const now = Date.now();
+    assetState.dispatchArrows = assetState.dispatchArrows.filter(a => now - a.time < 3000);
+    for (const arrow of assetState.dispatchArrows) {
+        const alpha = Math.max(0, 1 - (now - arrow.time) / 3000);
+        drawDispatchArrow(ctx, w, h, arrow.fromX, arrow.fromY, arrow.toX, arrow.toY, alpha);
+    }
+
     // Highlight selected asset's home
     if (assetState.selectedAsset && assetState.selectedAsset.home_x !== null && assetState.selectedAsset.home_x !== undefined) {
         const homeX = assetState.selectedAsset.home_x ?? 0;
@@ -319,6 +420,103 @@ function drawTacticalMap() {
         ctx.font = '8px "JetBrains Mono", monospace';
         ctx.fillText('HOME', hx, hy + 20);
     }
+}
+
+/**
+ * Draw a dispatch arrow (magenta) from source to destination in sim coords
+ */
+function drawDispatchArrow(ctx, w, h, fromX, fromY, toX, toY, alpha) {
+    const x1 = ((fromX + 30) / 60) * w;
+    const y1 = ((fromY + 30) / 60) * h;
+    const x2 = ((toX + 30) / 60) * w;
+    const y2 = ((toY + 30) / 60) * h;
+
+    ctx.strokeStyle = `rgba(255, 42, 109, ${alpha})`;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Arrowhead
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    const headLen = 10;
+    ctx.fillStyle = `rgba(255, 42, 109, ${alpha})`;
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - headLen * Math.cos(angle - 0.4), y2 - headLen * Math.sin(angle - 0.4));
+    ctx.lineTo(x2 - headLen * Math.cos(angle + 0.4), y2 - headLen * Math.sin(angle + 0.4));
+    ctx.closePath();
+    ctx.fill();
+}
+
+/**
+ * Update a simulation target from WebSocket telemetry data
+ */
+function updateSimTarget(data) {
+    if (!data || !data.target_id) return;
+
+    // Flatten nested position to top-level x/y (SimulationTarget.to_dict()
+    // sends {position: {x, y}} but assets.js/amy.js expect top-level t.x/t.y)
+    const posX = data.position ? data.position.x : data.x;
+    const posY = data.position ? data.position.y : data.y;
+
+    const existing = assetState.simTargets[data.target_id];
+    assetState.simTargets[data.target_id] = {
+        ...existing,
+        ...data,
+        x: posX,
+        y: posY,
+        name: data.name || (existing && existing.name) || data.target_id,
+        // Preserve display position for lerp
+        _dispX: existing ? existing._dispX : posX,
+        _dispY: existing ? existing._dispY : posY,
+    };
+
+    startSimAnimation();
+    drawTacticalMap();
+}
+
+/**
+ * Add a dispatch arrow to the tactical map
+ */
+function addDispatchArrow(targetId, destination) {
+    const target = assetState.simTargets[targetId];
+    if (!target) return;
+
+    assetState.dispatchArrows.push({
+        fromX: target.x || 0,
+        fromY: target.y || 0,
+        toX: destination.x,
+        toY: destination.y,
+        time: Date.now(),
+    });
+
+    startSimAnimation();
+}
+
+/**
+ * Start animation loop for smooth sim target rendering
+ */
+function startSimAnimation() {
+    if (assetState.simAnimating) return;
+    assetState.simAnimating = true;
+
+    function animate() {
+        const hasTargets = Object.keys(assetState.simTargets).length > 0;
+        const hasArrows = assetState.dispatchArrows.length > 0;
+
+        if (!hasTargets && !hasArrows) {
+            assetState.simAnimating = false;
+            return;
+        }
+
+        drawTacticalMap();
+        requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
 }
 
 /**
@@ -645,3 +843,6 @@ window.cancelCurrentTask = cancelCurrentTask;
 window.recallAsset = recallAsset;
 window.emergencyStop = emergencyStop;
 window.showAddAssetModal = showAddAssetModal;
+window.updateSimTarget = updateSimTarget;
+window.addDispatchArrow = addDispatchArrow;
+window.assetState = assetState;

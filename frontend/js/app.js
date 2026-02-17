@@ -119,6 +119,100 @@ function handleWebSocketMessage(message) {
         case 'detection':
             handleNewDetection(message.data);
             break;
+        case 'amy_sim_telemetry':
+            if (typeof updateSimTarget === 'function') {
+                updateSimTarget(message.data);
+            }
+            if (typeof updateBattlespacePanel === 'function') {
+                updateBattlespacePanel();
+            }
+            if (typeof warHandleSimTelemetry === 'function') {
+                warHandleSimTelemetry(message.data);
+            }
+            break;
+        case 'amy_sim_telemetry_batch':
+            if (message.data && Array.isArray(message.data)) {
+                for (const targetData of message.data) {
+                    if (typeof updateSimTarget === 'function') {
+                        updateSimTarget(targetData);
+                    }
+                    if (typeof warHandleSimTelemetry === 'function') {
+                        warHandleSimTelemetry(targetData);
+                    }
+                }
+                if (typeof updateBattlespacePanel === 'function') {
+                    updateBattlespacePanel();
+                }
+            }
+            break;
+        case 'amy_amy_dispatch':
+            if (message.data && typeof addDispatchArrow === 'function') {
+                addDispatchArrow(message.data.target_id, message.data.destination);
+            }
+            if (message.data && typeof warHandleDispatch === 'function') {
+                warHandleDispatch(message.data);
+            }
+            showNotification('DISPATCH', `${message.data.name || message.data.target_id} dispatched`, 'info');
+            break;
+        case 'amy_amy_alert':
+            if (message.data) {
+                showNotification('ALERT', message.data.message || 'Simulation alert', 'error');
+            }
+            break;
+        case 'amy_zone_violation':
+            if (message.data && typeof warHandleZoneViolation === 'function') {
+                warHandleZoneViolation(message.data);
+            }
+            showNotification('ZONE', message.data?.zone_name || 'Zone violation', 'error');
+            break;
+        case 'amy_threat_escalation':
+            if (message.data && typeof warHandleThreatEscalation === 'function') {
+                warHandleThreatEscalation(message.data);
+            }
+            showNotification('THREAT', `${message.data?.target_id?.slice(0,8) || '?'}: ${message.data?.old_level} -> ${message.data?.new_level}`, 'error');
+            break;
+        case 'amy_threat_deescalation':
+            if (message.data && typeof warHandleThreatEscalation === 'function') {
+                warHandleThreatEscalation(message.data);
+            }
+            break;
+        case 'amy_target_neutralized':
+            if (message.data && typeof warHandleTargetNeutralized === 'function') {
+                warHandleTargetNeutralized(message.data);
+            }
+            showNotification('NEUTRALIZED', `${message.data?.hostile_name || 'Hostile'} intercepted by ${message.data?.interceptor_name || 'unit'}`, 'success');
+            break;
+        case 'amy_auto_dispatch_speech':
+            if (message.data) {
+                showNotification('DISPATCH', message.data.text || 'Auto dispatch', 'info');
+                if (typeof warHandleAmySpeech === 'function') {
+                    warHandleAmySpeech(message.data);
+                }
+            }
+            break;
+        case 'amy_thought':
+            if (message.data && typeof warHandleAmyThought === 'function') {
+                warHandleAmyThought(message.data);
+            }
+            break;
+        case 'amy_state_change':
+            if (message.data && typeof warHandleAmyThought === 'function') {
+                // Update war room Amy panel state
+                if (typeof warState !== 'undefined') {
+                    warState.amyState = message.data.state || warState.amyState;
+                }
+            }
+            break;
+        case 'amy_mode_change':
+            if (message.data && typeof warHandleModeChange === 'function') {
+                warHandleModeChange(message.data);
+            }
+            break;
+        default:
+            // amy_* events are delivered via the dedicated SSE stream
+            // in amy.js (connectAmyThoughts) — not forwarded here to
+            // avoid duplicate entries in the sensorium panel.
+            break;
     }
 }
 
@@ -569,6 +663,26 @@ function switchView(view) {
         initAnalyticsView();
     }
 
+    // Initialize Amy view if needed
+    if (view === 'amy' && typeof initAmyView !== 'undefined') {
+        initAmyView();
+    }
+
+    // Initialize Scenarios view if needed
+    if (view === 'scenarios' && typeof initScenariosView !== 'undefined') {
+        initScenariosView();
+    }
+
+    // Initialize War Room view if needed
+    if (view === 'war' && typeof initWarView !== 'undefined') {
+        initWarView();
+    }
+
+    // Destroy War Room view when leaving
+    if (view !== 'war' && typeof destroyWarView !== 'undefined') {
+        destroyWarView();
+    }
+
     // Notify input manager of view change
     if (typeof tritiumInput !== 'undefined' && tritiumInput.setView) {
         tritiumInput.setView(view);
@@ -656,6 +770,9 @@ function initKeyboardShortcuts() {
         // Don't trigger if typing in input
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
+        // War Room captures s/t/o keys for mode switching
+        if (state.currentView === 'war' && ['s', 't', 'o'].includes(e.key)) return;
+
         switch (e.key) {
             case '1':
                 document.getElementById('grid-size').value = '1';
@@ -689,6 +806,15 @@ function initKeyboardShortcuts() {
                 break;
             case 'n':
                 switchView('analytics');
+                break;
+            case 'y':
+                switchView('amy');
+                break;
+            case 'w':
+                switchView('war');
+                break;
+            case 's':
+                switchView('scenarios');
                 break;
             case '/':
                 e.preventDefault();
@@ -750,12 +876,22 @@ function showKeyboardHelp() {
                     <div class="shortcut-row"><kbd>T</kbd> Targets Gallery</div>
                     <div class="shortcut-row"><kbd>A</kbd> Assets Control</div>
                     <div class="shortcut-row"><kbd>N</kbd> Analytics</div>
+                    <div class="shortcut-row"><kbd>Y</kbd> Amy Commander</div>
+                    <div class="shortcut-row"><kbd>W</kbd> War Room</div>
+                    <div class="shortcut-row"><kbd>S</kbd> Scenarios</div>
                 </div>
                 <div class="shortcut-section" style="margin-top: 8px;">
                     <div class="text-muted" style="margin-bottom: 4px; font-size: 0.7rem;">GRID SIZE</div>
                     <div class="shortcut-row"><kbd>1</kbd> Single Camera</div>
                     <div class="shortcut-row"><kbd>2</kbd> 2x2 Grid</div>
                     <div class="shortcut-row"><kbd>3</kbd> 3x3 Grid</div>
+                </div>
+                <div class="shortcut-section" style="margin-top: 8px;">
+                    <div class="text-muted" style="margin-bottom: 4px; font-size: 0.7rem;">WAR ROOM</div>
+                    <div class="shortcut-row"><kbd>O/T/S</kbd> Observe / Tactical / Setup</div>
+                    <div class="shortcut-row"><kbd>R-Click</kbd> Dispatch Selected</div>
+                    <div class="shortcut-row"><kbd>Tab</kbd> Cycle Targets</div>
+                    <div class="shortcut-row"><kbd>Space</kbd> Center on Selection</div>
                 </div>
                 <div class="shortcut-section" style="margin-top: 8px;">
                     <div class="text-muted" style="margin-bottom: 4px; font-size: 0.7rem;">OTHER</div>
