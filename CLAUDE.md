@@ -109,7 +109,10 @@ tritium-sc/
 | `frontend/js/amy.js` | Amy dashboard (thoughts, video, sensorium, chat) |
 | `frontend/js/war.js` | War Room — Canvas 2D RTS tactical map |
 | `frontend/js/assets.js` | Asset state + tactical map target rendering |
+| `frontend/js/war3d.js` | War Room — Three.js WebGL 3D renderer |
 | `frontend/js/input.js` | Gamepad/keyboard unified input system |
+| `tests/ui/test_vision.py` | Vision audit: Playwright + Ollama, 10 views x 3 resolutions x N models |
+| `docs/UI-VIEWS.md` | UI view specs — source of truth for vision audit prompts |
 | `examples/robot-template/` | Reference MQTT robot brain for real hardware |
 
 ## Environment Variables
@@ -137,6 +140,18 @@ cd tests/e2e && npx playwright test
 # UI layout drift test (Playwright + OpenCV, 30s observation)
 .venv/bin/python3 tests/ui/test_layout_drift.py
 
+# Vision UI audit (Playwright + Ollama, compares intent vs reality)
+# Compares screenshots against design specs in docs/UI-VIEWS.md
+# Models run one-at-a-time with explicit GPU unloading between passes
+python3 tests/ui/test_vision.py                       # Standard: llava + OCR, 10 views x 3 res
+python3 tests/ui/test_vision.py --quick                # Desktop only, llava only (fast check)
+python3 tests/ui/test_vision.py --deep                 # + qwen2.5vl (auto-sized for your RAM)
+python3 tests/ui/test_vision.py --ultra                # + qwen2.5vl:72b (overnight, needs 64GB+)
+python3 tests/ui/test_vision.py --view war             # Single view audit
+python3 tests/ui/test_vision.py --setup                # Download standard models
+python3 tests/ui/test_vision.py --setup --ultra        # Download all models incl. 72B
+python3 tests/ui/test_vision.py --list                 # List views, models, system info
+
 # Robot template tests
 cd examples/robot-template && python -m pytest tests/
 
@@ -155,6 +170,11 @@ Key test files:
 
 See [docs/UI-TESTING.md](docs/UI-TESTING.md) for the full methodology on detecting
 and fixing visual UI regressions with Playwright and OpenCV.
+
+See [docs/UI-VIEWS.md](docs/UI-VIEWS.md) for the canonical UI view specifications.
+When changing UI elements, update UI-VIEWS.md first, then derive the vision
+audit prompt in `tests/ui/test_vision.py` from the updated spec.  The audit
+prompts use a PRESENT/MISSING/WRONG/BROKEN/EXTRA comparison framework.
 
 ## Running
 
