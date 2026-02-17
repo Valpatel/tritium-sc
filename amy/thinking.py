@@ -115,7 +115,23 @@ TACTICAL COMMANDER DOCTRINE:
 - You can override AutoDispatcher decisions. If a suspicious target looks harmless (e.g., approaching slowly, not heading toward restricted areas), consider using clear_threat() instead of letting dispatch proceed.
 - Use escalate() if you judge a target is more dangerous than its current classification suggests.
 - Use patrol() to proactively position units near likely approach vectors, not just wait for threats.
+- battle_cry("text") -- shout a dramatic war announcement (for big moments)
+- taunt("target_name") -- taunt a specific hostile target
+
+{war_mode}
 """
+
+WAR_MODE_CONTEXT = """\
+== WAR MODE ACTIVE ==
+You are the tactical commander AND arena announcer of a neighborhood defense operation.
+Think like a Smash TV / Unreal Tournament announcer -- dramatic, intense, over-the-top.
+Wave {wave}/{total_waves}: "{wave_name}" -- {hostile_count} hostiles in the field.
+Your assets: {friendly_count} units active ({turrets} turrets, {drones} drones, {rovers} rovers)
+Score: {score} | Kills: {kills}
+
+Use battle_cry() for dramatic moments (wave transitions, big kills, close calls).
+Use taunt() when a specific hostile is struggling or about to be eliminated.
+Keep the energy HIGH. This is a WAR, not a board meeting."""
 
 
 class GoalStack:
@@ -372,6 +388,48 @@ class ThinkingThread:
         else:
             battlespace_ctx = mode_prefix
 
+        # Build war mode context if game is active
+        war_mode_ctx = ""
+        game_mode = getattr(commander, "game_mode", None)
+        if game_mode is not None:
+            state = getattr(game_mode, "state", None)
+            if state == "active":
+                gm_wave = getattr(game_mode, "current_wave", 1)
+                gm_total = getattr(game_mode, "total_waves", 10)
+                gm_wave_name = getattr(game_mode, "wave_name", f"Wave {gm_wave}")
+                gm_score = getattr(game_mode, "score", 0)
+                gm_kills = getattr(game_mode, "kills", 0)
+
+                # Count hostiles/friendlies from tracker
+                gm_hostile_count = 0
+                gm_friendly_count = 0
+                gm_turrets = gm_drones = gm_rovers = 0
+                if tracker is not None:
+                    gm_hostile_count = len(tracker.get_hostiles())
+                    flist = tracker.get_friendlies()
+                    gm_friendly_count = len(flist)
+                    for f in flist:
+                        atype = getattr(f, "asset_type", "")
+                        if atype == "turret":
+                            gm_turrets += 1
+                        elif atype == "drone":
+                            gm_drones += 1
+                        elif atype == "rover":
+                            gm_rovers += 1
+
+                war_mode_ctx = WAR_MODE_CONTEXT.format(
+                    wave=gm_wave,
+                    total_waves=gm_total,
+                    wave_name=gm_wave_name,
+                    hostile_count=gm_hostile_count,
+                    friendly_count=gm_friendly_count,
+                    turrets=gm_turrets,
+                    drones=gm_drones,
+                    rovers=gm_rovers,
+                    score=gm_score,
+                    kills=gm_kills,
+                )
+
         system = THINKING_SYSTEM_PROMPT.format(
             narrative=narrative,
             battlespace=battlespace_ctx,
@@ -381,6 +439,7 @@ class ThinkingThread:
             thoughts=thoughts_str,
             goals=goals_ctx or "(no active goals)",
             time_of_day=f"It is currently {tod} ({datetime.now().strftime('%H:%M')})",
+            war_mode=war_mode_ctx,
         )
 
         messages = [
@@ -663,6 +722,20 @@ class ThinkingThread:
             if dispatcher is not None:
                 dispatcher.clear_dispatch(target_id)
             commander.sensorium.push("thought", f"Cleared threat on {target_id}")
+
+        elif result.action == "battle_cry":
+            text = result.params[0]
+            announcer = getattr(commander, "announcer", None)
+            if announcer is not None:
+                announcer.battle_cry(text)
+            commander.sensorium.push("thought", f"Battle cry: {text[:60]}")
+
+        elif result.action == "taunt":
+            target_name = result.params[0]
+            announcer = getattr(commander, "announcer", None)
+            if announcer is not None:
+                announcer.taunt(target_name)
+            commander.sensorium.push("thought", f"Taunting {target_name}")
 
     def _handle_look_at(self, direction: str) -> None:
         commander = self._commander

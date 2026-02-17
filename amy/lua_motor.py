@@ -55,6 +55,8 @@ VALID_ACTIONS: dict[str, tuple[int, int, list[type]]] = {
     "patrol":            (2, 2, [str, str]),
     "escalate":          (2, 2, [str, str]),
     "clear_threat":      (1, 1, [str]),
+    "battle_cry":        (1, 1, [str]),
+    "taunt":             (1, 1, [str]),
 }
 
 VALID_DIRECTIONS = {
@@ -402,6 +404,14 @@ def validate_action(action: str, params: list[Any]) -> str | None:
     if action == "clear_threat" and params:
         if not isinstance(params[0], str):
             return "clear_threat() requires a string target_id"
+
+    if action == "battle_cry" and params:
+        if not isinstance(params[0], str):
+            return "battle_cry() requires a string text"
+
+    if action == "taunt" and params:
+        if not isinstance(params[0], str):
+            return "taunt() requires a string target name or id"
 
     return None
 
