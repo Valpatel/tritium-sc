@@ -467,10 +467,10 @@ async def no_cache_static(request: Request, call_next):
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    """Serve the main dashboard."""
-    index_path = frontend_path / "index.html"
-    if index_path.exists():
-        return FileResponse(index_path)
+    """Serve the Command Center (primary interface)."""
+    unified_path = frontend_path / "unified.html"
+    if unified_path.exists():
+        return FileResponse(unified_path)
     return HTMLResponse(
         content="""
         <html>
@@ -484,22 +484,29 @@ async def root():
     )
 
 
+@app.get("/unified", response_class=HTMLResponse)
+async def unified_redirect():
+    """Redirect /unified to / for backwards compatibility."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/", status_code=301)
+
+
+@app.get("/legacy", response_class=HTMLResponse)
+async def legacy_dashboard():
+    """Serve the legacy 10-tab SPA dashboard."""
+    index_path = frontend_path / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+    return HTMLResponse(content="Legacy dashboard not found")
+
+
 @app.get("/command", response_class=HTMLResponse)
 async def command_center():
-    """Serve the command center UI (sidebar + bottom bar layout)."""
+    """Serve the command center UI (deprecated, use / instead)."""
     cmd_path = frontend_path / "command.html"
     if cmd_path.exists():
         return FileResponse(cmd_path)
     return HTMLResponse(content="Command center not found")
-
-
-@app.get("/unified", response_class=HTMLResponse)
-async def unified_interface():
-    """Serve the unified command interface (floating panels over full-viewport map)."""
-    unified_path = frontend_path / "unified.html"
-    if unified_path.exists():
-        return FileResponse(unified_path)
-    return HTMLResponse(content="Unified interface not found")
 
 
 @app.get("/health")
