@@ -3,44 +3,44 @@
   "version": 1,
   "meta": {
     "name": "Cul-de-Sac Neighborhood",
-    "description": "Default neighborhood layout: one residential block (~60m x 60m). Two north-south streets at x=-10 and x=+10, two east-west streets at y=-10 and y=+10. Houses fill the four quadrants between streets. Amy's position is the property at center (0,0). House footprint roughly -6..+6 x -5..+5. Front yard faces north (+z), back porch faces south (-z). Driveway at east side.",
+    "description": "Default neighborhood layout: ~400m x 400m operational area. Amy's property at center (0,0). Patrol rovers cover perimeter routes, turrets guard property boundaries, drones sweep wider sectors. Cameras stay house-mounted near origin.",
     "scale": "1 unit = 1 meter",
-    "map_bounds": [-30, 30],
+    "map_bounds": [-200, 200],
     "author": "tritium-sc"
   },
   "objects": [
     {
       "type": "patrol_rover",
       "name": "Rover Alpha",
-      "position": {"x": -8.0, "y": 0.0, "z": 8.0},
+      "position": {"x": -60.0, "y": 0.0, "z": 80.0},
       "properties": {
         "name": "Rover Alpha",
         "patrol_waypoints": [
-          {"x": -8.0, "z": 8.0},
-          {"x": 8.0, "z": 8.0},
-          {"x": 8.0, "z": -8.0},
-          {"x": -8.0, "z": -8.0}
+          {"x": -80.0, "z": 100.0},
+          {"x": 80.0, "z": 100.0},
+          {"x": 80.0, "z": -100.0},
+          {"x": -80.0, "z": -100.0}
         ]
       }
     },
     {
       "type": "patrol_rover",
       "name": "Rover Bravo",
-      "position": {"x": 12.0, "y": 0.0, "z": -5.0},
+      "position": {"x": 100.0, "y": 0.0, "z": -40.0},
       "properties": {
         "name": "Rover Bravo",
         "patrol_waypoints": [
-          {"x": 12.0, "z": -5.0},
-          {"x": 12.0, "z": 12.0},
-          {"x": -12.0, "z": 12.0},
-          {"x": -12.0, "z": -5.0}
+          {"x": 120.0, "z": -60.0},
+          {"x": 120.0, "z": 120.0},
+          {"x": -120.0, "z": 120.0},
+          {"x": -120.0, "z": -60.0}
         ]
       }
     },
     {
       "type": "sentry_turret",
       "name": "Turret NW",
-      "position": {"x": -6.0, "y": 0.0, "z": 5.0},
+      "position": {"x": -40.0, "y": 0.0, "z": 35.0},
       "properties": {
         "name": "Turret NW"
       }
@@ -48,7 +48,7 @@
     {
       "type": "sentry_turret",
       "name": "Turret SE",
-      "position": {"x": 6.0, "y": 0.0, "z": -5.0},
+      "position": {"x": 40.0, "y": 0.0, "z": -35.0},
       "properties": {
         "name": "Turret SE"
       }
@@ -56,7 +56,7 @@
     {
       "type": "heavy_turret",
       "name": "Heavy Turret Front Gate",
-      "position": {"x": 0.0, "y": 0.0, "z": 10.0},
+      "position": {"x": 0.0, "y": 0.0, "z": 50.0},
       "properties": {
         "name": "Heavy Turret Front Gate"
       }
@@ -72,35 +72,35 @@
     {
       "type": "scout_drone",
       "name": "Scout Drone West",
-      "position": {"x": -15.0, "y": 8.0, "z": 0.0},
+      "position": {"x": -100.0, "y": 8.0, "z": 0.0},
       "properties": {
         "name": "Scout Drone West",
         "patrol_waypoints": [
-          {"x": -20.0, "z": 20.0},
-          {"x": -20.0, "z": -20.0},
-          {"x": -10.0, "z": -20.0},
-          {"x": -10.0, "z": 20.0}
+          {"x": -150.0, "z": 150.0},
+          {"x": -150.0, "z": -150.0},
+          {"x": -60.0, "z": -150.0},
+          {"x": -60.0, "z": 150.0}
         ]
       }
     },
     {
       "type": "scout_drone",
       "name": "Scout Drone East",
-      "position": {"x": 15.0, "y": 8.0, "z": 0.0},
+      "position": {"x": 100.0, "y": 8.0, "z": 0.0},
       "properties": {
         "name": "Scout Drone East",
         "patrol_waypoints": [
-          {"x": 20.0, "z": 20.0},
-          {"x": 20.0, "z": -20.0},
-          {"x": 10.0, "z": -20.0},
-          {"x": 10.0, "z": 20.0}
+          {"x": 150.0, "z": 150.0},
+          {"x": 150.0, "z": -150.0},
+          {"x": 60.0, "z": -150.0},
+          {"x": 60.0, "z": 150.0}
         ]
       }
     },
     {
       "type": "tank",
       "name": "Tank Guardian",
-      "position": {"x": 0.0, "y": 0.0, "z": -12.0},
+      "position": {"x": 0.0, "y": 0.0, "z": -60.0},
       "properties": {
         "name": "Tank Guardian"
       }
@@ -138,7 +138,7 @@
     {
       "type": "security_camera",
       "name": "East Side Cam",
-      "position": {"x": 6.0, "y": 2.5, "z": 0.0},
+      "position": {"x": 8.0, "y": 2.5, "z": 0.0},
       "properties": {
         "name": "East Side Cam",
         "fov": 90,
@@ -148,7 +148,7 @@
     {
       "type": "security_camera",
       "name": "West Side Cam",
-      "position": {"x": -6.0, "y": 2.5, "z": 0.0},
+      "position": {"x": -8.0, "y": 2.5, "z": 0.0},
       "properties": {
         "name": "West Side Cam",
         "fov": 90,
@@ -158,20 +158,20 @@
     {
       "type": "activity_zone",
       "name": "Front Yard Activity",
-      "position": {"x": 0.0, "y": 0.0, "z": 8.0},
+      "position": {"x": 0.0, "y": 0.0, "z": 40.0},
       "properties": {
         "name": "Front Yard Activity",
-        "radius": 10.0,
+        "radius": 50.0,
         "alert_level": "low"
       }
     },
     {
       "type": "restricted_area",
       "name": "Back Porch Restricted",
-      "position": {"x": 0.0, "y": 0.0, "z": -6.0},
+      "position": {"x": 0.0, "y": 0.0, "z": -30.0},
       "properties": {
         "name": "Back Porch Restricted",
-        "radius": 5.0,
+        "radius": 25.0,
         "alert_level": "high"
       }
     },
@@ -181,7 +181,7 @@
       "position": {"x": 0.0, "y": 0.0, "z": 0.0},
       "properties": {
         "name": "Full Perimeter",
-        "radius": 25.0,
+        "radius": 100.0,
         "alert_level": "medium"
       }
     }

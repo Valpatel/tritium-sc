@@ -5,8 +5,14 @@ Run script for development and production.
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
+
+# Add src/ to PYTHONPATH for app/amy imports
+_src = str(Path(__file__).parent / "src")
+if _src not in sys.path:
+    sys.path.insert(0, _src)
 
 import uvicorn
 from loguru import logger

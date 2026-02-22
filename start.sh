@@ -14,6 +14,7 @@ fi
 
 # GB10 (sm_121) CUDA not supported by PyTorch — force CPU for Whisper/YOLO
 export CUDA_VISIBLE_DEVICES=""
+export PYTHONPATH="$DIR/src${PYTHONPATH:+:$PYTHONPATH}"
 
 echo "TRITIUM-SC starting on http://localhost:$PORT"
 exec "$DIR/.venv/bin/uvicorn" app.main:app --host 0.0.0.0 --port "$PORT"

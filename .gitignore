@@ -15,6 +15,10 @@ credentials/
 # Allow .env.example (template for users)
 !.env.example
 
+# Fleet/host config (contains hostnames/IPs)
+conf/*.conf
+!conf/*.conf.example
+
 # ==================
 # VIDEO RECORDINGS
 # ==================
@@ -51,9 +55,12 @@ __pycache__/
 
 # Thumbnails and AI cache
 thumbnails/
+# Synthetic media (generated at runtime)
+data/synthetic/audio/
+data/synthetic/video/
 # Scenario run results and pre-generated images
 scenarios/.results/
-amy/scenarios/cache/
+src/amy/scenarios/cache/
 vectors.json
 labels.json
 merges.json
@@ -129,9 +136,7 @@ sample_data/
 # AMY RUNTIME DATA
 # ==================
 # Personal camera captures, memory, and transcripts
-amy/photos/
-amy/amy_memory.json
-amy/transcripts/
+data/amy/
 
 # ==================
 # TEST ARTIFACTS
@@ -139,6 +144,20 @@ amy/transcripts/
 tests/e2e/playwright-report/
 tests/e2e/test-results/
 tests/docs/.renders/
+tests/ui/.battle-results/
+tests/ui/.gameplay-results/
+tests/.test-results/
+tests/.baselines/current/
+
+# ==================
+# CLAUDE CODE
+# ==================
+.claude/
+
+# ==================
+# TEST ARTIFACTS (additional paths)
+# ==================
+tests/amy/.test-results/
 
 # ==================
 # SENSITIVE DOCS

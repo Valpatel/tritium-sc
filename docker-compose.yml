@@ -37,23 +37,49 @@ services:
   #   volumes:
   #     - ./go2rtc.yaml:/config/go2rtc.yaml:ro
 
-  # MQTT Broker (Phase 4)
-  # mosquitto:
-  #   image: eclipse-mosquitto:2
-  #   container_name: mosquitto
-  #   restart: unless-stopped
-  #   ports:
-  #     - "1883:1883"
-  #     - "9001:9001"
-  #   volumes:
-  #     - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-  #     - mosquitto_data:/mosquitto/data
-  #     - mosquitto_log:/mosquitto/log
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./conf/mosquitto:/mosquitto/config:ro
+      - mosquitto_data:/mosquitto/data
+
+  influxdb:
+    image: influxdb:2.7
+    container_name: influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUX_USER:-admin}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUX_PASSWORD:-tritium-sc-2026}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUX_ORG:-tritium}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUX_BUCKET:-telemetry}
+      - DOCKER_INFLUXDB_INIT_RETENTION=${INFLUX_RETENTION:-30d}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUX_TOKEN:-tritium-dev-token}
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+
+  telegraf:
+    image: telegraf:1.30
+    container_name: telegraf
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+      - influxdb
+    volumes:
+      - ./conf/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    environment:
+      - INFLUX_TOKEN=${INFLUX_TOKEN:-tritium-dev-token}
 
 volumes:
   tritium_db:
-  # mosquitto_data:
-  # mosquitto_log:
+  mosquitto_data:
+  influxdb_data:
 
 networks:
   default:
