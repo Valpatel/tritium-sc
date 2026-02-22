@@ -13,6 +13,15 @@
 
 **[ NERF WAR BATTLESPACE MANAGEMENT ]**
 
+![Command Center](docs/screenshots/command-center.png)
+*Command Center — real satellite imagery, AI-controlled units, live tactical panels*
+
+![Combat](docs/screenshots/game-combat.png)
+*Wave-based Nerf combat — turrets engage hostile intruders with projectile physics and kill streaks*
+
+![Neighborhood](docs/screenshots/neighborhood-wide.png)
+*Your neighborhood becomes the battlefield — same pipeline monitors real security*
+
 `▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀`
 
 *A garden of diverse digital life — AI that flourishes, machines that act independently*
@@ -42,6 +51,18 @@ The operator doesn't control this system. The operator **tends** it — like a f
 
 ---
 
+## TWO SIDES OF THE SAME COIN
+
+The Nerf game and the security system are the **same system**. The perception pipeline that detects a simulated hostile intruder on the tactical map is the same pipeline that detects a real stranger at the gate. The turret that tracks a foam dart target uses the same tracking code that follows a delivery truck across camera views.
+
+This is by design. The game is a continuous integration test for the security system. Every hostile eliminated in a 10-wave battle proves the detection pipeline works. Every one that sneaks past reveals a gap. Amy — the AI Commander — is the consciousness connecting both: she reasons about simulated threats and real-world anomalies with the same perception layers, the same inner monologue, the same decision process.
+
+All processing is local. No cloud. No subscriptions. No data leaves your network.
+
+See [docs/VISION.md](docs/VISION.md) for the full perception philosophy, security roadmap, and privacy design.
+
+---
+
 ## QUICK START
 
 ```bash
@@ -53,14 +74,48 @@ cd tritium-sc
 # 2. Start the server
 ./start.sh
 
-# 3. Open http://localhost:8000
+# 3. Open the Command Center
+#    http://localhost:8000/unified
 
-# 4. Press W to enter the War Room
-
-# 5. Watch, select units, right-click to dispatch
+# 4. Watch. Units patrol. Amy thinks. Hostiles spawn.
+#    Click a unit. Right-click to dispatch. Press B to begin war.
 ```
 
-The simulation engine starts automatically. Friendly units patrol, hostile intruders spawn, and Amy begins thinking. See [docs/HOW-TO-PLAY.md](docs/HOW-TO-PLAY.md) for the full player guide.
+The simulation engine starts automatically. Friendly units patrol, hostile intruders spawn at map edges, and Amy's inner monologue runs continuously. Press `B` to start a 10-wave Nerf battle.
+
+See [docs/HOW-TO-PLAY.md](docs/HOW-TO-PLAY.md) for the full player guide.
+See [docs/USER-STORIES.md](docs/USER-STORIES.md) for what the complete experience should feel like.
+See [docs/VISION.md](docs/VISION.md) for the perception philosophy and security monitoring roadmap.
+
+## DEVELOP
+
+```bash
+# Run the fast test suite (~60 seconds)
+./test.sh fast
+
+# Individual tiers
+./test.sh 1              # Syntax check (Python + JS)
+./test.sh 2              # Unit tests (1666 pytest)
+./test.sh 3              # JS tests (281 across 5 files)
+./test.sh 9              # Integration tests (23 server E2E)
+./test.sh 10             # Visual quality tests (/unified)
+
+# Everything (15+ minutes, includes visual E2E)
+./test.sh all
+
+# Dev server with hot reload
+./setup.sh dev
+```
+
+| What you changed | Test command | Time |
+|-----------------|-------------|------|
+| Python backend | `./test.sh 2` | ~45s |
+| Frontend JS | `./test.sh 3` | ~3s |
+| CSS / layout | Open browser, look at `/unified` | 5s |
+| Everything | `./test.sh fast` | ~60s |
+| Visual regression | `./test.sh 10` | ~30s |
+
+See [CLAUDE.md](CLAUDE.md) for full developer instructions, code conventions, and API reference.
 
 ---
 
@@ -186,6 +241,18 @@ AMY COMMANDER
 ├── POST /api/amy/command        Lua action (scan, look_at, observe)
 └── POST /api/amy/auto-chat      Toggle autonomous conversation
 ```
+
+### PERCEPTION LAYERS
+
+The same three-layer perception stack repeats everywhere in the system:
+
+| Layer | What | Tools | Speed |
+|-------|------|-------|-------|
+| L0 | Traditional vision | OpenCV: sharpness gate, edge density, motion detection | ~5ms/frame |
+| L1 | Machine learning | YOLO detection, ByteTrack tracking, CLIP embeddings | ~30ms/frame |
+| L2 | Vision language models | llava scene understanding, gemma3 reasoning | ~5s/cycle |
+
+This layering appears in the server (`perception.py` → `detector.py` → `thinking.py`), in robot brains (`VisionBridge`), in the test suite (OpenCV → API → LLM audit), and in synthetic media generation. See [docs/VISION.md](docs/VISION.md).
 
 ---
 
@@ -350,6 +417,8 @@ ACTIONS:
 • DISPATCH   - Task an asset to track/investigate this target
 • VIEW       - Jump to video footage at detection timestamp
 ```
+
+**Coming next:** Cross-camera re-identification (OSNet embeddings), learning "regulars" (mail carrier, dog walker, red sedan), and alerting on genuinely new appearances. See [docs/VISION.md](docs/VISION.md) for the full security monitoring roadmap.
 
 ---
 
@@ -541,8 +610,9 @@ Connect any Xbox, 8BitDo (xinput mode), or standard controller:
 │                                      + sim telemetry batches       │
 │                                                                    │
 │  MQTT (distributed devices)                                        │
-│  ├── tritium/{site}/robots/{id}/telemetry   Robot position/battery │
+│  ├── tritium/{site}/robots/{id}/telemetry   Position/battery/IMU   │
 │  ├── tritium/{site}/robots/{id}/command     Dispatch/patrol/recall  │
+│  ├── tritium/{site}/robots/{id}/thoughts    Robot LLM thoughts     │
 │  ├── tritium/{site}/cameras/{id}/detections Camera YOLO boxes      │
 │  ├── tritium/{site}/amy/alerts              Threat notifications   │
 │  └── tritium/{site}/escalation/change       Threat level changes   │
@@ -556,76 +626,73 @@ Connect any Xbox, 8BitDo (xinput mode), or standard controller:
 
 ```
 tritium-sc/
-├── amy/                         # AMY — AI Commander (autonomous consciousness)
-│   ├── commander.py             # Main orchestrator, event loop, VisionThread, AudioThread
-│   ├── event_bus.py             # EventBus — thread-safe pub/sub for all internal events
-│   ├── sensorium.py             # L3 awareness: temporal sensor fusion
-│   ├── thinking.py              # L4 deliberation: continuous inner monologue
-│   ├── target_tracker.py        # Unified registry of real (YOLO) + virtual (sim) targets
-│   ├── escalation.py            # ThreatClassifier (2Hz) + AutoDispatcher
-│   ├── mqtt_bridge.py           # MQTT broker bridge for distributed devices
-│   ├── perception.py            # Layered perception: quality, complexity, motion
-│   ├── lua_motor.py             # Action parser (Lua-structured LLM output)
-│   ├── memory.py                # Persistent spatial + event memory
-│   ├── motor.py                 # Motor programs (scan, track, breathe, nod)
-│   ├── listener.py              # Silero VAD + whisper.cpp GPU STT
-│   ├── speaker.py               # Piper TTS (BCC950 ALSA output)
-│   ├── vision.py                # Ollama deep vision API
-│   ├── agent.py                 # LLM chat agent with tool use
-│   ├── tools.py                 # Tool dispatch to Commander
-│   ├── extraction.py            # Fact extraction from conversation
-│   ├── router.py                # FastAPI: /api/amy/* endpoints + SSE
-│   ├── simulation/              # Battlespace simulation engine
-│   │   ├── engine.py            # 10Hz tick loop, hostile spawner
-│   │   ├── target.py            # SimulationTarget dataclass
-│   │   ├── ambient.py           # AmbientSpawner (neutral neighborhood activity)
-│   │   └── loader.py            # TritiumLevelFormat JSON parser
-│   └── nodes/                   # Distributed sensor architecture
-│       ├── base.py              # Abstract SensorNode (camera, mic, PTZ, speaker)
-│       ├── bcc950.py            # Logitech BCC950 PTZ camera + mic + speaker
-│       ├── ip_camera.py         # RTSP/NVR IP camera (view-only)
-│       ├── audio.py             # Standalone mic/speaker node
-│       └── virtual.py           # No-hardware (dashboard-only testing)
-├── app/
-│   ├── ai/
-│   │   ├── detector.py          # YOLO object detection
-│   │   ├── tracker.py           # ByteTrack integration
-│   │   ├── analyzer.py          # Video analysis pipeline
-│   │   └── embeddings.py        # Visual similarity (CLIP)
-│   ├── routers/
-│   │   ├── cameras.py           # Camera CRUD
-│   │   ├── videos.py            # Video browsing & streaming
-│   │   ├── ai.py                # Analysis endpoints
-│   │   ├── search.py            # Search & labeling
-│   │   ├── zones.py             # Zone management
-│   │   ├── assets.py            # Asset command & control
-│   │   ├── ws.py                # WebSocket broadcast + Amy event bridge
-│   │   └── discovery.py         # NVR auto-discovery
-│   ├── zones/
-│   │   └── checker.py           # Point-in-polygon zone checks
-│   ├── discovery/
-│   │   └── nvr.py               # Reolink NVR API client
-│   ├── main.py                  # FastAPI app, lifespan, Amy startup
-│   ├── config.py                # Pydantic settings (app + Amy config)
-│   ├── database.py              # Async SQLite + FTS5
-│   └── models.py                # SQLAlchemy models
-├── frontend/
-│   ├── index.html               # Main SPA (9 views incl. AMY + War Room)
-│   ├── css/
-│   │   ├── cybercore.css        # Cyberpunk base theme
-│   │   └── tritium.css          # App + Amy panel styles
-│   └── js/
-│       ├── app.js               # Main app, WebSocket, keyboard shortcuts
-│       ├── amy.js               # Amy dashboard (thoughts, video, chat)
-│       ├── war.js               # War Room — Canvas 2D RTS tactical map
-│       ├── grid.js              # Three.js 3D property view
-│       ├── player.js            # Video player
-│       ├── zones.js             # Zone management
-│       ├── targets.js           # People/vehicle gallery
-│       ├── assets.js            # Asset state + tactical map rendering
-│       ├── analytics.js         # Detection statistics
-│       └── input.js             # Unified keyboard + gamepad input
-└── tests/
+├── src/                            # ALL Python source code
+│   ├── amy/                        # AMY — AI Commander (autonomous consciousness)
+│   │   ├── commander.py            # Main orchestrator, event loop
+│   │   ├── router.py               # FastAPI: /api/amy/* endpoints + SSE
+│   │   ├── brain/                  # Consciousness & reasoning
+│   │   │   ├── thinking.py         # L4 deliberation: inner monologue (gemma3:4b)
+│   │   │   ├── sensorium.py        # L3 awareness: temporal sensor fusion
+│   │   │   ├── perception.py       # L0-L2 frame analysis, quality gate
+│   │   │   ├── vision.py           # Ollama chat API wrapper
+│   │   │   ├── memory.py           # Persistent long-term memory
+│   │   │   └── extraction.py       # Fact extraction from conversation
+│   │   ├── actions/                # Motor control & Lua dispatch
+│   │   │   ├── motor.py            # Motor programs (scan, track, breathe)
+│   │   │   ├── lua_motor.py        # Lua parser, VALID_ACTIONS
+│   │   │   ├── announcer.py        # War commentary (Smash TV style)
+│   │   │   └── tools.py            # Tool definitions for agent mode
+│   │   ├── comms/                  # Communication & I/O
+│   │   │   ├── event_bus.py        # Thread-safe pub/sub
+│   │   │   ├── listener.py         # Silero VAD + whisper.cpp GPU STT
+│   │   │   ├── speaker.py          # Piper TTS output
+│   │   │   ├── transcript.py       # Conversation logging
+│   │   │   └── mqtt_bridge.py      # MQTT broker bridge
+│   │   ├── tactical/               # Tracking & threat detection
+│   │   │   ├── target_tracker.py   # Unified registry (real + virtual)
+│   │   │   ├── escalation.py       # ThreatClassifier + AutoDispatcher
+│   │   │   └── geo.py              # Coordinate transforms
+│   │   ├── inference/              # Model routing & fleet
+│   │   │   ├── model_router.py     # Task-aware model selection
+│   │   │   └── fleet.py            # Multi-host Ollama discovery
+│   │   ├── simulation/             # Battlespace simulation engine
+│   │   │   ├── engine.py           # 10Hz tick loop, hostile spawner
+│   │   │   ├── combat.py           # Projectile flight, hit detection
+│   │   │   ├── game_mode.py        # Wave-based game progression
+│   │   │   ├── behaviors.py        # Unit AI (turret, drone, rover)
+│   │   │   └── target.py           # SimulationTarget dataclass
+│   │   └── nodes/                  # Distributed sensor nodes
+│   │       ├── base.py             # Abstract SensorNode
+│   │       ├── bcc950.py           # BCC950 PTZ camera + mic + speaker
+│   │       ├── ip_camera.py        # RTSP/NVR IP camera
+│   │       └── mqtt_robot.py       # MQTT robot as SensorNode
+│   └── app/                        # FastAPI backend
+│       ├── main.py                 # App entry point, lifespan
+│       ├── config.py               # Pydantic settings
+│       ├── models.py               # SQLAlchemy models
+│       ├── ai/                     # Detection pipeline
+│       │   ├── detector.py         # YOLO + ByteTrack
+│       │   ├── embeddings.py       # CLIP visual similarity
+│       │   └── tracker.py          # Multi-object tracking
+│       ├── routers/                # API endpoints
+│       │   ├── ws.py               # WebSocket + Amy event bridge
+│       │   ├── cameras.py          # Camera CRUD
+│       │   ├── game.py             # Game state API
+│       │   └── ...                 # zones, assets, search, videos
+│       └── zones/                  # Zone management
+│           └── checker.py          # Point-in-polygon checks
+├── frontend/                       # Static frontend (no build step)
+│   ├── unified.html                # PRIMARY — Command Center
+│   ├── index.html                  # Legacy 10-tab SPA
+│   ├── js/                         # Modular JavaScript
+│   │   ├── app.js                  # Main app, WebSocket, shortcuts
+│   │   └── war.js                  # War Room — Canvas 2D RTS map
+│   └── css/
+│       └── tritium.css             # CYBERCORE + custom styles
+├── examples/
+│   ├── robot-template/             # Reference MQTT robot brain
+│   └── ros2-robot/                 # ROS2 Humble robot
+└── tests/                          # 2000+ tests across 8 tiers
 ```
 
 ---
@@ -694,25 +761,31 @@ PHASE 3 ████████████████████ COMPLETE �
 ├── Amy speech on dispatch events
 └── TelemetryBatcher for WebSocket efficiency
 
-PHASE 4 ████████████████░░░░ IN PROGRESS — WAR ROOM RTS
-├── War Room view: full-screen Canvas 2D tactical map
+PHASE 4 ████████████████████ COMPLETE — WAR ROOM RTS + COMBAT
+├── War Room: full-screen Canvas 2D tactical map
 ├── Three modes: OBSERVE, TACTICAL, SETUP
-├── Target rendering with alliance colors + headings
-├── Camera pan/zoom, box select, dispatch via click
-└── TODO: fog of war, engagement viz, minimap
+├── 10-wave combat system with kill streaks
+├── Amy war announcer (Smash TV style)
+├── Synthetic video + audio pipeline
+└── Model Router + Fleet + Lua Registry + Robot Thinker
 
-PHASE 5 ░░░░░░░░░░░░░░░░░░░░ FUTURE — HARDWARE INTEGRATION
-├── N real cameras on mesh network
-├── Real Nerf turret servo control
-├── Real rover with motor control + onboard camera
-└── Battery and health monitoring for real assets
+PHASE 5 ████████░░░░░░░░░░░░ IN PROGRESS — HARDWARE + SIM-TO-REAL
+├── ROS2 robot template + MQTT bridge
+├── Robot LLM thinker (autonomous thinking)
+├── Extended telemetry (battery, IMU, GPS, odometry)
+├── Vision bridge (YOLO fast-path -> LLM slow-path)
+├── Nav planner (GPS <-> game coordinates)
+└── TODO: Isaac Lab, real Nerf turrets, mesh network
 
 PHASE 6 ░░░░░░░░░░░░░░░░░░░░ THE GARDEN MATURES
-├── Behavioral memory in threat classification
-├── Pursuit intercept (track moving targets)
-├── Force reserve + unit type awareness
-├── Historical replay on tactical map
-└── The system tends itself — the operator just watches
+├── Cross-camera re-ID (OSNet body embeddings)
+├── Face detection (opt-in, consenting household only)
+├── License plate recognition (fast-alpr)
+├── Pattern-of-life baselines (Poisson per zone, trajectory clustering)
+├── Anomaly detection (new person/car, temporal outliers)
+├── Weapon detection (YOLO-World zero-shot)
+├── Fleet coordination (Amy commands multiple robots)
+└── See docs/VISION.md for full roadmap + privacy tiers
 ```
 
 ---
