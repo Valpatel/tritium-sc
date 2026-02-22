@@ -5,6 +5,9 @@ from __future__ import annotations
 import os
 import tempfile
 
+# Force CPU for tests — GB10 sm_121 is incompatible with current PyTorch (sm_80-90)
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+
 import numpy as np
 import pytest
 
@@ -151,5 +154,32 @@ def memory_tmpdir(tmp_path):
 @pytest.fixture
 def sensorium():
     """A fresh Sensorium instance."""
-    from amy.sensorium import Sensorium
+    from amy.brain.sensorium import Sensorium
     return Sensorium()
+
+
+@pytest.fixture
+def synthetic_video_lib(tmp_path):
+    """A SyntheticVideoLibrary using a temp directory."""
+    from amy.synthetic.video_library import SyntheticVideoLibrary
+    return SyntheticVideoLibrary(library_path=str(tmp_path / "synthetic_video"))
+
+
+@pytest.fixture(scope="module")
+def perf_results():
+    """Collect performance metrics across tests in a module.
+
+    After the module completes, writes a JSON report to
+    tests/.test-results/perf-report.json.
+    """
+    import json
+    from pathlib import Path
+
+    results: dict[str, dict] = {}
+    yield results
+
+    results_dir = Path(__file__).parent.parent / ".test-results"
+    results_dir.mkdir(parents=True, exist_ok=True)
+    report_path = results_dir / "perf-report.json"
+    with open(report_path, "w") as f:
+        json.dump(results, f, indent=2)
