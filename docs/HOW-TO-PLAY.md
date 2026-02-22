@@ -18,10 +18,8 @@ cd tritium-sc
 ./start.sh
 # or: ./setup.sh dev
 
-# 4. Open the dashboard
+# 4. Open the Command Center
 # Navigate to http://localhost:8000
-
-# 5. Press W to enter the War Room
 ```
 
 That is it. The simulation engine starts automatically and populates the map with friendly units, hostile intruders, and ambient neighborhood activity. You are playing within seconds of opening the browser.
@@ -30,7 +28,7 @@ That is it. The simulation engine starts automatically and populates the map wit
 
 ## What You See
 
-When you press `W` to open the War Room, you see a full-screen 2D tactical map of the battlespace:
+The Command Center is a full-screen 2D tactical map of the battlespace:
 
 ```
 +---------------------------------------------------------------+
@@ -160,7 +158,7 @@ Amy operates independently:
 - **Speech**: Amy announces dispatches, threats, and observations via TTS
 - **Overrides**: Amy can countermand your orders or issue her own dispatch commands
 
-You see Amy's thoughts streaming in the Amy panel (top-right of the War Room) and in the dedicated Amy dashboard (press `Y`).
+You see Amy's thoughts streaming in the Amy panel on the Command Center map.
 
 ---
 
@@ -194,7 +192,7 @@ The camera has smooth interpolation (lerp factor 0.1) so movement feels fluid.
 
 ---
 
-## Keyboard Controls (War Room)
+## Keyboard Controls (Command Center)
 
 | Key | Action |
 |-----|--------|
@@ -217,31 +215,21 @@ The camera has smooth interpolation (lerp factor 0.1) so movement feels fluid.
 ![Help Overlay](screenshots/help-overlay.png)
 *Press ? to see all keyboard shortcuts*
 
-### Global Keyboard Shortcuts
+### Additional Shortcuts
 
-These work from any view:
-
-| Key | View |
-|-----|------|
-| `G` | Grid (camera mosaic) |
-| `P` | Player (video playback) |
-| `D` | 3D Tactical Map |
-| `Z` | Zones |
-| `T` | Targets Gallery |
-| `A` | Assets Control |
-| `N` | Analytics |
-| `Y` | Amy Dashboard |
-| `W` | War Room |
-| `S` | Scenarios |
-| `/` | Focus search |
+| Key | Action |
+|-----|--------|
+| `B` | Begin 10-wave battle |
+| `F` | Center camera on action |
+| `V` | Toggle synthetic camera PIP |
+| `M` | Mute/unmute audio |
 | `?` | Controls help overlay |
-| `ESC` | Close modal / cancel |
 
-Note: When in the War Room, `S`, `T`, and `O` are intercepted for mode switching. Use the sidebar tabs or LB/RB on a gamepad to leave the War Room.
+The legacy dashboard at `/legacy` has additional view-switching shortcuts (G/P/D/Z/T/A/N/Y/W/S) for its 10-tab interface.
 
 ---
 
-## Gamepad Controls (War Room)
+## Gamepad Controls (Command Center)
 
 | Button | Action |
 |--------|--------|
@@ -300,22 +288,9 @@ The simulation engine runs at 10 Hz, driving all virtual targets across the map:
 
 ---
 
-## Other Views
+## Legacy Dashboard
 
-The War Room is the primary gameplay interface, but TRITIUM-SC has 10 views total:
-
-| Key | View | Purpose |
-|-----|------|---------|
-| G | Grid | Multi-camera mosaic -- see all camera feeds at once |
-| P | Player | Single camera playback with timeline and annotations |
-| D | 3D Map | Three.js tactical map with camera field-of-view cones |
-| Z | Zones | Create and edit monitoring zones (activity, entry/exit, tripwire, restricted) |
-| T | Targets | Gallery of detected people and vehicles from YOLO |
-| A | Assets | Autonomous unit management and task history |
-| N | Analytics | Detection statistics and event counts |
-| Y | Amy | Amy's consciousness dashboard -- live camera, inner thoughts, chat, sensorium |
-| W | War Room | Full-screen RTS tactical map (the main gameplay view) |
-| S | Scenarios | Behavioral test runner for Amy's personality |
+The legacy 10-tab dashboard is still available at `/legacy` for accessing specialized views like Grid (camera mosaic), Player (video playback), Targets gallery, Zones editor, and Analytics. These views predate the Command Center and may be consolidated into floating panels in a future release.
 
 ---
 
@@ -351,7 +326,7 @@ For MQTT integration details (topic hierarchy, message formats, QoS settings), s
 
 9. **The alert log tells the story.** The bottom-right log shows zone violations, threat escalations, and dispatches in chronological order. Read it to understand what Amy is doing.
 
-10. **Press Y for Amy's thoughts.** The Amy dashboard shows her full inner monologue, sensorium narrative, and chat interface. If you want to understand why Amy made a decision, check her thoughts.
+10. **Watch Amy's panel.** The Amy Commander panel shows her inner monologue and current state. If you want to understand why Amy made a decision, check her thoughts.
 
 ---
 

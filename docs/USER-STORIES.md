@@ -10,7 +10,7 @@ These stories define the **intended user experience**. Every feature, every pane
 
 **As a new operator**, I want to start the system and immediately see something alive.
 
-I clone the repo, run `./setup.sh install && ./start.sh`, and open `http://localhost:8000/unified` in my browser. The page loads in under 2 seconds.
+I clone the repo, run `./setup.sh install && ./start.sh`, and open `http://localhost:8000` in my browser. The page loads in under 2 seconds.
 
 **What I see immediately:**
 - A dark, refined interface fills my entire screen. The background is near-black (#0a0a0f) with a subtle cyan grid overlay. It looks like a military command center, not a web dashboard.
@@ -276,7 +276,7 @@ I make a change to `frontend/js/command/map.js`. I want to know if I broke anyth
 # Integration tests against a live server (70 seconds)
 ./test.sh 9
 
-# Visual quality check of /unified (requires server + Playwright)
+# Visual quality check of Command Center (requires server + Playwright)
 ./test.sh 10
 
 # Everything including visual E2E (15 minutes)
@@ -292,7 +292,7 @@ For Python backend changes:
 .venv/bin/python3 -m pytest tests/amy/ -m unit -v
 ```
 
-For visual changes, I open `http://localhost:8000/unified` in my browser and look at it. Then I take a screenshot and check it against the user stories above. Does it look like what Story 1 describes? If not, it's wrong.
+For visual changes, I open `http://localhost:8000` in my browser and look at it. Then I take a screenshot and check it against the user stories above. Does it look like what Story 1 describes? If not, it's wrong.
 
 **What matters:** The test suite runs in 60 seconds for fast iteration. Visual changes require human eyes (or llava for automated visual regression). The user stories are the spec — if the screen doesn't match the story, the code is wrong.
 
@@ -326,7 +326,7 @@ A feature is done when:
 
 1. **Story match**: A human can perform the user story and it works as described.
 2. **Tests pass**: `./test.sh fast` passes with zero regressions.
-3. **Visual check**: Opening `/unified` in a browser shows what the stories describe.
+3. **Visual check**: Opening `http://localhost:8000` in a browser shows what the stories describe.
 4. **No dead features**: Every button does something. Every keyboard shortcut works. Every panel contains real data.
 
 A feature is NOT done when:

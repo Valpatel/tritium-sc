@@ -3,7 +3,7 @@
 **Version**: 1.0
 **Date**: 2026-02-21
 **Status**: IMPLEMENTED (Phase 5 complete)
-**Route**: `/unified`
+**Route**: `/` (default, was `/unified` before route consolidation)
 
 ---
 

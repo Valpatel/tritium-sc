@@ -154,7 +154,7 @@ flowchart LR
 
 ### Why Unit Tests Passing != UI Working
 
-Session 14 proved this conclusively: 9/9 test tiers passed while `/unified` was a black void. The Canvas 2D map rendered nothing — zero units, zero tiles, zero grid lines. All Python unit tests passed. All JS tests passed. The integration tests passed. But the actual page a user would see was completely broken.
+Session 14 proved this conclusively: 9/9 test tiers passed while the Command Center was a black void. The Canvas 2D map rendered nothing — zero units, zero tiles, zero grid lines. All Python unit tests passed. All JS tests passed. The integration tests passed. But the actual page a user would see was completely broken.
 
 The root cause: `map3d.js` (Three.js 3D renderer) had 8+ bugs but was never tested in a browser. The JS tests run in Node.js against isolated functions, not in a real browser with WebSocket data flow, DOM elements, and canvas rendering contexts. Unit tests verify that individual functions return correct values. They do not verify that the full pipeline — from WebSocket message to canvas pixel — actually works.
 
@@ -162,7 +162,7 @@ The lesson: **you need tests that load the actual page and verify pixels render.
 
 ### The Smoke Test Pattern (test_unified_smoke.py)
 
-The smoke test suite loads `/unified` in a real Playwright browser, waits for WebSocket data to flow, and makes deterministic assertions about what appears on screen. Eight tests, each targeting a specific layer of the rendering pipeline:
+The smoke test suite loads the Command Center (`/`) in a real Playwright browser, waits for WebSocket data to flow, and makes deterministic assertions about what appears on screen. Eight tests, each targeting a specific layer of the rendering pipeline:
 
 1. **Console errors** — JS exceptions = instant fail. Any `console.error` or uncaught exception means the page is broken. This catches import errors, missing globals, and runtime crashes that Node.js tests never see.
 2. **Canvas visibility** — The `#tactical-canvas` DOM element exists and has non-trivial dimensions (`width > 100, height > 100`). Catches CSS display issues, missing elements, and layout collapse.

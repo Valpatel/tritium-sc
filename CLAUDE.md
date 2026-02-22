@@ -40,8 +40,8 @@
 .venv/bin/python3 -m pytest tests/amy/simulation/test_combat.py  # Single test file
 
 # Open in browser
-# http://localhost:8000/unified              # Command Center (primary)
-# http://localhost:8000                      # Legacy dashboard (10 views)
+# http://localhost:8000                      # Command Center (primary)
+# http://localhost:8000/legacy               # Legacy dashboard (10 views)
 ```
 
 ## User Stories
@@ -50,7 +50,7 @@ Read **[docs/USER-STORIES.md](docs/USER-STORIES.md)** before writing ANY fronten
 
 ## Project Overview
 
-TRITIUM-SC is a neighborhood-scale Nerf battlefield management system and real-time strategy game. The Command Center (`/unified`) shows a full-screen tactical map with real satellite imagery, friendly units patrolling, hostile intruders spawning, and a 10-wave combat system with kill streaks, projectile physics, and Smash TV-style commentary from AI Commander Amy.
+TRITIUM-SC is a neighborhood-scale Nerf battlefield management system and real-time strategy game. The Command Center (`/`) shows a full-screen tactical map with real satellite imagery, friendly units patrolling, hostile intruders spawning, and a 10-wave combat system with kill streaks, projectile physics, and Smash TV-style commentary from AI Commander Amy.
 
 Real sensors (BCC950 PTZ cam, NVR cameras, RTSP streams, USB mics) coexist with virtual units (simulated rovers, drones, turrets, hostile intruders) on the same tactical map, same APIs, same event bus. Simulation lives alongside reality.
 
@@ -255,7 +255,7 @@ See `.env.example` for full list. Key settings:
 | 8 | `./test.sh 8` | Test infrastructure | 62 | ~1s |
 | 8b | `./test.sh 8b` | ROS2 robot tests | 125 | ~1s |
 | 9 | `./test.sh 9` | Integration (live headless server E2E) | 23 | ~70s |
-| 10 | `./test.sh 10` | Visual quality (/unified Playwright) | 7 | ~30s |
+| 10 | `./test.sh 10` | Visual quality (Playwright) | 7 | ~30s |
 | 7 | `./test.sh 7` | Visual E2E (three-layer verification) | 23 | ~13min |
 
 ```bash
@@ -276,7 +276,7 @@ For UI changes, **open a browser and look at it**. Then compare against [docs/US
 
 ```bash
 # Automated visual regression (requires running server + Playwright)
-./test.sh 10                                   # Quality check for /unified
+./test.sh 10                                   # Quality check for Command Center
 ./test.sh --visual                             # Full three-layer E2E
 python3 tests/ui/test_vision.py --quick        # llava vision audit (fast)
 ```
@@ -354,13 +354,15 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 ## Keyboard Shortcuts
 
-Press `?` in the UI for full list. Main shortcuts:
-- `G/P/D/Z/T/A/N/Y/W/S` - Switch views (Grid, Player, 3D, Zones, Targets, Assets, aNalytics, amY, War room, Scenarios)
-- `1/2/3` - Grid size
-- `/` - Focus search
+Press `?` in the UI for full list. Command Center shortcuts:
+- `B` - Begin 10-wave battle
+- `O/T/S` - Switch map modes (Observe, Tactical, Setup)
+- `F` - Center camera on action
+- `V` - Toggle synthetic camera PIP
+- `M` - Mute/unmute audio
 - `ESC` - Close modals
-- War Room: `O/T/S` modes (Observe, Tactical, Setup), `F` center on action, `R` reset camera
-- War Room: `V` toggle synthetic camera PIP, `M` mute/unmute audio
+
+Legacy dashboard (`/legacy`) has additional view-switching shortcuts (G/P/D/Z/T/A/N/Y/W/S).
 
 ## Gamepad Support
 
@@ -388,7 +390,7 @@ Rules:
 1. One agent, one focus area. Read anything, edit only your files.
 2. Run `./test.sh fast` after every change.
 3. Read [docs/USER-STORIES.md](docs/USER-STORIES.md) before writing frontend code.
-4. Open a browser and look at `/unified` after visual changes. Screenshots or it didn't happen.
+4. Open a browser and look at `/` after visual changes. Screenshots or it didn't happen.
 
 ## MJPEG Video Panel Layout Rules
 
