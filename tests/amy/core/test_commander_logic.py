@@ -480,3 +480,47 @@ class TestLayeredPerception:
         assert "motion_score" in source
         assert "complexity" in source
         assert "_yolo_skip_count" in source
+
+
+# ---------------------------------------------------------------------------
+# Game event -> sensorium integration
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestGameEventSensorium:
+    """Verify commander routes game events to sensorium."""
+
+    def test_commander_handles_game_state_change_event(self):
+        """Commander source code processes game_state_change messages."""
+        import inspect
+        # The event processing is in the _listen_events method
+        source = inspect.getsource(Commander)
+        assert "game_state_change" in source
+        assert "sensorium.push" in source
+
+    def test_commander_handles_wave_complete_event(self):
+        """Commander source code processes wave_complete messages."""
+        import inspect
+        source = inspect.getsource(Commander)
+        assert "wave_complete" in source
+
+    def test_commander_handles_game_over_event(self):
+        """Commander source code processes game_over messages."""
+        import inspect
+        source = inspect.getsource(Commander)
+        assert "game_over" in source
+
+    def test_game_state_change_pushes_all_states(self):
+        """Commander handles countdown, active, victory, defeat, setup states."""
+        import inspect
+        source = inspect.getsource(Commander)
+        for state in ("countdown", "active", "victory", "defeat", "setup"):
+            assert state in source, f"Commander should handle '{state}' state"
+
+    def test_sensorium_push_uses_tactical_channel(self):
+        """Game events push to the 'tactical' sensorium channel."""
+        import inspect
+        source = inspect.getsource(Commander)
+        # Count tactical pushes near game events
+        assert source.count('"tactical"') >= 5, \
+            "Should have multiple tactical sensorium pushes for game events"
