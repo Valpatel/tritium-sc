@@ -1,0 +1,40 @@
+"""amy.synthetic — Procedural synthetic video generation for testing.
+
+Generates tactical surveillance footage using OpenCV + numpy.  No PyTorch,
+no YOLO, no GPU dependencies.  Designed to run on any platform including
+aarch64 where standard PyTorch does not work.
+
+Scene types:
+  - bird_eye: Top-down tactical map view
+  - street_cam: Simulated street-level security camera
+  - battle: Active combat with projectiles and explosions
+  - neighborhood: Quiet ambient neighborhood scene
+
+Usage::
+
+    from amy.synthetic.video_gen import render_bird_eye
+    from amy.synthetic.video_library import SyntheticVideoLibrary
+
+    # Single frame
+    frame = render_bird_eye(targets)
+
+    # Full clip
+    lib = SyntheticVideoLibrary()
+    path = lib.generate_clip("bird_eye", duration=5.0, fps=10)
+"""
+
+from amy.synthetic.video_gen import (
+    render_battle_scene,
+    render_bird_eye,
+    render_neighborhood,
+    render_street_cam,
+)
+from amy.synthetic.video_library import SyntheticVideoLibrary
+
+__all__ = [
+    "render_bird_eye",
+    "render_street_cam",
+    "render_battle_scene",
+    "render_neighborhood",
+    "SyntheticVideoLibrary",
+]
