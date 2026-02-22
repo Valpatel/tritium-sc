@@ -4,7 +4,7 @@
 
 TRITIUM-SC is a three-layer system: a **browser frontend** renders the tactical picture, a **FastAPI server** hosts Amy's consciousness and the battlespace engine, and **external devices** (cameras, robots, sensors) connect via MQTT or direct USB.
 
-Real sensors and simulated units coexist on the same event bus, same APIs, same tactical map. Amy does not distinguish between them.
+Amy manages real Nerf battles with real hardware and monitors the neighborhood when no battle is running. The simulated battle mode exercises the same pipelines — same event bus, same APIs, same tactical map — as continuous integration for the real system.
 
 ```mermaid
 flowchart LR

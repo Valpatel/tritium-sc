@@ -6,9 +6,9 @@
 
 ## 1. Vision
 
-TRITIUM-SC is a neighborhood-scale Nerf battlefield management system with an
-AI Commander (Amy) at the center. The UI should feel like **commanding a
-real-time strategy game**, not browsing a web dashboard.
+TRITIUM-SC manages real Nerf battles with real robots, turrets, and people on
+a real neighborhood map. Amy is the AI commander at the center. The UI should
+feel like **commanding a battle**, not browsing a web dashboard.
 
 **Reference points**:
 - **StarCraft**: Advisor video box (bottom-left), minimap (bottom-left),

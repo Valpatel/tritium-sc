@@ -1,8 +1,8 @@
-# The Game IS the Security System
+# The Battle IS the Test
 
-What if the best security system was also the most fun game your kid ever played?
+TRITIUM-SC manages real Nerf battles with real robots, real turrets, and real people. Amy is the AI commander who watches through cameras, understands the neighborhood, and commands the fleet. When no battle is running, she's still on duty — tracking who comes and goes, learning the rhythms, noticing when something is off.
 
-TRITIUM-SC is built on a single provocation: the Nerf commander directing turrets, rovers, and drones against waves of hostile intruders uses the exact same perception pipeline, the exact same target registry, the exact same threat classifier, and the exact same event bus as the system that monitors your neighborhood for real intruders at 2am. The game is not a toy bolted onto a security system. The game is how the security system proves it works. Every hostile eliminated in the 10-wave combat mode is a detection pipeline that fired correctly. Every one that sneaks past reveals a gap in coverage, a blind spot in a zone, a turret with insufficient range. Play is validation.
+The simulated battle mode exercises the exact same perception pipeline, the exact same target registry, the exact same threat classifier, and the exact same event bus that Amy uses in normal operation. Every hostile eliminated in the 10-wave combat mode is a detection pipeline that fired correctly. Every one that sneaks past reveals a gap in coverage, a blind spot in a zone, a turret with insufficient range. The game is the system's continuous integration test. Play is validation.
 
 ---
 
@@ -210,4 +210,4 @@ Honesty about the current state matters more than aspirational claims.
 
 The infrastructure for the planned capabilities is in place. The `TargetTracker` is designed to accept `reid_embedding` fields. The `EmbeddingGenerator` produces normalized vectors ready for FAISS indexing. The `ThreatClassifier` already evaluates targets source-agnostically. The path from "built" to "planned" is integration work, not architectural rework.
 
-The game is the security system. The security system is the game. Amy connects both. And the neighborhood sleeps a little better because someone's kid is really good at defending it.
+The battle mode is the system test. Amy connects everything — real hardware, real neighborhood awareness, and simulated combat. Every wave cleared proves the pipeline works. Every gap revealed in simulation is a gap fixed before the real battle.

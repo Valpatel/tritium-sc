@@ -50,11 +50,11 @@ Read **[docs/USER-STORIES.md](docs/USER-STORIES.md)** before writing ANY fronten
 
 ## Project Overview
 
-TRITIUM-SC is a neighborhood-scale Nerf battlefield management system and real-time strategy game. The Command Center (`/`) shows a full-screen tactical map with real satellite imagery, friendly units patrolling, hostile intruders spawning, and a 10-wave combat system with kill streaks, projectile physics, and Smash TV-style commentary from AI Commander Amy.
+TRITIUM-SC manages real Nerf battles — real robots, real turrets, real people, on a real neighborhood map. The Command Center (`/`) shows a full-screen tactical map with real satellite imagery, live unit positions, and AI Commander Amy running continuously.
 
-Real sensors (BCC950 PTZ cam, NVR cameras, RTSP streams, USB mics) coexist with virtual units (simulated rovers, drones, turrets, hostile intruders) on the same tactical map, same APIs, same event bus. Simulation lives alongside reality.
+Amy is an autonomous consciousness with 4 cognitive layers (reflex -> instinct -> awareness -> deliberation). She sees through cameras, hears through mics, thinks in continuous inner monologue, dispatches assets, and acts when she decides to. When no battle is running, she monitors the neighborhood — tracking who comes and goes, learning the rhythms, noticing deviations.
 
-Amy is an autonomous consciousness with 4 cognitive layers (reflex -> instinct -> awareness -> deliberation). She sees through cameras, hears through mics, thinks in continuous inner monologue, dispatches assets, and acts when she decides to. Inspired by Masanobu Fukuoka's "One-Straw Revolution" -- the operator tends the system like a garden, not a factory.
+The simulated battle mode (10-wave combat with projectile physics, kill streaks, Smash TV commentary) exercises the exact same pipelines Amy uses in normal operation. The game is the system's continuous integration test. Inspired by Masanobu Fukuoka's "One-Straw Revolution" -- the operator tends the system like a garden, not a factory.
 
 See [docs/PLAN.md](docs/PLAN.md) for the full development roadmap and technical architecture.
 

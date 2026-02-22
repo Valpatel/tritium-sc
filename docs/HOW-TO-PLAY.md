@@ -1,6 +1,6 @@
 # How to Play TRITIUM-SC
 
-TRITIUM-SC is a neighborhood-scale Nerf battlefield management system. You watch a tactical map of your property, see simulated (and optionally real) threats appear, and dispatch friendly units to intercept them -- all while an AI commander named Amy thinks, observes, and acts alongside you. Think of it as a real-time strategy game layered on top of your actual neighborhood.
+TRITIUM-SC manages real Nerf battles — real robots, real turrets, real people, on a tactical map of your actual neighborhood. Amy is your AI commander who watches through cameras, listens through microphones, and commands the fleet alongside you. When no battle is running, she monitors the neighborhood — tracking threats, understanding the rhythms, and acting when something is off. The simulated battle mode stress-tests the exact same pipelines Amy uses in normal operation.
 
 ---
 

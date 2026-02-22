@@ -1,6 +1,6 @@
 # Simulation Engine
 
-The simulation engine drives virtual targets across the tactical map at 10 Hz. It spawns hostile intruders, friendly units (rovers, drones, turrets), and ambient neighborhood activity (neighbors, cars, dogs, cats, delivery people). All simulated targets flow through the same TargetTracker and EventBus as real YOLO detections.
+The simulation engine is the system's continuous integration test. It drives virtual targets across the tactical map at 10 Hz — hostile intruders, friendly units (rovers, drones, turrets), and ambient neighborhood activity (neighbors, cars, dogs, cats, delivery people). All simulated targets flow through the same TargetTracker and EventBus as real hardware, exercising the exact pipelines Amy uses in normal operation.
 
 Source: `src/amy/simulation/`
 

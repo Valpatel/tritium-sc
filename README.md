@@ -40,9 +40,9 @@ For educational purposes only with Nerf blasters and toy systems.
 
 > *"The ultimate goal of farming is not the growing of crops, but the cultivation and perfection of human beings."* — Masanobu Fukuoka
 
-TRITIUM-SC is inspired by Fukuoka's "do nothing farming" philosophy. Instead of a monolithic system that dominates its components, this is a **garden of diverse digital life** — simple services collaborating naturally, AI that flourishes on its own terms, and machines that take independent action.
+TRITIUM-SC manages **real Nerf battles** — real robots, real turrets, real people, on a real neighborhood map. Amy is the AI commander who watches through cameras, listens through microphones, understands the neighborhood, and commands your fleet. When you're not battling, she's still running — tracking who comes and goes, learning the rhythms of the block, noticing when something is off.
 
-The Nerf game and the security system are the **same system**. The perception pipeline that detects a simulated hostile intruder on the tactical map is the same pipeline that detects a real stranger at the gate. The game is a continuous integration test for the security system. All processing is local. No cloud. No subscriptions. No data leaves your network.
+The **simulated battle mode** is how we test the system. The game exercises the exact same detection pipeline, the same target registry, the same threat classifier, the same event bus that Amy uses in normal operation. Every hostile eliminated in a wave is a pipeline that fired correctly. Every one that sneaks past reveals a coverage gap. Play is validation. All processing is local. No cloud. No subscriptions. No data leaves your network.
 
 ---
 
@@ -60,11 +60,11 @@ cd tritium-sc
 # 3. Open the Command Center
 #    http://localhost:8000
 
-# 4. Watch. Units patrol. Amy thinks. Hostiles spawn.
-#    Click a unit. Right-click to dispatch. Press B to begin war.
+# 4. Amy wakes up. Units patrol. She watches the neighborhood.
+#    Click a unit. Right-click to dispatch. Press B to test with a battle.
 ```
 
-The simulation engine starts automatically. Friendly units patrol on real satellite imagery, hostile intruders spawn at map edges, and Amy's inner monologue runs continuously. Press `B` to start a 10-wave Nerf battle with projectile physics, kill streaks, and Smash TV-style commentary.
+Amy starts immediately — her inner monologue runs, friendly units patrol on real satellite imagery, and the neighborhood comes alive. Press `B` to start a 10-wave simulated battle to test the system — projectile physics, kill streaks, and Smash TV-style commentary included.
 
 See [docs/HOW-TO-PLAY.md](docs/HOW-TO-PLAY.md) for the full player guide.
 
@@ -75,9 +75,9 @@ See [docs/HOW-TO-PLAY.md](docs/HOW-TO-PLAY.md) for the full player guide.
 The primary interface is a full-screen tactical map with real ESRI satellite imagery, live unit positions, fog of war, and floating panels.
 
 **What you see:**
-- Satellite map of your actual neighborhood as the game board
+- Satellite map of your actual neighborhood as the operational map
 - Friendly units (turrets, rovers, drones) patrolling as green shapes
-- Hostile intruders spawning as red diamonds at map edges
+- Threats appearing as red diamonds — simulated in battle mode, real detections from cameras otherwise
 - Fog of war with glowing cyan vision cones around friendlies
 - Floating panels: unit list, Amy's thoughts, game HUD, alerts
 - Header bar with live unit count, threat level, clock
@@ -88,7 +88,7 @@ The primary interface is a full-screen tactical map with real ESRI satellite ima
 - **Click + drag** — pan the tactical map
 - **Click unit** — select and inspect
 - **Right-click** — dispatch selected unit to location
-- **B** — begin 10-wave battle
+- **B** — begin 10-wave battle (system test)
 - **O / T / S** — switch map modes (Observe, Tactical, Setup)
 - **F** — center camera on action
 - **V** — toggle synthetic camera PIP
@@ -134,9 +134,9 @@ Amy's thoughts stream in real time through the Command Center's Amy panel.
 
 ---
 
-## COMBAT SYSTEM
+## BATTLE MODE (SYSTEM TEST)
 
-The 10-wave battle system turns your neighborhood into a Nerf war arena:
+The 10-wave battle mode stress-tests the entire pipeline — same detection, same tracking, same dispatch logic Amy uses in normal operation. It's also a blast to play.
 
 - **Wave progression** — hostiles get tougher each wave, more spawn, new types appear
 - **Projectile physics** — turrets fire with travel time, leading targets, hit detection
@@ -145,7 +145,7 @@ The 10-wave battle system turns your neighborhood into a Nerf war arena:
 - **War announcer** — Smash TV-style commentary from Amy on every kill, streak, and wave clear
 - **Elimination feed** — scrolling kill feed in the sidebar
 
-Place turrets in Setup mode, press B, and defend the neighborhood.
+Place turrets in Setup mode, press B, and defend the neighborhood. Every wave cleared is proof the system works.
 
 ---
 

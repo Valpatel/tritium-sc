@@ -1846,6 +1846,67 @@ class Commander:
                                 "center_x": cx,
                                 "center_y": cy,
                             })
+                elif msg_type == "game_state_change":
+                    data = msg.get("data", {})
+                    state = data.get("state", "")
+                    wave = data.get("wave", 0)
+                    if state == "countdown":
+                        self.sensorium.push(
+                            "tactical",
+                            "Battle simulation starting — countdown initiated.",
+                            importance=0.9,
+                        )
+                    elif state == "active" and wave == 1:
+                        self.sensorium.push(
+                            "tactical",
+                            "Battle simulation active — Wave 1 beginning. All units engage.",
+                            importance=1.0,
+                        )
+                    elif state == "active" and wave > 1:
+                        wave_name = data.get("wave_name", f"Wave {wave}")
+                        self.sensorium.push(
+                            "tactical",
+                            f"Wave {wave} ({wave_name}) incoming.",
+                            importance=0.9,
+                        )
+                    elif state == "victory":
+                        score = data.get("score", 0)
+                        elims = data.get("total_eliminations", 0)
+                        self.sensorium.push(
+                            "tactical",
+                            f"Victory — all waves cleared. Score: {score}, eliminations: {elims}.",
+                            importance=1.0,
+                        )
+                    elif state == "defeat":
+                        self.sensorium.push(
+                            "tactical",
+                            "Defeat — all friendly combatants eliminated. Battle simulation ended.",
+                            importance=1.0,
+                        )
+                    elif state == "setup":
+                        self.sensorium.push(
+                            "tactical",
+                            "Battle simulation reset. Returning to normal operations.",
+                            importance=0.7,
+                        )
+                elif msg_type == "wave_complete":
+                    data = msg.get("data", {})
+                    wave = data.get("wave", 0)
+                    elims = data.get("eliminations", 0)
+                    self.sensorium.push(
+                        "tactical",
+                        f"Wave {wave} cleared — {elims} hostiles eliminated.",
+                        importance=0.8,
+                    )
+                elif msg_type == "game_over":
+                    data = msg.get("data", {})
+                    result = data.get("result", "unknown")
+                    score = data.get("score", 0)
+                    self.sensorium.push(
+                        "tactical",
+                        f"Battle simulation ended: {result}. Final score: {score}.",
+                        importance=1.0,
+                    )
                 elif msg_type == "auto_dispatch_speech":
                     data = msg.get("data", {})
                     text = data.get("text", "")

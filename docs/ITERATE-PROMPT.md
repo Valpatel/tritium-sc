@@ -9,10 +9,10 @@ fixes them.  Run it repeatedly until all phases are solid.
 ## The prompt
 
 Audit and iterate on the TRITIUM-SC RTS battlespace simulation system.
-This is a neighborhood-scale Nerf war management platform with AI Commander
-Amy, real sensors (BCC950 PTZ, NVR cameras), and a simulation engine that
-populates virtual targets (rovers, drones, turrets, hostile intruders)
-alongside real detections on the same tactical map.
+TRITIUM-SC manages real Nerf battles with real robots, turrets, and people on
+a real neighborhood map. Amy is the AI commander with real sensors (BCC950 PTZ,
+NVR cameras). The simulation engine provides a battle mode that stress-tests
+the same pipelines Amy uses in normal operation.
 
 The system has a games-common level editor (symlinked at frontend/common/)
 that provides a full 3D scene editor with 30 asset types defined in
@@ -123,6 +123,6 @@ Tests:
 - Don't break existing functionality (572+ tests must pass)
 - Follow existing conventions: type hints, no emojis, async/await, CYBERCORE CSS
 - The app name is TRITIUM-SC (Tritium-Security Central)
-- Real sensor tracking (people, cars) coexists with virtual targets
+- Real hardware (robots, turrets, cameras) is the primary use case; simulation tests the same pipelines
 - The games-common editor is a SHARED library — never modify files under frontend/common/
 - Only modify tritium-sc plugin files: TritiumAssets.js, TritiumLevelFormat.js, TritiumEditorPlugin.js

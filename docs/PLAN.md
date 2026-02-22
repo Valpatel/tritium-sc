@@ -10,15 +10,16 @@
 
 ## Vision
 
-TRITIUM-SC (Tritium-Security Central) is a neighborhood-scale Nerf battlefield
-management system and real-time strategy game. It interfaces with real and
-virtual sensors to provide tactical situational awareness through a trusted
-access terminal with AI Commander Amy.
+TRITIUM-SC (Tritium-Security Central) manages real Nerf battles with real
+robots, real turrets, and real people on a real neighborhood map. Amy is the AI
+commander who watches through cameras, listens through microphones, understands
+the neighborhood, and commands the fleet.
 
-The system tracks real people, real cars, and real events — then layers virtual
-combatants, autonomous rovers, turrets, and hostile intruders on the same
-tactical map, through the same APIs, the same event bus, the same detection
-pipeline. Simulation lives alongside reality.
+When no battle is running, Amy operates as neighborhood awareness — tracking
+who comes and goes, learning the rhythms, noticing when something is off. The
+simulated battle mode exercises the exact same detection pipeline, target
+registry, threat classifier, and event bus that Amy uses in normal operation.
+Every wave cleared is proof the system works.
 
 Inspired by Masanobu Fukuoka's "One-Straw Revolution" — the operator tends the
 system like a garden, not a factory. Amy thinks, observes, and acts on her own.
