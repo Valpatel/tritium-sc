@@ -64,6 +64,8 @@ from .target import SimulationTarget
 
 if TYPE_CHECKING:
     from amy.comms.event_bus import EventBus
+    from amy.tactical.obstacles import BuildingObstacles
+    from amy.tactical.street_graph import StreetGraph
 
 _HOSTILE_NAMES = [
     "Intruder Alpha",
@@ -112,6 +114,10 @@ class SimulationEngine:
         self.game_mode = GameMode(event_bus, self, self.combat)
         self.behaviors = UnitBehaviors(self.combat)
 
+        # Street graph and building obstacles for road-aware pathfinding
+        self._street_graph: StreetGraph | None = None
+        self._obstacles: BuildingObstacles | None = None
+
         # Wire target_eliminated events back to game mode for scoring
         self._combat_sub_thread: threading.Thread | None = None
 
@@ -130,6 +136,45 @@ class SimulationEngine:
         self._event_bus = event_bus
         self.combat._event_bus = event_bus
         self.game_mode._event_bus = event_bus
+
+    # -- Pathfinding integration ---------------------------------------------
+
+    def set_street_graph(self, street_graph: StreetGraph) -> None:
+        """Set the street graph for road-aware pathfinding."""
+        self._street_graph = street_graph
+
+    def set_obstacles(self, obstacles: BuildingObstacles) -> None:
+        """Set building obstacles for collision-aware pathfinding."""
+        self._obstacles = obstacles
+
+    def dispatch_unit(
+        self, target_id: str, destination: tuple[float, float]
+    ) -> None:
+        """Dispatch a unit to *destination* using pathfinding.
+
+        Sets waypoints on the target based on its unit type and the
+        available street graph.  If the target doesn't exist, this is a
+        no-op (no crash).
+        """
+        target = self.get_target(target_id)
+        if target is None:
+            return
+
+        from .pathfinding import plan_path
+
+        path = plan_path(
+            target.position,
+            destination,
+            target.asset_type,
+            self._street_graph,
+            self._obstacles,
+            alliance=target.alliance,
+        )
+        if path is not None:
+            target.waypoints = path
+            target._waypoint_index = 0
+            target.status = "active"
+            target.loop_waypoints = False
 
     # -- Target management --------------------------------------------------
 
@@ -379,23 +424,32 @@ class SimulationEngine:
             suffix += 1
         self._used_names.add(name)
 
-        # Multi-waypoint path: edge -> approach -> objective -> loiter -> escape
-        # Scale waypoint jitter proportionally to map bounds
+        # Generate waypoints: use pathfinder if available, else legacy jitter
         b = self._map_bounds
-        jitter = b * 0.025  # ~5m at 200m bounds
         obj_range = b * 0.04  # ~8m at 200m bounds
-        loiter_jitter = b * 0.015  # ~3m at 200m bounds
-        approach = (
-            position[0] * 0.5 + random.uniform(-jitter, jitter),
-            position[1] * 0.5 + random.uniform(-jitter, jitter),
-        )
         objective = (random.uniform(-obj_range, obj_range), random.uniform(-obj_range, obj_range))
-        loiter = (
-            objective[0] + random.uniform(-loiter_jitter, loiter_jitter),
-            objective[1] + random.uniform(-loiter_jitter, loiter_jitter),
-        )
-        escape_edge = self._random_edge_position()
-        waypoints = [approach, objective, loiter, escape_edge]
+
+        if self._street_graph is not None and self._street_graph.graph is not None:
+            # Road-aware path: edge -> roads -> last 30m direct -> objective
+            from .pathfinding import plan_path
+            road_path = plan_path(
+                position, objective, "person",
+                self._street_graph, self._obstacles,
+                alliance="hostile",
+            )
+            if road_path is not None and len(road_path) >= 2:
+                # Add loiter and escape after the road path
+                loiter_jitter = b * 0.015
+                loiter = (
+                    objective[0] + random.uniform(-loiter_jitter, loiter_jitter),
+                    objective[1] + random.uniform(-loiter_jitter, loiter_jitter),
+                )
+                escape_edge = self._random_edge_position()
+                waypoints = road_path[1:] + [loiter, escape_edge]
+            else:
+                waypoints = self._legacy_hostile_waypoints(position, objective)
+        else:
+            waypoints = self._legacy_hostile_waypoints(position, objective)
 
         target = SimulationTarget(
             target_id=str(uuid.uuid4()),
@@ -423,6 +477,26 @@ class SimulationEngine:
             return (self._map_max, coord)
         else:  # west
             return (self._map_min, coord)
+
+    def _legacy_hostile_waypoints(
+        self,
+        position: tuple[float, float],
+        objective: tuple[float, float],
+    ) -> list[tuple[float, float]]:
+        """Generate legacy hostile waypoints without street graph."""
+        b = self._map_bounds
+        jitter = b * 0.025
+        loiter_jitter = b * 0.015
+        approach = (
+            position[0] * 0.5 + random.uniform(-jitter, jitter),
+            position[1] * 0.5 + random.uniform(-jitter, jitter),
+        )
+        loiter = (
+            objective[0] + random.uniform(-loiter_jitter, loiter_jitter),
+            objective[1] + random.uniform(-loiter_jitter, loiter_jitter),
+        )
+        escape_edge = self._random_edge_position()
+        return [approach, objective, loiter, escape_edge]
 
     def _count_active_hostiles(self) -> int:
         """Count hostiles that are still a threat (active, not neutralized/escaped/destroyed)."""
