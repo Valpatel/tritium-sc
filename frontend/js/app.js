@@ -245,8 +245,11 @@ function handleWebSocketMessage(message) {
                 warHandleGameOver(message.data);
             }
             break;
+        case 'amy_elimination_streak':
         case 'amy_kill_streak':
-            if (message.data && typeof warHandleKillStreak === 'function') {
+            if (message.data && typeof warHandleEliminationStreak === 'function') {
+                warHandleEliminationStreak(message.data);
+            } else if (message.data && typeof warHandleKillStreak === 'function') {
                 warHandleKillStreak(message.data);
             }
             break;

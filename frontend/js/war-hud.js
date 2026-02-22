@@ -1,6 +1,6 @@
 /**
  * TRITIUM-SC War Room — Game HUD
- * Kill feed, wave banners, countdown, score, BEGIN WAR button, game over screen
+ * Elimination feed, wave banners, countdown, score, BEGIN WAR button, game over screen
  *
  * HTML overlay elements positioned over the canvas. Managed entirely here;
  * war.js calls our update functions from WebSocket event handlers.
@@ -13,11 +13,11 @@
 const _hudState = {
     score: 0,
     displayScore: 0, // for counting-up animation
-    kills: 0,
+    eliminations: 0,
     wave: 0,
     totalWaves: 10,
     gameState: 'idle', // idle | setup | countdown | active | wave_complete | game_over
-    killFeed: [],      // { text, killerColor, victimColor, time }
+    eliminationFeed: [],      // { text, interceptorColor, targetColor, time }
     announcements: [], // queued amy announcements
     countdownTimer: null,
     waveBannerTimer: null,
@@ -59,7 +59,8 @@ function warHudUpdateGameState(data) {
     if (data.wave !== undefined) _hudState.wave = data.wave;
     if (data.total_waves !== undefined) _hudState.totalWaves = data.total_waves;
     if (data.score !== undefined) _hudState.score = data.score;
-    if (data.total_kills !== undefined) _hudState.kills = data.total_kills;
+    if (data.total_eliminations !== undefined) _hudState.eliminations = data.total_eliminations;
+    else if (data.total_kills !== undefined) _hudState.eliminations = data.total_kills;
 
     _updateScoreDisplay();
 
@@ -146,12 +147,12 @@ function warHudShowWaveBanner(waveNum, waveName, hostileCount) {
     }, 3000);
 }
 
-function warHudShowWaveComplete(waveNum, kills, scoreBonus) {
+function warHudShowWaveComplete(waveNum, eliminations, scoreBonus) {
     const el = document.getElementById('war-wave-banner');
     if (!el) return;
 
     el.innerHTML = `<div class="war-wave-title war-wave-complete-text">WAVE ${waveNum} COMPLETE</div>
-                     <div class="war-wave-sub">${kills || 0} KILLS -- +${scoreBonus || 0} PTS</div>`;
+                     <div class="war-wave-sub">${eliminations || 0} NEUTRALIZED -- +${scoreBonus || 0} PTS</div>`;
     el.style.display = 'block';
     el.className = 'war-wave-banner war-wave-complete war-wave-slide-in';
 
@@ -167,57 +168,60 @@ function warHudShowWaveComplete(waveNum, kills, scoreBonus) {
 }
 
 // ============================================================
-// Kill feed
+// Elimination feed
 // ============================================================
 
-function warHudAddKillFeedEntry(data) {
+function warHudAddEliminationFeedEntry(data) {
     if (!data) return;
 
-    const killer = data.interceptor_name || data.killer_name || data.interceptor_id || 'Unit';
-    const victim = data.hostile_name || data.victim_name || data.hostile_id || 'Hostile';
-    const killerAlliance = (data.killer_alliance || 'friendly').toLowerCase();
-    const victimAlliance = (data.victim_alliance || 'hostile').toLowerCase();
+    const interceptor = data.interceptor_name || data.killer_name || data.interceptor_id || 'Unit';
+    const target = data.target_name || data.hostile_name || data.hostile_id || 'Hostile';
+    const interceptorAlliance = (data.interceptor_alliance || data.killer_alliance || 'friendly').toLowerCase();
+    const targetAlliance = (data.target_alliance || data.victim_alliance || 'hostile').toLowerCase();
 
-    const killerColor = killerAlliance === 'friendly' ? '#00f0ff' : '#ff2a6d';
-    const victimColor = victimAlliance === 'hostile' ? '#ff2a6d' : '#00f0ff';
+    const interceptorColor = interceptorAlliance === 'friendly' ? '#00f0ff' : '#ff2a6d';
+    const targetColor = targetAlliance === 'hostile' ? '#ff2a6d' : '#00f0ff';
 
-    _hudState.killFeed.push({
-        killer,
-        victim,
-        killerColor,
-        victimColor,
-        weapon: data.weapon || 'nerf_dart',
+    _hudState.eliminationFeed.push({
+        interceptor,
+        target,
+        interceptorColor,
+        targetColor,
+        weapon: data.weapon || data.method || 'nerf_dart',
         time: Date.now(),
     });
 
     // Keep max 6
-    if (_hudState.killFeed.length > 6) _hudState.killFeed.shift();
+    if (_hudState.eliminationFeed.length > 6) _hudState.eliminationFeed.shift();
 
-    _renderKillFeed();
+    _renderEliminationFeed();
 }
 
-function _renderKillFeed() {
-    const el = document.getElementById('war-kill-feed');
+// Backward compat alias
+var warHudAddKillFeedEntry = warHudAddEliminationFeedEntry;
+
+function _renderEliminationFeed() {
+    const el = document.getElementById('war-elimination-feed') || document.getElementById('war-kill-feed');
     if (!el) return;
 
     const now = Date.now();
     // Remove entries older than 8s
-    _hudState.killFeed = _hudState.killFeed.filter(k => now - k.time < 8000);
+    _hudState.eliminationFeed = _hudState.eliminationFeed.filter(k => now - k.time < 8000);
 
-    el.innerHTML = _hudState.killFeed.map(k => {
+    el.innerHTML = _hudState.eliminationFeed.map(k => {
         const age = now - k.time;
         const opacity = age < 6000 ? 1 : Math.max(0, 1 - (age - 6000) / 2000);
-        return `<div class="war-kill-entry" style="opacity: ${opacity}">
-            <span style="color: ${k.killerColor}">${_escHtml(k.killer)}</span>
-            <span class="war-kill-arrow">&gt;&gt;</span>
-            <span style="color: ${k.victimColor}">${_escHtml(k.victim)}</span>
+        return `<div class="war-elimination-entry" style="opacity: ${opacity}">
+            <span style="color: ${k.interceptorColor}">${_escHtml(k.interceptor)}</span>
+            <span class="war-elimination-arrow">&gt;&gt;</span>
+            <span style="color: ${k.targetColor}">${_escHtml(k.target)}</span>
         </div>`;
     }).join('');
 }
 
-// Periodically clean up faded kill feed entries
+// Periodically clean up faded elimination feed entries
 setInterval(() => {
-    if (_hudState.killFeed.length > 0) _renderKillFeed();
+    if (_hudState.eliminationFeed.length > 0) _renderEliminationFeed();
 }, 1000);
 
 // ============================================================
@@ -237,7 +241,7 @@ function _updateScoreDisplay() {
 
     el.innerHTML = `
         <div class="war-score-row"><span class="war-score-label">SCORE</span><span class="war-score-value">${_formatNum(_hudState.displayScore)}</span></div>
-        <div class="war-score-row"><span class="war-score-label">KILLS</span><span class="war-score-value war-score-kills">${_hudState.kills}</span></div>
+        <div class="war-score-row"><span class="war-score-label">ELIMS</span><span class="war-score-value war-score-elims">${_hudState.eliminations}</span></div>
         <div class="war-score-row"><span class="war-score-label">WAVE</span><span class="war-score-value">${_hudState.wave}/${_hudState.totalWaves}</span></div>
     `;
 }
@@ -290,7 +294,7 @@ function _onBeginWar() {
 // Game over screen
 // ============================================================
 
-function warHudShowGameOver(result, score, waves, kills) {
+function warHudShowGameOver(result, score, waves, eliminations) {
     const el = document.getElementById('war-game-over');
     if (!el) return;
 
@@ -309,8 +313,8 @@ function warHudShowGameOver(result, score, waves, kills) {
                     <div class="war-gameover-stat-label">SCORE</div>
                 </div>
                 <div class="war-gameover-stat">
-                    <div class="war-gameover-stat-value">${kills || 0}</div>
-                    <div class="war-gameover-stat-label">KILLS</div>
+                    <div class="war-gameover-stat-value">${eliminations || 0}</div>
+                    <div class="war-gameover-stat-label">ELIMINATIONS</div>
                 </div>
                 <div class="war-gameover-stat">
                     <div class="war-gameover-stat-value">${waves || 0}</div>
@@ -345,11 +349,11 @@ function warHudPlayAgain() {
     // Reset local state
     _hudState.score = 0;
     _hudState.displayScore = 0;
-    _hudState.kills = 0;
+    _hudState.eliminations = 0;
     _hudState.wave = 0;
     _hudState.gameState = 'idle';
-    _hudState.killFeed = [];
-    _renderKillFeed();
+    _hudState.eliminationFeed = [];
+    _renderEliminationFeed();
     _updateScoreDisplay();
 
     // Reset combat effects
@@ -360,7 +364,7 @@ function warHudPlayAgain() {
         warState.selectedTargets = [];
         warState.effects = [];
         warState.dispatchArrows = [];
-        warState.stats.kills = 0;
+        warState.stats.eliminations = 0;
         warState.stats.breaches = 0;
         warState.stats.dispatches = 0;
     }
@@ -396,7 +400,7 @@ function _processAnnouncementQueue() {
     el.textContent = item.text;
     el.style.opacity = '1';
 
-    const holdTime = item.category === 'wave' ? 3000 : (item.category === 'kill' ? 2000 : 4000);
+    const holdTime = item.category === 'wave' ? 3000 : (item.category === 'elimination' || item.category === 'kill' ? 2000 : 4000);
 
     setTimeout(() => {
         el.style.opacity = '0';

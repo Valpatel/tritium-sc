@@ -1,6 +1,6 @@
 /**
  * TRITIUM-SC War Room — Combat Rendering
- * Projectiles, hit effects, elimination explosions, health bars, weapon ranges, kill streaks
+ * Projectiles, hit effects, elimination explosions, health bars, weapon ranges, elimination streaks
  *
  * All rendering is done on Canvas 2D via worldToScreen() from war.js.
  * State is kept module-local; war.js calls our update/draw functions each frame.
@@ -114,7 +114,7 @@ function warCombatDrawProjectiles(ctx, worldToScreen) {
 // ============================================================
 
 const _particles = [];
-const _screenEffects = []; // full-screen effects (flashes, kill streak text)
+const _screenEffects = []; // full-screen effects (flashes, elimination streak text)
 
 function _spawnParticles(worldX, worldY, count, color, life, speedRange, sizeRange) {
     for (let i = 0; i < count; i++) {
@@ -270,7 +270,7 @@ function warCombatDrawEffects(ctx, worldToScreen, canvasW, canvasH) {
             ctx.globalAlpha = 1.0;
         }
 
-        if (e.type === 'kill_streak') {
+        if (e.type === 'elimination_streak' || e.type === 'kill_streak') {
             const alpha = age < 0.2 ? age / 0.2 : Math.max(0, 1 - (age - 0.2) / 0.8);
             const scale = 1 + Math.sin(age * Math.PI) * 0.1;
             ctx.save();
@@ -360,25 +360,24 @@ function warCombatDrawWeaponRange(ctx, worldToScreen, target, zoom) {
 }
 
 // ============================================================
-// Kill streak effects
+// Elimination streak effects
 // ============================================================
 
 const STREAK_NAMES = {
     3: 'KILLING SPREE',
     5: 'RAMPAGE',
     7: 'DOMINATING',
-    10: 'UNSTOPPABLE',
-    15: 'GODLIKE',
+    10: 'GODLIKE',
 };
 
-function warCombatAddKillStreakEffect(data) {
+function warCombatAddEliminationStreakEffect(data) {
     if (!data) return;
     const streak = data.streak || 0;
     const name = data.streak_name || STREAK_NAMES[streak] || `${streak}x STREAK`;
     const isFriendly = (data.alliance || '').toLowerCase() === 'friendly';
 
     _screenEffects.push({
-        type: 'kill_streak',
+        type: 'elimination_streak',
         text: name,
         color: isFriendly ? '#00f0ff' : '#ff2a6d',
         borderColor: isFriendly ? 'rgba(0, 240, 255, 0.5)' : 'rgba(255, 42, 109, 0.5)',
@@ -442,11 +441,62 @@ function warCombatDrawTargetShape(ctx, sp, radius, target, alliance, zoom) {
             ctx.lineTo(sp.x + Math.cos(rad) * aimLen, sp.y - Math.sin(rad) * aimLen);
             ctx.stroke();
         }
+        // Weapon cooldown arc
+        if (target.last_fired && target.weapon_cooldown) {
+            const elapsed = (Date.now() - target.last_fired) / 1000;
+            const fraction = Math.min(1, elapsed / target.weapon_cooldown);
+            if (fraction < 1) {
+                ctx.strokeStyle = 'rgba(5, 255, 161, 0.4)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(sp.x, sp.y, radius * 1.8, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * fraction);
+                ctx.stroke();
+            }
+        }
     } else if (type.includes('drone')) {
         // Drone: triangle pointing in heading direction, slightly transparent
         ctx.globalAlpha = isEliminated ? 0.2 : 0.75;
         _drawTriangle(ctx, sp.x, sp.y, radius, heading, '#05ffa1');
         ctx.globalAlpha = isEliminated ? 0.3 : 1.0;
+        // Spinning rotors
+        if (!isEliminated) {
+            const rotorAngle = Date.now() * 0.008;
+            const rotorDist = radius * 0.8;
+            for (let i = 0; i < 4; i++) {
+                const a = rotorAngle + i * Math.PI / 2;
+                ctx.fillStyle = 'rgba(5, 255, 161, 0.7)';
+                ctx.beginPath();
+                ctx.arc(sp.x + Math.cos(a) * rotorDist, sp.y + Math.sin(a) * rotorDist, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+    } else if (type.includes('mesh_radio') || type.includes('meshtastic')) {
+        // Mesh radio: cyan antenna icon
+        const color = '#00f0ff';
+        // Antenna mast
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(sp.x, sp.y + radius * 0.6);
+        ctx.lineTo(sp.x, sp.y - radius * 1.0);
+        ctx.stroke();
+        // Antenna tip dot
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y - radius * 1.0, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        // Radio waves (two arcs)
+        ctx.strokeStyle = 'rgba(0, 240, 255, 0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y - radius * 0.5, radius * 0.6, -Math.PI * 0.7, -Math.PI * 0.3);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y - radius * 0.5, radius * 1.0, -Math.PI * 0.7, -Math.PI * 0.3);
+        ctx.stroke();
+        // Base
+        ctx.fillStyle = 'rgba(0, 240, 255, 0.4)';
+        ctx.fillRect(sp.x - radius * 0.4, sp.y + radius * 0.4, radius * 0.8, radius * 0.3);
     } else if (type.includes('truck') || type.includes('vehicle')) {
         // Truck: larger green rectangle
         _drawRect(ctx, sp.x, sp.y, radius * 1.6, radius * 1.0, heading, '#05ffa1');
@@ -590,6 +640,6 @@ window.warCombatUpdateEffects = warCombatUpdateEffects;
 window.warCombatDrawEffects = warCombatDrawEffects;
 window.warCombatDrawHealthBar = warCombatDrawHealthBar;
 window.warCombatDrawWeaponRange = warCombatDrawWeaponRange;
-window.warCombatAddKillStreakEffect = warCombatAddKillStreakEffect;
+window.warCombatAddEliminationStreakEffect = warCombatAddEliminationStreakEffect;
 window.warCombatDrawTargetShape = warCombatDrawTargetShape;
 window.warCombatReset = warCombatReset;

@@ -1,3 +1,4 @@
+<!-- LEGACY: Original 10-tab SPA -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -474,24 +475,43 @@
                             <button id="war-address-btn" class="btn btn-cyber" onclick="warLoadAddress()">GEOCODE</button>
                             <span id="war-address-status" class="war-address-status"></span>
                         </div>
-                        <!-- Mode selector -->
-                        <div id="war-mode-selector" class="war-mode-selector" style="pointer-events: auto;">
-                            <button id="war-mode-sim" class="war-mode-btn active" onclick="warSetSimMode('sim')">SIM</button>
-                            <button id="war-mode-live" class="war-mode-btn" onclick="warSetSimMode('live')">LIVE</button>
+                        <!-- Mode selectors (stacked top-right) -->
+                        <div class="war-mode-stack" style="position: absolute; top: 8px; right: 12px; pointer-events: auto; z-index: 10;">
+                            <div id="war-mode-selector" class="war-mode-selector" style="position: static;">
+                                <button id="war-mode-sim" class="war-mode-btn active" onclick="warSetSimMode('sim')">SIM</button>
+                                <button id="war-mode-live" class="war-mode-btn" onclick="warSetSimMode('live')">LIVE</button>
+                            </div>
+                            <div id="war-interaction-mode" class="war-interaction-mode">
+                                <button class="war-interact-btn active" data-mode="observe" onclick="setWarMode('observe')">OBSERVE</button>
+                                <button class="war-interact-btn" data-mode="tactical" onclick="setWarMode('tactical')">TACTICAL</button>
+                                <button class="war-interact-btn" data-mode="setup" onclick="setWarMode('setup')">SETUP</button>
+                            </div>
                         </div>
-                        <div id="war-mode" style="position: absolute; top: 12px; left: 50%; transform: translateX(-50%); pointer-events: auto;"></div>
-                        <div id="war-amy-toast" style="position: absolute; top: 48px; left: 50%; transform: translateX(-50%); pointer-events: none; opacity: 0; transition: opacity 0.3s;"></div>
+                        <div id="war-amy-toast" style="position: absolute; top: 12px; left: 50%; transform: translateX(-50%); pointer-events: none; opacity: 0; transition: opacity 0.3s;"></div>
                         <div id="war-unit-info" style="position: absolute; top: 60px; left: 12px; width: 260px; pointer-events: auto; display: none;"></div>
-                        <div id="war-amy-panel" style="position: absolute; top: 60px; right: 12px; width: 280px; pointer-events: auto;"></div>
-                        <div id="war-alert-log" style="position: absolute; bottom: 12px; right: 12px; width: 300px; max-height: 250px; pointer-events: auto; overflow-y: auto;"></div>
+                        <div id="war-amy-panel" style="position: absolute; top: 80px; right: 12px; width: 280px; pointer-events: auto;"></div>
+                        <div id="war-alert-log" style="position: absolute; bottom: 178px; right: 12px; width: 300px; max-height: 200px; pointer-events: auto; overflow-y: auto;"></div>
                         <div id="war-setup-palette" style="position: absolute; top: 60px; left: 12px; width: 220px; pointer-events: auto; display: none;"></div>
                         <!-- Game HUD overlays -->
                         <div id="war-countdown" class="war-countdown" style="display:none"></div>
                         <div id="war-wave-banner" class="war-wave-banner" style="display:none"></div>
-                        <div id="war-kill-feed" class="war-kill-feed"></div>
+                        <div id="war-elimination-feed" class="war-elimination-feed"></div>
                         <div id="war-score" class="war-score" style="display:none"></div>
                         <button id="war-begin-btn" class="war-begin-btn" style="display:none">BEGIN WAR</button>
                         <div id="war-game-over" class="war-game-over" style="display:none"></div>
+                        <!-- Audio volume control -->
+                        <div id="war-audio-controls" class="war-audio-controls" style="pointer-events: auto;">
+                            <button id="war-audio-mute" class="war-audio-btn" onclick="warToggleMute()" title="Toggle mute (M)">VOL</button>
+                            <input type="range" id="war-audio-volume" class="war-audio-slider" min="0" max="100" value="70" oninput="warSetVolume(this.value)" title="Volume">
+                        </div>
+                        <!-- Synthetic camera PIP -->
+                        <div id="war-pip" class="war-pip" style="display:none; pointer-events: auto;">
+                            <div class="war-pip-header">
+                                <span class="war-pip-label">SYN-CAM</span>
+                                <button class="war-pip-close" onclick="warTogglePip()" title="Close PIP (V)">&times;</button>
+                            </div>
+                            <img id="war-pip-img" alt="Synthetic camera" style="width:100%;height:100%;object-fit:contain;display:block;">
+                        </div>
                     </div>
                 </div>
 
@@ -578,7 +598,11 @@
     <script src="/static/js/war-editor.js?v=4"></script>
     <script src="/static/js/war-combat.js?v=3"></script>
     <script src="/static/js/war-hud.js?v=3"></script>
-    <script src="/static/js/war.js?v=10"></script>
+    <script src="/static/js/war-fx.js?v=2"></script>
+    <script src="/static/js/war-fog.js?v=1"></script>
+    <script src="/static/js/war.js?v=11"></script>
+    <script src="/static/js/war-audio.js?v=1"></script>
+    <script src="/static/js/war-events.js?v=1"></script>
 
     <!-- Level Editor (games-common modules) -->
     <script src="/static/common/js/editor/AssetRegistry.js"></script>

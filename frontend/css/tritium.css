@@ -2508,26 +2508,7 @@ button:disabled:hover {
     cursor: crosshair;
 }
 
-#war-mode {
-    background: rgba(10, 10, 20, 0.9);
-    border: 1px solid rgba(0, 240, 255, 0.3);
-    padding: 4px 16px;
-    font-family: 'Orbitron', monospace;
-    font-size: 0.75rem;
-    letter-spacing: 3px;
-    color: var(--cyber-cyan);
-    text-transform: uppercase;
-}
-
-#war-mode.mode-tactical {
-    border-color: var(--cyber-magenta);
-    color: var(--cyber-magenta);
-}
-
-#war-mode.mode-setup {
-    border-color: var(--cyber-yellow);
-    color: var(--cyber-yellow);
-}
+/* #war-mode text indicator removed — replaced by .war-interact-btn buttons */
 
 #war-amy-toast {
     background: rgba(10, 10, 20, 0.85);
@@ -2791,15 +2772,17 @@ button:disabled:hover {
 }
 
 /* ========================================
-   War Room: Mode Selector (SIM / LIVE)
+   War Room: Mode Selectors (stacked)
    ======================================== */
+.war-mode-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
 .war-mode-selector {
-    position: absolute;
-    top: 8px;
-    right: 12px;
     display: flex;
     gap: 0;
-    z-index: 10;
 }
 .war-mode-btn {
     font-family: 'JetBrains Mono', monospace;
@@ -2828,6 +2811,53 @@ button:disabled:hover {
 .war-mode-btn:hover:not(.active) {
     background: rgba(0, 240, 255, 0.08);
     color: rgba(255, 255, 255, 0.7);
+}
+
+/* Interaction mode row (OBSERVE / TACTICAL / SETUP) */
+.war-interaction-mode {
+    display: flex;
+    gap: 0;
+}
+.war-interact-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+    padding: 3px 10px;
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    background: rgba(10, 10, 20, 0.85);
+    color: rgba(255, 255, 255, 0.4);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.war-interact-btn:first-child {
+    border-radius: 3px 0 0 3px;
+}
+.war-interact-btn:last-child {
+    border-radius: 0 3px 3px 0;
+    border-left: none;
+}
+.war-interact-btn:not(:first-child):not(:last-child) {
+    border-left: none;
+}
+.war-interact-btn.active[data-mode="observe"] {
+    background: rgba(0, 240, 255, 0.12);
+    color: #00f0ff;
+    border-color: rgba(0, 240, 255, 0.4);
+}
+.war-interact-btn.active[data-mode="tactical"] {
+    background: rgba(255, 42, 109, 0.12);
+    color: #ff2a6d;
+    border-color: rgba(255, 42, 109, 0.4);
+}
+.war-interact-btn.active[data-mode="setup"] {
+    background: rgba(252, 238, 10, 0.12);
+    color: #fcee0a;
+    border-color: rgba(252, 238, 10, 0.4);
+}
+.war-interact-btn:hover:not(.active) {
+    background: rgba(0, 240, 255, 0.06);
+    color: rgba(255, 255, 255, 0.6);
 }
 
 /* ============================================================
@@ -2924,6 +2954,7 @@ button:disabled:hover {
 }
 
 /* Kill feed */
+.war-elimination-feed,
 .war-kill-feed {
     position: absolute;
     bottom: 270px;
@@ -2935,6 +2966,7 @@ button:disabled:hover {
     pointer-events: none;
     z-index: 30;
 }
+.war-elimination-entry,
 .war-kill-entry {
     background: rgba(10, 10, 20, 0.85);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -2944,14 +2976,15 @@ button:disabled:hover {
     display: flex;
     align-items: center;
     gap: 6px;
-    animation: war-kill-in 0.25s ease-out;
+    animation: war-elimination-in 0.25s ease-out;
     border-radius: 2px;
 }
+.war-elimination-arrow,
 .war-kill-arrow {
     color: rgba(255, 255, 255, 0.3);
     font-size: 0.6rem;
 }
-@keyframes war-kill-in {
+@keyframes war-elimination-in {
     from { transform: translateX(30px); opacity: 0; }
     to { transform: translateX(0); opacity: 1; }
 }
@@ -3135,4 +3168,111 @@ button:disabled:hover {
     font-family: 'Orbitron', monospace;
     color: #05ffa1;
     border-color: #05ffa1;
+}
+
+/* ========================================
+   War Room — Audio Controls
+   ======================================== */
+.war-audio-controls {
+    position: absolute;
+    bottom: 12px;
+    left: 170px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(10, 10, 20, 0.85);
+    border: 1px solid rgba(0, 240, 255, 0.25);
+    padding: 4px 10px;
+    border-radius: 4px;
+    z-index: 20;
+}
+.war-audio-btn {
+    background: transparent;
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    color: #00f0ff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background 0.2s;
+}
+.war-audio-btn:hover {
+    background: rgba(0, 240, 255, 0.15);
+}
+.war-audio-btn.muted {
+    color: #ff2a6d;
+    border-color: rgba(255, 42, 109, 0.4);
+}
+.war-audio-slider {
+    width: 80px;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(0, 240, 255, 0.2);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+.war-audio-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    background: #00f0ff;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(0, 240, 255, 0.5);
+}
+.war-audio-slider::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    background: #00f0ff;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(0, 240, 255, 0.5);
+}
+
+/* ========================================
+   War Room — Synthetic Camera PIP
+   ======================================== */
+.war-pip {
+    position: absolute;
+    bottom: 50px;
+    left: 12px;
+    width: 200px;
+    height: 160px;
+    background: rgba(10, 10, 20, 0.92);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 4px;
+    overflow: hidden;
+    z-index: 20;
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.15);
+}
+.war-pip-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 6px;
+    background: rgba(0, 240, 255, 0.08);
+    border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+}
+.war-pip-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    color: #00f0ff;
+    letter-spacing: 1px;
+}
+.war-pip-close {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+}
+.war-pip-close:hover {
+    color: #ff2a6d;
 }

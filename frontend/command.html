@@ -1,0 +1,536 @@
+<!-- DEPRECATED: Superseded by unified.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRITIUM-SC Command Center</title>
+    <meta name="description" content="TRITIUM-SC Command Center - Real-time tactical battlefield management">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='12' fill='%230a0a0f'/><rect x='8' y='8' width='84' height='84' rx='8' fill='none' stroke='%2300f0ff' stroke-width='2' opacity='0.6'/><text x='50' y='65' text-anchor='middle' font-family='monospace' font-weight='bold' font-size='40' fill='%2300f0ff'>T</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/cybercore-v2.css">
+    <link rel="stylesheet" href="/static/css/command.css">
+</head>
+<body class="v2 grid-bg">
+
+    <!-- ================================================================== -->
+    <!-- HEADER BAR (36px)                                                   -->
+    <!-- ================================================================== -->
+    <header id="header-bar" class="cc-header" data-component="header">
+        <div class="header-left cc-header__left">
+            <span class="header-logo" data-element="logo">TRITIUM-SC</span>
+            <span class="header-separator"></span>
+            <button id="mode-indicator" class="mode-badge" data-mode="sim" data-element="mode-indicator">
+                <span class="mode-dot"></span>
+                <span class="mode-label">SIM</span>
+            </button>
+        </div>
+
+        <div class="header-center cc-header__center">
+            <span id="header-clock" class="header-clock mono" data-element="clock">00:00:00 UTC</span>
+            <span class="header-separator"></span>
+            <span id="header-units" class="header-stat" data-element="unit-count">
+                <span class="stat-dot status-green"></span>
+                <span class="stat-value">0</span>
+                <span class="stat-label">units</span>
+            </span>
+            <span class="header-separator"></span>
+            <span id="header-threats" class="header-stat" data-element="threat-count">
+                <span class="stat-dot status-amber"></span>
+                <span class="stat-value">0</span>
+                <span class="stat-label">threats</span>
+            </span>
+        </div>
+
+        <div class="header-right cc-header__right">
+            <div id="game-score-area" class="game-score" data-element="game-score" hidden>
+                <span class="score-label">WAVE</span>
+                <span id="game-wave" class="score-value">0/10</span>
+                <span class="score-sep"></span>
+                <span class="score-label">SCORE</span>
+                <span id="game-score" class="score-value">0</span>
+                <span class="score-sep"></span>
+                <span class="score-label">ELIMS</span>
+                <span id="game-eliminations" class="score-value">0</span>
+            </div>
+            <span id="connection-status" class="connection-indicator" data-element="connection-status" data-state="disconnected">
+                <span class="conn-dot"></span>
+                <span class="conn-label mono">OFFLINE</span>
+            </span>
+        </div>
+    </header>
+
+    <!-- ================================================================== -->
+    <!-- MAIN LAYOUT (CSS Grid: sidebar + center + overlays)                -->
+    <!-- ================================================================== -->
+    <main id="main-layout" class="command-center" data-component="main-layout">
+
+        <!-- ============================================================== -->
+        <!-- SIDEBAR (280px, collapsible)                                   -->
+        <!-- ============================================================== -->
+        <aside id="sidebar" class="sidebar cc-sidebar" data-component="sidebar" data-collapsed="false">
+            <button id="sidebar-toggle" class="sidebar-toggle" data-element="sidebar-toggle" aria-label="Toggle sidebar">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </button>
+
+            <!-- UNITS section -->
+            <section class="sidebar-section" data-section="units" data-expanded="true">
+                <button class="section-header" data-element="section-toggle" aria-expanded="true">
+                    <svg class="section-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                    <span class="section-title">UNITS</span>
+                    <span id="unit-count-badge" class="section-badge" data-element="unit-badge">0</span>
+                </button>
+                <div class="section-body">
+                    <div class="unit-filter">
+                        <select id="unit-filter" class="filter-select mono" data-element="unit-filter">
+                            <option value="all">ALL</option>
+                            <option value="friendly">FRIENDLY</option>
+                            <option value="hostile">HOSTILE</option>
+                            <option value="unknown">UNKNOWN</option>
+                        </select>
+                    </div>
+                    <ul id="unit-list" class="unit-list" data-element="unit-list" role="listbox" aria-label="Unit list">
+                        <!-- Units populated by JS -->
+                        <li class="unit-list-empty">No units detected</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ALERTS section -->
+            <section class="sidebar-section" data-section="alerts" data-expanded="true">
+                <button class="section-header" data-element="section-toggle" aria-expanded="true">
+                    <svg class="section-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                    <span class="section-title">ALERTS</span>
+                    <span id="alert-count-badge" class="section-badge alert-badge" data-element="alert-badge">0</span>
+                </button>
+                <div class="section-body">
+                    <ul id="alert-feed" class="alert-feed" data-element="alert-feed" role="log" aria-label="Alert feed" aria-live="polite">
+                        <!-- Alerts populated by JS -->
+                        <li class="alert-feed-empty">No alerts</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- CAMERAS section -->
+            <section class="sidebar-section" data-section="cameras" data-expanded="true">
+                <button class="section-header" data-element="section-toggle" aria-expanded="true">
+                    <svg class="section-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                    <span class="section-title">CAMERAS</span>
+                </button>
+                <div class="section-body">
+                    <div id="camera-pip" class="camera-pip" data-element="camera-pip">
+                        <div class="pip-placeholder">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                                <path d="M8 21h8M12 17v4"/>
+                            </svg>
+                            <span class="mono">NO FEED</span>
+                        </div>
+                        <!-- MJPEG img injected by JS: -->
+                        <!-- <img data-camera-feed src="" alt="Camera feed"> -->
+                    </div>
+                    <ul id="camera-list" class="camera-list" data-element="camera-list">
+                        <!-- Camera entries populated by JS -->
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ANALYTICS section (collapsed by default) -->
+            <section class="sidebar-section" data-section="analytics" data-expanded="false">
+                <button class="section-header" data-element="section-toggle" aria-expanded="false">
+                    <svg class="section-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                    <span class="section-title">ANALYTICS</span>
+                </button>
+                <div class="section-body" hidden>
+                    <div id="analytics-panel" class="analytics-panel" data-element="analytics-panel">
+                        <div class="analytics-row">
+                            <span class="analytics-label mono">DETECTIONS</span>
+                            <span id="stat-detections" class="analytics-value" data-stat="detections">0</span>
+                        </div>
+                        <div class="analytics-row">
+                            <span class="analytics-label mono">THREATS/HR</span>
+                            <span id="stat-threats-hr" class="analytics-value" data-stat="threats-hr">0</span>
+                        </div>
+                        <div class="analytics-row">
+                            <span class="analytics-label mono">UPTIME</span>
+                            <span id="stat-uptime" class="analytics-value" data-stat="uptime">--:--</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SYSTEM section (collapsed by default) -->
+            <section class="sidebar-section" data-section="system" data-expanded="false">
+                <button class="section-header" data-element="section-toggle" aria-expanded="false">
+                    <svg class="section-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                    <span class="section-title">SYSTEM</span>
+                </button>
+                <div class="section-body" hidden>
+                    <div id="system-panel" class="system-panel" data-element="system-panel">
+                        <button class="system-btn mono" data-action="camera-grid">[ CAMERA GRID ]</button>
+                        <button class="system-btn mono" data-action="scenarios">[ SCENARIOS ]</button>
+                        <button class="system-btn mono" data-action="settings">[ SETTINGS ]</button>
+                    </div>
+                </div>
+            </section>
+        </aside>
+
+        <!-- ============================================================== -->
+        <!-- CENTER: TACTICAL MAP (Canvas fills remaining space)            -->
+        <!-- ============================================================== -->
+        <div id="tactical-area" class="tactical-area cc-main" data-component="tactical-area">
+            <canvas id="tactical-canvas" data-element="tactical-canvas"></canvas>
+
+            <!-- Map mode indicator (top-left of map) -->
+            <div id="map-mode" class="map-mode-indicator" data-element="map-mode">
+                <button class="map-mode-btn active" data-map-mode="observe">
+                    <span class="mono">O</span>BSERVE
+                </button>
+                <button class="map-mode-btn" data-map-mode="tactical">
+                    <span class="mono">T</span>ACTICAL
+                </button>
+                <button class="map-mode-btn" data-map-mode="setup">
+                    <span class="mono">S</span>ETUP
+                </button>
+            </div>
+
+            <!-- Map coordinates display (bottom-left of map, above minimap) -->
+            <div id="map-coords" class="map-coords mono" data-element="map-coords">
+                <span data-coord="x">X: 0.0</span>
+                <span data-coord="y">Y: 0.0</span>
+            </div>
+
+            <!-- FPS counter (top-left of map, below mode indicator) -->
+            <div id="map-fps" class="map-fps mono" data-element="map-fps">-- FPS</div>
+
+            <!-- Minimap (bottom-left of map, 200x200) -->
+            <div id="minimap-container" class="minimap corner-marks" data-component="minimap">
+                <canvas id="minimap-canvas" width="200" height="200" data-element="minimap-canvas"></canvas>
+                <div class="minimap-label mono">MINIMAP</div>
+            </div>
+
+            <!-- Center-screen banner area (for announcer: wave banners, kill streaks) -->
+            <div id="center-banner" class="center-banner" data-element="center-banner" hidden>
+                <div class="banner-text" data-element="banner-text"></div>
+                <div class="banner-sub" data-element="banner-sub"></div>
+            </div>
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- BOTTOM BAR (160px)                                             -->
+        <!-- ============================================================== -->
+        <div id="bottom-bar" class="bottom-bar cc-bottom" data-component="bottom-bar">
+
+            <!-- Amy Box (left, 300px) -->
+            <div id="amy-box" class="amy-box corner-marks" data-component="amy-box" role="region" aria-label="AI Commander Amy">
+                <div class="amy-portrait" data-element="amy-portrait" data-state="idle">
+                    <div class="amy-portrait-frame">
+                        <!-- MJPEG or avatar injected by JS -->
+                        <div class="amy-avatar-placeholder">
+                            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                                <circle cx="20" cy="14" r="8" stroke="currentColor" stroke-width="1.5"/>
+                                <path d="M6 36c0-7.7 6.3-14 14-14s14 6.3 14 14" stroke="currentColor" stroke-width="1.5"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="amy-speaking-ring" data-element="speaking-ring"></div>
+                </div>
+                <div class="amy-info">
+                    <div class="amy-name-row">
+                        <span class="amy-name">AMY</span>
+                        <span id="amy-state" class="amy-state mono" data-element="amy-state">IDLE</span>
+                    </div>
+                    <div id="amy-mood" class="amy-mood mono" data-element="amy-mood">
+                        <span class="mood-dot"></span>
+                        <span class="mood-label">CALM</span>
+                    </div>
+                    <div id="amy-thought" class="amy-thought" data-element="amy-last-thought">
+                        Awaiting initialization...
+                    </div>
+                    <div class="amy-actions">
+                        <button class="amy-action-btn mono" data-action="chat" aria-label="Open chat with Amy">[ CHAT ]</button>
+                        <button class="amy-action-btn mono" data-action="attend" aria-label="Set Amy to attend mode">[ ATTEND ]</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Selected Unit Panel (center, flexible) -->
+            <div id="selected-unit" class="selected-unit-panel" data-component="selected-unit" hidden>
+                <div class="unit-portrait" data-element="unit-portrait">
+                    <div class="unit-icon" data-element="unit-icon">
+                        <!-- Unit type icon injected by JS -->
+                    </div>
+                </div>
+                <div class="unit-info">
+                    <div class="unit-name-row">
+                        <span id="unit-name" class="unit-name" data-element="unit-name">--</span>
+                        <span id="unit-type" class="unit-type mono" data-element="unit-type">--</span>
+                    </div>
+                    <div class="unit-bars">
+                        <div class="unit-bar health-bar" data-element="health-bar">
+                            <div class="bar-fill" data-fill="health" style="width: 100%"></div>
+                            <span class="bar-label mono" data-element="health-text">200/200 HP</span>
+                        </div>
+                        <div class="unit-bar battery-bar" data-element="battery-bar">
+                            <div class="bar-fill" data-fill="battery" style="width: 100%"></div>
+                            <span class="bar-label mono" data-element="battery-text">100%</span>
+                        </div>
+                    </div>
+                    <div class="unit-meta">
+                        <span id="unit-position" class="mono" data-element="unit-position">Position: (0.0, 0.0)</span>
+                        <span id="unit-status" class="mono" data-element="unit-status">Status: IDLE</span>
+                    </div>
+                    <div class="unit-last-thought" data-element="unit-last-thought"></div>
+                    <div class="unit-actions">
+                        <button class="unit-action-btn mono" data-action="dispatch">[ DISPATCH ]</button>
+                        <button class="unit-action-btn mono" data-action="recall">[ RECALL ]</button>
+                        <button class="unit-action-btn mono" data-action="patrol">[ PATROL ]</button>
+                        <button class="unit-action-btn mono" data-action="fire">[ FIRE ]</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Multi-select unit panel (when multiple units selected) -->
+            <div id="multi-select" class="multi-select-panel" data-component="multi-select" hidden>
+                <div class="multi-icons" data-element="multi-icons">
+                    <!-- Unit mini-icons populated by JS -->
+                </div>
+                <div class="multi-info">
+                    <span id="multi-count" class="multi-count" data-element="multi-count">0 units selected</span>
+                    <span id="multi-hp" class="multi-hp mono" data-element="multi-hp">Total HP: 0/0</span>
+                    <div class="multi-actions">
+                        <button class="unit-action-btn mono" data-action="dispatch-all">[ DISPATCH ALL ]</button>
+                        <button class="unit-action-btn mono" data-action="group">[ GROUP ]</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- No selection placeholder (center, shown when nothing selected) -->
+            <div id="no-selection" class="no-selection-panel" data-component="no-selection">
+                <span class="no-selection-text">Select a unit on the map or sidebar</span>
+                <span class="no-selection-hint mono">Click unit / 1-9 group select / TAB sidebar</span>
+            </div>
+
+            <!-- Game Status (right) -->
+            <div id="game-status" class="game-status-panel" data-component="game-status">
+                <div class="game-info" data-element="game-info">
+                    <div id="game-phase" class="game-phase mono" data-element="game-phase">STANDBY</div>
+                    <div class="game-stats">
+                        <div class="game-stat-row">
+                            <span class="game-stat-label mono">WAVE</span>
+                            <span id="game-wave-bottom" class="game-stat-value" data-element="game-wave">--</span>
+                        </div>
+                        <div class="game-stat-row">
+                            <span class="game-stat-label mono">SCORE</span>
+                            <span id="game-score-bottom" class="game-stat-value" data-element="game-score-bottom">0</span>
+                        </div>
+                        <div class="game-stat-row">
+                            <span class="game-stat-label mono">STREAK</span>
+                            <span id="game-streak" class="game-stat-value" data-element="game-streak">--</span>
+                        </div>
+                        <div class="game-stat-row">
+                            <span class="game-stat-label mono">TIME</span>
+                            <span id="game-timer" class="game-stat-value" data-element="game-timer">--:--</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="game-controls" data-element="game-controls">
+                    <button id="btn-begin-war" class="game-btn game-btn-primary mono" data-action="begin-war">
+                        [ BEGIN WAR ]
+                    </button>
+                    <button id="btn-reset-game" class="game-btn mono" data-action="reset-game" hidden>
+                        [ RESET ]
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- STATUS BAR (bottom edge, minimal)                              -->
+        <!-- ============================================================== -->
+        <div id="status-bar" class="status-bar" data-component="status-bar">
+            <span id="status-fps" class="status-item mono" data-element="status-fps">-- FPS</span>
+            <span class="status-sep"></span>
+            <span id="status-alive" class="status-item mono" data-element="status-alive">0 alive</span>
+            <span class="status-sep"></span>
+            <span id="status-threats" class="status-item mono" data-element="status-threats">0 threats</span>
+            <span class="status-sep"></span>
+            <span id="status-ws" class="status-item mono" data-element="status-ws">WS: --</span>
+            <span class="status-right">
+                <span class="status-item mono">TRITIUM-SC v0.1.0</span>
+                <span class="status-sep"></span>
+                <kbd class="status-key">?</kbd>
+                <span class="status-item">HELP</span>
+            </span>
+        </div>
+    </main>
+
+    <!-- ================================================================== -->
+    <!-- TOAST CONTAINER (top-right, for Amy thoughts + alerts)             -->
+    <!-- ================================================================== -->
+    <div id="toast-container" class="toast-container" data-component="toasts" role="status" aria-live="polite" aria-label="Notifications">
+        <!-- Toasts injected by JS, max 5 visible -->
+        <!--
+        <div class="toast toast-amy" data-toast-id="...">
+            <div class="toast-header">
+                <span class="toast-source mono">AMY</span>
+                <span class="toast-time mono">12s</span>
+                <button class="toast-close" aria-label="Dismiss">&times;</button>
+            </div>
+            <div class="toast-body">Movement detected at north fence perimeter...</div>
+        </div>
+        -->
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- CHAT PANEL (slide-out from right, hidden by default)               -->
+    <!-- ================================================================== -->
+    <div id="chat-overlay" class="chat-overlay" data-component="chat-overlay" hidden>
+        <div id="chat-panel" class="chat-panel" data-component="chat-panel">
+            <div class="chat-header">
+                <span class="chat-title mono">AMY COMM</span>
+                <button id="chat-close" class="chat-close-btn" data-element="chat-close" aria-label="Close chat">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="chat-context" data-element="chat-context">
+                <!-- Amy's latest thought shown as context -->
+                <div class="chat-context-label mono">LATEST THOUGHT</div>
+                <div id="chat-context-text" class="chat-context-text" data-element="chat-context-text">--</div>
+            </div>
+            <div id="chat-messages" class="chat-messages" data-element="chat-messages" role="log" aria-label="Chat messages">
+                <!-- Chat messages populated by JS -->
+                <!--
+                <div class="chat-msg chat-msg-amy">
+                    <span class="chat-msg-sender mono">AMY</span>
+                    <span class="chat-msg-text">Ready for your orders, Commander.</span>
+                </div>
+                <div class="chat-msg chat-msg-user">
+                    <span class="chat-msg-sender mono">YOU</span>
+                    <span class="chat-msg-text">Status report.</span>
+                </div>
+                -->
+            </div>
+            <div class="chat-input-area">
+                <input id="chat-input" class="chat-input" data-element="chat-input"
+                       type="text" placeholder="Talk to Amy..."
+                       autocomplete="off" spellcheck="false"
+                       aria-label="Chat message input">
+                <button id="chat-send" class="chat-send-btn mono" data-element="chat-send">SEND</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- MODAL LAYER (camera grid, video player, settings, help)            -->
+    <!-- ================================================================== -->
+    <div id="modal-overlay" class="modal-overlay" data-component="modal" hidden>
+        <div id="modal-content" class="modal-content" data-element="modal-content">
+            <!-- Modal content injected by JS based on context -->
+            <button id="modal-close" class="modal-close-btn" data-element="modal-close" aria-label="Close modal">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <path d="M5 5L15 15M15 5L5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- HELP OVERLAY (keyboard shortcuts, hidden by default)               -->
+    <!-- ================================================================== -->
+    <div id="help-overlay" class="help-overlay" data-component="help" hidden>
+        <div class="help-panel corner-marks">
+            <div class="help-header">
+                <span class="help-title">KEYBOARD SHORTCUTS</span>
+                <button class="help-close-btn" data-element="help-close" aria-label="Close help">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="help-body">
+                <div class="help-section">
+                    <div class="help-section-title mono">GENERAL</div>
+                    <div class="help-row"><kbd>?</kbd><span>Toggle help</span></div>
+                    <div class="help-row"><kbd>TAB</kbd><span>Toggle sidebar</span></div>
+                    <div class="help-row"><kbd>ESC</kbd><span>Close panel / modal</span></div>
+                    <div class="help-row"><kbd>C</kbd><span>Open Amy chat</span></div>
+                    <div class="help-row"><kbd>/</kbd><span>Focus chat input</span></div>
+                    <div class="help-row"><kbd>M</kbd><span>Toggle minimap</span></div>
+                    <div class="help-row"><kbd>G</kbd><span>Camera grid modal</span></div>
+                </div>
+                <div class="help-section">
+                    <div class="help-section-title mono">MAP</div>
+                    <div class="help-row"><kbd>O</kbd><span>Observe mode</span></div>
+                    <div class="help-row"><kbd>T</kbd><span>Tactical mode</span></div>
+                    <div class="help-row"><kbd>S</kbd><span>Setup mode</span></div>
+                    <div class="help-row"><kbd>F</kbd><span>Center on action</span></div>
+                    <div class="help-row"><kbd>R</kbd><span>Reset camera</span></div>
+                    <div class="help-row"><kbd>[</kbd> / <kbd>]</kbd><span>Zoom in / out</span></div>
+                </div>
+                <div class="help-section">
+                    <div class="help-section-title mono">UNITS</div>
+                    <div class="help-row"><kbd>1</kbd>-<kbd>9</kbd><span>Select unit group</span></div>
+                    <div class="help-row"><kbd>D</kbd><span>Dispatch to cursor</span></div>
+                    <div class="help-row"><kbd>R</kbd><span>Recall selected</span></div>
+                </div>
+                <div class="help-section">
+                    <div class="help-section-title mono">GAME</div>
+                    <div class="help-row"><kbd>SPACE</kbd><span>Pause / Resume</span></div>
+                    <div class="help-row"><kbd>B</kbd><span>Begin War</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- GAME OVER OVERLAY                                                  -->
+    <!-- ================================================================== -->
+    <div id="game-over-overlay" class="game-over-overlay" data-component="game-over" hidden>
+        <div class="game-over-panel corner-marks">
+            <div id="game-over-title" class="game-over-title" data-element="game-over-title">VICTORY</div>
+            <div class="game-over-stats">
+                <div class="go-stat">
+                    <span class="go-stat-label mono">FINAL SCORE</span>
+                    <span id="go-score" class="go-stat-value" data-element="go-score">0</span>
+                </div>
+                <div class="go-stat">
+                    <span class="go-stat-label mono">WAVES SURVIVED</span>
+                    <span id="go-waves" class="go-stat-value" data-element="go-waves">0</span>
+                </div>
+                <div class="go-stat">
+                    <span class="go-stat-label mono">TOTAL KILLS</span>
+                    <span id="go-kills" class="go-stat-value" data-element="go-kills">0</span>
+                </div>
+                <div class="go-stat">
+                    <span class="go-stat-label mono">BEST STREAK</span>
+                    <span id="go-streak" class="go-stat-value" data-element="go-streak">--</span>
+                </div>
+            </div>
+            <button class="game-btn game-btn-primary mono" data-action="play-again">[ PLAY AGAIN ]</button>
+        </div>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- Entry point: ES6 module                                            -->
+    <!-- ================================================================== -->
+    <script type="module" src="/static/js/command/main.js"></script>
+
+</body>
+</html>

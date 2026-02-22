@@ -88,12 +88,19 @@ const warState = {
     // Visual effects
     effects: [], // { type, x, y, time, data }
     // Score tracking
-    stats: { kills: 0, breaches: 0, dispatches: 0, sessionStart: Date.now() },
+    stats: { eliminations: 0, breaches: 0, dispatches: 0, sessionStart: Date.now() },
     // Audio context (lazy init on first user interaction)
     audioCtx: null,
     // Satellite tile images for 2D canvas rendering
     // Array of { image: HTMLImageElement, bounds: { minX, maxX, minY, maxY } }
     satTiles: [],
+    // Smooth heading interpolation cache (tid -> smoothed angle)
+    _smoothHeadings: {},
+    // Control groups: digit key -> array of target IDs
+    controlGroups: {},
+    // Last group key press (for double-tap center)
+    _lastGroupKey: null,
+    _lastGroupTime: 0,
 };
 
 // Alliance colors
@@ -126,6 +133,8 @@ function _getAudioCtx() {
 }
 
 function warPlaySound(type) {
+    // Skip legacy oscillator tones when new audio pipeline is active
+    if (typeof warAudio !== 'undefined' && warAudio._ctx) return;
     const ctx = _getAudioCtx();
     if (!ctx) return;
     try {
@@ -356,7 +365,7 @@ function fetchWarState() {
                 } else {
                     // game_state null means GameMode not loaded yet —
                     // default to setup so BEGIN WAR button is visible.
-                    warHudUpdateGameState({ state: 'setup', wave: 0, total_waves: 10, score: 0, total_kills: 0 });
+                    warHudUpdateGameState({ state: 'setup', wave: 0, total_waves: 10, score: 0, total_eliminations: 0 });
                 }
             }
         })
@@ -406,20 +415,41 @@ function renderLoop() {
 }
 
 function render() {
-    // Camera lerp (shared by both renderers)
-    const cam = warState.cam;
-    cam.x += (cam.targetX - cam.x) * 0.1;
-    cam.y += (cam.targetY - cam.y) * 0.1;
-    cam.zoom += (cam.targetZoom - cam.zoom) * 0.1;
-
-    // Delta time for physics
+    // Delta time for physics (computed first so camera lerp can use it)
     const now = performance.now();
     const dt = warState._lastFrameTime ? Math.min((now - warState._lastFrameTime) / 1000, 0.05) : 0.016;
     warState._lastFrameTime = now;
+    warState._dt = dt;
+
+    // Camera lerp (shared by both renderers)
+    const cam = warState.cam;
+    cam.x = typeof fadeToward === 'function' ? fadeToward(cam.x, cam.targetX, 8, dt) : cam.x + (cam.targetX - cam.x) * 0.1;
+    cam.y = typeof fadeToward === 'function' ? fadeToward(cam.y, cam.targetY, 8, dt) : cam.y + (cam.targetY - cam.y) * 0.1;
+    cam.zoom = typeof fadeToward === 'function' ? fadeToward(cam.zoom, cam.targetZoom, 6, dt) : cam.zoom + (cam.targetZoom - cam.zoom) * 0.1;
+
+    // Edge scrolling (only when not dragging and not in cinematic mode)
+    if (!warState.isPanning && !warState.isDragging && !(typeof warFxIsCinematic === 'function' && warFxIsCinematic())) {
+        const canvas = warState.canvas;
+        const m = warState.lastMouse;
+        if (canvas && m) {
+            const edgeMargin = 20;
+            const edgeSpeed = 15 * dt / Math.max(cam.zoom, 0.3);
+            if (m.x < edgeMargin) cam.targetX -= edgeSpeed;
+            else if (m.x > canvas.width - edgeMargin) cam.targetX += edgeSpeed;
+            if (m.y < edgeMargin) cam.targetY += edgeSpeed;
+            else if (m.y > canvas.height - edgeMargin) cam.targetY -= edgeSpeed;
+        }
+    }
 
     // Update combat systems
     if (typeof warCombatUpdateProjectiles === 'function') warCombatUpdateProjectiles(dt);
     if (typeof warCombatUpdateEffects === 'function') warCombatUpdateEffects(dt);
+
+    // Update FX systems
+    if (typeof warFxUpdateTrails === 'function') warFxUpdateTrails(getTargets(), dt);
+    if (typeof warFxCinematicTick === 'function') {
+        warFxCinematicTick(dt, cam, getTargets(), typeof _hudState !== 'undefined' ? _hudState : null);
+    }
 
     // 3D renderer path
     if (warState.use3D && typeof updateWar3D === 'function') {
@@ -444,6 +474,13 @@ function render() {
     drawMapBoundary(ctx);
     drawZones(ctx);
     drawTargets(ctx);
+    // FX: trails and vision cones over targets, under selection
+    if (typeof warFxDrawTrails === 'function') warFxDrawTrails(ctx, worldToScreen);
+    if (typeof warFxDrawVisionCones === 'function') warFxDrawVisionCones(ctx, worldToScreen, getTargets(), cam.zoom);
+    // Fog of War overlay (after targets, before selection/HUD)
+    if (typeof fogDraw === 'function') {
+        fogDraw(ctx, canvas, worldToScreen, getTargets(), cam, warState.mode);
+    }
     drawSelectionIndicators(ctx);
     drawWeaponRanges(ctx);
     drawDispatchArrows(ctx);
@@ -460,8 +497,24 @@ function render() {
     drawPlacingGhost(ctx);
     // Editor overlays (FOV cones, ghost, selection) — drawn over targets
     if (typeof warEditorDraw === 'function') warEditorDraw(ctx);
-    drawMinimap(ctx);
+    // Fog vision preview for ghost placement in SETUP mode
+    if (warState.mode === 'setup' && typeof fogDrawSetupPreview === 'function'
+        && typeof editorState !== 'undefined' && editorState.placing && editorState.ghostWorldPos) {
+        fogDrawSetupPreview(ctx, worldToScreen, cam,
+            editorState.ghostWorldPos.x, editorState.ghostWorldPos.y,
+            editorState.placing.type || editorState.placing.category || '');
+    }
+    // Enhanced minimap (bottom-right, with fog + alerts)
+    if (typeof fogDrawMinimap === 'function') {
+        var _visionCircles = typeof fogBuildVisionMap === 'function' ? fogBuildVisionMap(getTargets()) : [];
+        fogDrawMinimap(ctx, canvas, getTargets(), cam, warState.mapMin, warState.mapMax, warState.zones, [], _visionCircles);
+    } else {
+        drawMinimap(ctx);
+    }
     drawStats(ctx);
+    // FX: scanlines and event log on top of everything
+    if (typeof warFxDrawScanlines === 'function') warFxDrawScanlines(ctx, canvas.width, canvas.height);
+    if (typeof warFxDrawEventLog === 'function') warFxDrawEventLog(ctx, canvas.width, canvas.height);
 }
 
 // ============================================================
@@ -585,6 +638,20 @@ function drawTarget(ctx, tid, t) {
     const isHovered = warState.hoveredTarget === tid;
     const baseRadius = 6 * Math.min(warState.cam.zoom, 3);
     const radius = isSelected ? baseRadius * 1.3 : (isHovered ? baseRadius * 1.15 : baseRadius);
+
+    // Update trail color for this target
+    if (typeof _updateTrailColor === 'function') _updateTrailColor(tid, alliance);
+
+    // Smooth heading interpolation
+    if (t.heading !== undefined && t.heading !== null && typeof lerpAngle === 'function') {
+        const prev = warState._smoothHeadings[tid];
+        if (prev !== undefined) {
+            warState._smoothHeadings[tid] = lerpAngle(prev, t.heading, 10, warState._dt || 0.016);
+        } else {
+            warState._smoothHeadings[tid] = t.heading;
+        }
+        t.heading = warState._smoothHeadings[tid];
+    }
 
     // Draw waypoint paths for friendlies
     if (t.waypoints && t.waypoints.length > 1) {
@@ -901,7 +968,7 @@ function drawEffects(ctx) {
             ctx.arc(sp.x, sp.y, ringRadius, 0, Math.PI * 2);
             ctx.stroke();
 
-            // "KILL" text that floats up
+            // "NEUTRALIZED" text that floats up
             if (age < 1.2) {
                 const textAlpha = Math.max(0, 1 - age / 1.2);
                 const yOffset = age * 30;
@@ -955,7 +1022,7 @@ function drawStats(ctx) {
     ctx.textAlign = 'left';
 
     const rows = [
-        { label: 'KILLS', value: warState.stats.kills, color: '#ff2a6d' },
+        { label: 'ELIMS', value: warState.stats.eliminations, color: '#ff2a6d' },
         { label: 'BREACHES', value: warState.stats.breaches, color: '#ff9800' },
         { label: 'DISPATCHES', value: warState.stats.dispatches, color: '#00f0ff' },
         { label: 'HOSTILES', value: activeHostiles, color: activeHostiles > 0 ? '#ff2a6d' : '#05ffa1' },
@@ -1066,8 +1133,17 @@ function onCanvasMouseDown(e) {
     if (e.button === 0) {
         // Left click
 
-        // Minimap click-to-pan (2D mode only — in 3D mode minimap is HTML overlay)
-        if (!warState.use3D) {
+        // Enhanced minimap click-to-pan (bottom-right, via war-fog.js)
+        if (!warState.use3D && typeof fogMinimapHitTest === 'function') {
+            const mmHit = fogMinimapHitTest(sx, sy, warState.canvas.width, warState.canvas.height, warState.mapMin, warState.mapMax);
+            if (mmHit) {
+                warState.cam.targetX = mmHit.x;
+                warState.cam.targetY = mmHit.y;
+                return;
+            }
+        }
+        // Legacy minimap click-to-pan fallback (bottom-left, 2D mode)
+        if (!warState.use3D && typeof fogMinimapHitTest === 'undefined') {
             const mmSize = 150;
             const mmPad = 12;
             const mmX = mmPad;
@@ -1334,12 +1410,91 @@ function warKeyHandler(e) {
             break;
         case 'v':
         case 'V':
-            // Toggle 3D camera tilt
             if (warState.use3D && typeof war3dToggleTilt === 'function') {
+                // Toggle 3D camera tilt in 3D mode
                 war3dToggleTilt();
                 warAddAlert('Camera: ' + (war3d.camState.tilt ? 'TILTED' : 'TOP-DOWN'), 'info');
+            } else {
+                // Toggle synthetic camera PIP in 2D mode
+                warTogglePip();
             }
             break;
+        case 'm':
+        case 'M':
+            warToggleMute();
+            break;
+        case 'c':
+            // Toggle cinematic camera
+            if (typeof warFxToggleCinematic === 'function') {
+                const on = warFxToggleCinematic();
+                warAddAlert('Cinematic: ' + (on ? 'ON' : 'OFF'), 'info');
+                if (typeof warFxAddEvent === 'function') {
+                    warFxAddEvent(on ? 'CINEMATIC MODE ENGAGED' : 'CINEMATIC MODE OFF', '#00f0ff');
+                }
+            }
+            break;
+        case 'f':
+        case 'F':
+            // Toggle fog of war
+            if (typeof fogState !== 'undefined') {
+                fogState.fogEnabled = !fogState.fogEnabled;
+                warAddAlert('Fog of War: ' + (fogState.fogEnabled ? 'ON' : 'OFF'), 'info');
+                if (typeof warFxAddEvent === 'function') {
+                    warFxAddEvent(fogState.fogEnabled ? 'FOG OF WAR ENGAGED' : 'FOG OF WAR DISABLED', '#00f0ff');
+                }
+            }
+            break;
+        case 'n':
+        case 'N':
+            // Toggle minimap
+            if (typeof fogState !== 'undefined') {
+                fogState.minimapEnabled = !fogState.minimapEnabled;
+                warAddAlert('Minimap: ' + (fogState.minimapEnabled ? 'ON' : 'OFF'), 'info');
+            }
+            break;
+        case '1': case '2': case '3': case '4': case '5':
+        case '6': case '7': case '8': case '9':
+            // Control groups: Ctrl+digit saves, digit recalls
+            if (e.ctrlKey || e.metaKey) {
+                // Save current selection to group
+                if (warState.selectedTargets.length > 0) {
+                    warState.controlGroups[e.key] = [...warState.selectedTargets];
+                    warAddAlert('Group ' + e.key + ' saved (' + warState.selectedTargets.length + ' units)', 'info');
+                }
+                e.preventDefault();
+            } else {
+                const group = warState.controlGroups[e.key];
+                if (group && group.length > 0) {
+                    warState.selectedTargets = [...group];
+                    updateUnitInfo();
+                    // Double-tap detection: center camera on group centroid
+                    const nowMs = Date.now();
+                    if (warState._lastGroupKey === e.key && nowMs - warState._lastGroupTime < 300) {
+                        _centerOnGroup(group);
+                    }
+                    warState._lastGroupKey = e.key;
+                    warState._lastGroupTime = nowMs;
+                }
+            }
+            break;
+    }
+}
+
+function _centerOnGroup(group) {
+    const targets = getTargets();
+    let sumX = 0, sumY = 0, count = 0;
+    for (const tid of group) {
+        const t = targets[tid];
+        if (!t) continue;
+        const pos = getTargetPosition(t);
+        if (pos.x === undefined) continue;
+        sumX += pos.x;
+        sumY += pos.y;
+        count++;
+    }
+    if (count > 0) {
+        warState.cam.targetX = sumX / count;
+        warState.cam.targetY = sumY / count;
     }
 }
 
@@ -1487,12 +1642,11 @@ function buildModeIndicator() {
 }
 
 function updateModeIndicator() {
-    const el = document.getElementById('war-mode');
-    if (!el) return;
-    el.textContent = warState.mode.toUpperCase();
-    el.className = '';
-    if (warState.mode === 'tactical') el.classList.add('mode-tactical');
-    else if (warState.mode === 'setup') el.classList.add('mode-setup');
+    // Update interaction mode buttons (OBSERVE / TACTICAL / SETUP)
+    const btns = document.querySelectorAll('#war-interaction-mode .war-interact-btn');
+    btns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === warState.mode);
+    });
 }
 
 // ============================================================
@@ -1772,7 +1926,7 @@ function warHandleTargetNeutralized(data) {
     const interceptorName = data.interceptor_name || data.interceptor_id || 'unit';
     warAddAlert(`NEUTRALIZED: ${hostileName} by ${interceptorName}`, 'dispatch');
     warPlaySound('neutralized');
-    warState.stats.kills++;
+    warState.stats.eliminations++;
 
     // Visual flash at position (legacy effect)
     if (data.position) {
@@ -1784,8 +1938,10 @@ function warHandleTargetNeutralized(data) {
         warCombatAddEliminationEffect(data);
     }
 
-    // HUD: kill feed entry
-    if (typeof warHudAddKillFeedEntry === 'function') {
+    // HUD: elimination feed entry
+    if (typeof warHudAddEliminationFeedEntry === 'function') {
+        warHudAddEliminationFeedEntry(data);
+    } else if (typeof warHudAddKillFeedEntry === 'function') {
         warHudAddKillFeedEntry(data);
     }
 
@@ -1809,11 +1965,12 @@ function warHandleProjectileHit(data) {
 
 function warHandleTargetEliminated(data) {
     if (typeof warCombatAddEliminationEffect === 'function') warCombatAddEliminationEffect(data);
-    if (typeof warHudAddKillFeedEntry === 'function') warHudAddKillFeedEntry(data);
+    if (typeof warHudAddEliminationFeedEntry === 'function') warHudAddEliminationFeedEntry(data);
+    else if (typeof warHudAddKillFeedEntry === 'function') warHudAddKillFeedEntry(data);
     warPlaySound('neutralized');
-    warState.stats.kills++;
-    const name = data.hostile_name || data.victim_name || data.target_id || 'target';
-    warAddAlert(`ELIMINATED: ${name}`, 'dispatch');
+    warState.stats.eliminations++;
+    const name = data.target_name || data.hostile_name || data.target_id || 'target';
+    warAddAlert(`NEUTRALIZED: ${name}`, 'dispatch');
 }
 
 function warHandleWaveStart(data) {
@@ -1826,7 +1983,7 @@ function warHandleWaveStart(data) {
 
 function warHandleWaveComplete(data) {
     if (typeof warHudShowWaveComplete === 'function') {
-        warHudShowWaveComplete(data.wave_number, data.kills, data.score_bonus);
+        warHudShowWaveComplete(data.wave_number, data.eliminations || data.kills, data.score_bonus);
     }
     warAddAlert(`WAVE ${data.wave_number} COMPLETE`, 'dispatch');
 }
@@ -1835,13 +1992,14 @@ function warHandleGameState(data) {
     if (typeof warHudUpdateGameState === 'function') warHudUpdateGameState(data);
 }
 
-function warHandleKillStreak(data) {
-    if (typeof warCombatAddKillStreakEffect === 'function') warCombatAddKillStreakEffect(data);
+function warHandleEliminationStreak(data) {
+    if (typeof warCombatAddEliminationStreakEffect === 'function') warCombatAddEliminationStreakEffect(data);
+    else if (typeof warCombatAddKillStreakEffect === 'function') warCombatAddKillStreakEffect(data);
 }
 
 function warHandleGameOver(data) {
     if (typeof warHudShowGameOver === 'function') {
-        warHudShowGameOver(data.result, data.final_score, data.waves_completed, data.total_kills);
+        warHudShowGameOver(data.result, data.final_score, data.waves_completed, data.total_eliminations || data.total_kills);
     }
 }
 
@@ -1970,7 +2128,7 @@ function updateStatsHUD() {
     }
 
     const rows = [
-        { label: 'KILLS', value: warState.stats.kills, color: '#ff2a6d' },
+        { label: 'ELIMS', value: warState.stats.eliminations, color: '#ff2a6d' },
         { label: 'BREACHES', value: warState.stats.breaches, color: '#ff9800' },
         { label: 'DISPATCHES', value: warState.stats.dispatches, color: '#00f0ff' },
         { label: 'HOSTILES', value: activeHostiles, color: activeHostiles > 0 ? '#ff2a6d' : '#05ffa1' },
@@ -2240,6 +2398,95 @@ function _loadMapData(lat, lng) {
 }
 
 // ============================================================
+// Audio controls (delegates to warAudio from war-audio.js)
+// ============================================================
+
+function warToggleMute() {
+    if (typeof warAudio === 'undefined') return;
+    warAudio.toggleMute();
+    var btn = document.getElementById('war-audio-mute');
+    if (btn) {
+        btn.classList.toggle('muted', warAudio.isMuted());
+        btn.textContent = warAudio.isMuted() ? 'MUTE' : 'VOL';
+    }
+}
+
+function warSetVolume(val) {
+    if (typeof warAudio === 'undefined') return;
+    warAudio.setVolume(parseFloat(val) / 100);
+}
+
+// ============================================================
+// Synthetic Camera PIP
+// ============================================================
+
+var _pipActive = false;
+var _pipInterval = null;
+
+function warTogglePip() {
+    var pip = document.getElementById('war-pip');
+    if (!pip) return;
+
+    _pipActive = !_pipActive;
+    pip.style.display = _pipActive ? 'block' : 'none';
+
+    if (_pipActive) {
+        _startPipFeed();
+    } else {
+        _stopPipFeed();
+    }
+}
+
+function _startPipFeed() {
+    var img = document.getElementById('war-pip-img');
+    if (!img) return;
+
+    // Use the existing syn-cam-0 MJPEG endpoint if available,
+    // otherwise use the synthetic feed API snapshot polling
+    var synCamUrl = '/api/amy/nodes/syn-cam-0/video';
+
+    // Try MJPEG stream first (simple img.src assignment)
+    img.onerror = function() {
+        // Fallback to polling snapshots from synthetic feed API
+        img.onerror = null;
+        _pollPipSnapshots();
+    };
+    img.src = synCamUrl;
+}
+
+function _pollPipSnapshots() {
+    // Create a synthetic feed for PIP if none exists, then poll
+    var img = document.getElementById('war-pip-img');
+    if (!img) return;
+
+    // Try creating a feed
+    fetch('/api/synthetic/cameras', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feed_id: 'war-pip', scene_type: 'bird_eye', fps: 5, width: 320, height: 240 }),
+    }).catch(function() {});
+
+    // Poll snapshots
+    _pipInterval = setInterval(function() {
+        if (!_pipActive) return;
+        var newImg = new Image();
+        newImg.onload = function() {
+            if (img && _pipActive) img.src = newImg.src;
+        };
+        newImg.src = '/api/synthetic/cameras/war-pip/snapshot?t=' + Date.now();
+    }, 200);
+}
+
+function _stopPipFeed() {
+    var img = document.getElementById('war-pip-img');
+    if (img) img.src = '';
+    if (_pipInterval) {
+        clearInterval(_pipInterval);
+        _pipInterval = null;
+    }
+}
+
+// ============================================================
 // Expose globally
 // ============================================================
 
@@ -2259,7 +2506,8 @@ window.warHandleTargetEliminated = warHandleTargetEliminated;
 window.warHandleWaveStart = warHandleWaveStart;
 window.warHandleWaveComplete = warHandleWaveComplete;
 window.warHandleGameState = warHandleGameState;
-window.warHandleKillStreak = warHandleKillStreak;
+window.warHandleEliminationStreak = warHandleEliminationStreak;
+window.warHandleKillStreak = warHandleEliminationStreak; // backward compat
 window.warHandleGameOver = warHandleGameOver;
 window.warHandleAmyAnnouncement = warHandleAmyAnnouncement;
 window.warHandleCountdown = warHandleCountdown;
@@ -2275,3 +2523,7 @@ window.updateUnitInfo = updateUnitInfo;
 window.warLoadAddress = warLoadAddress;
 window.warSetSimMode = warSetSimMode;
 window.warHandleModeChange = warHandleModeChange;
+// Audio + PIP controls
+window.warToggleMute = warToggleMute;
+window.warSetVolume = warSetVolume;
+window.warTogglePip = warTogglePip;

@@ -1,0 +1,855 @@
+/**
+ * Floating Panel System
+ * Draggable, resizable panels for the unified command interface.
+ * Uses transform: translate() for GPU-accelerated positioning.
+ */
+
+
+/* ========================================
+   Panel Container
+   ======================================== */
+
+
+/* ========================================
+   Panel Frame
+   ======================================== */
+
+.panel-container > .panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(135deg, var(--surface-2) 0%, var(--surface-1) 100%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+    pointer-events: auto;
+    will-change: transform;
+    transition: box-shadow 0.2s ease;
+}
+
+.panel:hover {
+    box-shadow:
+        0 4px 24px rgba(0, 0, 0, 0.4),
+        0 0 1px rgba(0, 240, 255, 0.1);
+}
+
+/* Corner marks */
+.panel::before,
+.panel::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-color: rgba(0, 240, 255, 0.1);
+    pointer-events: none;
+    z-index: 2;
+}
+
+.panel::before {
+    top: 3px;
+    left: 3px;
+    border-top: 1px solid;
+    border-left: 1px solid;
+}
+
+.panel::after {
+    bottom: 3px;
+    right: 3px;
+    border-bottom: 1px solid;
+    border-right: 1px solid;
+}
+
+
+/* ========================================
+   Panel Header (drag handle)
+   ======================================== */
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    height: 28px;
+    min-height: 28px;
+    background: linear-gradient(180deg, rgba(0, 240, 255, 0.03) 0%, transparent 100%);
+    border-bottom: 1px solid var(--border);
+    cursor: grab;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.panel-header:active {
+    cursor: grabbing;
+}
+
+.panel-title {
+    font-size: 0.55rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.panel-controls {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.panel-btn {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    line-height: 1;
+    color: var(--text-ghost);
+    background: transparent;
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+    padding: 0;
+}
+
+.panel-btn:hover {
+    color: var(--text-primary);
+    background: rgba(0, 240, 255, 0.06);
+}
+
+.panel-close:hover {
+    color: var(--magenta);
+    background: rgba(255, 42, 109, 0.08);
+}
+
+
+/* ========================================
+   Panel Body
+   ======================================== */
+
+.panel-body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+    padding: 8px;
+}
+
+/* Scrollbar styling */
+.panel-body::-webkit-scrollbar {
+    width: 4px;
+}
+
+.panel-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.panel-body::-webkit-scrollbar-thumb {
+    background: rgba(0, 240, 255, 0.12);
+    border-radius: 2px;
+}
+
+
+/* ========================================
+   Panel Resize Handle
+   ======================================== */
+
+.panel-resize-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 14px;
+    height: 14px;
+    cursor: se-resize;
+    z-index: 3;
+}
+
+/* Diagonal grip lines */
+.panel-resize-handle::after {
+    content: '';
+    position: absolute;
+    bottom: 3px;
+    right: 3px;
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid rgba(0, 240, 255, 0.15);
+    border-bottom: 2px solid rgba(0, 240, 255, 0.15);
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.panel-resize-handle:hover::after {
+    opacity: 1;
+    border-color: rgba(0, 240, 255, 0.3);
+}
+
+
+/* ========================================
+   Panel States
+   ======================================== */
+
+.panel-minimized {
+    overflow: hidden;
+}
+
+.panel-minimized .panel-body,
+.panel-minimized .panel-resize-handle {
+    display: none;
+}
+
+.panel-minimized .panel-header {
+    border-bottom: none;
+}
+
+.panel-dragging {
+    opacity: 0.9;
+    box-shadow:
+        0 8px 40px rgba(0, 0, 0, 0.5),
+        0 0 2px rgba(0, 240, 255, 0.15);
+}
+
+.panel-resizing {
+    opacity: 0.95;
+}
+
+
+/* ========================================
+   Panel Content Components
+   Shared styles for panel innards.
+   ======================================== */
+
+/* Section divider inside a panel */
+.panel-section-label {
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-ghost);
+    margin: 8px 0 4px;
+}
+
+/* Stat row (label: value) */
+.panel-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 0;
+}
+
+.panel-stat-label {
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    color: var(--text-dim);
+}
+
+.panel-stat-value {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+}
+
+/* List items */
+.panel-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.panel-list-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s ease;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+.panel-list-item:hover {
+    background: rgba(0, 240, 255, 0.03);
+}
+
+.panel-list-item.active {
+    background: rgba(0, 240, 255, 0.06);
+    border: 1px solid rgba(0, 240, 255, 0.1);
+}
+
+/* Compact progress bar */
+.panel-bar {
+    position: relative;
+    height: 12px;
+    background: var(--surface-3);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.panel-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.panel-bar-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    color: var(--text-primary);
+    text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+}
+
+/* Action buttons inside panels */
+.panel-action-btn {
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    background: none;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    padding: 2px 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.panel-action-btn:hover {
+    color: var(--cyan);
+    border-color: rgba(0, 240, 255, 0.15);
+    background: rgba(0, 240, 255, 0.03);
+}
+
+.panel-action-btn-primary {
+    color: var(--cyan);
+    border-color: rgba(0, 240, 255, 0.2);
+    background: rgba(0, 240, 255, 0.04);
+}
+
+.panel-action-btn-primary:hover {
+    background: rgba(0, 240, 255, 0.08);
+    box-shadow: 0 0 8px rgba(0, 240, 255, 0.08);
+}
+
+/* Alliance color dots */
+.panel-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.panel-dot-friendly { background: var(--green); }
+.panel-dot-hostile  { background: var(--magenta); }
+.panel-dot-neutral  { background: var(--cyan); }
+.panel-dot-unknown  { background: var(--amber); }
+
+/* Empty state */
+.panel-empty {
+    font-size: 0.65rem;
+    color: var(--text-ghost);
+    text-align: center;
+    padding: 12px 0;
+}
+
+/* Icon badges */
+.panel-icon-badge {
+    width: 22px;
+    height: 22px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    flex-shrink: 0;
+}
+
+/* Filter dropdown */
+.panel-filter {
+    width: 100%;
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    color: var(--text-secondary);
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 3px 6px;
+    margin-bottom: 6px;
+}
+
+
+/* ========================================
+   Amy Panel Content
+   ======================================== */
+
+.amy-panel-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    height: 100%;
+}
+
+.amy-p-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.amy-p-portrait {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface-3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.3s ease;
+}
+
+.amy-p-portrait[data-state="thinking"] { border-color: var(--cyan); }
+.amy-p-portrait[data-state="speaking"] { border-color: var(--green); }
+.amy-p-portrait[data-state="listening"] { border-color: var(--amber); }
+
+.amy-p-avatar {
+    color: var(--text-dim);
+}
+
+.amy-p-speaking-ring {
+    position: absolute;
+    inset: -3px;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    transition: border-color 0.3s ease;
+    pointer-events: none;
+}
+
+.amy-p-portrait[data-state="speaking"] .amy-p-speaking-ring {
+    border-color: var(--green);
+    box-shadow: 0 0 6px rgba(5, 255, 161, 0.2);
+    animation: v2-pulse 1.5s ease-in-out infinite;
+}
+
+.amy-p-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.amy-p-name-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.amy-p-name {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    color: var(--text-primary);
+}
+
+.amy-p-state {
+    font-size: 0.5rem;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+}
+
+.amy-p-mood {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.5rem;
+    color: var(--text-ghost);
+    margin-top: 2px;
+}
+
+.amy-p-thought {
+    font-size: 0.6rem;
+    line-height: 1.4;
+    color: var(--text-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    flex: 1;
+    min-height: 0;
+}
+
+.amy-p-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+
+/* ========================================
+   Game HUD Panel Content
+   ======================================== */
+
+.game-hud-panel-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: 100%;
+}
+
+.ghud-status {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ghud-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 0;
+}
+
+.ghud-label {
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+}
+
+.ghud-value {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+}
+
+.ghud-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: auto;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+}
+
+
+/* ========================================
+   Units & Alerts Panel Inner Layout
+   ======================================== */
+
+.units-panel-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    height: 100%;
+}
+
+.alerts-panel-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    height: 100%;
+}
+
+.panel-detail {
+    border-top: 1px solid var(--border);
+    padding-top: 6px;
+}
+
+
+/* ========================================
+   Meshtastic Panel — Tabbed Interface
+   ======================================== */
+
+.mesh-panel-inner {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 0;
+}
+
+/* Tab bar */
+.mesh-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.mesh-tab {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-ghost);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 5px 4px;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.mesh-tab:hover {
+    color: var(--text-dim);
+    background: rgba(0, 240, 255, 0.02);
+}
+
+.mesh-tab.active {
+    color: var(--cyan);
+    border-bottom-color: var(--cyan);
+}
+
+/* Tab content area */
+.mesh-tab-content {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.mesh-tab-pane {
+    padding: 6px 0;
+}
+
+/* Bottom status bar */
+.mesh-status-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    border-top: 1px solid var(--border);
+    font-size: 0.5rem;
+    color: var(--text-ghost);
+    flex-shrink: 0;
+}
+
+/* Node detail expansion */
+.mesh-node-detail {
+    border-top: 1px solid var(--border);
+    padding-top: 6px;
+    margin-top: 6px;
+}
+
+/* Node stats inline */
+.mesh-node-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mesh-node-stats {
+    display: flex;
+    gap: 6px;
+    font-size: 0.5rem;
+    color: var(--text-ghost);
+    flex-shrink: 0;
+}
+
+/* Chat section */
+.mesh-chat-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+
+.mesh-channel-select {
+    font-size: 0.55rem;
+}
+
+.mesh-dm-indicator {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.55rem;
+    padding: 2px 6px;
+    background: rgba(255, 42, 109, 0.06);
+    border: 1px solid rgba(255, 42, 109, 0.15);
+    border-radius: var(--radius-sm);
+}
+
+.mesh-dm-clear {
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    color: var(--text-ghost);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0 2px;
+    margin-left: 4px;
+}
+
+.mesh-dm-clear:hover {
+    color: var(--magenta);
+}
+
+.mesh-chat-messages {
+    max-height: 200px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    margin-bottom: 6px;
+}
+
+.mesh-chat-msg {
+    display: flex;
+    gap: 6px;
+    padding: 2px 0;
+    font-size: 0.6rem;
+    line-height: 1.4;
+}
+
+.mesh-chat-sender {
+    flex-shrink: 0;
+    font-size: 0.55rem;
+}
+
+.mesh-chat-text {
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
+    color: var(--text-secondary);
+}
+
+.mesh-chat-meta {
+    flex-shrink: 0;
+    font-size: 0.45rem;
+    color: var(--text-ghost);
+}
+
+.mesh-chat-input-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.mesh-chat-input {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-primary);
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 4px 6px;
+    outline: none;
+}
+
+.mesh-chat-input:focus {
+    border-color: rgba(0, 240, 255, 0.2);
+}
+
+.mesh-char-counter {
+    font-size: 0.5rem;
+    color: var(--text-dim);
+    flex-shrink: 0;
+    min-width: 24px;
+    text-align: right;
+}
+
+/* Radio tab */
+.mesh-radio-status {
+    margin-bottom: 8px;
+}
+
+.mesh-radio-connect {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.mesh-radio-input-row {
+    display: flex;
+    gap: 4px;
+}
+
+.mesh-radio-input {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-primary);
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 4px 6px;
+    outline: none;
+}
+
+.mesh-radio-input:focus {
+    border-color: rgba(0, 240, 255, 0.2);
+}
+
+.mesh-radio-port-input {
+    width: 60px;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-primary);
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 4px 6px;
+    outline: none;
+}
+
+.mesh-radio-port-input:focus {
+    border-color: rgba(0, 240, 255, 0.2);
+}
+
+.mesh-radio-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.mesh-radio-channels {
+    margin-top: 4px;
+}
+
+/* Scan tab */
+.mesh-scan-actions {
+    margin-bottom: 8px;
+}
+
+.mesh-scan-status {
+    font-size: 0.55rem;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+}
+
+.mesh-scan-results {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.mesh-scan-device {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.mesh-scan-device-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    font-size: 0.6rem;
+}
