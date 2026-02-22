@@ -1,0 +1,16 @@
+# Ollama Fleet Configuration
+# Copy to ollama-fleet.conf and customize for your network.
+# This file is gitignored — do not commit your actual hosts.
+#
+# Format: one host per line, hostname:port
+# Lines starting with # are comments. Blank lines are ignored.
+# If this file is absent, the fleet client will auto-discover
+# hosts on the local network and tailscale.
+
+# Local machine (always included automatically)
+# localhost:11434
+
+# Examples — uncomment and set your hosts:
+# gb10-02:11434
+# agx-02:11434
+# my-server.local:11434
