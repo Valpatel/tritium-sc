@@ -50,7 +50,7 @@ The Nerf game and the security system are the **same system**. The perception pi
 
 ```bash
 # 1. Clone and install
-git clone git@github.com:mvalancy/tritium-sc.git
+git clone git@github.com:Valpatel/tritium-sc.git
 cd tritium-sc
 ./setup.sh install
 

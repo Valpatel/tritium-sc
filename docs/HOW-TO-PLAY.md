@@ -8,7 +8,7 @@ TRITIUM-SC is a neighborhood-scale Nerf battlefield management system. You watch
 
 ```bash
 # 1. Clone the repository
-git clone git@github.com:mvalancy/tritium-sc.git
+git clone git@github.com:Valpatel/tritium-sc.git
 cd tritium-sc
 
 # 2. Install everything
