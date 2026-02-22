@@ -403,6 +403,18 @@ function _draw() {
     ctx.fillStyle = BG_COLOR;
     ctx.fillRect(0, 0, cssW, cssH);
 
+    // Apply screen shake offset (from war-combat.js elimination effects)
+    if (typeof warCombatGetScreenShake === 'function') {
+        const shake = warCombatGetScreenShake();
+        if (shake.x !== 0 || shake.y !== 0) {
+            ctx.save();
+            ctx.translate(shake.x, shake.y);
+            _state._shakeActive = true;
+        } else {
+            _state._shakeActive = false;
+        }
+    }
+
     // Layer 1: Satellite tiles (under everything, 70% opacity)
     if (_state.showSatellite) {
         _drawSatelliteTiles(ctx);
@@ -454,6 +466,12 @@ function _draw() {
 
     // Layer 9: Dispatch arrows
     _drawDispatchArrows(ctx);
+
+    // Undo screen shake translate before fixed HUD elements
+    if (_state._shakeActive) {
+        ctx.restore();
+        _state._shakeActive = false;
+    }
 
     // Layer 10: Scanlines
     if (typeof warFxDrawScanlines === 'function') warFxDrawScanlines(ctx, cssW, cssH);

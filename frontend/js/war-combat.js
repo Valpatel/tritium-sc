@@ -13,10 +13,10 @@
 const _projectiles = []; // active in-flight projectiles
 
 const PROJECTILE_STYLES = {
-    nerf_dart: { color: '#ffa500', trailColor: '#ffcc00', radius: 3, trailLen: 4, speed: 25 },
-    nerf_rocket: { color: '#ff2a6d', trailColor: '#ff6040', radius: 5, trailLen: 6, speed: 15 },
-    water_balloon: { color: '#00a0ff', trailColor: '#40c0ff', radius: 6, trailLen: 3, speed: 12 },
-    default: { color: '#fcee0a', trailColor: '#ffee80', radius: 3, trailLen: 4, speed: 20 },
+    nerf_dart: { color: '#ffa500', trailColor: '#ffcc00', radius: 5, trailLen: 8, speed: 25 },
+    nerf_rocket: { color: '#ff2a6d', trailColor: '#ff6040', radius: 7, trailLen: 8, speed: 15 },
+    water_balloon: { color: '#00a0ff', trailColor: '#40c0ff', radius: 8, trailLen: 6, speed: 12 },
+    default: { color: '#fcee0a', trailColor: '#ffee80', radius: 5, trailLen: 8, speed: 20 },
 };
 
 function warCombatAddProjectile(data) {
@@ -36,6 +36,15 @@ function warCombatAddProjectile(data) {
         startTime: Date.now(),
         trail: [{ x: sx, y: sy }],
         speed: data.speed || style.speed,
+    });
+
+    // Muzzle flash at firing position
+    _screenEffects.push({
+        type: 'muzzle_flash',
+        x: sx,
+        y: sy,
+        startTime: Date.now(),
+        duration: 100, // 0.1s
     });
 }
 
@@ -73,28 +82,33 @@ function warCombatUpdateProjectiles(dt) {
 function warCombatDrawProjectiles(ctx, worldToScreen) {
     for (const p of _projectiles) {
         const s = p.style;
-        // Trail
+        // Trail (8 segments, brighter, wider)
         for (let i = 0; i < p.trail.length; i++) {
             const t = p.trail[i];
             const sp = worldToScreen(t.x, t.y);
             const alpha = (i + 1) / p.trail.length;
-            const alphaVals = [0.1, 0.3, 0.6, 1.0, 1.0, 1.0];
+            const alphaVals = [0.05, 0.1, 0.2, 0.35, 0.5, 0.7, 0.85, 1.0];
             const a = alphaVals[Math.min(i, alphaVals.length - 1)] || alpha;
             ctx.fillStyle = s.trailColor;
-            ctx.globalAlpha = a * 0.6;
+            ctx.globalAlpha = a * 0.8;
             ctx.beginPath();
-            ctx.arc(sp.x, sp.y, s.radius * (0.4 + 0.6 * alpha), 0, Math.PI * 2);
+            ctx.arc(sp.x, sp.y, s.radius * (0.3 + 0.7 * alpha), 0, Math.PI * 2);
             ctx.fill();
         }
         ctx.globalAlpha = 1.0;
 
-        // Head
+        // Head (larger glow)
         const head = worldToScreen(p.x, p.y);
         ctx.fillStyle = s.color;
         ctx.shadowColor = s.color;
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 12;
         ctx.beginPath();
         ctx.arc(head.x, head.y, s.radius, 0, Math.PI * 2);
+        ctx.fill();
+        // Bright core
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(head.x, head.y, s.radius * 0.4, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
 
@@ -149,10 +163,10 @@ function warCombatAddEliminationEffect(data) {
     const x = data.position ? data.position.x : 0;
     const y = data.position ? data.position.y : 0;
 
-    // 16 red+orange particles, big spread, 1.0s
-    _spawnParticles(x, y, 10, '#ff2a6d', 1.0, [3, 18], [3, 6]);
-    _spawnParticles(x, y, 6, '#ffa500', 0.8, [5, 22], [2, 5]);
-    _spawnParticles(x, y, 4, '#fcee0a', 0.6, [10, 25], [1, 3]);
+    // 29 particles total: 15 red + 8 orange + 6 yellow (larger, with gravity)
+    _spawnParticles(x, y, 15, '#ff2a6d', 1.2, [3, 22], [3, 8]);
+    _spawnParticles(x, y, 8, '#ffa500', 1.0, [5, 25], [2, 7]);
+    _spawnParticles(x, y, 6, '#fcee0a', 0.8, [10, 30], [2, 5]);
 
     // Expanding ring
     _screenEffects.push({
@@ -180,6 +194,14 @@ function warCombatAddEliminationEffect(data) {
         startTime: Date.now(),
         duration: 300,
     });
+
+    // Screen shake
+    _screenEffects.push({
+        type: 'screen_shake',
+        intensity: 3, // pixels
+        startTime: Date.now(),
+        duration: 200,
+    });
 }
 
 function warCombatUpdateEffects(dt) {
@@ -195,6 +217,8 @@ function warCombatUpdateEffects(dt) {
         }
         p.x += p.vx * dt;
         p.y += p.vy * dt;
+        // Gravity (particles arc downward in world space)
+        p.vy -= 15 * dt;
         // Friction
         p.vx *= 0.96;
         p.vy *= 0.96;
@@ -298,7 +322,56 @@ function warCombatDrawEffects(ctx, worldToScreen, canvasW, canvasH) {
                 ctx.globalAlpha = 1.0;
             }
         }
+
+        if (e.type === 'muzzle_flash') {
+            const sp = worldToScreen(e.x, e.y);
+            const flashAlpha = Math.max(0, 1 - age);
+            const flashRadius = 6 + (1 - age) * 4;
+            // White-yellow flash
+            ctx.fillStyle = '#ffffff';
+            ctx.globalAlpha = flashAlpha;
+            ctx.shadowColor = '#ffee00';
+            ctx.shadowBlur = 15;
+            ctx.beginPath();
+            ctx.arc(sp.x, sp.y, flashRadius, 0, Math.PI * 2);
+            ctx.fill();
+            // Yellow outer glow
+            ctx.fillStyle = '#ffee00';
+            ctx.globalAlpha = flashAlpha * 0.5;
+            ctx.beginPath();
+            ctx.arc(sp.x, sp.y, flashRadius * 1.8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1.0;
+        }
+
+        if (e.type === 'screen_shake') {
+            // Screen shake is applied as a canvas translate offset
+            // The actual offset is read by warCombatGetScreenShake()
+            // so map.js can apply it during rendering
+        }
     }
+}
+
+/**
+ * Returns the current screen shake offset { x, y } for the camera to apply.
+ * Called by the map renderer each frame.
+ */
+function warCombatGetScreenShake() {
+    const now = Date.now();
+    let shakeX = 0, shakeY = 0;
+    for (const e of _screenEffects) {
+        if (e.type === 'screen_shake') {
+            const age = (now - e.startTime) / e.duration;
+            if (age < 1) {
+                const decay = 1 - age;
+                const intensity = e.intensity * decay;
+                shakeX += (Math.random() * 2 - 1) * intensity;
+                shakeY += (Math.random() * 2 - 1) * intensity;
+            }
+        }
+    }
+    return { x: shakeX, y: shakeY };
 }
 
 // ============================================================
@@ -642,4 +715,5 @@ window.warCombatDrawHealthBar = warCombatDrawHealthBar;
 window.warCombatDrawWeaponRange = warCombatDrawWeaponRange;
 window.warCombatAddEliminationStreakEffect = warCombatAddEliminationStreakEffect;
 window.warCombatDrawTargetShape = warCombatDrawTargetShape;
+window.warCombatGetScreenShake = warCombatGetScreenShake;
 window.warCombatReset = warCombatReset;
