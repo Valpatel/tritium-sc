@@ -48,10 +48,10 @@ def browser(tritium_server):
 
 @pytest.fixture
 def page(browser, tritium_server):
-    """Fresh page at 1920x1080, navigated to /unified with data loaded."""
+    """Fresh page at 1920x1080, navigated to Command Center with data loaded."""
     ctx = browser.new_context(viewport={"width": 1920, "height": 1080})
     p = ctx.new_page()
-    p.goto(f"{tritium_server.url}/unified", wait_until="domcontentloaded",
+    p.goto(f"{tritium_server.url}/", wait_until="domcontentloaded",
            timeout=60000)
     # Wait for store to initialize and have units (simulation data)
     try:

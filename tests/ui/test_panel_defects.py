@@ -1,4 +1,4 @@
-"""Panel defect detection tests for /unified Command Center.
+"""Panel defect detection tests for the Command Center.
 
 These tests exercise KNOWN DEFECTS in the panel management system.
 They are designed to FAIL when the defects exist and PASS when fixed.

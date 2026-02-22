@@ -1,4 +1,4 @@
-"""Deterministic smoke tests for /unified Command Center.
+"""Deterministic smoke tests for the Command Center.
 
 Uses Playwright to verify core UI elements, canvas rendering, data flow,
 and frame rate without any LLM/ollama dependencies.
@@ -22,7 +22,7 @@ SCREENSHOT_DIR = Path("tests/.test-results/smoke-screenshots")
 
 
 class TestUnifiedSmoke:
-    """Playwright-based deterministic smoke tests for /unified."""
+    """Playwright-based deterministic smoke tests for the Command Center."""
 
     @pytest.fixture(autouse=True, scope="class")
     def _browser(
@@ -32,7 +32,7 @@ class TestUnifiedSmoke:
         test_db: ResultsDB,
         run_id: int,
     ):
-        """Launch headless browser, navigate to /unified, wait for data."""
+        """Launch headless browser, navigate to Command Center, wait for data."""
         cls = request.cls
         cls.url = tritium_server.url
         cls._db = test_db
@@ -49,7 +49,7 @@ class TestUnifiedSmoke:
         ctx = browser.new_context(viewport={"width": 1920, "height": 1080})
         cls.page = ctx.new_page()
         cls.page.on("pageerror", lambda e: cls._errors.append(str(e)))
-        cls.page.goto(f"{cls.url}/unified", wait_until="networkidle")
+        cls.page.goto(f"{cls.url}/", wait_until="networkidle")
         cls.page.wait_for_timeout(3000)
 
         yield

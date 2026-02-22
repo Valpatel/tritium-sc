@@ -102,7 +102,7 @@ class TestFullReport:
         cls._errors: list[str] = []
         cls.page.on("pageerror", lambda e: cls._errors.append(str(e)))
 
-        cls.page.goto(f"{cls.url}/unified", wait_until="networkidle")
+        cls.page.goto(f"{cls.url}/", wait_until="networkidle")
         cls.page.wait_for_timeout(4000)
 
         yield
@@ -224,7 +224,7 @@ class TestFullReport:
     # ==================================================================
 
     def test_01_01_server_healthy(self):
-        """Server is up and /unified loads without errors."""
+        """Server is up and Command Center loads without errors."""
         test_name = "s01_server_healthy"
         _log("Checking server health...")
 

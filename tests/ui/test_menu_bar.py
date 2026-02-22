@@ -1,4 +1,4 @@
-"""Menu bar interaction tests for /unified Command Center.
+"""Menu bar interaction tests for the Command Center.
 
 Exercises every dropdown menu: FILE, VIEW, LAYOUT, MAP, HELP.
 Verifies items appear, checkable items toggle, and actions fire.

@@ -1,4 +1,4 @@
-"""Meshtastic panel tests for /unified Command Center.
+"""Meshtastic panel tests for the Command Center.
 
 Exercises the Meshtastic (mesh) radio panel: open, verify structure,
 switch tabs (Nodes, Chat, Radio, Scan), interact with chat input.

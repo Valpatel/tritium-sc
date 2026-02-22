@@ -1,4 +1,4 @@
-"""Visual quality tests for the /unified Command Center view.
+"""Visual quality tests for the Command Center view.
 
 Verifies the unified tactical map renders correctly with:
 - Units spread across the map (not clustered in center)
@@ -41,13 +41,13 @@ def _ensure_dir() -> Path:
 
 
 def _launch_browser(server_url: str):
-    """Launch Playwright browser and navigate to /unified."""
+    """Launch Playwright browser and navigate to Command Center."""
     from playwright.sync_api import sync_playwright
 
     pw = sync_playwright().start()
     browser = pw.chromium.launch(headless=True)
     page = browser.new_page(viewport={"width": 1920, "height": 1080})
-    page.goto(f"{server_url}/unified")
+    page.goto(f"{server_url}/")
     page.wait_for_load_state("networkidle")
     _wait_for_canvas(page)
     return pw, browser, page

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Capture high-resolution hero screenshots for the README.
 
-Starts a headless TRITIUM-SC server, drives the /unified Command Center
+Starts a headless TRITIUM-SC server, drives the Command Center
 through three distinct visual states, and saves 1920x1080 screenshots
 to docs/screenshots/.
 
@@ -117,9 +117,9 @@ def run_capture(server: TritiumServer) -> int:
     page = ctx.new_page()
 
     try:
-        # Navigate to /unified
-        log("Navigating to /unified...")
-        page.goto(f"{server.url}/unified", wait_until="networkidle")
+        # Navigate to Command Center
+        log("Navigating to Command Center...")
+        page.goto(f"{server.url}/", wait_until="networkidle")
         page.wait_for_timeout(3000)
 
         # Wait for simulation data (units on the map)
@@ -142,7 +142,7 @@ def run_capture(server: TritiumServer) -> int:
         log("--- Screenshot 1: Command Center ---")
 
         # Ensure panels are visible (Units list, Amy thoughts)
-        # The default /unified view should show panels
+        # The default view should show panels
         page.wait_for_timeout(1000)
 
         path1 = str(OUTPUT_DIR / "command-center.png")

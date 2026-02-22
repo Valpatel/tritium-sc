@@ -1,4 +1,4 @@
-"""Overlay tests for /unified Command Center.
+"""Overlay tests for the Command Center.
 
 Tests help overlay, modal overlay, and game-over overlay behavior.
 

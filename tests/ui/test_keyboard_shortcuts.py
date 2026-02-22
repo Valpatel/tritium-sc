@@ -1,4 +1,4 @@
-"""Keyboard shortcut tests for /unified Command Center.
+"""Keyboard shortcut tests for the Command Center.
 
 Exercises every keyboard shortcut: panel toggles, chat, help,
 map modes, zoom, satellite, roads, minimap, layouts, save.

@@ -1,4 +1,4 @@
-"""Panel lifecycle tests for /unified Command Center.
+"""Panel lifecycle tests for the Command Center.
 
 For each of the 5 panels (amy, units, alerts, game, mesh):
 open, verify visible, drag, resize, minimize, restore, close.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Quality sweep for /unified Command Center.
+"""Quality sweep for Command Center.
 
 Captures screenshots, measures metrics, records to SQLite, generates reports.
 
@@ -211,7 +211,7 @@ def _run_single_sweep(url: str, db: ResultsDB) -> int:
         page = browser.new_page(viewport={"width": 1920, "height": 1080})
 
         # Navigate and wait
-        page.goto(f"{url}/unified")
+        page.goto(f"{url}/")
         page.wait_for_load_state("networkidle")
         time.sleep(3)
 
@@ -281,7 +281,7 @@ def _run_baseline(url: str, db: ResultsDB) -> None:
         browser = pw.chromium.launch(headless=True)
         page = browser.new_page(viewport={"width": 1920, "height": 1080})
 
-        page.goto(f"{url}/unified")
+        page.goto(f"{url}/")
         page.wait_for_load_state("networkidle")
         time.sleep(5)
 
@@ -341,7 +341,7 @@ def _run_watch(url: str, db: ResultsDB, interval: int = 60) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Quality sweep for /unified Command Center"
+        description="Quality sweep for Command Center"
     )
     parser.add_argument(
         "--url", default="http://localhost:8000",

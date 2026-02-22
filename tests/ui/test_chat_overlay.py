@@ -1,4 +1,4 @@
-"""Chat overlay tests for /unified Command Center.
+"""Chat overlay tests for the Command Center.
 
 Exercises the chat flow: open, type, send, verify message, close.
 

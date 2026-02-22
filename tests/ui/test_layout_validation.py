@@ -1,4 +1,4 @@
-"""UI layout validation tests for /unified Command Center.
+"""UI layout validation tests for the Command Center.
 
 Six test classes, one per known spatial issue. Tests are written to DETECT
 the issues -- they FAIL when the bug exists, proving the test catches it.

@@ -1,4 +1,4 @@
-"""Map interaction tests for /unified Command Center.
+"""Map interaction tests for the Command Center.
 
 Exercises pan, zoom, satellite toggle, roads toggle, minimap toggle,
 and map mode switching.

@@ -1,4 +1,4 @@
-"""Game flow tests for /unified Command Center.
+"""Game flow tests for the Command Center.
 
 Exercises the game lifecycle: open Game HUD, spawn hostile,
 begin war, verify phase changes.

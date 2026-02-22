@@ -229,7 +229,7 @@ class TestGameLoopProof:
         cls.page.on("pageerror", lambda e: cls._errors.append(str(e)))
 
         # Navigate and wait for data
-        cls.page.goto(f"{cls.url}/unified", wait_until="networkidle")
+        cls.page.goto(f"{cls.url}/", wait_until="networkidle")
         cls.page.wait_for_timeout(4000)
 
         yield
