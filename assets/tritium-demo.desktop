@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=TRITIUM Demo
+Comment=Launch TRITIUM-SC autonomous demo loop (10-wave battles, continuous)
+Exec=/home/scubasonar/Code/tritium-sc/scripts/tritium-demo-loop.sh
+Icon=/home/scubasonar/Code/tritium-sc/assets/tritium-demo.svg
+Terminal=false
+Type=Application
+Categories=Game;Simulation;
+Keywords=tritium;demo;battle;tactical;
+StartupNotify=true
+StartupWMClass=chromium
