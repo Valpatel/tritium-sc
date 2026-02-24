@@ -11,9 +11,9 @@ import threading
 import time
 from typing import TYPE_CHECKING
 
-from ..actions.lua_motor import parse_motor_output, format_motor_output
-from ..actions.lua_multi import parse_multi_actions, validate_action_sequence, extract_multi_actions
-from .vision import ollama_chat
+from engine.actions.lua_motor import parse_motor_output, format_motor_output
+from engine.actions.lua_multi import parse_multi_actions, validate_action_sequence, extract_multi_actions
+from engine.perception.vision import ollama_chat
 
 if TYPE_CHECKING:
     from ..commander import Commander
@@ -43,6 +43,8 @@ RECENT THOUGHTS:
 {thoughts}
 
 {goals}
+
+{tactical_situation}
 
 Respond with a Lua function call. For complex situations, you may chain 2-3 actions:
     think("Hostile from the north!")
@@ -435,6 +437,10 @@ class ThinkingThread:
                     kills=gm_kills,
                 )
 
+        # Build tactical situation context for active combat
+        from ..commander import build_tactical_context
+        tactical_ctx = build_tactical_context(commander)
+
         system = THINKING_SYSTEM_PROMPT.format(
             narrative=narrative,
             battlespace=battlespace_ctx,
@@ -445,6 +451,7 @@ class ThinkingThread:
             goals=goals_ctx or "(no active goals)",
             time_of_day=f"It is currently {tod} ({datetime.now().strftime('%H:%M')})",
             war_mode=war_mode_ctx,
+            tactical_situation=tactical_ctx,
         )
 
         messages = [
@@ -456,7 +463,7 @@ class ThinkingThread:
         try:
             router = getattr(commander, "model_router", None)
             if router is not None:
-                from ..inference.model_router import TaskType
+                from engine.inference.model_router import TaskType
                 # Classify based on battlespace state
                 hostile_count = len(tracker.get_hostiles()) if tracker else 0
                 active_threats = 0

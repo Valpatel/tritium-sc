@@ -24,11 +24,11 @@ from typing import TYPE_CHECKING
 import cv2
 import numpy as np
 
-from .nodes.base import SensorNode, Position
-from .brain.perception import FrameAnalyzer, FrameMetrics, PoseEstimator
+from engine.nodes.base import SensorNode, Position
+from engine.perception.perception import FrameAnalyzer, FrameMetrics, PoseEstimator
 from .brain.sensorium import Sensorium
 from .brain.memory import Memory
-from .brain.extraction import extract_person_name, extract_facts
+from engine.perception.extraction import extract_person_name, extract_facts
 from .comms.transcript import Transcript
 
 if TYPE_CHECKING:
@@ -89,7 +89,298 @@ class Event:
 # EventBus — re-exported from amy.comms.event_bus
 # ---------------------------------------------------------------------------
 
-from .comms.event_bus import EventBus  # noqa: F401 — re-exported for Commander consumers
+from engine.comms.event_bus import EventBus  # noqa: F401 — re-exported for Commander consumers
+
+
+# ---------------------------------------------------------------------------
+# Tactical event classification and routing
+# ---------------------------------------------------------------------------
+
+_COMBAT_EVENTS = {"projectile_fired", "projectile_hit", "target_eliminated"}
+_TACTICAL_EVENTS = {"elimination_streak", "wave_stats_summary", "combat_stats_update"}
+_STATUS_EVENTS = {"ammo_low"}
+
+
+def classify_tactical_event(event_type: str) -> str:
+    """Classify an event type as combat, tactical, status, or unknown."""
+    if event_type in _COMBAT_EVENTS:
+        return "combat"
+    if event_type in _TACTICAL_EVENTS:
+        return "tactical"
+    if event_type in _STATUS_EVENTS:
+        return "status"
+    return "unknown"
+
+
+def _handle_combat_event(cmd, event_type: str, data: dict) -> None:
+    """Route a combat event to the commander's sensorium.
+
+    Suppresses all observations when game is not active.
+    Throttles projectile_fired events into 2-second batches.
+    """
+    # Suppress when game is not active
+    engine = getattr(cmd, "simulation_engine", None)
+    if engine is None:
+        return
+    game_mode = getattr(engine, "game_mode", None)
+    if game_mode is None:
+        return
+    if getattr(game_mode, "state", "setup") != "active":
+        return
+
+    now = time.monotonic()
+
+    if event_type == "projectile_fired":
+        source_name = data.get("source_name", "unit")
+        # Batch fires within a 2-second window
+        if now - cmd._last_fire_batch < cmd._fire_batch_window:
+            cmd._fire_batch_count += 1
+            return  # Accumulate, don't push yet
+        else:
+            # Flush batch
+            count = cmd._fire_batch_count + 1
+            cmd._fire_batch_count = 0
+            cmd._last_fire_batch = now
+            if count > 1:
+                text = f"{source_name} fired ({count} shots)"
+            else:
+                text = f"{source_name} fired"
+            cmd.sensorium.push("tactical", text, importance=0.3)
+            _record_combat_event(cmd, event_type, text)
+
+    elif event_type == "projectile_hit":
+        target_name = data.get("target_name", "target")
+        damage = data.get("damage", 0)
+        remaining = data.get("remaining_health", 0)
+        text = f"Hit on {target_name} for {damage:.0f} damage ({remaining:.0f} HP remaining)"
+        cmd.sensorium.push("tactical", text, importance=0.5)
+        _record_combat_event(cmd, event_type, text)
+
+    elif event_type == "target_eliminated":
+        target_name = data.get("target_name", "target")
+        interceptor_name = data.get("interceptor_name", "unit")
+        pos = data.get("position", {})
+        px, py = pos.get("x", 0), pos.get("y", 0)
+        text = f"{target_name} eliminated by {interceptor_name} at ({px:.0f}, {py:.0f})"
+        cmd.sensorium.push("tactical", text, importance=0.7)
+        _record_combat_event(cmd, event_type, text)
+
+    elif event_type == "elimination_streak":
+        interceptor_name = data.get("interceptor_name", "unit")
+        streak = data.get("streak", 0)
+        streak_name = data.get("streak_name", "")
+        text = f"{interceptor_name} on a {streak}-kill streak: {streak_name}"
+        cmd.sensorium.push("tactical", text, importance=0.6)
+        _record_combat_event(cmd, event_type, text)
+
+    elif event_type == "ammo_low":
+        unit_name = data.get("unit_name", "unit")
+        ammo = data.get("ammo_remaining", 0)
+        text = f"{unit_name} ammo low ({ammo} remaining)"
+        cmd.sensorium.push("tactical", text, importance=0.8)
+        _record_combat_event(cmd, event_type, text)
+
+    elif event_type == "wave_stats_summary":
+        wave = data.get("wave", 0)
+        elims = data.get("eliminations", 0)
+        accuracy = data.get("accuracy", 0)
+        elapsed = data.get("time_elapsed", 0)
+        text = f"Wave {wave} stats: {elims} eliminations, {accuracy:.0%} accuracy, {elapsed:.0f}s elapsed"
+        cmd.sensorium.push("tactical", text, importance=0.6)
+        _record_combat_event(cmd, event_type, text)
+
+    elif event_type == "combat_stats_update":
+        top_unit = data.get("top_unit", "unit")
+        kills = data.get("kills", 0)
+        accuracy = data.get("accuracy", 0)
+        text = f"Combat update: {top_unit} leads with {kills} kills ({accuracy:.0%} accuracy)"
+        cmd.sensorium.push("tactical", text, importance=0.4)
+        _record_combat_event(cmd, event_type, text)
+
+
+def _record_combat_event(cmd, event_type: str, text: str) -> None:
+    """Add an event to the recent combat events buffer (max 20)."""
+    cmd._recent_combat_events.append({
+        "time": time.monotonic(),
+        "type": event_type,
+        "text": text,
+    })
+    if len(cmd._recent_combat_events) > 20:
+        cmd._recent_combat_events = cmd._recent_combat_events[-20:]
+
+
+def _check_unit_health(cmd, telemetry_data: dict) -> None:
+    """Warn when a friendly unit's health drops below 50%.
+
+    Suppressed when game is not active. Per-unit throttled to 10s intervals.
+    """
+    engine = getattr(cmd, "simulation_engine", None)
+    if engine is None:
+        return
+    game_mode = getattr(engine, "game_mode", None)
+    if game_mode is None:
+        return
+    if getattr(game_mode, "state", "setup") != "active":
+        return
+
+    alliance = telemetry_data.get("alliance", "")
+    if alliance != "friendly":
+        return
+
+    status = telemetry_data.get("status", "")
+    if status == "eliminated":
+        return
+
+    health = telemetry_data.get("health", 100.0)
+    max_health = telemetry_data.get("max_health", 100.0)
+    if max_health <= 0:
+        return
+
+    ratio = health / max_health
+    if ratio >= 0.5:
+        return
+
+    target_id = telemetry_data.get("target_id", "unknown")
+    now = time.monotonic()
+    last_warning = cmd._health_warning_times.get(target_id, 0.0)
+    if now - last_warning < cmd._health_warning_interval:
+        return
+
+    cmd._health_warning_times[target_id] = now
+    name = telemetry_data.get("name", target_id)
+    pct = int(ratio * 100)
+    text = f"{name} health critical: {pct}% ({health:.0f}/{max_health:.0f})"
+    cmd.sensorium.push("tactical", text, importance=0.6)
+
+
+def _generate_tactical_summary(cmd) -> str:
+    """Generate a one-line tactical summary: wave, hostiles, friendlies, score.
+
+    Returns empty string when game is not active.
+    """
+    engine = getattr(cmd, "simulation_engine", None)
+    if engine is None:
+        return ""
+    game_mode = getattr(engine, "game_mode", None)
+    if game_mode is None:
+        return ""
+    if getattr(game_mode, "state", "setup") != "active":
+        return ""
+
+    wave = getattr(game_mode, "wave", 0)
+    score = getattr(game_mode, "score", 0)
+    total_elims = getattr(game_mode, "total_eliminations", 0)
+
+    tracker = getattr(cmd, "target_tracker", None)
+    hostile_count = len(tracker.get_hostiles()) if tracker else 0
+    friendly_count = len(tracker.get_friendlies()) if tracker else 0
+
+    return (
+        f"Wave {wave}, {hostile_count} hostiles remaining, "
+        f"{friendly_count} friendlies active, Score: {score}"
+    )
+
+
+def _maybe_generate_tactical_summary(cmd) -> bool:
+    """Generate a tactical summary at most every 5s during active combat.
+
+    Pushes the summary into sensorium. Returns True if a summary was generated.
+    """
+    engine = getattr(cmd, "simulation_engine", None)
+    if engine is None:
+        return False
+    game_mode = getattr(engine, "game_mode", None)
+    if game_mode is None:
+        return False
+    if getattr(game_mode, "state", "setup") != "active":
+        return False
+
+    now = time.monotonic()
+    if now - cmd._last_tactical_summary < cmd._tactical_summary_interval:
+        return False
+
+    summary = _generate_tactical_summary(cmd)
+    if not summary:
+        return False
+
+    cmd._last_tactical_summary = now
+    cmd.sensorium.push("tactical", summary, importance=0.5)
+    return True
+
+
+def build_tactical_context(cmd) -> str:
+    """Build a TACTICAL SITUATION block for the thinking prompt.
+
+    Returns empty string when game is not active.
+    """
+    engine = getattr(cmd, "simulation_engine", None)
+    if engine is None:
+        return ""
+    game_mode = getattr(engine, "game_mode", None)
+    if game_mode is None:
+        return ""
+    if getattr(game_mode, "state", "setup") != "active":
+        return ""
+
+    parts = ["== TACTICAL SITUATION =="]
+
+    summary = _generate_tactical_summary(cmd)
+    if summary:
+        parts.append(summary)
+
+    # Recent combat events
+    if cmd._recent_combat_events:
+        parts.append("Recent events:")
+        for evt in cmd._recent_combat_events[-5:]:
+            parts.append(f"  - {evt['text']}")
+
+    return "\n".join(parts)
+
+
+def _clear_combat_state(cmd) -> None:
+    """Clear tactical tracking state on game reset."""
+    cmd._recent_combat_events = []
+    cmd._fire_batch_count = 0
+    cmd._last_fire_batch = 0.0
+    cmd._last_tactical_summary = 0.0
+    cmd._health_warning_times = {}
+
+
+def _process_bridge_message(cmd, msg: dict) -> None:
+    """Process a single message from the EventBus bridge.
+
+    Extracted from _sim_bridge_loop for testability. Handles both
+    existing event types (sim_telemetry, game_state_change, etc.) and
+    new combat event types.
+    """
+    msg_type = msg.get("type", "")
+    data = msg.get("data", {})
+
+    # New combat/tactical events
+    category = classify_tactical_event(msg_type)
+    if category != "unknown":
+        _handle_combat_event(cmd, msg_type, data)
+        return
+
+    # sim_telemetry — feed target tracker + check unit health
+    if msg_type == "sim_telemetry":
+        tracker = getattr(cmd, "target_tracker", None)
+        if tracker is not None:
+            tracker.update_from_simulation(data)
+        # Check health of each unit in telemetry
+        targets = data.get("targets", [])
+        if isinstance(targets, list):
+            for t in targets:
+                if isinstance(t, dict) and t.get("is_combatant"):
+                    _check_unit_health(cmd, t)
+        # Also check the top-level if it is a single unit dict
+        if data.get("is_combatant"):
+            _check_unit_health(cmd, data)
+
+    elif msg_type == "game_state_change":
+        state = data.get("state", "")
+        if state == "setup":
+            _clear_combat_state(cmd)
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +404,7 @@ class AudioThread:
     MIN_SPEECH_CHUNKS = 10        # ~0.3s min to bother transcribing
 
     def __init__(self, listener, event_queue: queue.Queue, chunk_duration: float = 4.0):
-        from .comms.listener import VAD_CHUNK_SAMPLES
+        from engine.comms.listener import VAD_CHUNK_SAMPLES
         self.listener = listener
         self.queue = event_queue
         self._chunk_samples = VAD_CHUNK_SAMPLES
@@ -694,7 +985,7 @@ class Commander:
         self._mode: str = "sim"
 
         # Target tracker (unified real + virtual)
-        from .tactical.target_tracker import TargetTracker
+        from engine.tactical.target_tracker import TargetTracker
         self.target_tracker = TargetTracker()
 
         # Amy config from loaded layouts
@@ -745,6 +1036,16 @@ class Commander:
         self.speaker = None
         self.listener = None
         self._ack_wavs: list[bytes] = []
+
+        # Tactical combat state (used by module-level tactical functions)
+        self._recent_combat_events: list = []
+        self._fire_batch_count: int = 0
+        self._last_fire_batch: float = 0.0
+        self._fire_batch_window: float = 2.0
+        self._last_tactical_summary: float = 0.0
+        self._tactical_summary_interval: float = 5.0
+        self._health_warning_times: dict = {}
+        self._health_warning_interval: float = 10.0
 
         self._running = False
         self._shutdown_called = False
@@ -1046,7 +1347,7 @@ class Commander:
         self._deep_thread.start()
 
     def _deep_think_worker(self) -> None:
-        from .brain.vision import ollama_chat
+        from engine.perception.vision import ollama_chat
 
         print(f"  [deep think ({self.deep_model})]...")
         image_b64 = self._capture_clear_frame()
@@ -1118,7 +1419,7 @@ class Commander:
             f"Observations:\n{spatial_data}"
         )
 
-        from .brain.vision import ollama_chat
+        from engine.perception.vision import ollama_chat
         try:
             response = ollama_chat(
                 model=self._chat_model,
@@ -1367,7 +1668,7 @@ class Commander:
         return self._auto_chat
 
     def _auto_chat_loop(self) -> None:
-        from .brain.vision import ollama_chat
+        from engine.perception.vision import ollama_chat
 
         friend_history: list[dict] = [
             {"role": "system", "content": (
@@ -1427,7 +1728,7 @@ class Commander:
     def _boot(self) -> None:
         """Initialize all subsystems. Called from run()."""
         from .brain.agent import Agent, CREATURE_SYSTEM_PROMPT
-        from .comms.speaker import Speaker
+        from engine.comms.speaker import Speaker
         from .brain.thinking import ThinkingThread
         from .actions.motor import MotorThread
 
@@ -1478,7 +1779,7 @@ class Commander:
         if mic_node is not None and self._use_listener:
             print("  [3/8] Speech-to-text (whisper.cpp GPU + Silero VAD)")
             try:
-                from .comms.listener import Listener
+                from engine.comms.listener import Listener
                 self.listener = Listener(
                     model_name=self._whisper_model,
                     audio_device=None,  # Listener auto-detects

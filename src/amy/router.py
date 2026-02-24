@@ -274,7 +274,7 @@ async def amy_command(request: Request, body: CommandRequest):
     if amy is None:
         return JSONResponse({"error": "Amy is not running"}, status_code=503)
 
-    from .actions.lua_motor import parse_motor_output
+    from engine.actions.lua_motor import parse_motor_output
 
     lua_str = body.action
     if body.params:
@@ -334,6 +334,16 @@ async def amy_auto_chat(request: Request):
 
 # --- Simulation endpoints ---
 
+class DispatchTarget(BaseModel):
+    x: float
+    y: float
+
+
+class DispatchRequest(BaseModel):
+    unit_id: str
+    target: DispatchTarget
+
+
 class SpawnRequest(BaseModel):
     name: str | None = None
     alliance: str = "hostile"
@@ -363,7 +373,7 @@ async def sim_spawn(request: Request, body: SpawnRequest):
     pos = None
     if body.lat is not None and body.lng is not None:
         # Real-world coordinates — convert to local meters
-        from amy.tactical.geo import latlng_to_local
+        from engine.tactical.geo import latlng_to_local
         x, y, _ = latlng_to_local(body.lat, body.lng)
         pos = (x, y)
     elif body.position:
@@ -372,7 +382,7 @@ async def sim_spawn(request: Request, body: SpawnRequest):
     if body.alliance == "hostile":
         target = engine.spawn_hostile(name=body.name, position=pos)
     else:
-        from .simulation.target import SimulationTarget
+        from engine.simulation.target import SimulationTarget
         import uuid
         _SPEEDS = {
             "rover": 2.0, "drone": 4.0, "turret": 0.0, "person": 1.5,
@@ -398,6 +408,29 @@ async def sim_spawn(request: Request, body: SpawnRequest):
         engine.add_target(target)
 
     return {"status": "ok", "target": target.to_dict()}
+
+
+@router.post("/simulation/dispatch")
+async def sim_dispatch(request: Request, body: DispatchRequest):
+    """Dispatch a friendly unit to a target position."""
+    engine = _get_sim_engine(request)
+    if engine is None:
+        return JSONResponse({"error": "Simulation engine not available"}, status_code=503)
+
+    if not engine._running:
+        return JSONResponse({"error": "Simulation not active"}, status_code=409)
+
+    target = engine.get_target(body.unit_id)
+    if target is None:
+        return JSONResponse({"error": f"Unit '{body.unit_id}' not found"}, status_code=404)
+
+    engine.dispatch_unit(body.unit_id, (body.target.x, body.target.y))
+
+    return {
+        "status": "dispatched",
+        "unit_id": body.unit_id,
+        "target": {"x": body.target.x, "y": body.target.y},
+    }
 
 
 @router.delete("/simulation/targets/{target_id}")
@@ -472,8 +505,9 @@ async def save_layout(request: Request, body: LayoutSaveRequest):
     """Save a layout JSON to the layouts directory."""
     import os
     import json as _json
+    import engine
 
-    layouts_dir = os.path.join(os.path.dirname(__file__), "layouts")
+    layouts_dir = os.path.join(os.path.dirname(engine.__file__), "layouts")
     os.makedirs(layouts_dir, exist_ok=True)
     safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', body.name)
     filepath = os.path.join(layouts_dir, f"{safe_name}.json")
@@ -488,8 +522,9 @@ async def save_layout(request: Request, body: LayoutSaveRequest):
 async def list_layouts(request: Request):
     """List saved layouts."""
     import os
+    import engine
 
-    layouts_dir = os.path.join(os.path.dirname(__file__), "layouts")
+    layouts_dir = os.path.join(os.path.dirname(engine.__file__), "layouts")
     if not os.path.isdir(layouts_dir):
         return {"layouts": []}
     files = sorted(f[:-5] for f in os.listdir(layouts_dir) if f.endswith(".json"))
@@ -501,8 +536,9 @@ async def get_layout(request: Request, name: str):
     """Load a specific layout."""
     import os
     import json as _json
+    import engine
 
-    layouts_dir = os.path.join(os.path.dirname(__file__), "layouts")
+    layouts_dir = os.path.join(os.path.dirname(engine.__file__), "layouts")
     safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', name)
     filepath = os.path.join(layouts_dir, f"{safe_name}.json")
     if not os.path.normpath(filepath).startswith(os.path.normpath(layouts_dir)):
@@ -546,7 +582,7 @@ async def load_layout_into_sim(request: Request, body: LoadLayoutRequest):
     if not layout_data:
         return JSONResponse({"error": "No layout data provided"}, status_code=400)
 
-    from amy.simulation.loader import load_layout as _load_layout
+    from engine.simulation.loader import load_layout as _load_layout
 
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp:
         _json.dump(layout_data, tmp)
@@ -718,7 +754,7 @@ async def fleet_actions(request: Request):
 
     # Use the registry if Amy has one, otherwise return core actions
     try:
-        from .actions.lua_registry import LuaActionRegistry
+        from engine.actions.lua_registry import LuaActionRegistry
         reg = LuaActionRegistry.with_core_actions()
         actions = []
         for name in reg.list_actions():

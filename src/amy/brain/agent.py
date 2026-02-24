@@ -11,7 +11,7 @@ import json
 import re
 
 from ..actions.tools import TOOL_DEFINITIONS, dispatch_tool_call
-from .vision import ollama_chat
+from engine.perception.vision import ollama_chat
 
 
 def clean_speech(text: str) -> str:
@@ -125,7 +125,7 @@ class Agent:
         try:
             router = getattr(self.commander, "model_router", None)
             if router is not None:
-                from ..inference.model_router import TaskType
+                from engine.inference.model_router import TaskType
                 has_images = bool(image_base64)
                 task_type = router.classify_task(
                     messages=self.history,

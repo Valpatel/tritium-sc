@@ -24,7 +24,7 @@ def create_amy(settings=None, simulation_engine=None) -> "Commander":
         A Commander instance ready to be started with .run()
     """
     from .commander import Commander
-    from .nodes.virtual import VirtualNode
+    from engine.nodes.virtual import VirtualNode
 
     # Read config from settings (or use defaults)
     deep_model = "llava:7b"
@@ -47,7 +47,7 @@ def create_amy(settings=None, simulation_engine=None) -> "Commander":
         ollama_host = getattr(settings, "ollama_host", ollama_host)
 
     # Set Ollama host for all Amy vision/LLM calls
-    from .brain.vision import set_ollama_host
+    from engine.perception.vision import set_ollama_host
     set_ollama_host(ollama_host)
 
     # Model routing — fleet-aware or static fallback
@@ -55,8 +55,8 @@ def create_amy(settings=None, simulation_engine=None) -> "Commander":
     fleet_enabled = getattr(settings, "fleet_enabled", False) if settings else False
     if fleet_enabled:
         try:
-            from .inference.fleet import OllamaFleet
-            from .inference.model_router import ModelRouter, ModelProfile
+            from engine.inference.fleet import OllamaFleet
+            from engine.inference.model_router import ModelRouter, ModelProfile
             fleet_auto = getattr(settings, "fleet_auto_discover", True) if settings else True
             fleet = OllamaFleet(auto_discover=fleet_auto)
             print(f"  [Amy] Fleet: {fleet.status()}")
@@ -90,7 +90,7 @@ def create_amy(settings=None, simulation_engine=None) -> "Commander":
 
     # Try BCC950
     try:
-        from .nodes.bcc950 import BCC950Node
+        from engine.nodes.bcc950 import BCC950Node
         node = BCC950Node(device=camera_device)
         # Don't start yet — just check if bcc950 package is importable
         # and the constructor doesn't fail

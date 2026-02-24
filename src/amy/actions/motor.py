@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass
 from typing import Generator
 
-from ..nodes.base import SensorNode
+from engine.nodes.base import SensorNode
 
 MotorProgram = Generator["MotorCommand", None, None]
 
