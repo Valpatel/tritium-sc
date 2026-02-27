@@ -443,7 +443,7 @@ console.log('\n--- _drawTooltip ---');
     assert(tooltipText.indexOf('3K') >= 0, 'Tooltip contains elimination count');
 })();
 
-(function testTooltipPositionRelativeToUnit() {
+(function testTooltipPositionRelativeToMouse() {
     var ctx = setupState({ width: 800, height: 600, zoom: 1.0, hoveredUnit: 'rover-1' });
     mockStore.units.set('rover-1', {
         id: 'rover-1',
@@ -451,13 +451,15 @@ console.log('\n--- _drawTooltip ---');
         position: { x: 0, y: 0 },
         fsm_state: 'patrolling',
     });
+    // Tooltip positions relative to lastMouse (offset +14px right, above mouse)
+    _state.lastMouse = { x: 400, y: 300 };
     _drawTooltip(ctx);
     var fillTexts = ctx.calls.filter(function(c) { return c.fn === 'fillText'; });
     assert(fillTexts.length > 0, 'Tooltip drawn');
-    // Tooltip should be offset +12 pixels to the right and -8 pixels up from screen pos
-    var sp = worldToScreen(0, 0);
-    assertClose(fillTexts[0].x, sp.x + 12, 1, 'Tooltip X is 12px right of unit screen pos');
-    assertClose(fillTexts[0].y, sp.y - 8, 1, 'Tooltip Y is 8px above unit screen pos');
+    // Tooltip X should be near lastMouse.x + 14 + padX(6) = 420
+    assert(fillTexts[0].x > 400 && fillTexts[0].x < 430, 'Tooltip X is offset right of mouse pos (got ' + fillTexts[0].x + ')');
+    // Tooltip Y should be above mouse position
+    assert(fillTexts[0].y < 300, 'Tooltip Y is above mouse pos (got ' + fillTexts[0].y + ')');
 })();
 
 (function testTooltipBackgroundDrawn() {

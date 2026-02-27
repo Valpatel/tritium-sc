@@ -122,9 +122,9 @@ assert(unitsSrc.includes('fsmColor'), 'units.js detail uses fsmColor variable');
 
 console.log('\n--- Map tooltip FSM ---');
 
-assert(mapSrc.includes('fsmState'), 'map.js tooltip builds fsmState variable');
-assert(mapSrc.includes("FSM_BADGE_COLORS[u.fsm_state]"), 'map.js tooltip uses FSM_BADGE_COLORS');
-assert(mapSrc.includes('fsmState + elims'), 'map.js tooltip includes fsmState in output');
+assert(mapSrc.includes('fsmLabel'), 'map.js tooltip builds fsmLabel variable');
+assert(mapSrc.includes("FSM_BADGE_COLORS[fsm]"), 'map.js tooltip uses FSM_BADGE_COLORS');
+assert(mapSrc.includes('u.fsm_state || u.fsmState'), 'map.js tooltip reads both fsm_state and fsmState');
 
 // ============================================================
 // Test: map.js status badges prefer fsm_state
