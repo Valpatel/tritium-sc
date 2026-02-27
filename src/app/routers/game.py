@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -91,3 +92,85 @@ async def get_projectiles(request: Request):
     """Get active projectiles for late-joining clients."""
     engine = _get_engine(request)
     return engine.combat.get_active_projectiles()
+
+
+@router.get("/scenarios")
+async def list_battle_scenarios():
+    """List available battle scenarios."""
+    scenarios_dir = Path(__file__).resolve().parents[3] / "scenarios" / "battle"
+    if not scenarios_dir.is_dir():
+        return []
+    results = []
+    for f in sorted(scenarios_dir.glob("*.json")):
+        try:
+            import json
+            data = json.loads(f.read_text())
+            results.append({
+                "name": f.stem,
+                "description": data.get("description", ""),
+                "map_bounds": data.get("map_bounds"),
+                "max_hostiles": data.get("max_hostiles"),
+                "wave_count": len(data.get("waves", [])),
+                "tags": data.get("tags", []),
+            })
+        except Exception:
+            continue
+    return results
+
+
+@router.post("/battle/{scenario_name}")
+async def start_battle_scenario(scenario_name: str, request: Request):
+    """Load a battle scenario and begin war atomically.
+
+    Resets game, loads scenario (places defenders, configures waves),
+    then starts countdown.
+    """
+    engine = _get_engine(request)
+
+    # Find scenario file
+    scenarios_dir = Path(__file__).resolve().parents[3] / "scenarios" / "battle"
+    scenario_file = scenarios_dir / f"{scenario_name}.json"
+    if not scenario_file.is_file():
+        raise HTTPException(404, f"Scenario not found: {scenario_name}")
+
+    # Reset to clean state
+    engine.reset_game()
+
+    # Load scenario
+    from engine.simulation.scenario import load_battle_scenario
+    scenario = load_battle_scenario(str(scenario_file))
+
+    # Apply: set bounds, place defenders, configure waves
+    engine._map_bounds = scenario.map_bounds
+    engine.MAX_HOSTILES = scenario.max_hostiles
+
+    # Place defenders
+    from engine.simulation.target import SimulationTarget
+    for defender in scenario.defenders:
+        target = SimulationTarget(
+            target_id=f"{defender.asset_type}-{uuid.uuid4().hex[:6]}",
+            name=defender.asset_type.replace("_", " ").title(),
+            alliance="friendly",
+            asset_type=defender.asset_type,
+            position=defender.position,
+            speed=0.0 if "turret" in defender.asset_type else 2.0,
+            waypoints=[],
+            status="idle" if "turret" not in defender.asset_type else "stationary",
+        )
+        target.apply_combat_profile()
+        engine.add_target(target)
+
+    # Load scenario into game mode (configures wave spawning)
+    engine.game_mode.load_scenario(scenario)
+
+    # Begin war
+    engine.begin_war()
+
+    return {
+        "status": "scenario_started",
+        "scenario": scenario_name,
+        "map_bounds": scenario.map_bounds,
+        "max_hostiles": scenario.max_hostiles,
+        "wave_count": len(scenario.waves),
+        "defender_count": len(scenario.defenders),
+    }

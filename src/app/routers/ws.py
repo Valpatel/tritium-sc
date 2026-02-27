@@ -256,6 +256,11 @@ def start_amy_event_bridge(amy_commander, loop: asyncio.AbstractEventLoop):
                 data = msg.get("data", {})
                 if event_type == "sim_telemetry":
                     batcher.add(data)
+                elif event_type == "sim_telemetry_batch":
+                    # Engine-side batch — forward directly to clients
+                    asyncio.run_coroutine_threadsafe(
+                        broadcast_amy_event("sim_telemetry_batch", data), loop
+                    )
                 elif event_type.startswith("amy_"):
                     # Already has amy_ prefix (e.g. amy_announcement) —
                     # broadcast directly to avoid double-prefixing.
@@ -310,12 +315,20 @@ def start_headless_event_bridge(event_bus, loop: asyncio.AbstractEventLoop):
                 data = msg.get("data", {})
                 if event_type == "sim_telemetry":
                     batcher.add(data)
+                elif event_type == "sim_telemetry_batch":
+                    asyncio.run_coroutine_threadsafe(
+                        broadcast_amy_event("sim_telemetry_batch", data), loop
+                    )
                 elif event_type in (
                     "game_state_change",
-                    "wave_started",
+                    "wave_start",
                     "wave_complete",
                     "target_eliminated",
                     "game_over",
+                    "projectile_fired",
+                    "projectile_hit",
+                    "elimination_streak",
+                    "announcer",
                 ):
                     asyncio.run_coroutine_threadsafe(
                         broadcast_amy_event(event_type, data), loop

@@ -6,7 +6,47 @@ with the appropriate sensor nodes.
 
 from __future__ import annotations
 
+import sqlite3
+
 __version__ = "0.1.0"
+
+
+def _discover_ip_cameras(db_path: str) -> dict:
+    """Discover IP cameras from SQLite Camera table.
+
+    Reads all enabled cameras with an rtsp_url and creates
+    IPCameraNode instances.  Uses synchronous sqlite3 so it
+    can be called during app startup (before the async loop).
+
+    Args:
+        db_path: Path to the SQLite database file.
+
+    Returns:
+        dict mapping node_id -> IPCameraNode
+    """
+    from engine.nodes.ip_camera import IPCameraNode
+
+    nodes = {}
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT channel, name, rtsp_url FROM cameras WHERE enabled = 1 AND rtsp_url IS NOT NULL"
+        ).fetchall()
+        conn.close()
+    except Exception:
+        return nodes
+
+    for row in rows:
+        channel = row["channel"]
+        node_id = f"ip-cam-{channel}"
+        nodes[node_id] = IPCameraNode(
+            node_id=node_id,
+            name=row["name"],
+            rtsp_url=row["rtsp_url"],
+        )
+
+    return nodes
 
 
 def create_amy(settings=None, simulation_engine=None) -> "Commander":
@@ -98,6 +138,17 @@ def create_amy(settings=None, simulation_engine=None) -> "Commander":
         print("  [Amy] BCC950 node registered (will init on boot)")
     except Exception as e:
         print(f"  [Amy] BCC950 not available: {e}")
+
+    # Discover IP cameras from database
+    db_url = getattr(settings, "database_url", "") if settings else ""
+    if db_url:
+        # Extract file path from SQLAlchemy URL (e.g. sqlite+aiosqlite:///./tritium.db)
+        db_path = db_url.split("///", 1)[-1] if "///" in db_url else ""
+        if db_path:
+            ip_cameras = _discover_ip_cameras(db_path)
+            if ip_cameras:
+                nodes.update(ip_cameras)
+                print(f"  [Amy] IP cameras discovered: {len(ip_cameras)} ({', '.join(ip_cameras.keys())})")
 
     # Fallback to virtual if no hardware
     if not nodes:

@@ -32,6 +32,7 @@ from app.routers.audio import router as audio_router
 from app.routers.synthetic_feed import router as synthetic_feed_router
 from app.routers.telemetry import router as telemetry_router
 from app.routers.mesh import router as mesh_router
+from app.routers.geodata import router as geodata_router
 
 
 # ---------------------------------------------------------------------------
@@ -155,6 +156,60 @@ def _start_meshtastic_bridge(amy_instance) -> object | None:
         return None
 
 
+def _start_meshcore_bridge(amy_instance) -> object | None:
+    """Start MeshCore serial bridge if enabled. Returns bridge or None.
+
+    Graceful: if the radio is not reachable, logs a warning and continues.
+    """
+    if not settings.meshcore_enabled:
+        return None
+
+    try:
+        from engine.comms.meshcore_bridge import MeshCoreBridge
+        bridge = MeshCoreBridge(
+            event_bus=amy_instance.event_bus,
+            target_tracker=amy_instance.target_tracker,
+            serial_port=settings.meshcore_serial_port,
+        )
+        bridge.start()
+        logger.info(
+            f"MeshCore bridge started "
+            f"(serial={settings.meshcore_serial_port or 'none'})"
+        )
+        return bridge
+    except Exception as e:
+        logger.warning(f"MeshCore bridge failed to start: {e}")
+        return None
+
+
+def _start_mesh_web_source(amy_instance) -> object | None:
+    """Start mesh web source poller if enabled. Returns source or None.
+
+    Graceful: if the web source is unreachable, logs a warning and continues.
+    """
+    if not settings.mesh_web_enabled:
+        return None
+
+    try:
+        from engine.comms.mesh_web_source import MeshWebSource
+        source = MeshWebSource(
+            event_bus=amy_instance.event_bus,
+            target_tracker=amy_instance.target_tracker,
+            poll_interval=settings.mesh_web_poll_interval,
+            mesh_web_url=settings.mesh_web_url,
+        )
+        source.start()
+        logger.info(
+            f"Mesh web source started "
+            f"(interval={settings.mesh_web_poll_interval}s, "
+            f"url={'configured' if settings.mesh_web_url else 'none'})"
+        )
+        return source
+    except Exception as e:
+        logger.warning(f"Mesh web source failed to start: {e}")
+        return None
+
+
 def _start_escalation(amy_instance, sim_engine, mqtt_bridge) -> None:
     """Start threat classifier and auto-dispatcher."""
     try:
@@ -166,6 +221,8 @@ def _start_escalation(amy_instance, sim_engine, mqtt_bridge) -> None:
             event_bus=amy_instance.event_bus,
             target_tracker=amy_instance.target_tracker,
             zones=zones,
+            linger_threshold=settings.escalation_linger_threshold,
+            deescalation_time=settings.escalation_deescalation_time,
         )
         classifier.start()
         amy_instance.threat_classifier = classifier
@@ -176,6 +233,7 @@ def _start_escalation(amy_instance, sim_engine, mqtt_bridge) -> None:
             simulation_engine=sim_engine,
             mqtt_bridge=mqtt_bridge,
             threat_classifier=classifier,
+            min_battery=settings.escalation_min_battery,
         )
         dispatcher.start()
         amy_instance.auto_dispatcher = dispatcher
@@ -248,6 +306,18 @@ def _shutdown_subsystems(amy_instance, sim_engine, mqtt_bridge, app: FastAPI) ->
     if mesh_bridge is not None:
         logger.info("Stopping Meshtastic bridge...")
         mesh_bridge.stop()
+
+    # 2.2. MeshCore bridge
+    meshcore_bridge = getattr(getattr(app, "state", None), "meshcore_bridge", None)
+    if meshcore_bridge is not None:
+        logger.info("Stopping MeshCore bridge...")
+        meshcore_bridge.stop()
+
+    # 2.3. Mesh web source
+    mesh_web = getattr(getattr(app, "state", None), "mesh_web_source", None)
+    if mesh_web is not None:
+        logger.info("Stopping mesh web source...")
+        mesh_web.stop()
 
     # 2.5. Synthetic camera
     syn_cam = getattr(getattr(app, "state", None), "syn_cam", None)
@@ -389,6 +459,16 @@ async def lifespan(app: FastAPI):
             if mesh_bridge is not None:
                 app.state.meshtastic_bridge = mesh_bridge
 
+            # MeshCore serial radio bridge
+            meshcore_bridge = _start_meshcore_bridge(amy_instance)
+            if meshcore_bridge is not None:
+                app.state.meshcore_bridge = meshcore_bridge
+
+            # Mesh web source (public mesh network maps)
+            mesh_web = _start_mesh_web_source(amy_instance)
+            if mesh_web is not None:
+                app.state.mesh_web_source = mesh_web
+
             # Threat escalation
             _start_escalation(amy_instance, sim_engine, mqtt_bridge)
 
@@ -473,6 +553,7 @@ app.include_router(audio_router)
 app.include_router(synthetic_feed_router)
 app.include_router(telemetry_router)
 app.include_router(mesh_router)
+app.include_router(geodata_router)
 
 # Static files
 frontend_path = Path(__file__).parent.parent.parent / "frontend"

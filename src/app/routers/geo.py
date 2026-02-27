@@ -240,6 +240,57 @@ async def get_tile(z: int, x: int, y: int):
 
 
 # ---------------------------------------------------------------------------
+# Terrain tile proxy (Mapzen Terrarium DEM from AWS Public Dataset)
+# ---------------------------------------------------------------------------
+
+_TERRAIN_TILE_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
+_TERRAIN_CACHE = _CACHE_DIR / "tiles" / "terrain"
+
+
+@router.get("/terrain-tile/{z}/{x}/{y}.png")
+async def get_terrain_tile(z: int, x: int, y: int):
+    """Proxy Mapzen Terrarium terrain tiles (DEM) from AWS Public Dataset.
+
+    Terrarium encoding: elevation = (red * 256 + green + blue / 256) - 32768
+    Tiles are cached on disk at tiles/terrain/{z}/{x}/{y}.png.
+    No API key required (AWS Public Dataset).
+    """
+    if z < 0 or z > 15:
+        raise HTTPException(status_code=400, detail="Terrain tile zoom must be 0-15")
+
+    cache_path = _TERRAIN_CACHE / str(z) / str(x) / f"{y}.png"
+    if cache_path.exists():
+        return Response(
+            content=cache_path.read_bytes(),
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=2592000"},  # 30 days
+        )
+
+    url = _TERRAIN_TILE_URL.format(z=z, y=y, x=x)
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(url, timeout=15.0)
+            resp.raise_for_status()
+        except httpx.HTTPError as e:
+            logger.warning(f"Terrain tile fetch failed: {z}/{x}/{y}: {e}")
+            raise HTTPException(status_code=502, detail="Terrain tile service unavailable")
+
+    tile_data = resp.content
+
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        cache_path.write_bytes(tile_data)
+    except Exception:
+        pass
+
+    return Response(
+        content=tile_data,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=2592000"},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Road tile proxy (transparent overlay)
 # ---------------------------------------------------------------------------
 
@@ -357,6 +408,149 @@ async def get_buildings(
         pass
 
     return buildings
+
+
+# ---------------------------------------------------------------------------
+# Microsoft Building Footprints (satellite-aligned, from ESRI vector tiles)
+# ---------------------------------------------------------------------------
+
+_MSFT_VT_URL = (
+    "https://tiles.arcgis.com/tiles/P3ePLMYs2RVChkJx/arcgis/rest/services/"
+    "Microsoft_Building_Footprints/VectorTileServer/tile/{z}/{y}/{x}.pbf"
+)
+_MSFT_CACHE = _CACHE_DIR / "msft_buildings"
+
+
+def _tile_to_latlng(
+    tx: int, ty: int, zoom: int, px: float, py: float, extent: int = 4096
+) -> tuple[float, float]:
+    """Convert tile-local pixel coords to lat/lng."""
+    import math
+
+    n = 2**zoom
+    lng = (tx + px / extent) / n * 360 - 180
+    lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * (ty + py / extent) / n)))
+    lat = math.degrees(lat_rad)
+    return lat, lng
+
+
+@router.get("/msft-buildings")
+async def get_msft_buildings(
+    lat: float = Query(..., description="Center latitude"),
+    lng: float = Query(..., description="Center longitude"),
+    radius: float = Query(300.0, description="Search radius in meters", ge=50, le=1000),
+):
+    """Fetch Microsoft Building Footprints from ESRI-hosted PBF vector tiles.
+
+    These footprints are ML-derived from satellite imagery and align much
+    better with ESRI World Imagery tiles than OSM building data.
+
+    Returns building polygons as [[lat, lng], ...] with an integer ID.
+    """
+    import math
+
+    try:
+        import mapbox_vector_tile
+    except ImportError:
+        raise HTTPException(
+            status_code=501,
+            detail="mapbox-vector-tile package not installed (pip install mapbox-vector-tile)",
+        )
+
+    # Use zoom 16 for good coverage (~600m per tile at mid-latitudes)
+    zoom = 16
+    n = 2**zoom
+    lat_rad = math.radians(lat)
+
+    center_tx = int((lng + 180) / 360 * n)
+    center_ty = int(
+        (1 - math.log(math.tan(lat_rad) + 1 / math.cos(lat_rad)) / math.pi) / 2 * n
+    )
+
+    # Determine how many tiles we need to cover the radius
+    tile_size_m = 40075016.686 * math.cos(lat_rad) / n
+    tiles_needed = math.ceil(radius / tile_size_m) + 1
+
+    all_buildings: list[dict] = []
+    bid = 0
+
+    async with httpx.AsyncClient() as client:
+        for dx in range(-tiles_needed, tiles_needed + 1):
+            for dy in range(-tiles_needed, tiles_needed + 1):
+                tx = center_tx + dx
+                ty = center_ty + dy
+                if ty < 0 or ty >= n:
+                    continue
+
+                # Check disk cache
+                cache_path = _MSFT_CACHE / f"{zoom}_{tx}_{ty}.json"
+                if cache_path.exists():
+                    try:
+                        cached = json.loads(cache_path.read_text())
+                        all_buildings.extend(cached)
+                        continue
+                    except Exception:
+                        pass
+
+                # Fetch PBF tile
+                url = _MSFT_VT_URL.format(z=zoom, y=ty, x=tx)
+                try:
+                    resp = await client.get(url, timeout=10.0)
+                    if resp.status_code != 200:
+                        continue
+                except httpx.HTTPError:
+                    continue
+
+                # Decode PBF
+                try:
+                    tile = mapbox_vector_tile.decode(resp.content)
+                except Exception as e:
+                    logger.warning(f"PBF decode failed for {zoom}/{ty}/{tx}: {e}")
+                    continue
+
+                tile_buildings = []
+                for layer_name, layer in tile.items():
+                    for feature in layer.get("features", []):
+                        geom = feature.get("geometry", {})
+                        if geom.get("type") != "Polygon":
+                            continue
+                        rings = geom.get("coordinates", [])
+                        if not rings or len(rings[0]) < 3:
+                            continue
+
+                        # Convert tile-local pixels to lat/lng
+                        polygon = []
+                        for px, py in rings[0]:
+                            flat, flng = _tile_to_latlng(tx, ty, zoom, px, py)
+                            polygon.append([flat, flng])
+
+                        # Filter by radius
+                        centroid_lat = sum(p[0] for p in polygon) / len(polygon)
+                        centroid_lng = sum(p[1] for p in polygon) / len(polygon)
+                        dy_m = (centroid_lat - lat) * 111320.0
+                        dx_m = (centroid_lng - lng) * 111320.0 * math.cos(lat_rad)
+                        dist = math.sqrt(dx_m**2 + dy_m**2)
+                        if dist > radius:
+                            continue
+
+                        bid += 1
+                        tile_buildings.append(
+                            {"id": bid, "polygon": polygon, "tags": {}}
+                        )
+
+                # Cache this tile's buildings
+                _MSFT_CACHE.mkdir(parents=True, exist_ok=True)
+                try:
+                    cache_path.write_text(json.dumps(tile_buildings))
+                except Exception:
+                    pass
+
+                all_buildings.extend(tile_buildings)
+
+    logger.info(
+        f"Microsoft buildings: {len(all_buildings)} footprints at ({lat:.5f}, {lng:.5f})"
+    )
+    return all_buildings
 
 
 # ---------------------------------------------------------------------------

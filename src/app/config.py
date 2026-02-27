@@ -46,6 +46,15 @@ class Settings(BaseSettings):
     meshtastic_host: str = ""           # auto-discover if empty
     meshtastic_port: int = 4403
 
+    # MeshCore mesh radio (serial USB)
+    meshcore_enabled: bool = False
+    meshcore_serial_port: str = ""      # e.g. "/dev/ttyUSB0"
+
+    # Mesh web source (public mesh network maps)
+    mesh_web_enabled: bool = False
+    mesh_web_poll_interval: int = 60    # seconds
+    mesh_web_url: str = ""              # JSON endpoint returning mesh node list
+
     # InfluxDB v2 time-series store
     influx_enabled: bool = True
     influx_url: str = "http://localhost:8086"
@@ -72,6 +81,7 @@ class Settings(BaseSettings):
     simulation_layout: str = "scenarios/neighborhood_default.json"
     simulation_mode: str = "sim"  # "sim" or "live" — controls Amy's tactical data source
     simulation_bounds: float = 200.0  # Half-extent in meters (±200 = 400m x 400m)
+    simulation_max_hostiles: int = 200  # Maximum simultaneous hostile targets
 
     # Amy AI Commander
     amy_enabled: bool = True
@@ -86,6 +96,11 @@ class Settings(BaseSettings):
     # Fleet / Model routing
     fleet_enabled: bool = False       # opt-in; False = existing static behavior
     fleet_auto_discover: bool = True  # Tailscale peer scan when fleet_enabled
+
+    # Escalation thresholds
+    escalation_linger_threshold: float = 30.0
+    escalation_deescalation_time: float = 30.0
+    escalation_min_battery: float = 0.20
 
     # Detection settings
     motion_threshold: float = 25.0

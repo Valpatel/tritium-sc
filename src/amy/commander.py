@@ -1029,6 +1029,7 @@ class Commander:
         # These get initialized in _boot()
         self.chat_agent = None
         self.motor = None
+        self.vision_threads: dict[str, VisionThread] = {}
         self.vision_thread: VisionThread | None = None
         self.audio_thread: AudioThread | None = None
         self.curiosity_timer = None
@@ -1114,6 +1115,21 @@ class Commander:
                 engine.pause_spawners()
             else:
                 engine.resume_spawners()
+
+        # Switch primary vision_thread based on mode
+        if self.vision_threads:
+            if mode == "live":
+                # Prefer real (non-virtual) cameras
+                for nid, vt in self.vision_threads.items():
+                    if nid != "virtual" and not nid.startswith("synthetic"):
+                        self.vision_thread = vt
+                        break
+            else:
+                # Sim mode: prefer virtual/synthetic
+                for nid, vt in self.vision_threads.items():
+                    if nid == "virtual" or nid.startswith("synthetic"):
+                        self.vision_thread = vt
+                        break
 
         # Publish mode change event
         self.event_bus.publish("mode_change", {
@@ -1795,18 +1811,24 @@ class Commander:
             print("  [3/8] Speech-to-text: no mic available")
             self.listener = None
 
-        # YOLO
-        cam = self.primary_camera
-        if cam is not None:
-            print("  [4/8] YOLO object detection")
-            self.vision_thread = VisionThread(
-                cam, self.event_bus,
-                event_queue=self._event_queue,
-            )
+        # YOLO — create VisionThread for every camera node
+        print("  [4/8] YOLO object detection")
+        self.vision_threads = {}
+        for nid, node in self.nodes.items():
+            if node.has_camera:
+                vt = VisionThread(
+                    node, self.event_bus,
+                    event_queue=self._event_queue,
+                )
+                self.vision_threads[nid] = vt
+
+        if self.vision_threads:
+            self.vision_thread = next(iter(self.vision_threads.values()))
             print(f"        Backend: {self.vision_thread._yolo_backend}")
+            print(f"        Camera nodes: {len(self.vision_threads)} ({', '.join(self.vision_threads.keys())})")
         else:
-            print("  [4/8] YOLO: no camera available")
             self.vision_thread = None
+            print("        No camera available")
 
         # Chat agent
         print(f"  [5/8] Chat model")
@@ -1944,9 +1966,9 @@ class Commander:
         # Start YOLO after greeting
         if self._boot_delay > 0:
             time.sleep(self._boot_delay)
-        if self.vision_thread is not None:
-            self.vision_thread.start()
-            print("  YOLO detection: running")
+        for nid, vt in self.vision_threads.items():
+            vt.start()
+            print(f"  YOLO detection: running ({nid})")
 
         # Start thinking thread
         self.thinking.start()
@@ -2275,8 +2297,8 @@ class Commander:
         self.memory.add_event("shutdown", "Amy shutting down")
         self.memory.save()
         self.transcript.close()
-        if self.vision_thread:
-            self.vision_thread.stop()
+        for vt in self.vision_threads.values():
+            vt.stop()
         if self.curiosity_timer:
             self.curiosity_timer.stop()
         if self.audio_thread:
