@@ -83,6 +83,7 @@ console.log('\n--- Module Imports ---');
     assert(mainSrc.includes("import { AlertsPanelDef }"), 'Imports AlertsPanelDef');
     assert(mainSrc.includes("import { GameHudPanelDef }"), 'Imports GameHudPanelDef');
     assert(mainSrc.includes("import { MeshPanelDef }"), 'Imports MeshPanelDef');
+    assert(mainSrc.includes("import { MinimapPanelDef }"), 'Imports MinimapPanelDef');
 })();
 
 (function testPanelImportPaths() {
@@ -91,6 +92,7 @@ console.log('\n--- Module Imports ---');
     assert(mainSrc.includes("from './panels/alerts.js'"), 'AlertsPanelDef path is panels/alerts.js');
     assert(mainSrc.includes("from './panels/game-hud.js'"), 'GameHudPanelDef path is panels/game-hud.js');
     assert(mainSrc.includes("from './panels/mesh.js'"), 'MeshPanelDef path is panels/mesh.js');
+    assert(mainSrc.includes("from './panels/minimap.js'"), 'MinimapPanelDef path is panels/minimap.js');
 })();
 
 // ============================================================
@@ -220,7 +222,6 @@ console.log('\n--- DOM Element IDs ---');
         'amy-state',
         'amy-mood',
         'amy-thought',
-        'minimap-container',
     ];
     for (const id of expectedIds) {
         assert(mainSrc.includes(`'${id}'`) || mainSrc.includes(`"${id}"`),
@@ -408,6 +409,7 @@ console.log('\n--- Panel System Init ---');
     assert(mainSrc.includes('panelManager.register(AlertsPanelDef)'), 'Registers AlertsPanelDef');
     assert(mainSrc.includes('panelManager.register(GameHudPanelDef)'), 'Registers GameHudPanelDef');
     assert(mainSrc.includes('panelManager.register(MeshPanelDef)'), 'Registers MeshPanelDef');
+    assert(mainSrc.includes('panelManager.register(MinimapPanelDef)'), 'Registers MinimapPanelDef');
 })();
 
 (function testDefaultPanelsOpened() {

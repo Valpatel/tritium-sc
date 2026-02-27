@@ -22,6 +22,7 @@ import { EventsPanelDef } from './panels/events.js';
 import { PatrolPanelDef } from './panels/patrol.js';
 import { ScenariosPanelDef } from './panels/scenarios.js';
 import { SystemPanelDef } from './panels/system.js';
+import { MinimapPanelDef } from './panels/minimap.js';
 
 // Make available on window for console debugging
 window.TritiumStore = TritiumStore;
@@ -336,12 +337,14 @@ function initPanelSystem(container) {
     panelManager.register(PatrolPanelDef);
     panelManager.register(ScenariosPanelDef);
     panelManager.register(SystemPanelDef);
+    panelManager.register(MinimapPanelDef);
 
     // Try loading saved layout; if none, open defaults
     if (!panelManager.loadLayout()) {
         panelManager.open('amy');
         panelManager.open('units');
         panelManager.open('alerts');
+        panelManager.open('minimap');
     }
 
     // Layout manager
@@ -869,11 +872,9 @@ function initKeyboard() {
                 toggleChat(true);
                 break;
             case 'm':
-            case 'M': {
-                const mm = document.getElementById('minimap-container');
-                if (mm) mm.hidden = !mm.hidden;
+            case 'M':
+                panelManager.toggle('minimap');
                 break;
-            }
             case 'o':
             case 'O':
                 document.querySelector('[data-map-mode="observe"]')?.click();

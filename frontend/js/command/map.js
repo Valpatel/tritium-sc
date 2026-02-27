@@ -162,6 +162,10 @@ const _state = {
     // Screen shake tracking
     _shakeActive: false,
 
+    // Context menu
+    contextMenu: null,
+    contextMenuWorld: null,
+
     // Cleanup handles
     unsubs: [],
     boundHandlers: new Map(),
@@ -280,6 +284,7 @@ export function initMap() {
         EventBus.on('unit:dispatch-mode', _onDispatchMode),
         EventBus.on('unit:dispatched', _onDispatched),
         EventBus.on('mesh:center-on-node', _onMeshCenterOnNode),
+        EventBus.on('minimap:pan', _onMinimapPan),
     );
 
     // Subscribe to store for selectedUnitId changes (highlight sync)
@@ -952,24 +957,59 @@ function _drawTooltip(ctx) {
     const u = TritiumStore.units.get(_state.hoveredUnit);
     if (!u || !u.position) return;
 
-    const sp = worldToScreen(u.position.x, u.position.y);
-    const tooltipColor = FSM_BADGE_COLORS[u.fsm_state] || '#ccc';
-    const fsmState = u.fsm_state ? u.fsm_state.toUpperCase() : '';
+    const mouse = _state.lastMouse || worldToScreen(u.position.x, u.position.y);
+    const fsm = u.fsm_state || u.fsmState || '';
+    const tooltipColor = FSM_BADGE_COLORS[fsm] || '#ccc';
+    const fsmLabel = fsm ? fsm.toUpperCase() : '';
     const elims = u.eliminations ? ` ${u.eliminations}K` : '';
-    const tooltipText = (u.name || _state.hoveredUnit) + (fsmState ? ' ' + fsmState + elims : '');
+
+    // Build tooltip lines
+    const lines = [];
+    lines.push((u.name || _state.hoveredUnit) + (fsmLabel ? ' ' + fsmLabel + elims : elims));
+    if (u.type) lines.push(u.type.toUpperCase());
+    if (u.health !== undefined && u.maxHealth) {
+        lines.push('HP: ' + Math.round(u.health) + '/' + u.maxHealth);
+    }
 
     ctx.save();
     ctx.font = `11px ${FONT_FAMILY}`;
     ctx.textAlign = 'left';
-    ctx.textBaseline = 'bottom';
-    const tw = ctx.measureText(tooltipText).width;
-    const tx = sp.x + 12;
-    const ty = sp.y - 8;
+    ctx.textBaseline = 'top';
 
-    ctx.fillStyle = 'rgba(6, 6, 9, 0.85)';
-    ctx.fillRect(tx - 4, ty - 14, tw + 8, 18);
-    ctx.fillStyle = tooltipColor;
-    ctx.fillText(tooltipText, tx, ty);
+    // Measure widths
+    const lineH = 15;
+    const padX = 6;
+    const padY = 4;
+    let maxW = 0;
+    for (const line of lines) {
+        const w = ctx.measureText(line).width;
+        if (w > maxW) maxW = w;
+    }
+    const boxW = maxW + padX * 2;
+    const boxH = lines.length * lineH + padY * 2;
+
+    // Position: offset from mouse, clamped to canvas bounds
+    const cssW = _state.canvas.width / _state.dpr;
+    const cssH = _state.canvas.height / _state.dpr;
+    let tx = mouse.x + 14;
+    let ty = mouse.y - boxH - 8;
+    if (tx + boxW > cssW - 4) tx = mouse.x - boxW - 8;
+    if (ty < 4) ty = mouse.y + 14;
+    if (ty + boxH > cssH - 4) ty = cssH - boxH - 4;
+
+    // Background
+    ctx.fillStyle = 'rgba(6, 6, 9, 0.9)';
+    ctx.fillRect(tx, ty, boxW, boxH);
+    ctx.strokeStyle = tooltipColor;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(tx, ty, boxW, boxH);
+
+    // Text lines
+    for (let i = 0; i < lines.length; i++) {
+        ctx.fillStyle = i === 0 ? tooltipColor : '#aaa';
+        ctx.fillText(lines[i], tx + padX, ty + padY + i * lineH);
+    }
+
     ctx.restore();
 }
 
@@ -1366,16 +1406,33 @@ function _drawScaleBar(ctx) {
 // ============================================================
 
 function _drawMinimap() {
-    const ctx = _state.minimapCtx;
+    // Dynamically find minimap canvas (may come from panel system)
+    let mmCanvas = _state.minimapCanvas;
+    let ctx = _state.minimapCtx;
+
+    // If cached ref is gone or detached, re-lookup by id
+    if (!mmCanvas || !mmCanvas.isConnected) {
+        mmCanvas = document.getElementById('minimap-canvas');
+        _state.minimapCanvas = mmCanvas;
+        _state.minimapCtx = mmCanvas ? mmCanvas.getContext('2d') : null;
+        ctx = _state.minimapCtx;
+    }
+
     if (!ctx) {
         _drawMinimapOnMain();
         return;
     }
-    const mmCanvas = _state.minimapCanvas;
     const mmRect = mmCanvas?.getBoundingClientRect();
     if (!mmRect || mmRect.width === 0 || mmRect.height === 0) {
         _drawMinimapOnMain();
         return;
+    }
+    // Resize canvas buffer to match layout if panel was resized
+    const layoutW = Math.max(1, Math.floor(mmRect.width));
+    const layoutH = Math.max(1, Math.floor(mmRect.height));
+    if (mmCanvas.width !== layoutW || mmCanvas.height !== layoutH) {
+        mmCanvas.width = layoutW;
+        mmCanvas.height = layoutH;
     }
     const mmW = mmCanvas.width;
     const mmH = mmCanvas.height;
@@ -1612,6 +1669,7 @@ function _unbindCanvasEvents() {
 }
 
 function _onMouseDown(e) {
+    _hideContextMenu();
     const rect = _state.canvas.getBoundingClientRect();
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
@@ -1702,17 +1760,19 @@ function _onMouseUp(e) {
     const sy = e.clientY - rect.top;
 
     if (_state.isPanning) {
-        // If right-click and barely moved, treat as right-click dispatch
+        // If right-click and barely moved, show context menu
         if (e.button === 2 && _state.dragStart) {
             const dx = Math.abs(sx - _state.dragStart.x);
             const dy = Math.abs(sy - _state.dragStart.y);
             if (dx < 5 && dy < 5) {
-                // Right-click dispatch for selected unit
+                const wp = screenToWorld(sx, sy);
                 const selectedId = TritiumStore.get('map.selectedUnitId');
                 if (selectedId) {
-                    const wp = screenToWorld(sx, sy);
+                    // Quick dispatch for selected unit (existing behavior)
                     _doDispatch(selectedId, wp.x, wp.y);
                 }
+                // Also show context menu for additional options
+                _showContextMenu(e.clientX, e.clientY, wp);
             }
         }
         _state.isPanning = false;
@@ -1810,6 +1870,124 @@ function _hitTestUnit(sx, sy) {
         }
     }
     return closest;
+}
+
+/**
+ * Hit-test a building polygon. Uses ray-casting point-in-polygon.
+ * Works in world coordinates (overlay buildings use world coords).
+ * @param {number} wx - world X
+ * @param {number} wy - world Y
+ * @returns {object|null} - building object with polygon + tags, or null
+ */
+function _hitTestBuilding(wx, wy) {
+    const buildings = _state.overlayBuildings;
+    if (!buildings || !buildings.length) return null;
+
+    for (const b of buildings) {
+        const poly = b.polygon;
+        if (!poly || poly.length < 3) continue;
+        // Ray-casting algorithm
+        let inside = false;
+        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+            const xi = poly[i][0], yi = poly[i][1];
+            const xj = poly[j][0], yj = poly[j][1];
+            if (((yi > wy) !== (yj > wy)) &&
+                (wx < (xj - xi) * (wy - yi) / (yj - yi) + xi)) {
+                inside = !inside;
+            }
+        }
+        if (inside) return b;
+    }
+    return null;
+}
+
+/**
+ * Show a context menu at the given screen position.
+ * @param {number} sx - screen X
+ * @param {number} sy - screen Y
+ * @param {object} worldPos - {x, y} world coordinates
+ */
+function _showContextMenu(sx, sy, worldPos) {
+    _hideContextMenu();
+    const selectedId = TritiumStore.get('map.selectedUnitId');
+    const building = _hitTestBuilding(worldPos.x, worldPos.y);
+
+    const menu = document.createElement('div');
+    menu.className = 'map-context-menu';
+    menu.style.position = 'fixed';
+    menu.style.left = sx + 'px';
+    menu.style.top = sy + 'px';
+    menu.style.zIndex = '9999';
+
+    const items = [];
+    if (selectedId) {
+        items.push({ label: 'DISPATCH HERE', action: 'dispatch', icon: '>' });
+        items.push({ label: 'SET WAYPOINT', action: 'waypoint', icon: '+' });
+    }
+    items.push({ label: 'DROP MARKER', action: 'marker', icon: 'x' });
+    items.push({ label: 'MEASURE DISTANCE', action: 'measure', icon: '~' });
+    if (building) {
+        const addr = building.tags && building.tags['addr:street']
+            ? building.tags['addr:street']
+            : 'Building';
+        items.push({ label: 'INFO: ' + addr, action: 'building_info', icon: '?' });
+    }
+
+    for (const item of items) {
+        const el = document.createElement('div');
+        el.className = 'map-ctx-item';
+        el.textContent = item.icon + ' ' + item.label;
+        el.dataset.action = item.action;
+        menu.appendChild(el);
+    }
+
+    _state.contextMenu = menu;
+    _state.contextMenuWorld = worldPos;
+
+    // Attach click handler
+    menu.addEventListener('click', (e) => {
+        const target = e.target.closest('.map-ctx-item');
+        if (!target) return;
+        const action = target.dataset.action;
+        _handleContextAction(action, worldPos, selectedId, building);
+        _hideContextMenu();
+    });
+
+    // Attach to canvas parent or document body
+    const parent = _state.canvas.parentNode || document.body;
+    if (parent && parent.appendChild) parent.appendChild(menu);
+}
+
+function _hideContextMenu() {
+    if (_state.contextMenu) {
+        _state.contextMenu.remove();
+        _state.contextMenu = null;
+    }
+}
+
+function _handleContextAction(action, worldPos, selectedId, building) {
+    switch (action) {
+        case 'dispatch':
+            if (selectedId) _doDispatch(selectedId, worldPos.x, worldPos.y);
+            break;
+        case 'waypoint':
+            EventBus.emit('map:waypoint', { x: worldPos.x, y: worldPos.y, unitId: selectedId });
+            break;
+        case 'marker':
+            EventBus.emit('map:marker', { x: worldPos.x, y: worldPos.y });
+            break;
+        case 'measure':
+            EventBus.emit('map:measure_start', { x: worldPos.x, y: worldPos.y });
+            break;
+        case 'building_info':
+            if (building) {
+                EventBus.emit('building:info', {
+                    tags: building.tags || {},
+                    polygon: building.polygon,
+                });
+            }
+            break;
+    }
 }
 
 // ============================================================
@@ -1960,6 +2138,12 @@ function _onMeshCenterOnNode(data) {
     _state.cam.targetY = data.y;
     _state.cam.targetZoom = Math.max(5.0, _state.cam.zoom);
     console.log(`[MAP] Center on mesh node: (${data.x.toFixed(1)}, ${data.y.toFixed(1)})`);
+}
+
+function _onMinimapPan(data) {
+    if (!data || data.x === undefined || data.y === undefined) return;
+    _state.cam.targetX = data.x;
+    _state.cam.targetY = data.y;
 }
 
 function _onSelectedUnitChanged(newId, _oldId) {

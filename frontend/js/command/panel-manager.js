@@ -557,16 +557,19 @@ export class PanelManager {
 
         return {
             commander: {
-                amy:    { x: 8,        y: ch - 210, w: 320, h: 200 },
-                units:  { x: 8,        y: 8,        w: 260, h: ch - 230 },
-                alerts: { x: cw - 296, y: 8,        w: 280, h: 320 },
+                amy:     { x: 8,        y: ch - 210, w: 320, h: 200 },
+                units:   { x: 8,        y: 8,        w: 260, h: ch - 230 },
+                alerts:  { x: cw - 296, y: 8,        w: 280, h: 320 },
+                minimap: { x: cw - 236, y: ch - 236, w: 220, h: 220 },
             },
             observer: {
-                alerts: { x: cw - 296, y: 8,        w: 280, h: 300 },
+                alerts:  { x: cw - 296, y: 8,        w: 280, h: 300 },
+                minimap: { x: cw - 236, y: ch - 236, w: 220, h: 220 },
             },
             tactical: {
-                units:  { x: 8,        y: 8,        w: 260, h: ch - 230 },
-                alerts: { x: cw - 296, y: 8,        w: 280, h: 300 },
+                units:   { x: 8,        y: 8,        w: 260, h: ch - 230 },
+                alerts:  { x: cw - 296, y: 8,        w: 280, h: 300 },
+                minimap: { x: cw - 236, y: ch - 236, w: 220, h: 220 },
             },
         };
     }
