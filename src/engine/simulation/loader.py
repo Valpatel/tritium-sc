@@ -153,6 +153,7 @@ def load_layout(path: str, engine: SimulationEngine) -> int:
             waypoints=waypoints,
             loop_waypoints=(alliance == "friendly" and speed > 0),
         )
+        target.apply_combat_profile()
         engine.add_target(target)
         created_targets.append((target, position))
         count += 1

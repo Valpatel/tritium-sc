@@ -83,3 +83,33 @@ class DegradationSystem:
     def reset(self) -> None:
         """Clear all degradation state."""
         self._degradation.clear()
+
+
+# ---------------------------------------------------------------------------
+# Module-level convenience functions using a shared singleton instance.
+# Behavior modules (turret, drone, rover, hostile) import these directly:
+#   from ..degradation import apply_degradation, can_fire_degraded, get_effective_cooldown
+# ---------------------------------------------------------------------------
+
+_default_system = DegradationSystem()
+
+
+def apply_degradation(target: SimulationTarget) -> None:
+    """Update the target's degradation field based on current health.
+
+    Sets ``target.degradation`` to a 0.0-1.0 value where 0.0 is pristine
+    and 1.0 is fully degraded.  This is the inverse of the degradation
+    factor (1.0 = no degradation).
+    """
+    factor = _default_system.get_degradation_factor(target)
+    target.degradation = 1.0 - factor
+
+
+def can_fire_degraded(target: SimulationTarget) -> bool:
+    """Return True if the unit is healthy enough to fire."""
+    return _default_system.can_fire_degraded(target)
+
+
+def get_effective_cooldown(target: SimulationTarget) -> float:
+    """Return the effective weapon cooldown after degradation."""
+    return _default_system.get_effective_cooldown(target)

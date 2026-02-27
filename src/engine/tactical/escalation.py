@@ -81,6 +81,8 @@ class ThreatClassifier:
         event_bus: EventBus,
         target_tracker: TargetTracker,
         zones: list[dict] | None = None,
+        linger_threshold: float | None = None,
+        deescalation_time: float | None = None,
     ) -> None:
         self._event_bus = event_bus
         self._tracker = target_tracker
@@ -91,6 +93,11 @@ class ThreatClassifier:
         self._thread: threading.Thread | None = None
         # Track when targets left all zones (for de-escalation)
         self._zone_exit_times: dict[str, float] = {}
+        # Override class constants with instance values if provided
+        if linger_threshold is not None:
+            self.LINGER_THRESHOLD = linger_threshold
+        if deescalation_time is not None:
+            self.DEESCALATION_TIME = deescalation_time
 
     @property
     def zones(self) -> list[dict]:
@@ -296,6 +303,7 @@ class AutoDispatcher:
         simulation_engine: SimulationEngine | None = None,
         mqtt_bridge=None,
         threat_classifier: ThreatClassifier | None = None,
+        min_battery: float | None = None,
     ) -> None:
         self._event_bus = event_bus
         self._tracker = target_tracker
@@ -307,6 +315,9 @@ class AutoDispatcher:
         self._running = False
         self._thread: threading.Thread | None = None
         self._sub: queue.Queue | None = None
+        # Override class constant with instance value if provided
+        if min_battery is not None:
+            self.MIN_BATTERY = min_battery
 
     def start(self) -> None:
         if self._running:

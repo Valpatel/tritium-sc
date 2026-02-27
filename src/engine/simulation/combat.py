@@ -41,11 +41,12 @@ if TYPE_CHECKING:
     from engine.comms.event_bus import EventBus
     from .target import SimulationTarget
 
-# Hit detection radius — projectile is "close enough" to count as a hit
-HIT_RADIUS = 1.5
+# Hit detection radius — projectile is "close enough" to count as a hit.
+# Must be large enough to account for target movement during projectile flight.
+HIT_RADIUS = 5.0
 
 # Miss distance — projectile has overshot target by this much
-MISS_OVERSHOOT = 3.0
+MISS_OVERSHOOT = 8.0
 
 # Elimination streak thresholds and names
 _STREAK_NAMES: list[tuple[int, str]] = [
@@ -131,7 +132,7 @@ class CombatSystem:
             target_id=target.target_id,
             position=source.position,
             target_pos=target.position,
-            speed=25.0,
+            speed=80.0,
             damage=source.weapon_damage,
             projectile_type=projectile_type,
         )
@@ -141,9 +142,12 @@ class CombatSystem:
             "id": proj.id,
             "source_id": source.target_id,
             "source_name": source.name,
+            "source_type": source.asset_type,
             "source_pos": {"x": source.position[0], "y": source.position[1]},
+            "target_id": target.target_id,
             "target_pos": {"x": target.position[0], "y": target.position[1]},
             "projectile_type": projectile_type,
+            "damage": proj.damage,
         })
         return proj
 
@@ -156,23 +160,24 @@ class CombatSystem:
                 to_remove.append(proj.id)
                 continue
 
-            # Move projectile toward target_pos
-            dx = proj.target_pos[0] - proj.position[0]
-            dy = proj.target_pos[1] - proj.position[1]
-            dist_to_target_pos = math.hypot(dx, dy)
+            # Move projectile toward target's CURRENT position (semi-guided)
+            target = targets.get(proj.target_id)
+            aim_pos = target.position if (target is not None and target.status in ("active", "idle", "stationary")) else proj.target_pos
+            dx = aim_pos[0] - proj.position[0]
+            dy = aim_pos[1] - proj.position[1]
+            dist_to_aim = math.hypot(dx, dy)
 
-            if dist_to_target_pos > 0:
+            if dist_to_aim > 0:
                 step = proj.speed * dt
-                if step >= dist_to_target_pos:
-                    proj.position = proj.target_pos
+                if step >= dist_to_aim:
+                    proj.position = aim_pos
                 else:
                     proj.position = (
-                        proj.position[0] + (dx / dist_to_target_pos) * step,
-                        proj.position[1] + (dy / dist_to_target_pos) * step,
+                        proj.position[0] + (dx / dist_to_aim) * step,
+                        proj.position[1] + (dy / dist_to_aim) * step,
                     )
 
             # Check hit: is the projectile within HIT_RADIUS of the actual target?
-            target = targets.get(proj.target_id)
             if target is not None and target.status in ("active", "idle", "stationary"):
                 tdx = proj.position[0] - target.position[0]
                 tdy = proj.position[1] - target.position[1]
@@ -188,6 +193,8 @@ class CombatSystem:
                         "damage": proj.damage,
                         "remaining_health": target.health,
                         "source_id": proj.source_id,
+                        "projectile_type": proj.projectile_type,
+                        "position": {"x": target.position[0], "y": target.position[1]},
                     })
 
                     if eliminated:
@@ -224,12 +231,9 @@ class CombatSystem:
                     to_remove.append(proj.id)
                     continue
 
-            # Check miss: projectile has overshot its target_pos
-            # (distance from origin to current pos > distance from origin to target_pos + overshoot)
-            dx_from_tpos = proj.position[0] - proj.target_pos[0]
-            dy_from_tpos = proj.position[1] - proj.target_pos[1]
-            overshoot_dist = math.hypot(dx_from_tpos, dy_from_tpos)
-            if dist_to_target_pos < 0.1 or overshoot_dist > MISS_OVERSHOOT:
+            # Check miss: projectile exceeded max flight time (5 seconds)
+            flight_time = time.time() - proj.created_at
+            if flight_time > 5.0:
                 proj.missed = True
                 to_remove.append(proj.id)
 

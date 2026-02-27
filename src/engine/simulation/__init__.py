@@ -17,7 +17,9 @@ from .movement import MovementController, smooth_path
 from .pathfinding import plan_path
 from .pursuit import PursuitSystem
 from .replay import ReplayRecorder
+from .scenario import BattleScenario, DefenderConfig, SpawnGroup, WaveDefinition, load_battle_scenario
 from .sensors import SensorDevice, SensorSimulator
+from .spatial import SpatialGrid
 from .spectator import SpectatorMode
 from .squads import Squad, SquadManager
 from .state_machine import State, StateMachine, Transition
@@ -49,7 +51,13 @@ __all__ = [
     "SensorDevice",
     "SensorSimulator",
     "Signal",
+    "BattleScenario",
+    "DefenderConfig",
+    "SpawnGroup",
+    "WaveDefinition",
     "SimulationEngine",
+    "SpatialGrid",
+    "load_battle_scenario",
     "SimulationTarget",
     "SpectatorMode",
     "Squad",

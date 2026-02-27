@@ -119,12 +119,23 @@ class GameMode:
         self._wave_hostile_ids: set[str] = set()
         self._spawn_thread: threading.Thread | None = None
 
+        # Scenario support (optional — None means use default WAVE_CONFIGS)
+        self._scenario: object | None = None
+        self._scenario_waves: list | None = None
+
     # -- Public interface -------------------------------------------------------
 
     def begin_war(self) -> None:
         """Transition from setup to countdown. Starts the war."""
         if self.state != "setup":
             return
+        # Reset all friendly units to full readiness
+        for t in self._engine.get_targets():
+            if t.alliance == "friendly" and t.is_combatant:
+                t.battery = 1.0
+                t.health = t.max_health
+                if t.status in ("low_battery", "idle", "stationary"):
+                    t.status = "active"
         self.state = "countdown"
         self._countdown_remaining = _COUNTDOWN_DURATION
         self.wave = 1
@@ -160,19 +171,28 @@ class GameMode:
         """Notify the game mode that a target was eliminated.
 
         Called by the engine/combat integration to update elimination counts
-        and scoring.
+        and scoring.  Any hostile elimination counts toward score; wave
+        hostiles also count toward wave completion.
         """
         if self.state != "active":
             return
+        # All hostile eliminations score points
+        self.total_eliminations += 1
+        self.score += 100  # points per elimination
+        # Wave hostiles also count toward wave completion
         if target_id in self._wave_hostile_ids:
             self.wave_eliminations += 1
-            self.total_eliminations += 1
-            self.score += 100  # points per elimination
+        self._publish_state_change()
 
     def get_state(self) -> dict:
         """Return serializable game state for API/frontend."""
         wave_config = self._current_wave_config()
-        total_waves = -1 if self.infinite else len(WAVE_CONFIGS)
+        if self._scenario_waves is not None:
+            total_waves = len(self._scenario_waves)
+        elif self.infinite:
+            total_waves = -1
+        else:
+            total_waves = len(WAVE_CONFIGS)
         return {
             "state": self.state,
             "wave": self.wave,
@@ -198,10 +218,12 @@ class GameMode:
 
     def _tick_active(self, dt: float) -> None:
         # Check defeat: all friendly combatants eliminated
+        # low_battery units are still alive (reduced capability, not dead)
+        _ALIVE_STATUSES = ("active", "idle", "stationary", "low_battery")
         friendlies_alive = [
             t for t in self._engine.get_targets()
             if t.alliance == "friendly" and t.is_combatant
-            and t.status in ("active", "idle", "stationary")
+            and t.status in _ALIVE_STATUSES
         ]
         if not friendlies_alive:
             self.state = "defeat"
@@ -238,6 +260,33 @@ class GameMode:
                 self._start_wave(self.wave)
                 self._publish_state_change()
 
+    # -- Scenario support -------------------------------------------------------
+
+    def load_scenario(self, scenario) -> None:
+        """Load a BattleScenario, replacing default WAVE_CONFIGS.
+
+        Places defenders from the scenario onto the engine and stores
+        wave definitions for use during gameplay.
+        """
+        from .scenario import BattleScenario, WaveDefinition
+        self._scenario = scenario
+        self._scenario_waves = list(scenario.waves)
+
+        # Place pre-defined defenders
+        from .target import SimulationTarget
+        for d in scenario.defenders:
+            tid = f"{d.asset_type}-{d.name or 'auto'}-{id(d)}"
+            target = SimulationTarget(
+                target_id=tid,
+                name=d.name or f"{d.asset_type.title()}",
+                alliance="friendly",
+                asset_type=d.asset_type,
+                position=d.position,
+                speed=0.0 if d.asset_type in ("turret", "heavy_turret", "missile_turret") else 2.0,
+            )
+            target.apply_combat_profile()
+            self._engine.add_target(target)
+
     # -- Wave management --------------------------------------------------------
 
     def _current_wave_config(self) -> WaveConfig | None:
@@ -249,13 +298,31 @@ class GameMode:
 
     def _start_wave(self, wave_num: int) -> None:
         """Spawn hostiles for this wave in a background thread (staggered)."""
-        config = self._current_wave_config()
-        if config is None:
-            return
-
         self.wave_eliminations = 0
         self._wave_start_time = time.time()
         self._wave_hostile_ids.clear()
+
+        # Check if a scenario is loaded with custom wave definitions
+        if self._scenario_waves is not None and 1 <= wave_num <= len(self._scenario_waves):
+            wave_def = self._scenario_waves[wave_num - 1]
+            self._event_bus.publish("wave_start", {
+                "wave_number": wave_num,
+                "wave_name": wave_def.name,
+                "hostile_count": wave_def.total_count,
+            })
+            self._spawn_thread = threading.Thread(
+                target=self._spawn_scenario_wave,
+                args=(wave_def,),
+                name=f"wave-{wave_num}-spawner",
+                daemon=True,
+            )
+            self._spawn_thread.start()
+            return
+
+        # Default WAVE_CONFIGS path
+        config = self._current_wave_config()
+        if config is None:
+            return
 
         self._event_bus.publish("wave_start", {
             "wave_number": wave_num,
@@ -271,6 +338,24 @@ class GameMode:
             daemon=True,
         )
         self._spawn_thread.start()
+
+    def _spawn_scenario_wave(self, wave_def) -> None:
+        """Spawn hostiles from a scenario WaveDefinition (mixed types)."""
+        from .scenario import WaveDefinition
+        spawn_index = 0
+        for group in wave_def.groups:
+            for i in range(group.count):
+                if self.state not in ("active",):
+                    return
+                hostile = self._engine.spawn_hostile_typed(
+                    asset_type=group.asset_type,
+                    speed=group.speed * wave_def.speed_mult,
+                    health=group.health * wave_def.health_mult,
+                )
+                self._wave_hostile_ids.add(hostile.target_id)
+                spawn_index += 1
+                if spawn_index < wave_def.total_count:
+                    time.sleep(_SPAWN_STAGGER)
 
     def _spawn_wave_hostiles(self, config: WaveConfig) -> None:
         """Spawn hostiles with staggered timing."""

@@ -59,23 +59,23 @@ _DRAIN_RATES: dict[str, float] = {
 # Combat stat profiles by (asset_type, alliance).
 # Format: (health, max_health, weapon_range, weapon_cooldown, weapon_damage, is_combatant)
 _COMBAT_PROFILES: dict[str, tuple[float, float, float, float, float, bool]] = {
-    "turret":           (200.0, 200.0, 20.0, 1.5, 15.0, True),
-    "drone":            (60.0,  60.0,  12.0, 1.0,  8.0, True),
-    "rover":            (150.0, 150.0, 10.0, 2.0, 12.0, True),
-    "person_hostile":   (80.0,  80.0,   8.0, 2.5, 10.0, True),
+    "turret":           (200.0, 200.0, 80.0, 1.5, 15.0, True),
+    "drone":            (60.0,  60.0,  50.0, 1.0,  8.0, True),
+    "rover":            (150.0, 150.0, 60.0, 2.0, 12.0, True),
+    "person_hostile":   (80.0,  80.0,  40.0, 2.5, 10.0, True),
     "person_neutral":   (50.0,  50.0,   0.0, 0.0,  0.0, False),
     "vehicle":          (300.0, 300.0,  0.0, 0.0,  0.0, False),
     "animal":           (30.0,  30.0,   0.0, 0.0,  0.0, False),
     # Heavy units
-    "tank":             (400.0, 400.0, 25.0, 3.0, 30.0, True),
-    "apc":              (300.0, 300.0, 15.0, 1.0,  8.0, True),
-    "heavy_turret":     (350.0, 350.0, 30.0, 2.5, 25.0, True),
-    "missile_turret":   (200.0, 200.0, 35.0, 5.0, 50.0, True),
+    "tank":             (400.0, 400.0, 100.0, 3.0, 30.0, True),
+    "apc":              (300.0, 300.0,  60.0, 1.0,  8.0, True),
+    "heavy_turret":     (350.0, 350.0, 120.0, 2.5, 25.0, True),
+    "missile_turret":   (200.0, 200.0, 150.0, 5.0, 50.0, True),
     # Scout variant
-    "scout_drone":      (40.0,  40.0,   8.0, 1.5,  5.0, True),
+    "scout_drone":      (40.0,  40.0,  40.0, 1.5,  5.0, True),
     # Hostile variants
-    "hostile_vehicle":  (200.0, 200.0, 12.0, 2.0, 15.0, True),
-    "hostile_leader":   (150.0, 150.0, 10.0, 2.0, 12.0, True),
+    "hostile_vehicle":  (200.0, 200.0, 70.0, 2.0, 15.0, True),
+    "hostile_leader":   (150.0, 150.0, 50.0, 2.0, 12.0, True),
 }
 
 
@@ -342,4 +342,5 @@ class SimulationTarget:
             "morale": round(self.morale, 2),
             "degradation": round(self.degradation, 2),
             "detected": self.detected,
+            "weapon_range": round(self.weapon_range, 1),
         }

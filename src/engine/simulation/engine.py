@@ -71,6 +71,7 @@ from .target import SimulationTarget
 from .terrain import TerrainMap
 from .unit_states import create_fsm_for_type
 from .upgrades import UpgradeSystem
+from .spatial import SpatialGrid
 from .weapons import WeaponSystem
 
 if TYPE_CHECKING:
@@ -91,9 +92,10 @@ _HOSTILE_NAMES = [
 class SimulationEngine:
     """Drives simulated targets at 10 Hz and publishes telemetry events."""
 
-    MAX_HOSTILES = 10
+    MAX_HOSTILES = 200
 
-    def __init__(self, event_bus: EventBus, map_bounds: float | None = None) -> None:
+    def __init__(self, event_bus: EventBus, map_bounds: float | None = None,
+                 max_hostiles: int | None = None) -> None:
         self._event_bus = event_bus
         self._targets: dict[str, SimulationTarget] = {}
         self._lock = threading.Lock()
@@ -105,6 +107,10 @@ class SimulationEngine:
         self._despawned_at: dict[str, float] = {}
         self._ambient_spawner: AmbientSpawner | None = None
         self._spawners_paused = threading.Event()  # clear = running, set = paused
+
+        # Overridable max hostiles
+        if max_hostiles is not None:
+            self.MAX_HOSTILES = max_hostiles
 
         # Configurable map bounds (half-extent in meters)
         if map_bounds is not None:
@@ -118,6 +124,9 @@ class SimulationEngine:
         self._map_min = -self._map_bounds
         self._map_max = self._map_bounds
 
+        # Spatial partitioning grid for O(1) neighbor queries
+        self._spatial_grid = SpatialGrid()
+
         # Combat subsystems
         self.combat = CombatSystem(event_bus)
         self.game_mode = GameMode(event_bus, self, self.combat)
@@ -130,7 +139,7 @@ class SimulationEngine:
         self.pursuit_system = PursuitSystem()
         self.unit_comms = UnitComms()
         self.stats_tracker = StatsTracker()
-        self.terrain_map = TerrainMap(map_bounds=200.0)
+        self.terrain_map = TerrainMap(map_bounds=self._map_bounds)
         self.upgrade_system = UpgradeSystem()
         self.weapon_system = WeaponSystem()
 
@@ -146,6 +155,13 @@ class SimulationEngine:
 
         # Sensor simulation
         self.sensor_sim = SensorSimulator(event_bus)
+
+        # Idle-unit telemetry throttling — track per-target state snapshots
+        # to detect no-change ticks.  After 5 consecutive identical ticks,
+        # downgrade to 2Hz (publish every 5th tick) until something changes.
+        self._idle_ticks: dict[str, int] = {}       # target_id -> consecutive idle ticks
+        self._last_snapshot: dict[str, tuple] = {}  # target_id -> (pos_x, pos_y, heading, health, status)
+        self._tick_counter: int = 0
 
     @property
     def event_bus(self) -> EventBus:
@@ -364,86 +380,126 @@ class SimulationEngine:
     def _tick_loop(self) -> None:
         while self._running:
             time.sleep(0.1)
-            with self._lock:
-                targets = list(self._targets.values())
-                targets_dict = dict(self._targets)
-            for target in targets:
-                target.tick(0.1)
-                self._event_bus.publish("sim_telemetry", target.to_dict())
+            self._do_tick(0.1)
 
-            # Game mode active — run combat subsystems
-            game_active = self.game_mode.state == "active"
-            if self.game_mode.state in ("countdown", "active", "wave_complete"):
-                self.game_mode.tick(0.1)
-            if game_active:
-                self.combat.tick(0.1, targets_dict)
-                self.behaviors.tick(0.1, targets_dict)
+    def _do_tick(self, dt: float) -> None:
+        """Execute one simulation tick.  Called from the tick loop thread, or
+        directly in tests to exercise the engine without starting threads."""
+        with self._lock:
+            targets = list(self._targets.values())
+            targets_dict = dict(self._targets)
+
+        # Rebuild spatial grid once per tick (O(n)) and share with behaviors
+        self._spatial_grid.rebuild(targets)
+        self.behaviors.set_spatial_grid(self._spatial_grid)
+        self._tick_counter += 1
+
+        for target in targets:
+            target.tick(dt)
+
+        # Game mode active — run combat subsystems
+        game_active = self.game_mode.state == "active"
+        if self.game_mode.state in ("countdown", "active", "wave_complete"):
+            self.game_mode.tick(dt)
+        if game_active:
+            self.combat.tick(dt, targets_dict)
+            self.behaviors.tick(dt, targets_dict)
+        else:
+            # Legacy interception check (non-game-mode)
+            if self.game_mode.state == "setup":
+                self._check_interceptions(targets)
+
+        # Tick extended subsystems (always, regardless of game state)
+        self.morale_system.tick(dt, targets_dict)
+        self.cover_system.tick(dt, targets_dict)
+        self.degradation_system.tick(dt, targets_dict)
+        self.pursuit_system.tick(dt, targets_dict)
+        self.unit_comms.tick(dt, targets_dict)
+        self.stats_tracker.tick(dt, targets_dict)
+        self.upgrade_system.tick(dt, targets_dict)
+
+        # Tick FSMs with enriched context and sync state back to targets
+        self._tick_fsms(dt, targets_dict)
+
+        # Batch telemetry: collect all target dicts AFTER all subsystems have
+        # ticked, so the batch reflects combat damage, eliminations, FSM state
+        # changes, etc. from this tick — not from the previous tick.
+        # Idle units (no state change for 5+ ticks) are throttled to 2Hz.
+        batch: list[dict] = []
+        for target in targets:
+            snap = (
+                round(target.position[0], 2),
+                round(target.position[1], 2),
+                round(target.heading, 1),
+                round(target.health, 1),
+                target.status,
+            )
+            tid = target.target_id
+            prev = self._last_snapshot.get(tid)
+            if prev == snap:
+                idle = self._idle_ticks.get(tid, 0) + 1
+                self._idle_ticks[tid] = idle
             else:
-                # Legacy interception check (non-game-mode)
-                if self.game_mode.state == "setup":
-                    self._check_interceptions(targets)
+                self._idle_ticks[tid] = 0
+                self._last_snapshot[tid] = snap
 
-            # Tick extended subsystems (always, regardless of game state)
-            self.morale_system.tick(0.1, targets_dict)
-            self.cover_system.tick(0.1, targets_dict)
-            self.degradation_system.tick(0.1, targets_dict)
-            self.pursuit_system.tick(0.1, targets_dict)
-            self.unit_comms.tick(0.1, targets_dict)
-            self.stats_tracker.tick(0.1, targets_dict)
-            self.upgrade_system.tick(0.1, targets_dict)
+            # Throttle: idle for 5+ ticks → only publish every 5th tick
+            idle_count = self._idle_ticks.get(tid, 0)
+            if idle_count >= 5 and self._tick_counter % 5 != 0:
+                continue
+            batch.append(target.to_dict())
 
-            # Tick FSMs with enriched context and sync state back to targets
-            self._tick_fsms(0.1, targets_dict)
+        self._event_bus.publish("sim_telemetry_batch", batch)
 
-            # Lifecycle cleanup
-            now = time.time()
-            to_remove: list[str] = []
-            for target in targets:
-                if target.battery <= 0 and target.status == "low_battery":
-                    if target.target_id not in self._destroyed_at:
-                        self._destroyed_at[target.target_id] = now
-                    elif now - self._destroyed_at[target.target_id] > 60:
-                        target.status = "destroyed"
-                if target.status == "destroyed":
-                    if target.target_id not in self._destroyed_at:
-                        self._destroyed_at[target.target_id] = now
-                    elif now - self._destroyed_at[target.target_id] > 300:
-                        to_remove.append(target.target_id)
-                # Despawned neutrals — remove after 5s
-                if target.status == "despawned":
-                    if target.target_id not in self._despawned_at:
-                        self._despawned_at[target.target_id] = now
-                    elif now - self._despawned_at[target.target_id] > 5:
-                        to_remove.append(target.target_id)
-                # Escaped hostiles — remove after 10s (they left the map)
-                if target.status == "escaped":
-                    if target.target_id not in self._despawned_at:
-                        self._despawned_at[target.target_id] = now
-                    elif now - self._despawned_at[target.target_id] > 10:
-                        to_remove.append(target.target_id)
-                # Neutralized targets — remove after 30s (visible on map briefly)
-                if target.status == "neutralized":
-                    if target.target_id not in self._despawned_at:
-                        self._despawned_at[target.target_id] = now
-                    elif now - self._despawned_at[target.target_id] > 30:
-                        to_remove.append(target.target_id)
-                # Eliminated targets — remove after 30s
-                if target.status == "eliminated":
-                    if target.target_id not in self._despawned_at:
-                        self._despawned_at[target.target_id] = now
-                    elif now - self._despawned_at[target.target_id] > 30:
-                        to_remove.append(target.target_id)
+        # Lifecycle cleanup
+        now = time.time()
+        to_remove: list[str] = []
+        for target in targets:
+            if target.battery <= 0 and target.status == "low_battery":
+                if target.target_id not in self._destroyed_at:
+                    self._destroyed_at[target.target_id] = now
+                elif now - self._destroyed_at[target.target_id] > 60:
+                    target.status = "destroyed"
+            if target.status == "destroyed":
+                if target.target_id not in self._destroyed_at:
+                    self._destroyed_at[target.target_id] = now
+                elif now - self._destroyed_at[target.target_id] > 300:
+                    to_remove.append(target.target_id)
+            # Despawned neutrals — remove after 5s
+            if target.status == "despawned":
+                if target.target_id not in self._despawned_at:
+                    self._despawned_at[target.target_id] = now
+                elif now - self._despawned_at[target.target_id] > 5:
+                    to_remove.append(target.target_id)
+            # Escaped hostiles — remove after 10s (they left the map)
+            if target.status == "escaped":
+                if target.target_id not in self._despawned_at:
+                    self._despawned_at[target.target_id] = now
+                elif now - self._despawned_at[target.target_id] > 10:
+                    to_remove.append(target.target_id)
+            # Neutralized targets — remove after 30s (visible on map briefly)
+            if target.status == "neutralized":
+                if target.target_id not in self._despawned_at:
+                    self._despawned_at[target.target_id] = now
+                elif now - self._despawned_at[target.target_id] > 30:
+                    to_remove.append(target.target_id)
+            # Eliminated targets — remove after 30s
+            if target.status == "eliminated":
+                if target.target_id not in self._despawned_at:
+                    self._despawned_at[target.target_id] = now
+                elif now - self._despawned_at[target.target_id] > 30:
+                    to_remove.append(target.target_id)
 
-            for tid in to_remove:
-                with self._lock:
-                    removed = self._targets.pop(tid, None)
-                self._destroyed_at.pop(tid, None)
-                self._despawned_at.pop(tid, None)
-                self._fsms.pop(tid, None)
-                if removed is not None:
-                    self._used_names.discard(removed.name)
-                    if self._ambient_spawner is not None:
-                        self._ambient_spawner.release_name(removed.name)
+        for tid in to_remove:
+            with self._lock:
+                removed = self._targets.pop(tid, None)
+            self._destroyed_at.pop(tid, None)
+            self._despawned_at.pop(tid, None)
+            self._fsms.pop(tid, None)
+            if removed is not None:
+                self._used_names.discard(removed.name)
+                if self._ambient_spawner is not None:
+                    self._ambient_spawner.release_name(removed.name)
 
     # -- FSM context enrichment -------------------------------------------------
 
@@ -652,6 +708,67 @@ class SimulationEngine:
         )
         # Apply combat profile for hostile person
         target.apply_combat_profile()
+        self.add_target(target)
+        return target
+
+    def spawn_hostile_typed(
+        self,
+        asset_type: str,
+        name: str | None = None,
+        position: tuple[float, float] | None = None,
+        speed: float | None = None,
+        health: float | None = None,
+    ) -> SimulationTarget:
+        """Create a hostile target of any type (person, hostile_vehicle, hostile_leader).
+
+        This is the multi-type variant of spawn_hostile(), used by the scenario
+        system to spawn mixed hostile waves.
+        """
+        if position is None:
+            position = self._random_edge_position()
+
+        # Name generation
+        if name is None:
+            base_name = random.choice(_HOSTILE_NAMES)
+        else:
+            base_name = name
+        final_name = base_name
+        suffix = 2
+        while final_name in self._used_names:
+            final_name = f"{base_name}-{suffix}"
+            suffix += 1
+        self._used_names.add(final_name)
+
+        # Default speed by type
+        default_speeds = {
+            "person": 1.5,
+            "hostile_vehicle": 6.0,
+            "hostile_leader": 1.8,
+        }
+        target_speed = speed if speed is not None else default_speeds.get(asset_type, 1.5)
+
+        waypoints = self._generate_hostile_waypoints(position)
+
+        target = SimulationTarget(
+            target_id=str(uuid.uuid4()),
+            name=final_name,
+            alliance="hostile",
+            asset_type=asset_type,
+            position=position,
+            speed=target_speed,
+            waypoints=waypoints,
+        )
+        target.apply_combat_profile()
+
+        # Override health if specified
+        if health is not None:
+            target.health = health
+            target.max_health = health
+
+        # Mark leaders
+        if asset_type == "hostile_leader":
+            target.is_leader = True
+
         self.add_target(target)
         return target
 

@@ -49,6 +49,22 @@ _GROUP_RUSH_SPEED_MULT = 1.2  # 20% speed boost during rush
 # Cover-seeking parameters
 _COVER_HEALTH_THRESHOLD = 0.5  # seek cover below this health fraction
 
+# Weapon projectile type by asset_type (matches weapons.py loadouts)
+_WEAPON_TYPES: dict[str, str] = {
+    "turret": "nerf_turret_gun",
+    "heavy_turret": "nerf_heavy_turret",
+    "missile_turret": "nerf_missile_launcher",
+    "drone": "nerf_dart_gun",
+    "scout_drone": "nerf_scout_gun",
+    "rover": "nerf_cannon",
+    "tank": "nerf_tank_cannon",
+    "apc": "nerf_apc_mg",
+    "person": "nerf_pistol",
+    "hostile_person": "nerf_pistol",
+    "hostile_leader": "nerf_pistol",
+    "hostile_vehicle": "nerf_cannon",
+}
+
 
 class UnitBehaviors:
     """Per-unit-type combat AI. Called each tick to decide actions."""
@@ -60,6 +76,7 @@ class UnitBehaviors:
         self._group_rush_ids: set[str] = set()     # currently rushing hostiles
         self._base_speeds: dict[str, float] = {}   # original speeds before rush boost
         self._obstacles = None                      # obstacle geometry for cover-seeking
+        self._spatial_grid = None                   # SpatialGrid for O(1) neighbor queries
 
         # Sensor awareness tracking
         self._detected_base_speeds: dict[str, float] = {}  # speeds before detection boost
@@ -73,6 +90,14 @@ class UnitBehaviors:
                        is a list of (x, y) tuples defining building outlines.
         """
         self._obstacles = obstacles
+
+    def set_spatial_grid(self, grid) -> None:
+        """Set the SpatialGrid for O(1) neighbor queries.
+
+        When set, _nearest_in_range and _detect_group_rush use grid.query_radius()
+        instead of O(n) / O(n^2) brute-force scans.
+        """
+        self._spatial_grid = grid
 
     def tick(self, dt: float, targets: dict[str, SimulationTarget]) -> None:
         """For each active combatant, run its type-specific behavior."""
@@ -122,8 +147,9 @@ class UnitBehaviors:
         dy = target.position[1] - turret.position[1]
         turret.heading = math.degrees(math.atan2(dx, dy))
 
-        # Fire
-        self._combat.fire(turret, target)
+        # Fire with weapon-specific projectile type
+        ptype = _WEAPON_TYPES.get(turret.asset_type, "nerf_dart")
+        self._combat.fire(turret, target, projectile_type=ptype)
 
     def _drone_behavior(
         self,
@@ -144,7 +170,8 @@ class UnitBehaviors:
         drone.heading = math.degrees(math.atan2(dx, dy))
 
         # Fire if in range
-        self._combat.fire(drone, target)
+        ptype = _WEAPON_TYPES.get(drone.asset_type, "nerf_dart")
+        self._combat.fire(drone, target, projectile_type=ptype)
 
     def _rover_behavior(
         self,
@@ -163,7 +190,8 @@ class UnitBehaviors:
         rover.heading = math.degrees(math.atan2(dx, dy))
 
         # Fire if in range
-        self._combat.fire(rover, target)
+        ptype = _WEAPON_TYPES.get(rover.asset_type, "nerf_dart")
+        self._combat.fire(rover, target, projectile_type=ptype)
 
     def _hostile_kid_behavior(
         self,
@@ -194,7 +222,8 @@ class UnitBehaviors:
         # Fire at nearest defender in range (always, regardless of state)
         target = self._nearest_in_range(kid, friendlies)
         if target is not None:
-            self._combat.fire(kid, target)
+            ptype = _WEAPON_TYPES.get(kid.asset_type, "nerf_pistol")
+            self._combat.fire(kid, target, projectile_type=ptype)
 
         # Cover-seeking: damaged hostile moves toward nearest building edge
         # When seeking cover, skip flanking and dodge (cover takes priority)
@@ -269,44 +298,80 @@ class UnitBehaviors:
         self._last_flank[hostile.target_id] = now
         return True
 
-    @staticmethod
     def _nearest_stationary_in_range(
+        self,
         unit: SimulationTarget,
         enemies: dict[str, SimulationTarget],
         max_range: float,
     ) -> SimulationTarget | None:
-        """Find the nearest stationary (speed==0) enemy within max_range."""
+        """Find the nearest stationary (speed==0) enemy within max_range.
+
+        Uses SpatialGrid when available for O(k) lookup instead of O(n).
+        """
         best = None
         best_dist = float("inf")
-        for enemy in enemies.values():
-            if enemy.speed > 0:
-                continue
-            dx = enemy.position[0] - unit.position[0]
-            dy = enemy.position[1] - unit.position[1]
-            dist = math.hypot(dx, dy)
-            if dist <= max_range and dist < best_dist:
-                best_dist = dist
-                best = enemy
+
+        if self._spatial_grid is not None:
+            candidates = self._spatial_grid.query_radius(unit.position, max_range)
+            for candidate in candidates:
+                if candidate.target_id not in enemies:
+                    continue
+                if candidate.speed > 0:
+                    continue
+                dx = candidate.position[0] - unit.position[0]
+                dy = candidate.position[1] - unit.position[1]
+                dist = dx * dx + dy * dy
+                if dist < best_dist:
+                    best_dist = dist
+                    best = candidate
+        else:
+            mr2 = max_range * max_range
+            for enemy in enemies.values():
+                if enemy.speed > 0:
+                    continue
+                dx = enemy.position[0] - unit.position[0]
+                dy = enemy.position[1] - unit.position[1]
+                dist = dx * dx + dy * dy
+                if dist <= mr2 and dist < best_dist:
+                    best_dist = dist
+                    best = enemy
         return best
 
     # -- Group rush -------------------------------------------------------------
 
     def _detect_group_rush(self, hostiles: dict[str, SimulationTarget]) -> None:
-        """Detect groups of 3+ hostiles within GROUP_RUSH_RADIUS and boost them."""
-        hostile_list = list(hostiles.values())
+        """Detect groups of 3+ hostiles within GROUP_RUSH_RADIUS and boost them.
+
+        Uses SpatialGrid when available for O(n*k) instead of O(n^2).
+        """
         new_rush_ids: set[str] = set()
 
-        for i, h in enumerate(hostile_list):
-            nearby_count = 0
-            for j, other in enumerate(hostile_list):
-                if i == j:
-                    continue
-                dx = h.position[0] - other.position[0]
-                dy = h.position[1] - other.position[1]
-                if math.hypot(dx, dy) <= _GROUP_RUSH_RADIUS:
-                    nearby_count += 1
-            if nearby_count >= _GROUP_RUSH_MIN_COUNT - 1:  # -1 because we count others
-                new_rush_ids.add(h.target_id)
+        if self._spatial_grid is not None:
+            # Grid-accelerated: query radius around each hostile
+            for h in hostiles.values():
+                nearby = self._spatial_grid.query_radius(h.position, _GROUP_RUSH_RADIUS)
+                # Count only hostiles (exclude self and non-hostiles)
+                nearby_count = sum(
+                    1 for n in nearby
+                    if n.target_id != h.target_id and n.target_id in hostiles
+                )
+                if nearby_count >= _GROUP_RUSH_MIN_COUNT - 1:
+                    new_rush_ids.add(h.target_id)
+        else:
+            # Brute-force fallback
+            hostile_list = list(hostiles.values())
+            r2 = _GROUP_RUSH_RADIUS * _GROUP_RUSH_RADIUS
+            for i, h in enumerate(hostile_list):
+                nearby_count = 0
+                for j, other in enumerate(hostile_list):
+                    if i == j:
+                        continue
+                    dx = h.position[0] - other.position[0]
+                    dy = h.position[1] - other.position[1]
+                    if dx * dx + dy * dy <= r2:
+                        nearby_count += 1
+                if nearby_count >= _GROUP_RUSH_MIN_COUNT - 1:
+                    new_rush_ids.add(h.target_id)
 
         # Apply speed boost to newly rushing hostiles
         for tid in new_rush_ids:
@@ -450,21 +515,40 @@ class UnitBehaviors:
 
     # -- Helpers ----------------------------------------------------------------
 
-    @staticmethod
     def _nearest_in_range(
+        self,
         unit: SimulationTarget,
         enemies: dict[str, SimulationTarget],
     ) -> SimulationTarget | None:
-        """Find the nearest enemy within weapon_range."""
+        """Find the nearest enemy within weapon_range.
+
+        Uses SpatialGrid when available for O(k) lookup instead of O(n).
+        """
         best: SimulationTarget | None = None
         best_dist = float("inf")
-        for enemy in enemies.values():
-            dx = enemy.position[0] - unit.position[0]
-            dy = enemy.position[1] - unit.position[1]
-            dist = math.hypot(dx, dy)
-            if dist <= unit.weapon_range and dist < best_dist:
-                best_dist = dist
-                best = enemy
+
+        if self._spatial_grid is not None:
+            # Grid-accelerated: only check targets in weapon_range radius
+            candidates = self._spatial_grid.query_radius(unit.position, unit.weapon_range)
+            for candidate in candidates:
+                if candidate.target_id not in enemies:
+                    continue
+                dx = candidate.position[0] - unit.position[0]
+                dy = candidate.position[1] - unit.position[1]
+                dist = dx * dx + dy * dy
+                if dist < best_dist:
+                    best_dist = dist
+                    best = candidate
+        else:
+            # Brute-force fallback
+            wr2 = unit.weapon_range * unit.weapon_range
+            for enemy in enemies.values():
+                dx = enemy.position[0] - unit.position[0]
+                dy = enemy.position[1] - unit.position[1]
+                dist = dx * dx + dy * dy
+                if dist <= wr2 and dist < best_dist:
+                    best_dist = dist
+                    best = enemy
         return best
 
     def clear_dodge_state(self) -> None:

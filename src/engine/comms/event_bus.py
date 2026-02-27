@@ -25,7 +25,7 @@ class EventBus:
         The optional ``_filter`` parameter is accepted for API compatibility
         but is currently ignored — the caller must filter events itself.
         """
-        q: queue.Queue = queue.Queue(maxsize=100)
+        q: queue.Queue = queue.Queue(maxsize=1000)
         with self._lock:
             self._subscribers.append(q)
         return q
