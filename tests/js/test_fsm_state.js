@@ -143,7 +143,7 @@ assert(mapSrc.includes("const badgeText = fsm || status"), 'map.js badge prefers
 console.log('\n--- Websocket fsm_state passthrough ---');
 
 const wsSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/websocket.js', 'utf8');
-assert(wsSrc.includes('fsm_state: t.fsm_state'), 'websocket.js passes fsm_state from telemetry');
+assert(wsSrc.includes('fsm_state = t.fsm_state'), 'websocket.js passes fsm_state from telemetry');
 
 // ============================================================
 // Test: CSS has unit-fsm-badge style
