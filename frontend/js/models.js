@@ -715,12 +715,14 @@ function createNameLabel(text, color) {
         transparent: true,
         depthTest: false,
         depthWrite: false,
+        sizeAttenuation: false,
     });
     const sprite = new THREE.Sprite(spriteMat);
 
-    // Scale the sprite to be readable
+    // sizeAttenuation: false means scale is in NDC (fraction of viewport)
+    // Aspect-correct so text isn't stretched. 8% screen height = readable at any zoom
     const aspect = canvas.width / canvas.height;
-    sprite.scale.set(aspect * 0.8, 0.8, 1);
+    sprite.scale.set(aspect * 0.08, 0.08, 1);
 
     sprite.userData.isNameLabel = true;
     return sprite;

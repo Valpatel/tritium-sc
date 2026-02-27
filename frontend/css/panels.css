@@ -380,6 +380,17 @@
     flex-shrink: 0;
 }
 
+.unit-fsm-badge {
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 1px 4px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-3);
+    flex-shrink: 0;
+}
+
 /* Filter dropdown */
 .panel-filter {
     width: 100%;
@@ -907,6 +918,7 @@
 
 .mesh-radio-input {
     flex: 1;
+    min-width: 0;
     font-family: var(--font-mono);
     font-size: 0.6rem;
     color: var(--text-primary);
@@ -922,7 +934,8 @@
 }
 
 .mesh-radio-port-input {
-    width: 60px;
+    width: 80px;
+    flex-shrink: 0;
     font-family: var(--font-mono);
     font-size: 0.6rem;
     color: var(--text-primary);
@@ -931,6 +944,13 @@
     border-radius: var(--radius-sm);
     padding: 4px 6px;
     outline: none;
+    -moz-appearance: textfield;
+}
+
+.mesh-radio-port-input::-webkit-inner-spin-button,
+.mesh-radio-port-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
 
 .mesh-radio-port-input:focus {

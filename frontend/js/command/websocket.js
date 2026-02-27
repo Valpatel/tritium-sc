@@ -122,11 +122,22 @@ export class WebSocketManager {
         // Extended combat telemetry fields
         if (t.kills !== undefined) update.kills = t.kills;
         if (t.morale !== undefined) update.morale = t.morale;
-        if (t.fsm_state !== undefined) update.fsmState = t.fsm_state;
+        if (t.fsm_state !== undefined) { update.fsmState = t.fsm_state; update.fsm_state = t.fsm_state; }
         if (t.degradation !== undefined) update.degradation = t.degradation;
         if (t.weapon_range !== undefined) update.weaponRange = t.weapon_range;
         if (t.is_combatant !== undefined) update.isCombatant = t.is_combatant;
         TritiumStore.updateUnit(t.target_id, update);
+
+        // Clean up terminal-state units after a delay so effects/animations complete.
+        // Without this, eliminated/destroyed/despawned units accumulate forever in the
+        // store, causing a memory leak (100+ dead units after 10 waves).
+        const TERMINAL_STATES = ['eliminated', 'destroyed', 'despawned'];
+        if (TERMINAL_STATES.includes(update.status)) {
+            const id = t.target_id;
+            // Schedule removal — 5s for eliminated (kill effects), 2s for others
+            const delay = update.status === 'eliminated' ? 5000 : 2000;
+            setTimeout(() => TritiumStore.removeUnit(id), delay);
+        }
     }
 
     _scheduleReconnect() {

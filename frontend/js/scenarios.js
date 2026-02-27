@@ -624,7 +624,7 @@ function appendTimelineAction(a) {
     if (countEl) countEl.textContent = scenarioState._actionCount + ' actions';
 
     const catClass = 'scenarios-cat-' + (a.category || 'event');
-    const time = a.timestamp !== undefined ? a.timestamp.toFixed(1) + 's' : '--';
+    const time = (a.timestamp != null && typeof a.timestamp === 'number') ? a.timestamp.toFixed(1) + 's' : '--';
     const text = a.text || '';
 
     const row = document.createElement('div');
@@ -654,7 +654,7 @@ function renderTimeline(actions) {
 
     el.innerHTML = actions.map(a => {
         const catClass = 'scenarios-cat-' + (a.category || 'event');
-        const time = a.timestamp !== undefined ? a.timestamp.toFixed(1) + 's' : '--';
+        const time = (a.timestamp != null && typeof a.timestamp === 'number') ? a.timestamp.toFixed(1) + 's' : '--';
         const text = a.text || '';
         return `
             <div class="scenarios-action ${catClass}">
@@ -769,6 +769,7 @@ function renderBehavioral(profile) {
         </div>
     `;
     container.appendChild(panel);
+}
 
 async function pollRunStatus(runId) {
     const poll = async () => {

@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
     <link rel="stylesheet" href="/static/css/cybercore-v2.css">
     <link rel="stylesheet" href="/static/css/command.css">
     <link rel="stylesheet" href="/static/css/panels.css">
@@ -272,6 +273,7 @@
     <!-- ================================================================== -->
     <!-- Three.js + 3D models (loaded before module entry for global access) -->
     <!-- ================================================================== -->
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="/static/js/models.js"></script>
 
@@ -283,6 +285,11 @@
     <script src="/static/js/war-hud.js"></script>
     <script src="/static/js/war-audio.js"></script>
     <script src="/static/js/war-events.js"></script>
+
+    <!-- ================================================================== -->
+    <!-- Mesh radio overlay (global, loaded before module entry)            -->
+    <!-- ================================================================== -->
+    <script src="/static/js/command/mesh-layer.js"></script>
 
     <!-- ================================================================== -->
     <!-- Entry point: ES6 module                                            -->

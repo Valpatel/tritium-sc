@@ -22,6 +22,27 @@ const ALLIANCE_COLORS = {
 const TYPE_ICONS = {
     rover: 'R', drone: 'D', turret: 'T', person: 'P',
     hostile_kid: 'H', camera: 'C', sensor: 'S',
+    tank: 'K', apc: 'A', scout_drone: 'D',
+    hostile_vehicle: 'V', hostile_leader: 'L', vehicle: 'V',
+    heavy_turret: 'T', missile_turret: 'T',
+};
+
+const FSM_STATE_COLORS = {
+    idle: '#888888',
+    scanning: '#4a9eff',
+    tracking: '#00f0ff',
+    engaging: '#ff2a6d',
+    cooldown: '#668899',
+    patrolling: '#05ffa1',
+    pursuing: '#ff8800',
+    retreating: '#fcee0a',
+    rtb: '#4a8866',
+    scouting: '#88ddaa',
+    orbiting: '#66ccee',
+    spawning: '#cccccc',
+    advancing: '#22dd66',
+    flanking: '#ff6633',
+    fleeing: '#ffff00',
 };
 
 export const UnitsPanelDef = {
@@ -84,9 +105,12 @@ export const UnitsPanelDef = {
                     ? `${Math.round(u.health)}/${u.maxHealth}`
                     : '';
                 const active = u.id === selectedId ? ' active' : '';
+                const fsm = u.fsmState || '';
+                const fsmBadge = fsm ? `<span class="unit-fsm-badge" style="color:${FSM_STATE_COLORS[fsm] || '#888'}">${fsm.toUpperCase()}</span>` : '';
                 return `<li class="panel-list-item${active}" data-unit-id="${_esc(u.id)}" role="option">
                     <span class="panel-icon-badge" style="color:${color};border-color:${color}">${icon}</span>
                     <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(u.name || u.id)}</span>
+                    ${fsmBadge}
                     <span class="panel-stat-value" style="font-size:0.5rem">${hp}</span>
                 </li>`;
             }).join('');
@@ -122,6 +146,9 @@ export const UnitsPanelDef = {
             const hpColor = hpPct > 60 ? 'var(--green)' : hpPct > 25 ? 'var(--amber)' : 'var(--magenta)';
             const batPct = u.battery !== undefined ? Math.round(u.battery) : null;
 
+            const fsmState = u.fsmState || '';
+            const fsmColor = FSM_STATE_COLORS[fsmState] || '#888';
+
             detailEl.style.display = '';
             detailEl.innerHTML = `
                 <div class="panel-section-label" style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px">
@@ -136,6 +163,11 @@ export const UnitsPanelDef = {
                     <span class="panel-stat-label">ALLIANCE</span>
                     <span class="panel-stat-value" style="color:${color}">${alliance.toUpperCase()}</span>
                 </div>
+                ${fsmState ? `
+                <div class="panel-stat-row">
+                    <span class="panel-stat-label">FSM</span>
+                    <span class="panel-stat-value" style="color:${fsmColor}">${fsmState.toUpperCase()}</span>
+                </div>` : ''}
                 ${u.maxHealth ? `
                 <div class="panel-stat-row">
                     <span class="panel-stat-label">HEALTH</span>
@@ -148,6 +180,26 @@ export const UnitsPanelDef = {
                 <div class="panel-stat-row">
                     <span class="panel-stat-label">BATTERY</span>
                     <span class="panel-stat-value">${batPct}%</span>
+                </div>` : ''}
+                ${u.morale !== undefined ? `
+                <div class="panel-stat-row">
+                    <span class="panel-stat-label">MORALE</span>
+                    <span class="panel-stat-value" style="color:${u.morale > 0.6 ? 'var(--green)' : u.morale > 0.3 ? 'var(--amber)' : 'var(--magenta)'}">${Math.round(u.morale * 100)}%</span>
+                </div>` : ''}
+                ${u.degradation !== undefined && u.degradation > 0 ? `
+                <div class="panel-stat-row">
+                    <span class="panel-stat-label">DEGRADATION</span>
+                    <span class="panel-stat-value" style="color:var(--amber)">${Math.round(u.degradation * 100)}%</span>
+                </div>` : ''}
+                ${u.weaponRange !== undefined && u.weaponRange > 0 ? `
+                <div class="panel-stat-row">
+                    <span class="panel-stat-label">WEAPON RANGE</span>
+                    <span class="panel-stat-value">${Math.round(u.weaponRange)}m</span>
+                </div>` : ''}
+                ${u.kills !== undefined && u.kills > 0 ? `
+                <div class="panel-stat-row">
+                    <span class="panel-stat-label">KILLS</span>
+                    <span class="panel-stat-value" style="color:var(--magenta)">${u.kills}</span>
                 </div>` : ''}
                 <div class="panel-stat-row">
                     <span class="panel-stat-label">HEADING</span>
