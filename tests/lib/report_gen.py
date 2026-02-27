@@ -22,6 +22,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from engine.inference.fleet import OllamaFleet
 from tests.lib.results_db import ResultsDB
 
 
@@ -774,8 +775,21 @@ class ReportGenerator:
         if fleet is not None:
             exec_summary = self._generate_summary(fleet, summary, all_results)
 
+        # LLM failure analysis
+        failed_results = [r for r in all_results if not r.get("passed")]
+        analysis_data: dict[str, Any] = {}
+        screenshot_annotations: dict[str, str] = {}
+        if failed_results:
+            analysis_data = self._analyze_failures(failed_results, fleet=fleet)
+            failed_names = {r["test_name"] for r in failed_results}
+            screenshot_annotations = self._analyze_screenshots(
+                screenshots, failed_names, fleet=fleet,
+            )
+
         html_content = self._render(
             summary, all_results, failures, screenshots, trend, exec_summary,
+            analysis_data=analysis_data,
+            screenshot_annotations=screenshot_annotations,
         )
 
         filename = (
@@ -888,6 +902,149 @@ class ReportGenerator:
         return results
 
     # -------------------------------------------------------------------
+    # LLM Analysis
+    # -------------------------------------------------------------------
+
+    def _analyze_failures(
+        self, failed_results: list[dict], fleet: Any = None,
+    ) -> dict[str, Any]:
+        """Cluster failures by error message similarity and optionally get LLM analysis.
+
+        Groups failures by first 50 characters of their error message. For each
+        cluster: count, representative error, affected test files.
+
+        Args:
+            failed_results: List of failed test result dicts.
+            fleet: Optional OllamaFleet for LLM root cause analysis.
+
+        Returns:
+            Dict with 'clusters' list and optional 'llm_analysis' string.
+        """
+        if not failed_results:
+            return {"clusters": [], "llm_analysis": ""}
+
+        # Extract error strings from details
+        prefix_groups: dict[str, list[dict]] = {}
+        for r in failed_results:
+            details = r.get("details", {})
+            if isinstance(details, str):
+                try:
+                    details = json.loads(details)
+                except (json.JSONDecodeError, TypeError):
+                    details = {}
+            error_msg = ""
+            if isinstance(details, dict):
+                error_msg = str(details.get("error", ""))
+            if not error_msg:
+                # Fall back to details_json
+                dj = r.get("details_json", "")
+                if dj:
+                    try:
+                        d = json.loads(dj)
+                        error_msg = str(d.get("error", ""))
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+            if not error_msg:
+                error_msg = "Unknown error"
+
+            prefix = error_msg[:50]
+            prefix_groups.setdefault(prefix, []).append({
+                "test_name": r.get("test_name", "unknown"),
+                "error": error_msg,
+            })
+
+        clusters = []
+        for prefix, items in prefix_groups.items():
+            clusters.append({
+                "count": len(items),
+                "representative": items[0]["error"],
+                "test_files": [i["test_name"] for i in items],
+            })
+
+        # Sort by count descending
+        clusters.sort(key=lambda c: c["count"], reverse=True)
+
+        result: dict[str, Any] = {"clusters": clusters}
+
+        # LLM analysis if fleet available
+        if fleet is not None:
+            cluster_summary = "\n".join(
+                f"- {c['count']}x: {c['representative'][:100]}"
+                for c in clusters
+            )
+            prompt = (
+                "Given these test failure clusters, identify root causes and "
+                "suggest fixes:\n\n"
+                f"{cluster_summary}\n\n"
+                "Be concise. Focus on actionable root causes."
+            )
+            try:
+                llm_text = fleet.generate(model="qwen2.5:7b", prompt=prompt, timeout=30)
+                if llm_text:
+                    result["llm_analysis"] = llm_text
+                else:
+                    result["llm_analysis"] = "LLM analysis unavailable"
+            except Exception:
+                result["llm_analysis"] = "LLM analysis unavailable"
+        else:
+            result["llm_analysis"] = ""
+
+        return result
+
+    def _analyze_screenshots(
+        self,
+        screenshots: list[dict],
+        failed_test_names: set[str],
+        fleet: Any = None,
+    ) -> dict[str, str]:
+        """Analyze screenshots from failed tests using vision LLM.
+
+        Only screenshots associated with failed tests are analyzed.
+
+        Args:
+            screenshots: All screenshots from the run.
+            failed_test_names: Set of test names that failed.
+            fleet: Optional OllamaFleet with vision model (llava:7b).
+
+        Returns:
+            Dict mapping test_name to LLM description of screenshot issues.
+        """
+        if fleet is None:
+            return {}
+
+        annotations: dict[str, str] = {}
+        for shot in screenshots:
+            test_name = shot.get("test_name", "")
+            if test_name not in failed_test_names:
+                continue
+
+            image_path = shot.get("image_path", "")
+            if not image_path or not os.path.isfile(image_path):
+                continue
+
+            try:
+                with open(image_path, "rb") as f:
+                    import base64 as b64mod
+                    img_b64 = b64mod.b64encode(f.read()).decode()
+
+                prompt = (
+                    f"This is a screenshot from a failed test '{test_name}'. "
+                    "Describe what looks wrong or broken in 1-2 sentences."
+                )
+                result = fleet.chat(
+                    model="llava:7b",
+                    prompt=prompt,
+                    images=[img_b64],
+                    timeout=30,
+                )
+                if result:
+                    annotations[test_name] = result
+            except Exception:
+                continue
+
+        return annotations
+
+    # -------------------------------------------------------------------
     # Rendering
     # -------------------------------------------------------------------
 
@@ -899,6 +1056,8 @@ class ReportGenerator:
         screenshots: list[dict],
         trend: list[dict],
         exec_summary: str,
+        analysis_data: dict[str, Any] | None = None,
+        screenshot_annotations: dict[str, str] | None = None,
     ) -> str:
         """Render the full interactive HTML report."""
         suite = html.escape(summary["suite"]).upper()
@@ -923,8 +1082,15 @@ class ReportGenerator:
         has_overlap = bool(overlap_data.get("overlap_pairs") is not None
                           or overlap_data.get("coverage"))
 
+        # Detect analysis data
+        has_analysis = bool(
+            analysis_data and analysis_data.get("clusters")
+        )
+
         # Determine which tabs to show
         tabs = [("results", "Results"), ("screenshots", "Screenshots")]
+        if has_analysis:
+            tabs.append(("analysis", "Analysis"))
         if has_overlap:
             tabs.append(("overlap", "Overlap"))
         if has_game_loop:
@@ -1005,6 +1171,14 @@ class ReportGenerator:
         parts.append(f'<div id="tab-screenshots" class="tab-content{active_cls}">')
         parts.append(self._render_screenshots(screenshots))
         parts.append("</div>")
+
+        # Tab: Analysis
+        if has_analysis:
+            parts.append('<div id="tab-analysis" class="tab-content">')
+            parts.append(
+                self._render_analysis(analysis_data or {}, screenshot_annotations or {})
+            )
+            parts.append("</div>")
 
         # Tab: Overlap Diagnostic
         if has_overlap:
@@ -1158,6 +1332,68 @@ class ReportGenerator:
 
         parts.append("</div>")
         parts.append("</div>")
+        return "\n".join(parts)
+
+    def _render_analysis(
+        self, analysis_data: dict, screenshot_annotations: dict[str, str],
+    ) -> str:
+        """Render the Analysis tab with failure clusters and LLM insights."""
+        parts = ['<div class="section-title">Failure Clusters</div>']
+
+        clusters = analysis_data.get("clusters", [])
+        if clusters:
+            for cluster in clusters:
+                count = cluster.get("count", 0)
+                rep = html.escape(cluster.get("representative", "")[:200])
+                test_files = cluster.get("test_files", [])
+                files_str = html.escape(", ".join(test_files[:5]))
+                if len(test_files) > 5:
+                    files_str += f" (+{len(test_files) - 5} more)"
+
+                parts.append(
+                    f'<div class="overlap-finding bad">'
+                    f'<span class="of-label">'
+                    f'<strong>{count}x</strong> {rep}'
+                    f'<br><span style="font-size:11px;color:var(--text-dim);">'
+                    f'{files_str}</span>'
+                    f'</span>'
+                    f'</div>'
+                )
+        else:
+            parts.append(
+                '<div class="overlap-finding ok">'
+                '<span class="of-label">No failure clusters</span>'
+                '<span class="of-value ok">CLEAR</span>'
+                '</div>'
+            )
+
+        # LLM root cause analysis
+        llm_text = analysis_data.get("llm_analysis", "")
+        if llm_text:
+            parts.append(
+                '<div class="section-title" style="margin-top:20px;">'
+                'LLM Root Cause Analysis</div>'
+            )
+            parts.append(
+                f'<div class="exec-summary">{html.escape(llm_text)}</div>'
+            )
+
+        # Screenshot annotations
+        if screenshot_annotations:
+            parts.append(
+                '<div class="section-title" style="margin-top:20px;">'
+                'Screenshot Analysis</div>'
+            )
+            for test_name, annotation in screenshot_annotations.items():
+                parts.append(
+                    f'<div class="overlap-finding bad">'
+                    f'<span class="of-label">'
+                    f'<strong>{html.escape(test_name)}</strong>'
+                    f'<br>{html.escape(annotation)}'
+                    f'</span>'
+                    f'</div>'
+                )
+
         return "\n".join(parts)
 
     def _render_game_loop(
@@ -1817,7 +2053,10 @@ class ReportGenerator:
             result = fleet.generate(
                 model="qwen2.5:7b", prompt=prompt, timeout=30,
             )
-            return result.get("response", "")
+            # generate() returns a string directly
+            if isinstance(result, dict):
+                return result.get("response", "")
+            return str(result) if result else ""
         except Exception:
             return ""
 
@@ -1836,12 +2075,19 @@ def _cli():
                         help="Output directory for reports")
     parser.add_argument("--json", action="store_true",
                         help="Also export JSON metrics")
+    parser.add_argument("--fleet", action="store_true",
+                        help="Enable LLM analysis via OllamaFleet")
     parser.add_argument("--serve", action="store_true",
                         help="Open report in browser after generation")
     args = parser.parse_args()
 
     db = ResultsDB(db_path=args.db)
     gen = ReportGenerator(db, output_dir=args.output_dir)
+
+    fleet = None
+    if args.fleet:
+        fleet = OllamaFleet(auto_discover=True)
+        print(fleet.status())
 
     run_id = args.run_id
     if args.latest or run_id is None:
@@ -1851,7 +2097,7 @@ def _cli():
             sys.exit(1)
         run_id = trend[-1]["id"]
 
-    path = gen.generate(run_id)
+    path = gen.generate(run_id, fleet=fleet)
     print(f"Report generated: {path}")
 
     if args.json:
