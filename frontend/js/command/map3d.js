@@ -58,11 +58,14 @@ const ALLIANCE_HEX = {
 };
 
 // Dynamic satellite tile zoom levels: [maxCamZoom, tileZoom, radiusMeters]
+// camZoom = orthographic frustum half-size in meters (5=close, 500=far)
 const SAT_TILE_LEVELS = [
-    [15,   15, 1000],
-    [50,   17,  400],
-    [150,  19,  200],
-    [Infinity, 19, 200],
+    [10,   20,  200],   // extreme close-up: max detail (~0.15m/px)
+    [20,   19,  300],   // close-up: very high detail (~0.3m/px)
+    [60,   18,  600],   // neighborhood
+    [150,  17, 1200],   // district
+    [300,  16, 2500],   // city block
+    [Infinity, 15, 5000], // wide area
 ];
 
 // ============================================================
@@ -97,6 +100,7 @@ const _state = {
 
     // Mouse state
     lastMouse: { x: 0, y: 0 },
+    mouseOverCanvas: false,
     isPanning: false,
     panStart: null,
     hoveredUnit: null,
@@ -165,6 +169,19 @@ const _state = {
 // Utility
 // ============================================================
 
+function _updateLayerHud() {
+    if (!_state.layerHud) return;
+    const layers = [];
+    if (_state.showSatellite) layers.push('SAT');
+    if (_state.buildingGroup?.visible) layers.push('BLDG');
+    if (_state.showRoads) layers.push('ROADS');
+    if (_state.showGrid !== false && _state.gridHelper?.visible) layers.push('GRID');
+    if (_state.showUnits !== false) layers.push('UNITS');
+    const tilt = _state.cam?.tiltTarget > 70 ? '2D' : '3D';
+    const zoom = _state.cam?.zoom ? Math.round(_state.cam.zoom) : '?';
+    _state.layerHud.textContent = `${tilt} z${zoom} | ${layers.join(' + ') || 'ALL OFF'}`;
+}
+
 function fadeToward(current, target, speed, dt) {
     const t = 1 - Math.exp(-speed * dt);
     return current + (target - current) * t;
@@ -206,7 +223,7 @@ export function initMap() {
     // Scene
     _state.scene = new THREE.Scene();
     _state.scene.background = new THREE.Color(BG_COLOR);
-    _state.scene.fog = new THREE.FogExp2(BG_COLOR, 0.002);
+    _state.scene.fog = new THREE.FogExp2(BG_COLOR, 0.0008);
 
     // Orthographic camera (RTS view)
     const aspect = _state.container.clientWidth / Math.max(1, _state.container.clientHeight);
@@ -239,6 +256,22 @@ export function initMap() {
     const canvas2d = document.getElementById('tactical-canvas');
     if (canvas2d) canvas2d.style.display = 'none';
     _state.container.prepend(_state.renderer.domElement);
+
+    // Layer status HUD overlay (top-center of map)
+    _state.layerHud = document.createElement('div');
+    _state.layerHud.id = 'map-layer-hud';
+    _state.layerHud.style.cssText = [
+        'position:absolute; top:8px; left:50%; transform:translateX(-50%);',
+        'z-index:10; pointer-events:none;',
+        'font-family:"JetBrains Mono",monospace; font-size:11px;',
+        'color:#00f0ff; background:rgba(6,6,9,0.75);',
+        'padding:4px 12px; border-radius:3px;',
+        'border:1px solid rgba(0,240,255,0.2);',
+        'text-transform:uppercase; letter-spacing:1px;',
+        'white-space:nowrap;',
+    ].join('');
+    _state.container.appendChild(_state.layerHud);
+    _updateLayerHud();
 
     // Raycaster
     _state.raycaster = new THREE.Raycaster();
@@ -291,10 +324,9 @@ export function initMap() {
         TritiumStore.on('map.selectedUnitId', _onSelectedUnitChanged),
     );
 
-    // Load geo reference + satellite tiles
+    // Load geo reference + satellite tiles (overlay loaded after geo reference)
     _loadGeoReference();
     _fetchZones();
-    _loadOverlayData();
 
     // Start render loop
     _state.lastFrameTime = performance.now();
@@ -387,18 +419,20 @@ function _updateCamera(dt) {
         c.tiltAngle = fadeToward(c.tiltAngle, c.tiltTarget, CAM_LERP * 0.6, dt);
     }
 
-    // Edge scrolling
-    if (!_state.isPanning) {
+    // Edge scrolling — only when mouse is inside the canvas and recently moved
+    if (!_state.isPanning && _state.mouseOverCanvas) {
         const rect = _state.renderer.domElement.getBoundingClientRect();
-        const mx = _state.lastMouse.clientX || 0;
-        const my = _state.lastMouse.clientY || 0;
-        const t = EDGE_SCROLL_THRESHOLD;
-        const speed = EDGE_SCROLL_SPEED * dt;
+        const mx = _state.lastMouse.clientX;
+        const my = _state.lastMouse.clientY;
+        if (mx !== undefined && my !== undefined) {
+            const t = EDGE_SCROLL_THRESHOLD;
+            const speed = EDGE_SCROLL_SPEED * dt;
 
-        if (mx < rect.left + t && mx >= rect.left) c.targetX -= speed;
-        if (mx > rect.right - t && mx <= rect.right) c.targetX += speed;
-        if (my < rect.top + t && my >= rect.top) c.targetY += speed;
-        if (my > rect.bottom - t && my <= rect.bottom) c.targetY -= speed;
+            if (mx < rect.left + t && mx >= rect.left) c.targetX -= speed;
+            if (mx > rect.right - t && mx <= rect.right) c.targetX += speed;
+            if (my < rect.top + t && my >= rect.top) c.targetY += speed;
+            if (my > rect.bottom - t && my <= rect.bottom) c.targetY -= speed;
+        }
     }
 
     _positionCamera();
@@ -427,15 +461,13 @@ function _buildGround() {
     // Large ground plane with satellite or dark texture
     const size = 5000;
     const geo = new THREE.PlaneGeometry(size, size, 1, 1);
-    const mat = new THREE.MeshStandardMaterial({
+    const mat = new THREE.MeshBasicMaterial({
         color: BG_COLOR,
-        roughness: 0.95,
-        metalness: 0.0,
+        fog: false,  // Satellite imagery should not dim with distance
     });
     _state.groundMesh = new THREE.Mesh(geo, mat);
     _state.groundMesh.rotation.x = -Math.PI / 2;
     _state.groundMesh.position.y = -0.01;
-    _state.groundMesh.receiveShadow = true;
     _state.scene.add(_state.groundMesh);
 }
 
@@ -524,13 +556,26 @@ function _initMaterials() {
         side: THREE.DoubleSide, depthWrite: false,
     });
 
-    // Building material (dark with subtle emissive for cyberpunk look)
-    _state.materials.building = new THREE.MeshStandardMaterial({
-        color: 0x1a1a2e,
-        roughness: 0.85,
-        metalness: 0.1,
-        emissive: 0x0a0a15,
-        emissiveIntensity: 0.1,
+    // Building wall material — semi-transparent dark blue with edge glow
+    _state.materials.building = new THREE.MeshBasicMaterial({
+        color: 0x0a0a2e,
+        transparent: true,
+        opacity: 0.55,
+        fog: false,
+        side: THREE.DoubleSide,
+    });
+    // Building roof material — slightly lighter, more visible from above
+    _state.materials.buildingRoof = new THREE.MeshBasicMaterial({
+        color: 0x0d1030,
+        transparent: true,
+        opacity: 0.7,
+        fog: false,
+    });
+    // Building outline material — bright cyan edges for cyberpunk look
+    _state.materials.buildingEdge = new THREE.LineBasicMaterial({
+        color: 0x00f0ff,
+        transparent: true,
+        opacity: 0.6,
     });
 
     // Road surface material
@@ -662,20 +707,20 @@ function _createUnitMesh(id, unit) {
 function _createTextSprite(text, alliance) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    canvas.width = 256;
-    canvas.height = 64;
-    ctx.clearRect(0, 0, 256, 64);
+    canvas.width = 512;
+    canvas.height = 128;
+    ctx.clearRect(0, 0, 512, 128);
 
-    ctx.font = `bold 28px ${FONT_FAMILY}`;
+    ctx.font = `bold 48px ${FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    ctx.strokeStyle = 'rgba(0,0,0,0.8)';
-    ctx.lineWidth = 4;
-    ctx.strokeText(text.substring(0, 16), 128, 32);
+    ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+    ctx.lineWidth = 6;
+    ctx.strokeText(text.substring(0, 20), 256, 64);
 
     ctx.fillStyle = ALLIANCE_HEX[alliance] || '#ffffff';
-    ctx.fillText(text.substring(0, 16), 128, 32);
+    ctx.fillText(text.substring(0, 20), 256, 64);
 
     const tex = new THREE.CanvasTexture(canvas);
     tex.minFilter = THREE.LinearFilter;
@@ -684,7 +729,7 @@ function _createTextSprite(text, alliance) {
         map: tex, transparent: true, depthWrite: false, sizeAttenuation: false,
     });
     const sprite = new THREE.Sprite(mat);
-    sprite.scale.set(0.08, 0.02, 1);
+    sprite.scale.set(0.22, 0.055, 1);
     return sprite;
 }
 
@@ -909,6 +954,16 @@ function _updateUnits(dt) {
                 }
             });
         }
+
+        // Adaptive unit scale: body meshes grow when zoomed out so units stay visible
+        // At zoom=30 (default) scale=1; at zoom=200 scale~3; at zoom=500 scale~5
+        // Labels use sizeAttenuation:false so they maintain screen size automatically
+        const zoomScale = Math.max(1, _state.cam.zoom / 30);
+        group.children.forEach(c => {
+            if (c.userData?.isBody || c.userData?.isBattery || c.isMesh) {
+                c.scale.setScalar(zoomScale);
+            }
+        });
 
         // Neutralized visual
         if (unit.status === 'neutralized' || unit.health <= 0) {
@@ -1162,6 +1217,12 @@ function _renderLoop() {
 
     // Update coords display
     _updateCoordsDisplay();
+
+    // Update layer HUD (throttled to 2Hz)
+    if (now - (_state.lastHudUpdate || 0) > 500) {
+        _state.lastHudUpdate = now;
+        _updateLayerHud();
+    }
 }
 
 function _updateFps() {
@@ -1270,11 +1331,19 @@ function _bindEvents() {
     el.addEventListener('wheel', onWheel, { passive: false });
     el.addEventListener('contextmenu', onContextMenu);
 
+    // Track mouse enter/leave for edge scrolling guard
+    const onMouseEnter = () => { _state.mouseOverCanvas = true; };
+    const onMouseLeave = () => { _state.mouseOverCanvas = false; };
+    el.addEventListener('mouseenter', onMouseEnter);
+    el.addEventListener('mouseleave', onMouseLeave);
+
     _state.boundHandlers.set('mousemove', onMouseMove);
     _state.boundHandlers.set('mousedown', onMouseDown);
     _state.boundHandlers.set('mouseup', onMouseUp);
     _state.boundHandlers.set('wheel', onWheel);
     _state.boundHandlers.set('contextmenu', onContextMenu);
+    _state.boundHandlers.set('mouseenter', onMouseEnter);
+    _state.boundHandlers.set('mouseleave', onMouseLeave);
 }
 
 function _selectAtScreen(e) {
@@ -1513,6 +1582,7 @@ function _loadGeoReference() {
             _state.geoCenter = { lat: data.lat, lng: data.lng };
             _state.noLocationSet = false;
             _loadSatelliteTiles(data.lat, data.lng);
+            _loadOverlayData();
         })
         .catch(err => console.warn('[MAP3D] Geo reference fetch failed:', err));
 }
@@ -1560,16 +1630,18 @@ function _checkSatelliteTileReload() {
     const newLevel = _getSatTileLevelIndex();
     if (newLevel === _state.satTileLevel) return;
 
+    // Update level immediately to stop retriggering on every frame
+    _state.satTileLevel = newLevel;
+
+    // Debounce the actual tile fetch (zoom may still be lerping)
     clearTimeout(_state.satReloadTimer);
     _state.satReloadTimer = setTimeout(() => {
         const idx = _getSatTileLevelIndex();
-        if (idx !== _state.satTileLevel) {
-            _state.satTileLevel = idx;
-            const [, tileZoom, radius] = SAT_TILE_LEVELS[idx];
-            console.log(`[MAP3D] Reloading tiles: zoom=${tileZoom}, radius=${radius}m`);
-            _fetchTilesFromApi(_state.geoCenter.lat, _state.geoCenter.lng, radius, tileZoom);
-        }
-    }, 300);
+        _state.satTileLevel = idx;
+        const [, tileZoom, radius] = SAT_TILE_LEVELS[idx];
+        console.log(`[MAP3D] Reloading tiles: zoom=${tileZoom}, radius=${radius}m`);
+        _fetchTilesFromApi(_state.geoCenter.lat, _state.geoCenter.lng, radius, tileZoom);
+    }, 500);
 }
 
 function _loadSatelliteTiles(lat, lng) {
@@ -1591,50 +1663,66 @@ function _fetchTilesFromApi(centerLat, centerLng, radiusMeters, zoom) {
     const tilesNeeded = Math.ceil(radiusMeters / tileSize) + 1;
 
     const tiles = [];
+    const roadTiles = [];
     let loaded = 0;
     let total = 0;
+
+    // Helper: compute tile bounds in game coords
+    function _tileBounds(tx, ty) {
+        const tileLng = tx / n * 360 - 180;
+        const tileLngEnd = (tx + 1) / n * 360 - 180;
+        const tileLat = Math.atan(Math.sinh(Math.PI * (1 - 2 * ty / n))) * 180 / Math.PI;
+        const tileLatEnd = Math.atan(Math.sinh(Math.PI * (1 - 2 * (ty + 1) / n))) * 180 / Math.PI;
+        const R = 6378137;
+        return {
+            minX: (tileLng - centerLng) * Math.PI / 180 * R * Math.cos(latRad),
+            maxX: (tileLngEnd - centerLng) * Math.PI / 180 * R * Math.cos(latRad),
+            minY: (tileLatEnd - centerLat) * Math.PI / 180 * R,
+            maxY: (tileLat - centerLat) * Math.PI / 180 * R,
+        };
+    }
 
     for (let dx = -tilesNeeded; dx <= tilesNeeded; dx++) {
         for (let dy = -tilesNeeded; dy <= tilesNeeded; dy++) {
             const tx = centerTX + dx;
             const ty = centerTY + dy;
             if (ty < 0 || ty >= n) continue;
-            total++;
+            total += 2;  // satellite + road overlay
 
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = () => {
+            const bounds = _tileBounds(tx, ty);
+
+            // Satellite tile
+            const satImg = new Image();
+            satImg.crossOrigin = 'anonymous';
+            satImg.onload = () => {
                 loaded++;
-                // Compute tile bounds in game coords (meters from center)
-                const tileLng = tx / n * 360 - 180;
-                const tileLngEnd = (tx + 1) / n * 360 - 180;
-                const tileLat = Math.atan(Math.sinh(Math.PI * (1 - 2 * ty / n))) * 180 / Math.PI;
-                const tileLatEnd = Math.atan(Math.sinh(Math.PI * (1 - 2 * (ty + 1) / n))) * 180 / Math.PI;
-
-                const R = 6378137;
-                const minX = (tileLng - centerLng) * Math.PI / 180 * R * Math.cos(latRad);
-                const maxX = (tileLngEnd - centerLng) * Math.PI / 180 * R * Math.cos(latRad);
-                const minY = (tileLatEnd - centerLat) * Math.PI / 180 * R;
-                const maxY = (tileLat - centerLat) * Math.PI / 180 * R;
-
-                tiles.push({ image: img, bounds: { minX, maxX, minY, maxY } });
-
-                if (loaded === total) {
-                    _applySatelliteTexture(tiles, centerLat, centerLng, radiusMeters);
-                }
+                tiles.push({ image: satImg, bounds });
+                if (loaded === total) _applySatelliteTexture(tiles, roadTiles, centerLat, centerLng, radiusMeters);
             };
-            img.onerror = () => {
+            satImg.onerror = () => {
                 loaded++;
-                if (loaded === total && tiles.length > 0) {
-                    _applySatelliteTexture(tiles, centerLat, centerLng, radiusMeters);
-                }
+                if (loaded === total && tiles.length > 0) _applySatelliteTexture(tiles, roadTiles, centerLat, centerLng, radiusMeters);
             };
-            img.src = `/api/geo/tile/${zoom}/${tx}/${ty}`;
+            satImg.src = `/api/geo/tile/${zoom}/${tx}/${ty}`;
+
+            // Road overlay tile (transparent PNG, aligned with satellite)
+            const roadImg = new Image();
+            roadImg.crossOrigin = 'anonymous';
+            roadImg.onload = () => {
+                loaded++;
+                roadTiles.push({ image: roadImg, bounds });
+                if (loaded === total) _applySatelliteTexture(tiles, roadTiles, centerLat, centerLng, radiusMeters);
+            };
+            roadImg.onerror = () => {
+                loaded++;
+                if (loaded === total && tiles.length > 0) _applySatelliteTexture(tiles, roadTiles, centerLat, centerLng, radiusMeters);
+            };
+            roadImg.src = `/api/geo/road-tile/${zoom}/${tx}/${ty}`;
         }
     }
 }
 
-function _applySatelliteTexture(tiles, centerLat, centerLng, radiusMeters) {
+function _applySatelliteTexture(tiles, roadOverlayTiles, centerLat, centerLng, radiusMeters) {
     if (tiles.length === 0) return;
 
     // Remove "no location" label if present
@@ -1654,8 +1742,8 @@ function _applySatelliteTexture(tiles, centerLat, centerLng, radiusMeters) {
     const rangeX = bMaxX - bMinX;
     const rangeY = bMaxY - bMinY;
 
-    // Composite all tiles onto a single canvas
-    const canvasSize = 2048;
+    // Composite all tiles onto a single canvas (4096 for sharp satellite detail)
+    const canvasSize = 4096;
     const canvas = document.createElement('canvas');
     canvas.width = canvasSize;
     canvas.height = canvasSize;
@@ -1664,20 +1752,40 @@ function _applySatelliteTexture(tiles, centerLat, centerLng, radiusMeters) {
     ctx.fillStyle = '#060609';
     ctx.fillRect(0, 0, canvasSize, canvasSize);
 
+    // Layer 1: satellite imagery
     for (const t of tiles) {
         const px = ((t.bounds.minX - bMinX) / rangeX) * canvasSize;
-        const py = ((bMaxY - t.bounds.maxY) / rangeY) * canvasSize; // Y inverted
+        const py = ((bMaxY - t.bounds.maxY) / rangeY) * canvasSize;
         const pw = ((t.bounds.maxX - t.bounds.minX) / rangeX) * canvasSize;
         const ph = ((t.bounds.maxY - t.bounds.minY) / rangeY) * canvasSize;
         ctx.drawImage(t.image, px, py, pw, ph);
     }
 
-    // Create or update ground texture
+    // Layer 2: ESRI road overlay (transparent PNGs, pixel-aligned with satellite)
+    if (roadOverlayTiles && roadOverlayTiles.length > 0) {
+        ctx.globalAlpha = 0.7;
+        for (const t of roadOverlayTiles) {
+            const px = ((t.bounds.minX - bMinX) / rangeX) * canvasSize;
+            const py = ((bMaxY - t.bounds.maxY) / rangeY) * canvasSize;
+            const pw = ((t.bounds.maxX - t.bounds.minX) / rangeX) * canvasSize;
+            const ph = ((t.bounds.maxY - t.bounds.minY) / rangeY) * canvasSize;
+            ctx.drawImage(t.image, px, py, pw, ph);
+        }
+        ctx.globalAlpha = 1.0;
+        console.log(`[MAP3D] Road overlay: ${roadOverlayTiles.length} tiles composited`);
+    }
+
+    // Create or update ground texture with high-quality filtering
     const tex = new THREE.CanvasTexture(canvas);
-    tex.minFilter = THREE.LinearFilter;
+    tex.minFilter = THREE.LinearMipMapLinearFilter;
     tex.magFilter = THREE.LinearFilter;
+    tex.generateMipmaps = true;
     tex.wrapS = THREE.ClampToEdgeWrapping;
     tex.wrapT = THREE.ClampToEdgeWrapping;
+    // Anisotropic filtering for sharp texture at oblique angles
+    if (_state.renderer) {
+        tex.anisotropy = _state.renderer.capabilities.getMaxAnisotropy();
+    }
 
     if (_state.satTexture) _state.satTexture.dispose();
     _state.satTexture = tex;
@@ -1724,13 +1832,62 @@ function _fetchZones() {
 async function _loadOverlayData() {
     try {
         const resp = await fetch('/api/geo/overlay');
-        if (!resp.ok) return;
-        _state.overlayData = await resp.json();
-        _buildBuildings();
-        _buildRoads();
+        if (resp.ok) {
+            _state.overlayData = await resp.json();
+        }
     } catch (e) {
-        console.warn('[MAP3D] Overlay data unavailable:', e.message);
+        console.warn('[MAP3D] Overlay fetch failed:', e.message);
     }
+
+    // Always try Microsoft Building Footprints for visual overlay
+    // (satellite-derived, much better alignment than OSM data)
+    if (_state.geoCenter) {
+        const { lat, lng } = _state.geoCenter;
+        // Use same coordinate conversion as satellite tiles for consistency
+        const R = 6378137;  // WGS84 equatorial radius (matches satellite tile conversion)
+        const latRad = lat * Math.PI / 180;
+        const cosFactor = Math.cos(latRad);
+        const convertToLocal = (rawBuildings) => rawBuildings.map(b => ({
+            polygon: b.polygon.map(([plat, plng]) => [
+                (plng - lng) * Math.PI / 180 * R * cosFactor,
+                (plat - lat) * Math.PI / 180 * R,
+            ]),
+            height: b.tags?.height ? parseFloat(b.tags.height) || 8 : 8,
+        }));
+
+        // Try Microsoft satellite-derived footprints first
+        try {
+            const resp = await fetch(`/api/geo/msft-buildings?lat=${lat}&lng=${lng}&radius=500`);
+            if (resp.ok) {
+                const rawBuildings = await resp.json();
+                if (rawBuildings.length > 0) {
+                    _state.overlayData = _state.overlayData || {};
+                    _state.overlayData.buildings = convertToLocal(rawBuildings);
+                    console.log(`[MAP3D] Fetched ${rawBuildings.length} Microsoft buildings (satellite-aligned)`);
+                }
+            }
+        } catch (e) {
+            console.warn('[MAP3D] Microsoft buildings fetch failed:', e.message);
+        }
+
+        // Fallback to OSM Overpass if Microsoft didn't return results
+        if (!_state.overlayData?.buildings?.length) {
+            try {
+                const resp = await fetch(`/api/geo/buildings?lat=${lat}&lng=${lng}&radius=500`);
+                if (resp.ok) {
+                    const rawBuildings = await resp.json();
+                    _state.overlayData = _state.overlayData || {};
+                    _state.overlayData.buildings = convertToLocal(rawBuildings);
+                    console.log(`[MAP3D] Fetched ${rawBuildings.length} buildings from OSM (fallback)`);
+                }
+            } catch (e) {
+                console.warn('[MAP3D] OSM buildings fallback failed:', e.message);
+            }
+        }
+    }
+
+    _buildBuildings();
+    _buildRoads();
 }
 
 function _buildBuildings() {
@@ -1741,36 +1898,75 @@ function _buildBuildings() {
     group.name = 'buildings';
 
     for (const bldg of buildings) {
-        const height = bldg.height || 8;
         const poly = bldg.polygon;
         if (!poly || poly.length < 3) continue;
 
-        // Build a THREE.Shape from polygon points (game coords)
+        // Building height: use tag data if available, else default 8m
+        const height = bldg.height || 8;
+
+        // Create 2D shape from polygon (game coordinates)
         const shape = new THREE.Shape();
         for (let i = 0; i < poly.length; i++) {
             const [gx, gy] = poly[i];
-            // Shape is built in XY plane; we'll rotate to XZ after extrude
             if (i === 0) shape.moveTo(gx, gy);
             else shape.lineTo(gx, gy);
         }
         shape.closePath();
 
-        const extrudeSettings = { depth: height, bevelEnabled: false };
-        const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+        // Extrude into 3D building
+        const extrudeSettings = {
+            depth: height,
+            bevelEnabled: false,
+        };
+        const extGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
 
-        const mesh = new THREE.Mesh(geo, _state.materials.building);
-        // ExtrudeGeometry builds in XY with depth along +Z.
-        // Rotate so Y=up, X=east, Z=-north (matching Three.js scene).
-        mesh.rotation.x = -Math.PI / 2;
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
+        // ExtrudeGeometry creates shape in XY, extrudes along Z.
+        // We need: shape in XZ (ground), extrude along Y (up).
+        // Rotate -90deg around X to put XY→XZ, then Z extrusion becomes Y.
+        const wallMesh = new THREE.Mesh(extGeo, _state.materials.building);
+        wallMesh.rotation.x = -Math.PI / 2;
+        wallMesh.position.y = 0;
+        group.add(wallMesh);
 
-        group.add(mesh);
+        // Roof cap (flat on top) — use ShapeGeometry for clean top
+        const roofGeo = new THREE.ShapeGeometry(shape);
+        const roofMesh = new THREE.Mesh(roofGeo, _state.materials.buildingRoof);
+        roofMesh.rotation.x = -Math.PI / 2;
+        roofMesh.position.y = height;
+        group.add(roofMesh);
+
+        // Cyan edge outlines at ground level and roofline
+        const outlineGround = [];
+        const outlineRoof = [];
+        for (const [gx, gy] of poly) {
+            const tp = gameToThree(gx, gy);
+            outlineGround.push(new THREE.Vector3(tp.x, 0.15, tp.z));
+            outlineRoof.push(new THREE.Vector3(tp.x, height, tp.z));
+        }
+        if (outlineGround.length > 0) {
+            outlineGround.push(outlineGround[0].clone());
+            outlineRoof.push(outlineRoof[0].clone());
+        }
+
+        // Ground outline
+        const groundLineGeo = new THREE.BufferGeometry().setFromPoints(outlineGround);
+        group.add(new THREE.Line(groundLineGeo, _state.materials.buildingEdge));
+
+        // Roofline outline
+        const roofLineGeo = new THREE.BufferGeometry().setFromPoints(outlineRoof);
+        group.add(new THREE.Line(roofLineGeo, _state.materials.buildingEdge));
+
+        // Vertical corner edges (every 3rd vertex to avoid clutter)
+        for (let i = 0; i < outlineGround.length - 1; i += 3) {
+            const verts = [outlineGround[i].clone(), outlineRoof[i].clone()];
+            const vertGeo = new THREE.BufferGeometry().setFromPoints(verts);
+            group.add(new THREE.Line(vertGeo, _state.materials.buildingEdge));
+        }
     }
 
     _state.scene.add(group);
     _state.buildingGroup = group;
-    console.log(`[MAP3D] Buildings: ${buildings.length} extruded meshes`);
+    console.log(`[MAP3D] Buildings: ${buildings.length} extruded 3D meshes`);
 }
 
 function _buildRoads() {
@@ -1961,7 +2157,7 @@ export function toggleFog() {
         if (_state.scene.fog && _state.scene.fog.density > 0) {
             _state.scene.fog.density = 0;
         } else {
-            _state.scene.fog = new THREE.FogExp2(BG_COLOR, 0.002);
+            _state.scene.fog = new THREE.FogExp2(BG_COLOR, 0.0008);
         }
     }
 }
@@ -1989,6 +2185,40 @@ export function getMapState() {
         showRoads: !!_state.showRoads,
         showGrid: _state.showGrid !== false,
         showBuildings: _state.buildingGroup ? _state.buildingGroup.visible : false,
+        showUnits: _state.showUnits !== false,
         tiltMode: _state.cam.tiltTarget > 70 ? 'top-down' : 'tilted',
     };
+}
+
+/**
+ * Set specific layer visibility (deterministic, not toggle).
+ * @param {Object} layers - { satellite, buildings, roads, grid, units }
+ */
+export function setLayers(layers) {
+    if (layers.satellite !== undefined) {
+        const want = !!layers.satellite;
+        if (_state.showSatellite !== want) toggleSatellite();
+    }
+    if (layers.buildings !== undefined) {
+        const want = !!layers.buildings;
+        const current = _state.buildingGroup ? _state.buildingGroup.visible : false;
+        if (current !== want) toggleBuildings();
+    }
+    if (layers.roads !== undefined) {
+        const want = !!layers.roads;
+        if (!!_state.showRoads !== want) toggleRoads();
+    }
+    if (layers.grid !== undefined) {
+        const want = !!layers.grid;
+        if ((_state.showGrid !== false) !== want) toggleGrid();
+    }
+    if (layers.units !== undefined) {
+        // Show/hide all unit meshes
+        _state.showUnits = !!layers.units;
+        for (const group of Object.values(_state.unitMeshes)) {
+            group.visible = _state.showUnits;
+        }
+    }
+    console.log('[MAP3D] Layers set:', JSON.stringify(getMapState()));
+    return getMapState();
 }

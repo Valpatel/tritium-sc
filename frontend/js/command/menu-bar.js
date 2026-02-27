@@ -9,6 +9,20 @@
 import { EventBus } from './events.js';
 
 // ---------------------------------------------------------------------------
+// Scenario selection state (module-level)
+// ---------------------------------------------------------------------------
+
+let _selectedScenario = null;
+
+/**
+ * Get the currently selected battle scenario name, or null for classic.
+ * @returns {string|null}
+ */
+export function getSelectedScenario() {
+    return _selectedScenario;
+}
+
+// ---------------------------------------------------------------------------
 // Menu definitions (data-driven)
 // ---------------------------------------------------------------------------
 
@@ -100,16 +114,73 @@ function _layoutMenuItems(layoutManager) {
 function _mapMenuItems(mapActions) {
     const s = () => mapActions.getMapState();
     return [
+        { label: 'Toggle All', action: () => mapActions.toggleAllLayers() },
+        { separator: true },
+        // Base map layers
         { label: 'Satellite', shortcut: 'I', checkable: true, checked: () => s().showSatellite, action: () => mapActions.toggleSatellite() },
         { label: 'Roads', shortcut: 'G', checkable: true, checked: () => s().showRoads, action: () => mapActions.toggleRoads() },
+        { label: 'Buildings', shortcut: 'K', checkable: true, checked: () => s().showBuildings, action: () => mapActions.toggleBuildings() },
+        { label: 'Waterways', checkable: true, checked: () => s().showWaterways, action: () => mapActions.toggleWaterways() },
+        { label: 'Parks', checkable: true, checked: () => s().showParks, action: () => mapActions.toggleParks() },
         { label: 'Grid', checkable: true, checked: () => s().showGrid, action: () => mapActions.toggleGrid() },
-        { label: '3D Mode', checkable: true, checked: () => s().is3DMode, action: () => mapActions.toggle3DMode() },
         { separator: true },
+        // Unit layers
+        { label: '3D Models', checkable: true, checked: () => s().showModels3d, action: () => mapActions.toggleModels() },
+        { label: 'Labels', checkable: true, checked: () => s().showLabels, action: () => mapActions.toggleLabels() },
+        { label: 'Mesh Network', checkable: true, checked: () => s().showMesh, action: () => mapActions.toggleMesh() },
+        { separator: true },
+        // Combat FX layers
+        { label: 'Tracers', checkable: true, checked: () => s().showTracers, action: () => mapActions.toggleTracers() },
+        { label: 'Explosions', checkable: true, checked: () => s().showExplosions, action: () => mapActions.toggleExplosions() },
+        { label: 'Particles', checkable: true, checked: () => s().showParticles, action: () => mapActions.toggleParticles() },
+        { label: 'Hit Flashes', checkable: true, checked: () => s().showHitFlashes, action: () => mapActions.toggleHitFlashes() },
+        { label: 'Floating Text', checkable: true, checked: () => s().showFloatingText, action: () => mapActions.toggleFloatingText() },
+        { separator: true },
+        // Overlay layers
+        { label: 'Kill Feed', checkable: true, checked: () => s().showKillFeed, action: () => mapActions.toggleKillFeed() },
+        { label: 'Screen FX', checkable: true, checked: () => s().showScreenFx, action: () => mapActions.toggleScreenFx() },
+        { label: 'Banners', checkable: true, checked: () => s().showBanners, action: () => mapActions.toggleBanners() },
+        { label: 'Layer HUD', checkable: true, checked: () => s().showLayerHud, action: () => mapActions.toggleLayerHud() },
+        { separator: true },
+        // Unit decorations
+        { label: 'Health Bars', checkable: true, checked: () => s().showHealthBars, action: () => mapActions.toggleHealthBars() },
+        { label: 'Selection FX', checkable: true, checked: () => s().showSelectionFx, action: () => mapActions.toggleSelectionFx() },
+        { separator: true },
+        // Environment
+        { label: 'Fog', checkable: true, checked: () => s().showFog, action: () => mapActions.toggleFog() },
+        { label: 'Terrain', shortcut: 'H', checkable: true, checked: () => s().showTerrain, action: () => mapActions.toggleTerrain() },
+        { label: '3D Mode', checkable: true, checked: () => s().tiltMode === 'tilted', action: () => mapActions.toggleTilt() },
+        { separator: true },
+        // Camera controls
         { label: 'Center on Action', shortcut: 'F', action: () => mapActions.centerOnAction() },
         { label: 'Reset Camera', shortcut: 'R', action: () => mapActions.resetCamera() },
         { label: 'Zoom In', shortcut: ']', action: () => mapActions.zoomIn() },
         { label: 'Zoom Out', shortcut: '[', action: () => mapActions.zoomOut() },
     ];
+}
+
+function _gameMenuItems(mapActions) {
+    const scenarios = [
+        { id: null, label: 'Classic 10-Wave' },
+        { id: 'street_combat', label: 'Street Combat' },
+        { id: 'riot', label: 'Riot' },
+    ];
+    const items = [
+        { label: 'Begin Battle', shortcut: 'B',
+          action: () => { if (mapActions.beginWar) mapActions.beginWar(); } },
+        { separator: true },
+    ];
+    for (const sc of scenarios) {
+        items.push({
+            label: sc.label, checkable: true,
+            checked: () => _selectedScenario === sc.id,
+            action: () => { _selectedScenario = sc.id; },
+        });
+    }
+    items.push({ separator: true });
+    items.push({ label: 'Reset Game', shortcut: 'R',
+        action: () => { if (mapActions.resetGame) mapActions.resetGame(); } });
+    return items;
 }
 
 function _helpMenuItems() {
@@ -153,6 +224,7 @@ export function createMenuBar(container, panelManager, layoutManager, mapActions
         { label: 'VIEW',   getItems: () => _viewMenuItems(panelManager) },
         { label: 'LAYOUT', getItems: () => _layoutMenuItems(layoutManager) },
         { label: 'MAP',    getItems: () => _mapMenuItems(mapActions) },
+        { label: 'GAME',   getItems: () => _gameMenuItems(mapActions) },
         { label: 'HELP',   getItems: () => _helpMenuItems() },
     ];
 
@@ -253,7 +325,7 @@ export function createMenuBar(container, panelManager, layoutManager, mapActions
             if (prev) prev.hidden = true;
             openMenu.classList.remove('active');
         }
-        _buildDropdown(dropdown, menuDef.getItems(), bar, layoutManager);
+        _buildDropdown(dropdown, menuDef.getItems(), bar, layoutManager, _closeAll);
         dropdown.hidden = false;
         trigger.classList.add('active');
         openMenu = trigger;
@@ -286,7 +358,7 @@ export function focusSaveInput(barEl) {
 // Build dropdown items
 // ---------------------------------------------------------------------------
 
-function _buildDropdown(dropdown, items, barEl, layoutManager) {
+function _buildDropdown(dropdown, items, barEl, layoutManager, closeAll) {
     dropdown.innerHTML = '';
     for (const item of items) {
         if (item.separator) {
@@ -324,7 +396,7 @@ function _buildDropdown(dropdown, items, barEl, layoutManager) {
             del.addEventListener('click', (e) => {
                 e.stopPropagation();
                 item.onDelete();
-                _buildDropdown(dropdown, _layoutMenuItems(layoutManager), barEl, layoutManager);
+                _buildDropdown(dropdown, _layoutMenuItems(layoutManager), barEl, layoutManager, closeAll);
             });
             row.appendChild(del);
         }
@@ -341,7 +413,9 @@ function _buildDropdown(dropdown, items, barEl, layoutManager) {
             e.stopPropagation();
             if (item.action) item.action(barEl, layoutManager);
             if (!item.checkable) {
-                _closeAllDropdowns(barEl);
+                // Use the closure-aware closeAll to properly reset internal state
+                if (closeAll) closeAll();
+                else _closeAllDropdowns(barEl);
             } else if (item.checked) {
                 check.textContent = item.checked() ? '\u2022' : '';
             }

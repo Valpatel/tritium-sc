@@ -46,10 +46,12 @@ const GRID_LEVELS = [
 
 // Dynamic satellite tile zoom levels: [maxCamZoom, tileZoom, radiusMeters]
 const SAT_TILE_LEVELS = [
-    [0.1,  13, 3000],
-    [0.5,  15, 1000],
-    [2.0,  17,  400],
-    [Infinity, 19, 200],
+    [0.15, 14, 8000],   // extremely zoomed out
+    [0.5,  15, 3000],   // very zoomed out
+    [2.0,  16, 1200],   // zoomed out
+    [5.0,  17,  500],   // medium
+    [12.0, 18,  250],   // zoomed in
+    [Infinity, 19, 200], // close-up (default view)
 ];
 
 const ALLIANCE_COLORS = {
@@ -57,6 +59,24 @@ const ALLIANCE_COLORS = {
     hostile:  '#ff2a6d',
     neutral:  '#00a0ff',
     unknown:  '#fcee0a',
+};
+
+const FSM_BADGE_COLORS = {
+    idle: '#888888',
+    scanning: '#4a9eff',
+    tracking: '#00f0ff',
+    engaging: '#ff2a6d',
+    cooldown: '#668899',
+    patrolling: '#05ffa1',
+    pursuing: '#ff8800',
+    retreating: '#fcee0a',
+    rtb: '#4a8866',
+    scouting: '#88ddaa',
+    orbiting: '#66ccee',
+    spawning: '#cccccc',
+    advancing: '#22dd66',
+    flanking: '#ff6633',
+    fleeing: '#ffff00',
 };
 
 // ============================================================
@@ -113,10 +133,15 @@ const _state = {
 
     // Road tile overlay
     roadTiles: [],      // { image, bounds: { minX, maxX, minY, maxY } }
-    showRoads: false,   // toggled with G key (default off)
+    showRoads: true,    // toggled with G key (default on)
     roadTileLevel: -1,
     roadReloadTimer: null,
     showGrid: true,     // toggled from menu
+
+    // Overlay data (building outlines + road polylines from OSM)
+    overlayBuildings: [],  // [{ polygon: [[x,y], ...], height }]
+    overlayRoads: [],      // [{ points: [[x,y], ...], class }]
+    showBuildings: true,   // toggled with K key
 
     // Zones (from escalation)
     zones: [],
@@ -130,6 +155,9 @@ const _state = {
 
     // Fog of war
     fogEnabled: true,
+
+    // Mesh radio overlay
+    showMesh: true,
 
     // Screen shake tracking
     _shakeActive: false,
@@ -251,6 +279,7 @@ export function initMap() {
         EventBus.on('map:mode', _onMapMode),
         EventBus.on('unit:dispatch-mode', _onDispatchMode),
         EventBus.on('unit:dispatched', _onDispatched),
+        EventBus.on('mesh:center-on-node', _onMeshCenterOnNode),
     );
 
     // Subscribe to store for selectedUnitId changes (highlight sync)
@@ -431,6 +460,16 @@ function _draw() {
         _drawRoadTiles(ctx);
     }
 
+    // Layer 1.7: Building outlines (OSM building footprints)
+    if (_state.showBuildings) {
+        _drawBuildingOutlines(ctx);
+    }
+
+    // Layer 1.8: Road polylines (OSM street graph)
+    if (_state.showRoads && _state.overlayRoads.length > 0) {
+        _drawRoadPolylines(ctx);
+    }
+
     // Layer 2: Grid (adaptive spacing based on zoom)
     if (_state.showGrid) _drawGrid(ctx);
 
@@ -449,11 +488,20 @@ function _draw() {
         fogDraw(ctx, fogCanvas, worldToScreen, fogTargets, _state.cam, TritiumStore.get('map.mode'));
     }
 
+    // Layer 4.7: Mesh radio overlay (protocol-specific icons + dotted links)
+    if (typeof meshDrawNodes === 'function' && _state.showMesh) {
+        const meshTargets = _buildMeshTargets();
+        meshDrawNodes(ctx, worldToScreen, meshTargets, _state.showMesh);
+    }
+
     // Layer 5: Targets (shapes only — labels handled separately)
     _drawTargets(ctx);
 
     // Layer 5.1: Unit labels (collision-resolved)
     _drawLabels(ctx);
+
+    // Layer 5.2: Hovered unit tooltip
+    _drawTooltip(ctx);
 
     // Layer 5.5: FOV cones (if war-fx.js loaded)
     if (typeof warFxDrawVisionCones === 'function') {
@@ -542,6 +590,27 @@ function _buildTargetsObject() {
     return obj;
 }
 
+/**
+ * Build array of mesh_radio targets for the mesh draw layer.
+ * Filters TritiumStore.units to only mesh_radio asset types.
+ */
+function _buildMeshTargets() {
+    const result = [];
+    for (const [id, unit] of TritiumStore.units) {
+        if ((unit.type || unit.asset_type) !== 'mesh_radio') continue;
+        const pos = unit.position;
+        if (!pos || pos.x === undefined) continue;
+        result.push({
+            target_id: id,
+            x: pos.x,
+            y: pos.y,
+            asset_type: 'mesh_radio',
+            metadata: unit.metadata || {},
+        });
+    }
+    return result;
+}
+
 // ============================================================
 // Layer 1: Satellite tiles
 // ============================================================
@@ -554,7 +623,7 @@ function _drawSatelliteTiles(ctx) {
     const cssH = _state.canvas.height / _state.dpr;
 
     ctx.save();
-    ctx.globalAlpha = 0.7;
+    ctx.globalAlpha = 1.0;
 
     for (const tile of tiles) {
         const b = tile.bounds;
@@ -569,6 +638,106 @@ function _drawSatelliteTiles(ctx) {
         if (br.y < 0 || tl.y > cssH) continue;
 
         ctx.drawImage(tile.image, tl.x, tl.y, sw, sh);
+    }
+
+    ctx.restore();
+}
+
+// ============================================================
+// Layer 1.7: Building outlines (OSM footprints from overlay API)
+// ============================================================
+
+function _drawBuildingOutlines(ctx) {
+    const buildings = _state.overlayBuildings;
+    if (!buildings || buildings.length === 0) return;
+
+    const cssW = _state.canvas.width / _state.dpr;
+    const cssH = _state.canvas.height / _state.dpr;
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0, 240, 255, 0.35)';
+    ctx.fillStyle = 'rgba(0, 240, 255, 0.06)';
+    ctx.lineWidth = 1;
+
+    for (const bldg of buildings) {
+        const poly = bldg.polygon;
+        if (!poly || poly.length < 3) continue;
+
+        // Quick bounds check: skip if all points are off-screen
+        const first = worldToScreen(poly[0][0], poly[0][1]);
+        let minSx = first.x, maxSx = first.x, minSy = first.y, maxSy = first.y;
+        for (let i = 1; i < poly.length; i++) {
+            const sp = worldToScreen(poly[i][0], poly[i][1]);
+            if (sp.x < minSx) minSx = sp.x;
+            if (sp.x > maxSx) maxSx = sp.x;
+            if (sp.y < minSy) minSy = sp.y;
+            if (sp.y > maxSy) maxSy = sp.y;
+        }
+        if (maxSx < 0 || minSx > cssW || maxSy < 0 || minSy > cssH) continue;
+
+        // Draw polygon
+        ctx.beginPath();
+        ctx.moveTo(first.x, first.y);
+        for (let i = 1; i < poly.length; i++) {
+            const sp = worldToScreen(poly[i][0], poly[i][1]);
+            ctx.lineTo(sp.x, sp.y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+// ============================================================
+// Layer 1.8: Road polylines (OSM street graph from overlay API)
+// ============================================================
+
+const _ROAD_STYLES = {
+    motorway:    { color: 'rgba(255, 200, 50, 0.5)',  width: 3 },
+    trunk:       { color: 'rgba(255, 200, 50, 0.4)',  width: 2.5 },
+    primary:     { color: 'rgba(255, 180, 50, 0.35)', width: 2 },
+    secondary:   { color: 'rgba(200, 200, 100, 0.3)', width: 1.5 },
+    tertiary:    { color: 'rgba(180, 180, 120, 0.25)',width: 1.2 },
+    residential: { color: 'rgba(150, 150, 150, 0.2)', width: 1 },
+    service:     { color: 'rgba(120, 120, 120, 0.15)',width: 0.8 },
+};
+
+function _drawRoadPolylines(ctx) {
+    const roads = _state.overlayRoads;
+    if (!roads || roads.length === 0) return;
+
+    const cssW = _state.canvas.width / _state.dpr;
+    const cssH = _state.canvas.height / _state.dpr;
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    for (const road of roads) {
+        const pts = road.points;
+        if (!pts || pts.length < 2) continue;
+
+        // Quick cull
+        const s0 = worldToScreen(pts[0][0], pts[0][1]);
+        const s1 = worldToScreen(pts[pts.length - 1][0], pts[pts.length - 1][1]);
+        if (s0.x < -50 && s1.x < -50) continue;
+        if (s0.x > cssW + 50 && s1.x > cssW + 50) continue;
+        if (s0.y < -50 && s1.y < -50) continue;
+        if (s0.y > cssH + 50 && s1.y > cssH + 50) continue;
+
+        const style = _ROAD_STYLES[road.class] || _ROAD_STYLES.residential;
+        ctx.strokeStyle = style.color;
+        ctx.lineWidth = style.width;
+
+        ctx.beginPath();
+        ctx.moveTo(s0.x, s0.y);
+        for (let i = 1; i < pts.length; i++) {
+            const sp = worldToScreen(pts[i][0], pts[i][1]);
+            ctx.lineTo(sp.x, sp.y);
+        }
+        ctx.stroke();
     }
 
     ctx.restore();
@@ -717,13 +886,22 @@ function _drawLabels(ctx) {
     for (const [id, unit] of units) {
         const pos = unit.position;
         if (!pos || pos.x === undefined || pos.y === undefined) continue;
+        const fsm = unit.fsm_state || '';
+        const status = (unit.status || 'active').toLowerCase();
+        const badgeColor = FSM_BADGE_COLORS[fsm] || FSM_BADGE_COLORS[status] || null;
+        const fsmState = fsm ? ` [${fsm.toUpperCase()}]` : '';
+        const elims = unit.eliminations ? ` ${unit.eliminations}K` : '';
+        const badgeText = fsm || status;
         entries.push({
             id,
             text: unit.name || id,
+            badge: fsmState + elims,
+            badgeColor,
+            badgeText,
             worldX: pos.x,
             worldY: pos.y,
             alliance: (unit.alliance || 'unknown').toLowerCase(),
-            status: (unit.status || 'active').toLowerCase(),
+            status,
             isSelected: id === selectedId,
         });
     }
@@ -755,8 +933,58 @@ function _drawLabels(ctx) {
         const isNeutralized = r.status === 'neutralized' || r.status === 'eliminated' || r.status === 'destroyed';
         ctx.fillStyle = isNeutralized ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.85)';
         ctx.fillText(r.text, r.labelX + 3, r.labelY + 3);
+
+        // FSM badge
+        if (r.badge) {
+            const textW = ctx.measureText(r.text).width;
+            ctx.fillStyle = r.badgeColor || 'rgba(255, 255, 255, 0.5)';
+            ctx.font = `${Math.max(7, fontSize - 2)}px ${FONT_FAMILY}`;
+            ctx.fillText(r.badge, r.labelX + 3 + textW + 4, r.labelY + 3);
+            ctx.font = `${fontSize}px ${FONT_FAMILY}`;
+        }
     }
 
+    ctx.restore();
+}
+
+function _drawTooltip(ctx) {
+    if (!_state.hoveredUnit) return;
+    const u = TritiumStore.units.get(_state.hoveredUnit);
+    if (!u || !u.position) return;
+
+    const sp = worldToScreen(u.position.x, u.position.y);
+    const tooltipColor = FSM_BADGE_COLORS[u.fsm_state] || '#ccc';
+    const fsmState = u.fsm_state ? u.fsm_state.toUpperCase() : '';
+    const elims = u.eliminations ? ` ${u.eliminations}K` : '';
+    const tooltipText = (u.name || _state.hoveredUnit) + (fsmState ? ' ' + fsmState + elims : '');
+
+    ctx.save();
+    ctx.font = `11px ${FONT_FAMILY}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    const tw = ctx.measureText(tooltipText).width;
+    const tx = sp.x + 12;
+    const ty = sp.y - 8;
+
+    ctx.fillStyle = 'rgba(6, 6, 9, 0.85)';
+    ctx.fillRect(tx - 4, ty - 14, tw + 8, 18);
+    ctx.fillStyle = tooltipColor;
+    ctx.fillText(tooltipText, tx, ty);
+    ctx.restore();
+}
+
+function _drawStatusBadge(ctx, unit, sp) {
+    const fsm = unit.fsm_state || '';
+    const status = (unit.status || 'active').toLowerCase();
+    const badgeText = fsm || status;
+    if (!badgeText || badgeText === 'active') return;
+
+    const badgeColor = FSM_BADGE_COLORS[fsm] || '#888';
+    ctx.save();
+    ctx.font = `8px ${FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = badgeColor;
+    ctx.fillText(badgeText.toUpperCase(), sp.x, sp.y - 18);
     ctx.restore();
 }
 
@@ -784,8 +1012,8 @@ function _drawUnit(ctx, id, unit) {
     }
 
     // Compute scale from zoom and hover/selection
-    let scale = Math.min(_state.cam.zoom, 3) / 3; // normalized 0..1 for zoom 0..3
-    scale = Math.max(0.3, scale); // minimum readability
+    let scale = Math.min(_state.cam.zoom, 3) / 1.5; // normalized 0..2 for zoom 0..3
+    scale = Math.max(0.5, scale); // minimum readability
     if (isSelected) scale *= 1.3;
     else if (isHovered) scale *= 1.15;
 
@@ -811,6 +1039,9 @@ function _drawUnit(ctx, id, unit) {
 
     // Draw using procedural unit icons
     drawUnitIcon(ctx, iconType, alliance, smoothedHeading, sp.x, sp.y, scale, isSelected, health);
+
+    // FSM status badge above unit
+    _drawStatusBadge(ctx, unit, sp);
 
     // Labels are drawn by _drawLabels() using label-collision.js
 }
@@ -1722,6 +1953,15 @@ function _onDispatched(data) {
     // Arrow already added if we originated the dispatch
 }
 
+function _onMeshCenterOnNode(data) {
+    // Center camera on a mesh radio node
+    if (!data || data.x === undefined || data.y === undefined) return;
+    _state.cam.targetX = data.x;
+    _state.cam.targetY = data.y;
+    _state.cam.targetZoom = Math.max(5.0, _state.cam.zoom);
+    console.log(`[MAP] Center on mesh node: (${data.x.toFixed(1)}, ${data.y.toFixed(1)})`);
+}
+
 function _onSelectedUnitChanged(newId, _oldId) {
     // If a unit is selected, optionally center camera on it
     // (Only on explicit programmatic selection, not on every click)
@@ -1747,10 +1987,32 @@ function _loadGeoReference() {
             _state.noLocationSet = false;
             _state.geoCenter = { lat: data.lat, lng: data.lng };
             _loadSatelliteTiles(data.lat, data.lng);
+            _loadOverlayData();
         })
         .catch(err => {
             console.warn('[MAP] Geo reference fetch failed:', err);
             _state.noLocationSet = true;
+        });
+}
+
+/**
+ * Fetch overlay data (building outlines + road polylines) from the server.
+ * Called once after geo reference is loaded.
+ */
+function _loadOverlayData() {
+    fetch('/api/geo/overlay')
+        .then(r => {
+            if (!r.ok) return null;
+            return r.json();
+        })
+        .then(data => {
+            if (!data) return;
+            _state.overlayBuildings = data.buildings || [];
+            _state.overlayRoads = data.roads || [];
+            console.log(`[MAP] Overlay loaded: ${_state.overlayBuildings.length} buildings, ${_state.overlayRoads.length} road segments`);
+        })
+        .catch(err => {
+            console.warn('[MAP] Overlay fetch failed:', err);
         });
 }
 
@@ -1775,17 +2037,19 @@ function _checkSatelliteTileReload() {
     const newLevel = _getSatTileLevelIndex();
     if (newLevel === _state.satTileLevel) return;
 
-    // Zoom level crossed threshold — debounce reload (300ms)
+    // Update level immediately to stop retriggering on every frame
+    // (smooth zoom lerp would otherwise reset the debounce timer forever)
+    _state.satTileLevel = newLevel;
+
+    // Debounce the actual tile fetch (zoom may still be lerping)
     clearTimeout(_state.satReloadTimer);
     _state.satReloadTimer = setTimeout(() => {
         const idx = _getSatTileLevelIndex();
-        if (idx !== _state.satTileLevel) {
-            _state.satTileLevel = idx;
-            const [, tileZoom, radius] = SAT_TILE_LEVELS[idx];
-            console.log(`[MAP] Reloading satellite tiles: zoom=${tileZoom}, radius=${radius}m`);
-            _fetchTilesFromApi(_state.geoCenter.lat, _state.geoCenter.lng, radius, tileZoom);
-        }
-    }, 300);
+        _state.satTileLevel = idx;
+        const [, tileZoom, radius] = SAT_TILE_LEVELS[idx];
+        console.log(`[MAP] Reloading satellite tiles: zoom=${tileZoom}, radius=${radius}m`);
+        _fetchTilesFromApi(_state.geoCenter.lat, _state.geoCenter.lng, radius, tileZoom);
+    }, 500);
 }
 
 function _loadSatelliteTiles(lat, lng) {
@@ -2019,6 +2283,14 @@ export function toggleGrid() {
 }
 
 /**
+ * Toggle building outlines on/off.
+ */
+export function toggleBuildings() {
+    _state.showBuildings = !_state.showBuildings;
+    console.log(`[MAP] Buildings ${_state.showBuildings ? 'ON' : 'OFF'}`);
+}
+
+/**
  * Return current map state for menu checkmarks.
  */
 /**
@@ -2029,12 +2301,21 @@ export function toggleFog() {
     console.log(`[MAP] Fog of war ${_state.fogEnabled ? 'ON' : 'OFF'}`);
 }
 
+/**
+ * Toggle mesh radio overlay on/off.
+ */
+export function toggleMesh() {
+    _state.showMesh = !_state.showMesh;
+    console.log(`[MAP] Mesh network ${_state.showMesh ? 'ON' : 'OFF'}`);
+}
+
 export function getMapState() {
     return {
         showSatellite: _state.showSatellite,
         showRoads: _state.showRoads,
         showGrid: _state.showGrid,
         fogEnabled: _state.fogEnabled,
+        showMesh: _state.showMesh,
     };
 }
 

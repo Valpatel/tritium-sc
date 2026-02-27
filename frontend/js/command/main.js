@@ -7,10 +7,10 @@
 import { TritiumStore } from './store.js';
 import { EventBus } from './events.js';
 import { WebSocketManager } from './websocket.js';
-import { initMap, destroyMap, toggleSatellite, toggleRoads, toggleGrid, toggleFog, getMapState, centerOnAction, resetCamera, zoomIn, zoomOut, toggleTilt } from './map3d.js';
+import { initMap, destroyMap, toggleSatellite, toggleRoads, toggleGrid, toggleBuildings, toggleFog, toggleTerrain, toggleLabels, toggleModels, toggleWaterways, toggleParks, toggleMesh, toggleAllLayers, toggleTracers, toggleExplosions, toggleParticles, toggleHitFlashes, toggleFloatingText, toggleKillFeed, toggleScreenFx, toggleBanners, toggleLayerHud, toggleHealthBars, toggleSelectionFx, getMapState, centerOnAction, resetCamera, zoomIn, zoomOut, toggleTilt, setLayers, setMapMode } from './map-maplibre.js';
 import { PanelManager } from './panel-manager.js';
 import { LayoutManager } from './layout-manager.js';
-import { createMenuBar, focusSaveInput } from './menu-bar.js';
+import { createMenuBar, focusSaveInput, getSelectedScenario } from './menu-bar.js';
 import { AmyPanelDef } from './panels/amy.js';
 import { UnitsPanelDef } from './panels/units.js';
 import { AlertsPanelDef } from './panels/alerts.js';
@@ -29,7 +29,6 @@ const ws = new WebSocketManager();
 let panelManager = null;
 let layoutManager = null;
 let menuBarEl = null;
-let _is3DMode = false;
 
 function init() {
     console.log('%c[TRITIUM] Command Center initializing...', 'color: #00f0ff; font-weight: bold;');
@@ -200,7 +199,7 @@ function init() {
         fetchAmyStatus();
     }
 
-    // Audio: initialize on first user interaction
+    // Audio: initialize on first user interaction and wire combat events
     let _audioInitialized = false;
     const _initAudio = () => {
         if (_audioInitialized) return;
@@ -208,12 +207,98 @@ function init() {
         if (typeof window.WarAudioManager === 'function') {
             try {
                 const audioMgr = new window.WarAudioManager();
+                audioMgr.init();
                 window._tritiumAudio = audioMgr;
-                if (typeof window.WarEventMapper === 'function') {
-                    const mapper = new window.WarEventMapper(audioMgr);
-                    window._tritiumEventMapper = mapper;
-                }
-                console.log('[TRITIUM] Audio initialized');
+
+                // Preload critical combat + game sounds
+                audioMgr.preload([
+                    'nerf_shot', 'impact_hit', 'explosion', 'explosion_small',
+                    'turret_rotate', 'turret_lock_on', 'drone_buzz', 'drone_flyby',
+                    'ricochet', 'shield_hit', 'reload',
+                    'wave_start', 'wave_complete', 'countdown_tick', 'countdown_go',
+                    'victory_fanfare', 'defeat_sting', 'dispatch_ack',
+                    'hostile_detected', 'alert_tone', 'escalation_siren',
+                    'killing_spree', 'rampage', 'dominating', 'godlike',
+                    'ambient_wind',
+                ]);
+
+                // Wire EventBus combat events to weapon-specific audio
+                // Uses projectile_type from backend for accurate weapon sounds
+                EventBus.on('combat:projectile', (d) => {
+                    const pos = d.source_pos || {};
+                    const x = pos.x || 0, y = pos.y || 0;
+                    const ptype = d.projectile_type || '';
+                    if (ptype.includes('missile')) {
+                        audioMgr.playAt('nerf_shot', x, y);
+                        audioMgr.playAt('turret_lock_on', x, y);
+                    } else if (ptype.includes('tank')) {
+                        audioMgr.playAt('nerf_shot', x, y);
+                        audioMgr.playAt('turret_rotate', x, y);
+                    } else if (ptype.includes('heavy')) {
+                        audioMgr.playAt('nerf_shot', x, y);
+                        audioMgr.playAt('turret_rotate', x, y);
+                    } else if (ptype.includes('scout') || ptype.includes('dart_gun')) {
+                        audioMgr.playAt('nerf_shot', x, y);
+                        audioMgr.playAt('drone_buzz', x, y);
+                    } else if (ptype.includes('apc')) {
+                        audioMgr.playAt('nerf_shot', x, y);
+                    } else {
+                        audioMgr.playAt('nerf_shot', x, y);
+                    }
+                });
+                EventBus.on('combat:hit', (d) => {
+                    const pos = d.position || {};
+                    let x = pos.x, y = pos.y;
+                    if (x === undefined) {
+                        const unit = TritiumStore.units.get(d.target_id);
+                        const upos = unit?.position || {};
+                        x = upos.x || 0;
+                        y = upos.y || 0;
+                    }
+                    const ptype = d.projectile_type || '';
+                    // Heavy weapons get deeper impact, others get hit/ricochet mix
+                    if (ptype.includes('missile') || ptype.includes('tank')) {
+                        audioMgr.playAt('explosion', x, y);
+                    } else {
+                        const sound = Math.random() < 0.75 ? 'impact_hit' : 'ricochet';
+                        audioMgr.playAt(sound, x, y);
+                    }
+                });
+                EventBus.on('combat:elimination', (d) => {
+                    const pos = d.position || {};
+                    const x = pos.x || 0, y = pos.y || 0;
+                    audioMgr.playAt('explosion', x, y);
+                    if (d.interceptor_name) {
+                        audioMgr.play('dispatch_ack');
+                    }
+                });
+                EventBus.on('combat:streak', (d) => {
+                    const streak = d.streak || 3;
+                    const effect = streak >= 10 ? 'godlike'
+                                 : streak >= 7 ? 'dominating'
+                                 : streak >= 5 ? 'rampage'
+                                 : 'killing_spree';
+                    audioMgr.play(effect);
+                });
+                EventBus.on('game:wave_start', () => {
+                    audioMgr.play('wave_start');
+                });
+                EventBus.on('game:wave_complete', () => {
+                    audioMgr.play('wave_complete');
+                });
+                EventBus.on('game:state', (d) => {
+                    if (d.state === 'active') {
+                        audioMgr.startAmbient();
+                        audioMgr.play('hostile_detected');
+                    } else if (d.state === 'idle' || d.state === 'victory' || d.state === 'defeat') {
+                        audioMgr.stopAmbient();
+                    }
+                    if (d.state === 'countdown') audioMgr.play('countdown_tick');
+                    if (d.state === 'victory') audioMgr.play('victory_fanfare');
+                    else if (d.state === 'defeat') audioMgr.play('defeat_sting');
+                });
+
+                console.log('[TRITIUM] Audio initialized + combat events wired');
             } catch (e) {
                 console.warn('[TRITIUM] Audio init failed:', e);
             }
@@ -259,18 +344,40 @@ function initPanelSystem(container) {
             toggleRoads: () => (_activeMapModule ? _activeMapModule.toggleRoads() : toggleRoads()),
             toggleGrid: () => (_activeMapModule ? _activeMapModule.toggleGrid() : toggleGrid()),
             toggleFog: () => (_activeMapModule ? _activeMapModule.toggleFog() : toggleFog()),
-            toggle3DMode,
+            toggleTerrain: () => (_activeMapModule ? _activeMapModule.toggleTerrain() : toggleTerrain()),
+            toggleLabels: () => (_activeMapModule ? _activeMapModule.toggleLabels() : toggleLabels()),
+            toggleModels: () => (_activeMapModule ? _activeMapModule.toggleModels() : toggleModels()),
+            toggleWaterways: () => (_activeMapModule ? _activeMapModule.toggleWaterways() : toggleWaterways()),
+            toggleParks: () => (_activeMapModule ? _activeMapModule.toggleParks() : toggleParks()),
+            toggleTilt: () => (_activeMapModule ? _activeMapModule.toggleTilt() : toggleTilt()),
+            toggleBuildings: () => (_activeMapModule ? _activeMapModule.toggleBuildings() : toggleBuildings()),
+            toggleMesh: () => (_activeMapModule ? _activeMapModule.toggleMesh() : toggleMesh()),
+            toggleAllLayers: () => (_activeMapModule ? _activeMapModule.toggleAllLayers() : toggleAllLayers()),
+            toggleTracers: () => (_activeMapModule ? _activeMapModule.toggleTracers() : toggleTracers()),
+            toggleExplosions: () => (_activeMapModule ? _activeMapModule.toggleExplosions() : toggleExplosions()),
+            toggleParticles: () => (_activeMapModule ? _activeMapModule.toggleParticles() : toggleParticles()),
+            toggleHitFlashes: () => (_activeMapModule ? _activeMapModule.toggleHitFlashes() : toggleHitFlashes()),
+            toggleFloatingText: () => (_activeMapModule ? _activeMapModule.toggleFloatingText() : toggleFloatingText()),
+            toggleKillFeed: () => (_activeMapModule ? _activeMapModule.toggleKillFeed() : toggleKillFeed()),
+            toggleScreenFx: () => (_activeMapModule ? _activeMapModule.toggleScreenFx() : toggleScreenFx()),
+            toggleBanners: () => (_activeMapModule ? _activeMapModule.toggleBanners() : toggleBanners()),
+            toggleLayerHud: () => (_activeMapModule ? _activeMapModule.toggleLayerHud() : toggleLayerHud()),
+            toggleHealthBars: () => (_activeMapModule ? _activeMapModule.toggleHealthBars() : toggleHealthBars()),
+            toggleSelectionFx: () => (_activeMapModule ? _activeMapModule.toggleSelectionFx() : toggleSelectionFx()),
             centerOnAction: () => (_activeMapModule ? _activeMapModule.centerOnAction() : centerOnAction()),
             resetCamera: () => (_activeMapModule ? _activeMapModule.resetCamera() : resetCamera()),
             zoomIn: () => (_activeMapModule ? _activeMapModule.zoomIn() : zoomIn()),
             zoomOut: () => (_activeMapModule ? _activeMapModule.zoomOut() : zoomOut()),
-            getMapState: () => {
-                const base = _activeMapModule ? _activeMapModule.getMapState() : getMapState();
-                return { ...base, is3DMode: _is3DMode };
-            },
+            getMapState: () => (_activeMapModule ? _activeMapModule.getMapState() : getMapState()),
+            setLayers: (layers) => (_activeMapModule ? _activeMapModule.setLayers(layers) : setLayers(layers)),
+            setMapMode: (mode) => (_activeMapModule ? _activeMapModule.setMapMode(mode) : setMapMode(mode)),
+            beginWar: () => beginWar(),
+            resetGame: () => resetGame(),
         };
         // Store on module scope so keyboard handlers can access it
         _mapActions = mapActions;
+        // Expose for automated testing
+        window._mapActions = mapActions;
         menuBarEl = createMenuBar(barContainer, panelManager, layoutManager, mapActions);
     }
 
@@ -404,6 +511,10 @@ function initChat() {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendChat(chatInput);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                chatInput.blur();
+                toggleChat(false);
             }
         });
     }
@@ -587,7 +698,13 @@ function initGameControls() {
 
 async function beginWar() {
     try {
-        const resp = await fetch('/api/game/begin', { method: 'POST' });
+        const scenario = getSelectedScenario();
+        let resp;
+        if (scenario) {
+            resp = await fetch(`/api/game/battle/${encodeURIComponent(scenario)}`, { method: 'POST' });
+        } else {
+            resp = await fetch('/api/game/begin', { method: 'POST' });
+        }
         const data = await resp.json();
         if (data.error) showToast(data.error, 'alert');
     } catch (e) {
@@ -693,7 +810,15 @@ function initModal() {
 
 function initKeyboard() {
     document.addEventListener('keydown', (e) => {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        // Allow Escape even when focused on an input/textarea (to close overlays)
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            if (e.key === 'Escape') {
+                e.target.blur();
+                // Fall through to Escape handler below
+            } else {
+                return;
+            }
+        }
 
         // Ctrl+Shift+S: save layout
         if (e.ctrlKey && e.shiftKey && (e.key === 'S' || e.key === 's')) {
@@ -795,9 +920,7 @@ function initKeyboard() {
                 break;
             case 'k':
             case 'K':
-                if (_activeMapModule && _activeMapModule.toggleBuildings) {
-                    _activeMapModule.toggleBuildings();
-                }
+                _mapActions ? _mapActions.toggleBuildings() : toggleBuildings();
                 break;
             case 'g':
             case 'G':
@@ -806,6 +929,10 @@ function initKeyboard() {
             case 'i':
             case 'I':
                 _mapActions ? _mapActions.toggleSatellite() : toggleSatellite();
+                break;
+            case 'h':
+            case 'H':
+                _mapActions ? _mapActions.toggleTerrain() : toggleTerrain();
                 break;
             case 'Tab':
                 if (panelManager) {
@@ -835,44 +962,6 @@ async function fetchAmyStatus() {
         if (data.last_thought) TritiumStore.set('amy.lastThought', data.last_thought);
     } catch (e) {
         // Amy might not be running
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Dynamic renderer switching (2D ↔ 3D)
-// ---------------------------------------------------------------------------
-
-async function toggle3DMode() {
-    _is3DMode = !_is3DMode;
-    console.log(`[TRITIUM] 3D mode ${_is3DMode ? 'ON' : 'OFF'} — reloading renderer...`);
-
-    // Destroy current renderer
-    destroyMap();
-
-    try {
-        // Dynamic import based on mode
-        const mod = _is3DMode
-            ? await import('./map3d.js')
-            : await import('./map.js');
-
-        // Rebind all module-level references (the static import bindings
-        // from line 10 are const, so we can't reassign them directly.
-        // Instead we call the imported functions through the module object.)
-        // Store the module for re-dispatch.
-        _activeMapModule = mod;
-        mod.initMap();
-        EventBus.emit('toast:show', {
-            message: `Switched to ${_is3DMode ? '3D' : '2D'} mode`,
-            type: 'info',
-        });
-    } catch (err) {
-        console.error('[TRITIUM] Renderer switch failed:', err);
-        // Fallback: reload 2D
-        _is3DMode = false;
-        const fallback = await import('./map.js');
-        _activeMapModule = fallback;
-        fallback.initMap();
-        EventBus.emit('toast:show', { message: 'Failed to load 3D renderer, falling back to 2D', type: 'alert' });
     }
 }
 
