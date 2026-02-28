@@ -272,7 +272,7 @@ The **Graphlings** plugin brings compute-scalable digital life to the AI mesh. N
 
 Graphlings live in their own universe between missions, developing personalities, backstories, and motivations. When a mission begins, they cross over to play their roles — a defender who remembers last week's breach, an attacker with a grudge, a bystander who notices things. When the mission ends, they return home. The world is a mix: traditional game AI provides the crowd, Graphlings provide the intelligence.
 
-Think of it like the TV show *ReBoot*: the simulation is a game that descends into the Graphlings' world. They suit up, play their parts, and go home when the game ends. The system distributes Graphling cognition across your local compute fleet — RTX workstations, NVIDIA Jetson, GB10 dev kits, Mac Minis, or any Ollama-capable device on your network or Tailscale mesh. Small fast models handle background life; larger models drive critical decisions. Community ownership means your AI runs on your hardware.
+Think of it like the TV show *ReBoot*: the simulation is a game that descends into the Graphlings' world. They suit up, play their parts, and go home when the game ends. The system distributes Graphling cognition across your local compute fleet — desktop mini PCs, RTX workstations, NVIDIA Jetson, Mac Minis, or any Ollama-capable device on your network or Tailscale mesh. Small fast models handle background life; larger models drive critical decisions. Community ownership means your AI runs on your hardware.
 
 See [docs/PLUGIN-SPEC.md](docs/PLUGIN-SPEC.md) for the plugin architecture.
 
