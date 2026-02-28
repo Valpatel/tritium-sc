@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Batch 33 damage direction, hit marker, combat stats overlay, unit trail glow tests.
 
 Verifies damage direction indicator arcs, hit marker X flashes,

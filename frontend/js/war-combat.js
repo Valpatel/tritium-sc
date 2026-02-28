@@ -1,3 +1,6 @@
+// Created by Matthew Valancy
+// Copyright 2026 Valpatel Software LLC
+// Licensed under AGPL-3.0 — see LICENSE for details.
 /**
  * TRITIUM-SC War Room — Combat Rendering
  * Projectiles, hit effects, elimination explosions, health bars, weapon ranges, elimination streaks

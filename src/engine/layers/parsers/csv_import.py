@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Parse CSV with lat,lng columns to point Layer.
 
 Uses stdlib csv module. Expects column headers to include 'lat' and 'lng'

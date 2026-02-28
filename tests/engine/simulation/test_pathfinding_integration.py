@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Integration tests: pathfinding wired into SimulationEngine.
 
 Verifies that the engine uses the pathfinder for hostile spawns,

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Standalone mic/speaker sensor node.
 
 Phase 2 stub — any USB mic or ALSA audio device, no camera.

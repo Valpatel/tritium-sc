@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Server-side geo-reference — coordinate transforms between lat/lng and local meters.
 
 The geo-reference point (map center) grounds all simulation coordinates to

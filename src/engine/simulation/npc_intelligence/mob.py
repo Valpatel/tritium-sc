@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """MobManager — riot and mob formation behavior for NPCs.
 
 When an NPC radicalizes, nearby aggressive NPCs can be recruited into a mob.

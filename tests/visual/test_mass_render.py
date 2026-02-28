@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Mass-scale render test — 200+ units, layer isolation, OpenCV verification.
 
 Spawns hundreds of hostiles via the API, then systematically hides all

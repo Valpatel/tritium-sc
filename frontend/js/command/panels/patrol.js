@@ -1,3 +1,6 @@
+// Created by Matthew Valancy
+// Copyright 2026 Valpatel Software LLC
+// Licensed under AGPL-3.0 — see LICENSE for details.
 // Patrol Routes Panel
 // Shows friendly units with patrol waypoints, allows clearing/dispatching patrols.
 // Subscribes to: units (Map), game.phase

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Visual test: verify combat effects are visible and correctly positioned.
 
 After the AdditiveBlending -> NormalBlending fix, effects should be visible

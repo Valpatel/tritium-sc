@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Unit tests for the Amy router (/api/amy/*).
 
 Tests simulation endpoints (work in headless mode), 503 error responses

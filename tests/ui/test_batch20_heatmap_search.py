@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Batch 20 heat map legend, unit search, status bar mode, and type breakdown tests.
 
 Verifies heat map legend rendering, unit text search filter,

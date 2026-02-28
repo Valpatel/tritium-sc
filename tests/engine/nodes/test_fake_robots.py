@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Tests for fake MQTT robot fleet (scripts/fake_robots.py).
 
 Tests the FakeRobot class logic: physics ticking, telemetry format,

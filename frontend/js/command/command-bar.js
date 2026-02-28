@@ -1,3 +1,6 @@
+// Created by Matthew Valancy
+// Copyright 2026 Valpatel Software LLC
+// Licensed under AGPL-3.0 — see LICENSE for details.
 // CommandBar -- thin toolbar for panel toggles and layout management.
 // Sits between the header and the tactical area (28px height).
 //

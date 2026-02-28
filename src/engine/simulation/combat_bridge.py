@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """CombatBridge — routes simulation combat actions to physical hardware via MQTT.
 
 Dual-Authority Model

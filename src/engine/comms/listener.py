@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Streaming speech-to-text with VAD + whisper.cpp GPU for Amy.
 
 Uses Silero VAD for real-time voice activity detection and whisper.cpp

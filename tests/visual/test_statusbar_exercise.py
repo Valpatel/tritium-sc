@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """
 Status Bar Exercise: Verify all elements in the bottom status bar,
 including FPS counter, unit counts, threat count, WebSocket status,

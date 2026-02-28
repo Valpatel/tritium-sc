@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Responsive width tests — detect horizontal overflow at every viewport size.
 
 Tests the Command Center at 5 viewport widths (375..1920px) and reports

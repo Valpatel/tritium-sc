@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """MeshCoreBridge — bridges MeshCore mesh radio <-> internal EventBus + TargetTracker.
 
 MeshCore radios connect via USB serial.  This bridge reads serial frames,

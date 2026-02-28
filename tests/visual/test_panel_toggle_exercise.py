@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """
 Panel Toggle Exercise: Open/close every registered panel through the VIEW
 menu, verify each panel's DOM presence, bounding box, and visual change

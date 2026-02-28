@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """
 Keyboard Shortcuts Exercise: Verify all keyboard shortcuts work correctly.
 Tests mode switching (O/T/S), panel toggles (1/2/3/4/M/C), camera controls

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """EventBus — thread-safe pub/sub for internal event passing.
 
 This is the core messaging primitive used by Commander, SimulationEngine,

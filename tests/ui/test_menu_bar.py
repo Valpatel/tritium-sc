@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Menu bar interaction tests for the Command Center.
 
 Exercises every dropdown menu: FILE, VIEW, LAYOUT, MAP, HELP.

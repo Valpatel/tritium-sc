@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """PursuitSystem -- intercept waypoint computation for rovers.
 
 When a hostile is detected, the pursuit system computes an intercept

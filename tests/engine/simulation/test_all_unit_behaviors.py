@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Exercise every registered unit type through the simulation engine.
 
 Spawns all 16 unit types, ticks the simulation with combat enabled, and

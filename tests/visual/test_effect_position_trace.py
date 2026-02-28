@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Diagnostic: trace combat effect positions during a real battle.
 
 Hooks into EventBus combat events in the browser, captures the exact

@@ -1,3 +1,6 @@
+// Created by Matthew Valancy
+// Copyright 2026 Valpatel Software LLC
+// Licensed under AGPL-3.0 — see LICENSE for details.
 /**
  * TRITIUM-SC War Room — Visual Effects & Math Utilities
  * Smooth interpolation, trails, vision cones, scanlines, event log, cinematic camera

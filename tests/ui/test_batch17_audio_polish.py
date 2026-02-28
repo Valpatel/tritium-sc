@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Batch 17 audio integration + combat polish tests.
 
 Verifies EventBus-to-audio bridge, neutral unit type labels,

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Panel defect detection tests for the Command Center.
 
 These tests exercise KNOWN DEFECTS in the panel management system.

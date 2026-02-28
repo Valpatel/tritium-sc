@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """ThinkingThread — Amy's L4 DELIBERATION layer.
 
 A continuous background thread that reads the sensorium narrative,

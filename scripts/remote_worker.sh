@@ -1,4 +1,7 @@
 #!/bin/bash
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 # Remote worker/mirror mode launcher — run on any remote test machine
 set -euo pipefail
 

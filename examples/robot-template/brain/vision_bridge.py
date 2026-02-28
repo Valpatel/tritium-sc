@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Vision Bridge — converts YOLO detections into thinker-compatible targets.
 
 YOLO runs fast (~10fps) for reactive tracking. The LLM thinker runs slow

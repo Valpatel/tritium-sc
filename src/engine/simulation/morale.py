@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """MoraleSystem -- per-unit morale tracking and effects.
 
 Morale ranges from 0.0 (broken) to 1.0 (fully emboldened).  It decays

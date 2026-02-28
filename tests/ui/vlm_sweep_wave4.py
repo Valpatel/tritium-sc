@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """VLM Comprehensive Sweep - Wave 4
 Systematically screenshot every UI state and ask llava:7b to identify defects.
 """

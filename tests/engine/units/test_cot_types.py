@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Tests for CoT type codes on unit types.
 
 Validates that every UnitType has a valid cot_type field and that

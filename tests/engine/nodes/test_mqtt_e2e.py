@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """End-to-end integration tests for MQTT bridge data flow.
 
 These tests use REAL EventBus and REAL TargetTracker (no mocks for those)

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """NPC Intelligence Plugin — behavioral AI for neutral simulation entities.
 
 Adds FSMs, LLM-powered thinking, event reactions, crowd dynamics, and

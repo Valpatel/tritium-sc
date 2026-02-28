@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """
 Layout Switching Exercise: Switch between Commander, Observer, Tactical, and
 Battle layout presets via the LAYOUT menu.  Verify that each layout produces

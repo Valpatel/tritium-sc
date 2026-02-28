@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """MeshtasticBridge — bridges meshtastic mesh radio <-> internal EventBus + TargetTracker.
 
 LoRa mesh radios (Heltec V3, T-Beam, etc.) connect via TCP. This bridge

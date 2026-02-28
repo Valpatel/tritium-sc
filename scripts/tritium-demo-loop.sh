@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 # TRITIUM-SC Demo Loop Launcher
 # Starts the server (if not running) and runs the full autonomous demo in
 # continuous loop mode with 10-wave battles.

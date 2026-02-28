@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Visual tests for map mode switching (Observe / Tactical / Setup).
 
 Verifies that pressing O, T, S keys (or clicking mode buttons) changes

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """City-scale battle E2E proof test.
 
 Starts battle scenarios via API, captures screenshots, verifies

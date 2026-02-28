@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Test new UX features: alerts filtering, unit dispatch, placement mode, thought stream.
 
 Verifies the enhanced panel features work correctly in the Command Center.

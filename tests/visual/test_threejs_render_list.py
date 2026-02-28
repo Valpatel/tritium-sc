@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Diagnostic: check Three.js render list, exceptions, and render target.
 
 Three.js r128 issues zero draw calls despite 880 visible meshes.

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Batch 29 unit status badges, minimap pings/rally, elapsed timer, cooldown arcs tests.
 
 Verifies unit health status badges (critical/damaged), minimap ping and rally

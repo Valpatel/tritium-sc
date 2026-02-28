@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Generate synthetic CCTV camera feeds — frames and video clips.
 
 Generates 50 still frames and 1 five-second clip per camera for 6 cameras:

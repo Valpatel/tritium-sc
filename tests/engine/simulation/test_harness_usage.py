@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Combat scenario tests using SimulationTestHarness.
 
 Note on combat distances: Projectiles are semi-guided (track target's

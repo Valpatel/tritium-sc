@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Unit tests for the synthetic feed router -- CRUD, MJPEG streaming, snapshots.
 
 Tests Pydantic models, SyntheticFeedManager logic, and all endpoints

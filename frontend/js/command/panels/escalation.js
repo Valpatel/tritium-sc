@@ -1,3 +1,6 @@
+// Created by Matthew Valancy
+// Copyright 2026 Valpatel Software LLC
+// Licensed under AGPL-3.0 — see LICENSE for details.
 // Escalation Panel
 // Shows current threat level, auto-dispatch status, and recent escalation changes.
 // Subscribes to: EventBus 'escalation_change', polls /api/targets/hostiles for count.

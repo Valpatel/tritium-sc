@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """MemorySync — experience recording and batch sync to Graphling server.
 
 Queues in-game experiences per soul_id and flushes them in batch to the

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """
 Mode Switching Visual Exercise: Switch between Observe, Tactical, and Setup
 map modes.  Capture screenshots at each mode, measure visual differences

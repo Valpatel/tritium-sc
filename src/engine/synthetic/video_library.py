@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """SyntheticVideoLibrary — generate, store, and retrieve synthetic video clips.
 
 Each clip is stored as a directory under ``{library_path}/{scene_type}/{timestamp}/``

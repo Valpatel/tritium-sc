@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Map data layer system — import/export/stream geospatial formats.
 
 Supports KML 2.3, GeoJSON (RFC 7946), GPX 1.1, CoT XML, and CSV.

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Tests for Lua formation actions — TDD red phase.
 
 These tests cover formation creation, formation types (wedge/line/column/circle),

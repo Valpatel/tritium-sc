@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Tests for AgentBridge agency methods — feedback, pending-actions, world model, mood, objectives.
 
 These close the loop between the Tritium-SC plugin and the Graphlings server,

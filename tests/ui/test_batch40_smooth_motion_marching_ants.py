@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Batch 40 smooth motion, marching ants, help gaps, toast animation tests.
 
 Verifies smooth unit position interpolation, animated patrol path dashes,

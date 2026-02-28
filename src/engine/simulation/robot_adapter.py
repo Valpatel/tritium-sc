@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """FakeRobotAdapter — bridges FakeRobot to the MQTT pipeline without a real broker.
 
 Provides bidirectional in-process message routing:

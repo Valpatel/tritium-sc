@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """SensorSimulator -- virtual sensor network that reacts to nearby targets.
 
 Sensors (motion detectors, door sensors, tripwires) are placed in the scenario

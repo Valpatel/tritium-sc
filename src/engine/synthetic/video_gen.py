@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Synthetic video frame generators for tactical surveillance footage.
 
 Each function takes target data (SimulationTarget-like dicts or objects) and

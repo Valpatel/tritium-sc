@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Mission Combat — E2E visual verification of LLM-generated mission placement and battle.
 
 Verifies the full pipeline: generate scripted mission -> defenders placed near

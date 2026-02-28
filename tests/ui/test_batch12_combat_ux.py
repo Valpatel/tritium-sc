@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Batch 12 combat UX feature tests.
 
 Verifies panel border flash animations, inline health bars in Units panel,

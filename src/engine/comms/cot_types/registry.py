@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """CoT type data registry.
 
 Loads curated MIL-STD-2525 atom types and TAK extension types from JSON,

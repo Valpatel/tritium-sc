@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Map interaction tests for the Command Center.
 
 Exercises pan, zoom, satellite toggle, roads toggle, minimap toggle,

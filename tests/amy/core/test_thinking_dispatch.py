@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Integration tests for Amy's thinking dispatch — verify she can command units.
 
 Tests that parse_motor_output correctly handles dispatch/escalate/clear_threat

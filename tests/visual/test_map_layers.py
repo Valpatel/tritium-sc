@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Playwright E2E tests for map layer toggle behavior in the Command Center.
 
 Verifies that keyboard shortcuts and programmatic actions correctly toggle

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Batch 24 engagement lines, hostile threat ranges, wave progress, unit status tests.
 
 Verifies engagement line rendering between shooter and target,

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Tests for MeshWebSource._fetch_nodes() multi-format parsing.
 
 TDD — written before implementation changes. These tests exercise the

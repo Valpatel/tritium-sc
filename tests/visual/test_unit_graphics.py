@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Visual tests for unit graphics, combat effects, and fog of war.
 
 Uses Playwright to take screenshots during active simulation and OpenCV

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """
 Unit Marker Exercise: Verify DOM markers show location indicators
 when 3D models are hidden, and exercise marker styles across modes.

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Batch 36 kill lines, formation hull, quick-select, threat proximity tests.
 
 Verifies elimination kill line animation, formation convex hull overlay,

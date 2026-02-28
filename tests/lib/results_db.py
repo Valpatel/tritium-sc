@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """ResultsDB — SQLite store for test results, screenshots, and trends.
 
 Persists test run data across sessions for reporting, trend analysis,

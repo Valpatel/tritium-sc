@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """SpatialGrid — grid-based spatial partitioning for O(1) neighbor queries.
 
 Used by the SimulationEngine to replace O(n^2) scans in combat,

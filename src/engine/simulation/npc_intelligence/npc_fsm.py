@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """NPC FSM factories — state machines for civilian pedestrians, vehicles, animals.
 
 Each factory creates a StateMachine using the builder API. The FSMs are

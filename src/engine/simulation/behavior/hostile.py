@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """HostileBehavior -- hostile kid combat AI with tactical layers.
 
 Kids with nerf guns. Follow waypoints, shoot at defenders in range.

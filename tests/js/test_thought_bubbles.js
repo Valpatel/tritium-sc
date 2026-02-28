@@ -1,3 +1,6 @@
+// Created by Matthew Valancy
+// Copyright 2026 Valpatel Software LLC
+// Licensed under AGPL-3.0 — see LICENSE for details.
 /**
  * TRITIUM-SC Thought Bubble Tests
  * Tests the helper functions for NPC thought bubble rendering.

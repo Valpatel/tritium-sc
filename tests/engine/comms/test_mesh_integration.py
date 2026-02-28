@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Integration tests for mesh subsystem wiring into main.py.
 
 Verifies that MeshCoreBridge and MeshWebSource are started/skipped

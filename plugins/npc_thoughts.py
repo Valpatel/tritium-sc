@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """NPC Context-Aware Thought Bubble Plugin — reference implementation.
 
 Demonstrates the ThoughtRegistry + PluginInterface end-to-end:

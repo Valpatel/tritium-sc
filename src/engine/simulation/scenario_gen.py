@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """ScenarioGenerator — LLM-based battle scenario context generation.
 
 At the start of each battle round, generates rich narrative context via Ollama:

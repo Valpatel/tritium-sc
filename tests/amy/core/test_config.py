@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Unit tests for app/config.py — Settings validation, defaults, env parsing.
 
 Tests Pydantic settings model: default values, type coercion, and

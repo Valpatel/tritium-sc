@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Batch 38 dispatch distance, chat timestamps, selection card, ping distance tests.
 
 Verifies dispatch arrow distance+bearing labels, chat message timestamps,

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """
 Map Interaction Exercise: Zoom, pan, tilt, click on units, and verify
 the map responds correctly.  Uses OpenCV to measure visual changes and

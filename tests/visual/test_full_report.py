@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Comprehensive full-feature test report for TRITIUM-SC Command Center.
 
 Exercises ALL system features: panel management, map rendering, game flow,

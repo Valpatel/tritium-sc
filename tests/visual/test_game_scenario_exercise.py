@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """
 Game Scenario Exercise: Open the GAME menu, select each scenario, start a
 battle, verify combat events begin, and capture visual proof at each stage.

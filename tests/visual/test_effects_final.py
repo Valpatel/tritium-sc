@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Final verification: combat effects positioned at units, no top-left spill.
 
 Run: .venv/bin/python3 tests/visual/test_effects_final.py

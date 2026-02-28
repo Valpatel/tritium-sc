@@ -1,3 +1,6 @@
+// Created by Matthew Valancy
+// Copyright 2026 Valpatel Software LLC
+// Licensed under AGPL-3.0 — see LICENSE for details.
 // Audio Controls Panel
 // Sound effects browser, volume control, mute toggle.
 // Lists effects from /api/audio/effects, click to preview.

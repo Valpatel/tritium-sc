@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Threat escalation — autonomous threat classification and unit dispatch.
 
 Architecture overview:  docs/ESCALATION.md

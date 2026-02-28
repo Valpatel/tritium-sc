@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Robot Thinker — LLM-powered autonomous thinking for robots.
 
 Gives robots their own thinking thread with Lua action generation,

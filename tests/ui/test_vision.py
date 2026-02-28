@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """TRITIUM-SC Comprehensive UI Audit Suite.
 
 Sweeps every view at mobile/tablet/desktop resolutions using multiple local

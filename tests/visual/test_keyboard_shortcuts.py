@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """E2E tests for Command Center keyboard shortcuts.
 
 Validates every shortcut in initKeyboard() (main.js lines 786-928):

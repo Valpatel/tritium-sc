@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Batch 27 score popups, zone breach alarm, auto-center, compass labels tests.
 
 Verifies floating score popups on eliminations, zone breach flash overlay,

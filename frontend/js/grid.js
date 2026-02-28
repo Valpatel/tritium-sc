@@ -1,3 +1,6 @@
+// Created by Matthew Valancy
+// Copyright 2026 Valpatel Software LLC
+// Licensed under AGPL-3.0 — see LICENSE for details.
 /**
  * TRITIUM - 3D Camera Grid with Live Previews
  * Interactive Three.js visualization for camera spatial layout

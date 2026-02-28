@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Smoke tests for ReportGenerator — validates HTML report generation."""
 import os
 import tempfile

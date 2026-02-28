@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Batch 19 grid labels, measurement shortcut, and selection UX tests.
 
 Verifies coordinate grid labels, measurement tool keyboard activation,

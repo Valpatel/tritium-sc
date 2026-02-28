@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Synthetic camera feed router — MJPEG streaming from synthetic renderers.
 
 Provides REST endpoints to create, list, snapshot, stream, and delete

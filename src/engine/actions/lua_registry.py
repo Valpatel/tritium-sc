@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Extensible Lua action registry for Amy and robots.
 
 Replaces the hardcoded VALID_ACTIONS dict in lua_motor.py with a dynamic

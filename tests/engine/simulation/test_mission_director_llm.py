@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Integration tests for MissionDirector with real Ollama LLM.
 
 These tests call a real local Ollama instance (gemma3:4b by default).

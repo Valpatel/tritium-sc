@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """GIS data layer endpoints — Dublin, CA government ArcGIS services.
 
 All data sources are FREE government services (no API keys):

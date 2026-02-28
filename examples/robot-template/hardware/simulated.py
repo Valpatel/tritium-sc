@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Simulated hardware backend — no real hardware required.
 
 Simulates an RC car moving on a 2D plane. Position updates based on

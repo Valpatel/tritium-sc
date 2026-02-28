@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """WeaponSystem -- per-unit weapon state with ammo, accuracy, and weapon class.
 
 Each unit can have a weapon assigned with specific stats.  The weapon system

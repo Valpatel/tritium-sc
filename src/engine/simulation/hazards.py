@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """HazardManager — environmental hazards that block paths and force rerouting.
 
 Hazards are dynamic obstacles (roadblocks, fires, floods) that spawn during

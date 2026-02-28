@@ -1,3 +1,6 @@
+// Created by Matthew Valancy
+// Copyright 2026 Valpatel Software LLC
+// Licensed under AGPL-3.0 — see LICENSE for details.
 // TRITIUM Command Center -- entry point
 // Initializes store, event bus, WebSocket, panel system, and UI bindings.
 // Serves both unified (floating panels) and legacy (sidebar+bottom bar) layouts.

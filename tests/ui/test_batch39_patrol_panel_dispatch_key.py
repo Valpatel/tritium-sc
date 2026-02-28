@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Batch 39 patrol panel, D dispatch shortcut, help overlay updates tests.
 
 Verifies patrol panel registration and toggling, D key dispatch mode,

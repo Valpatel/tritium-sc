@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Deep unit tests for HostileBehavior -- hostile kid combat AI with tactical layers.
 
 Exhaustive coverage of every method, decision branch, and edge case in

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """PerceptionEngine — translates TRITIUM-SC game state to graphling perception.
 
 Reads from TargetTracker to find nearby entities, calculates danger level,

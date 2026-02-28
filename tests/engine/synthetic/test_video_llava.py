@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """LLaVA structured visual validation of synthetic video frames.
 
 Uses Ollama's llava:7b for visual verification with majority vote.

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """
 System Panel Exercise: Verify 5-tab system panel (Cameras, Discovery,
 Telemetry, Perf, AI), tab switching, data displays, and action buttons.

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Verify that the units registry contains all expected types and values.
 
 These tests ensure the registry holds the canonical data that was previously

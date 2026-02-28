@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Parse GeoJSON (RFC 7946) to Layer using stdlib json.
 
 Handles FeatureCollection, Feature, Point/LineString/Polygon geometries.

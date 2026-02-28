@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Intercept prediction — proportional navigation and lead targeting.
 
 Provides three functions used by the behavior and combat systems:

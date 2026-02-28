@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """
 Escalation Panel Exercise: Verify threat level display, hostile count,
 auto-dispatch indicator, escalation history, and color coding per threat level.

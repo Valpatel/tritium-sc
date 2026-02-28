@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """NPCRouter — NPC-type-aware pathfinding that respects spatial rules.
 
 Pedestrians walk on sidewalks, cross roads at crosswalks, and avoid buildings.

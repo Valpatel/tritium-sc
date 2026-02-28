@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Telemetry publisher node for ROS2 robot.
 
 Subscribes to standard ROS2 topics (/odom, /battery_state, /joint_states)

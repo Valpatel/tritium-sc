@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """
 Minimap Panel Exercise: Verify minimap renders as a standard panel with
 zones, units, camera viewport, click-to-pan, resize, and drag.

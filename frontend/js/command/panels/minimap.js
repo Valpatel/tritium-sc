@@ -1,3 +1,6 @@
+// Created by Matthew Valancy
+// Copyright 2026 Valpatel Software LLC
+// Licensed under AGPL-3.0 — see LICENSE for details.
 // Minimap Panel
 // Tactical overview panel showing all units, zones, and camera viewport.
 // Renders via a dedicated canvas. Click to pan the main map.

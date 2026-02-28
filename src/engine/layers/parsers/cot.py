@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Parse CoT (Cursor on Target) XML to LayerFeature.
 
 Uses xml.etree.ElementTree (stdlib only). References the existing CoT parser

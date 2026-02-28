@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """SyntheticCameraNode — generates MJPEG from simulation state.
 
 Provides a bird's-eye view of the battlespace as if from a virtual overhead

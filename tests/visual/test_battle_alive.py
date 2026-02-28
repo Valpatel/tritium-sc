@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Battle Alive Test — verify combat happens fast with dramatic effects.
 
 Starts a battle, spawns extra hostiles close to defenders, and checks:

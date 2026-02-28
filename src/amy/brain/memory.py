@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Long-term memory for Amy — persists observations across sessions.
 
 Stores spatial observations (what Amy has seen at different camera angles),

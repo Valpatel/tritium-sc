@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Multi-action Lua parser for compound behavior sequences.
 
 Extends the single-action lua_motor parser to handle multiple Lua

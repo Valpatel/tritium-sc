@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """BehaviorTreeFallback — weighted-random NPC decision making.
 
 When the LLM is unavailable or a brain doesn't need a full think cycle,

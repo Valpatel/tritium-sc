@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Batch 23 kill feed, unit cycling, multi-select highlight, and batch commands tests.
 
 Verifies kill feed overlay rendering, Tab/Shift+Tab unit cycling,

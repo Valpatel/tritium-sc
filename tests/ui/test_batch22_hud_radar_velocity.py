@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Batch 22 game phase HUD, radar sweep, velocity vectors, and gamePhase sync tests.
 
 Verifies canvas combat HUD overlay, minimap radar sweep animation,

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Loader shim for PluginManager auto-discovery.
 
 PluginManager scans plugins/ for top-level *.py files. This file

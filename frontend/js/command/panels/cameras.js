@@ -1,3 +1,6 @@
+// Created by Matthew Valancy
+// Copyright 2026 Valpatel Software LLC
+// Licensed under AGPL-3.0 — see LICENSE for details.
 // Camera Feeds Panel
 // Shows synthetic camera MJPEG feeds as PIP overlays.
 // Lists feeds from /api/synthetic/cameras, click to view MJPEG stream.

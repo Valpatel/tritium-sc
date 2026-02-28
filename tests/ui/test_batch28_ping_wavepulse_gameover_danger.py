@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Batch 28 tactical ping, wave zoom pulse, enhanced game over, danger close tests.
 
 Verifies Z-key tactical pings, wave transition zoom pulse effect,

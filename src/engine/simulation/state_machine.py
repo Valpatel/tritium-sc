@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """State machine infrastructure for unit behavior FSMs.
 
 Provides generic State, Transition, and StateMachine classes that can be

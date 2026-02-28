@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Responsive RESIZE tests — verify the UI adapts when viewport changes.
 
 Unlike test_responsive_width.py (which opens fresh pages at each size),

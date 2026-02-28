@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """SimulationLifecycleHandler — auto-deploy graphlings on countdown, recall on game over.
 
 Listens for game_state_change events from the EventBus and orchestrates

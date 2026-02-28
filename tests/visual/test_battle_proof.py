@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Battle Proof — end-to-end 10-wave battle verification with screenshots.
 
 Runs a FULL battle from server health check through victory/defeat,

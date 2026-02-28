@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Comprehensive unit tests for Amy Commander — the core orchestrator.
 
 Tests all module-level tactical functions, Commander class methods, mode logic,

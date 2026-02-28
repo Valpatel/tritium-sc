@@ -1,3 +1,6 @@
+// Created by Matthew Valancy
+// Copyright 2026 Valpatel Software LLC
+// Licensed under AGPL-3.0 — see LICENSE for details.
 // Search / Intel Panel
 // People and vehicle identification, recurring individual detection,
 // suspicion scoring, visual similarity search, text search via CLIP.

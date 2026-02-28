@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Unit tests for app.main — FastAPI app creation, routing, middleware, lifespan.
 
 Tests verify the FastAPI instance configuration, router registration,

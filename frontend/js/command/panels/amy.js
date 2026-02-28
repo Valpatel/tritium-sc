@@ -1,3 +1,6 @@
+// Created by Matthew Valancy
+// Copyright 2026 Valpatel Software LLC
+// Licensed under AGPL-3.0 — see LICENSE for details.
 // Amy Commander Panel
 // Portrait, state, mood, latest thought, CHAT and ATTEND buttons.
 // Subscribes to: amy.state, amy.mood, amy.lastThought, amy.speaking

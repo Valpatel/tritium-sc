@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Unit tests for ScenarioLibrary — load, list, save, rate, stats, export.
 
 Uses temp directories so no real scenario files are needed.

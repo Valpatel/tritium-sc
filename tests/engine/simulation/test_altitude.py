@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Tests for altitude and 3D building collision awareness.
 
 Phase 1: Data model (altitude field, building heights)

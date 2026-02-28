@@ -1,3 +1,6 @@
+// Created by Matthew Valancy
+// Copyright 2026 Valpatel Software LLC
+// Licensed under AGPL-3.0 — see LICENSE for details.
 // Video Playback Panel
 // Browse NVR channels, dates, and video files. Stream MP4 with
 // detection annotation overlay. Uses /api/videos/* endpoints.

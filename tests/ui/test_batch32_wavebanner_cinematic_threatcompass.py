@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Batch 32 canvas wave banner, cinematic camera, threat compass, minimap health tests.
 
 Verifies big canvas wave banner animation, K-key cinematic camera orbit,

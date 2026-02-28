@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """
 Events Timeline Exercise: Verify event filtering, list rendering,
 clear button, event types, timestamps, and auto-scroll behavior.

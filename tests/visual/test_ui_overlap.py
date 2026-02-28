@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """UI Overlap Detection & Label Validation Pipeline.
 
 Detects overlapping UI elements, validates label rendering quality,

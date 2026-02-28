@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """E2E tests for TAK bridge with real EventBus + TargetTracker.
 
 These tests verify the full pipeline without a real TAK server:

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Layered perception — cheap OpenCV frame analysis before expensive ML.
 
 L0: Quality gate (sharpness, brightness) — reject blurred/dark frames

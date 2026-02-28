@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """MotorOutput — converts graphling LLM actions to TRITIUM-SC state changes.
 
 Parses Lua-style action strings (from the Graphlings consciousness engine)

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """
 Patrol Panel Exercise: Verify patrol routes, unit health bars, idle/active
 listings, Patrol All / Recall All buttons, and unit selection interaction.

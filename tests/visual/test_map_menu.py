@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Map Menu tests -- verify all menu items, checkmarks, toggles, and keyboard shortcuts.
 
 Uses Playwright (headed) to exercise the MAP dropdown in the Command Center menu bar.

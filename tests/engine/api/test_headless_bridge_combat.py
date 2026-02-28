@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Tests for headless WS bridge combat event forwarding.
 
 Verifies that start_headless_event_bridge forwards ALL combat events to

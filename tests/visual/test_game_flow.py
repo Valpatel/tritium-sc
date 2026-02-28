@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Full game lifecycle E2E test: setup -> countdown -> active -> wave_complete -> victory/game_over.
 
 Validates the complete war flow through both the REST API and the browser UI,

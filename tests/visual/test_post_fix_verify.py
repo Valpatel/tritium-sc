@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Post-fix verification sweep: confirm all visual defects are actually fixed.
 
 Uses headed Playwright + OpenCV + local VLM (llava:7b) to verify:

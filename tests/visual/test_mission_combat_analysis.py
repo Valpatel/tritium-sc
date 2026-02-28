@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Deep tactical analysis of combat test screenshots.
 
 Post-test analysis suite that runs AFTER combat tests produce screenshots.

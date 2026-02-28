@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Visual quality tests for the Command Center view.
 
 Verifies the unified tactical map renders correctly with:

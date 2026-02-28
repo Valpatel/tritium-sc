@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Tests for A* pathfinding with street graph and building obstacle awareness.
 
 TDD: These tests are written FIRST, before the implementation.

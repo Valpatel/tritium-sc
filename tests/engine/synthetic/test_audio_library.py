@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Unit tests for AudioLibrary — effect catalog, generation, caching, WAV writing.
 
 Tests with tmp_path for isolated file I/O. Requires numpy only.

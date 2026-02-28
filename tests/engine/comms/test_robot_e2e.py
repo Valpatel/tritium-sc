@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """End-to-end tests using FakeRobot + mqtt_cot codec.
 
 ~15 tests verifying the full pipeline: FakeRobot telemetry -> CoT XML -> back,

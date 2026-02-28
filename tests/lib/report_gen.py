@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """HTML Report Generator — Cybercore v2 styled interactive test reports.
 
 Generates self-contained HTML reports from ResultsDB data with:

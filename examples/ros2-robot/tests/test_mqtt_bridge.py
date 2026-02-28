@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Unit tests for the ROS2 MQTT bridge node logic.
 
 Tests verify MQTT message formats, command parsing, topic structure,

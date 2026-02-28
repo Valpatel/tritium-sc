@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """MQTT CoT codec -- converts between TRITIUM JSON and CoT XML on MQTT.
 
 Pure functions for encoding/decoding CoT XML payloads that travel over MQTT.

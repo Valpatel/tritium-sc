@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Unit tests for ModelRouter — task-aware model selection with fleet fallback.
 
 Tests TaskType classification, ModelProfile, model selection chains,

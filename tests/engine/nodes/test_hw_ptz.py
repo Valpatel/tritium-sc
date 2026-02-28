@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Hardware tests for BCC950Node PTZ (pan/tilt/zoom) functionality.
 
 Requires a physical BCC950 ConferenceCam connected via USB.

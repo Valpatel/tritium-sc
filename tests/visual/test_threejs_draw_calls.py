@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Diagnostic: count Three.js draw calls and check shader compilation.
 
 We know raw WebGL works inside the custom layer. The question is:

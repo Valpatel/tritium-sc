@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Telemetry API — proxies InfluxDB queries so tokens never reach the browser."""
 
 from __future__ import annotations

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """BCC950 PTZ camera + mic + speaker sensor node.
 
 Full-featured node: camera with YOLO-capable frames, PTZ motor control,

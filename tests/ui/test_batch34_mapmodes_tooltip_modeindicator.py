@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Batch 34 map mode behaviors, setup grid, tooltip weapon range, mode indicator tests.
 
 Verifies tactical mode friendly range rings, setup mode 5m grid overlay,

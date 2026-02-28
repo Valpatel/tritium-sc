@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Unit tests for the geo router — geocoding, satellite tiles, building footprints.
 
 Tests Pydantic models, cache logic, tile zoom validation, and endpoints

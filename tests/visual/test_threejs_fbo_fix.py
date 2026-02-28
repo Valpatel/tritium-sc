@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Diagnostic: check framebuffer binding during Three.js custom layer render.
 
 Theory: MapLibre v4 renders to an internal FBO. Three.js renderer.render()

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Integration tests for ModelRouter wiring into Amy's subsystems.
 
 Tests that create_amy(), Commander, ThinkingThread, and Agent correctly

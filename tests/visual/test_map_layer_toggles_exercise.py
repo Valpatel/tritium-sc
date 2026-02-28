@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """
 Map Layer Toggles Exercise: Verify each map layer toggle produces visible
 changes. Tests satellite, roads, grid, buildings, fog, terrain, waterways,

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """ROS2 <-> TRITIUM-SC MQTT bridge node.
 
 Subscribes to TRITIUM-SC command topics via MQTT, translates them into

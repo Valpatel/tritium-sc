@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """LLM review of gameplay test results using qwen2.5:7b on a remote Ollama host."""
 
 import json, os, subprocess, sys, requests

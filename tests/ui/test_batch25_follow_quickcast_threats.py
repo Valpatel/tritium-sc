@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Batch 25 camera follow, quick-cast placement, off-screen threats, formation center tests.
 
 Verifies double-click camera tracking mode, Q/W/A quick-cast placement hotkeys,

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Tool dispatch for LLM-driven camera control.
 
 Uses the SensorNode interface instead of BCC950Controller directly.

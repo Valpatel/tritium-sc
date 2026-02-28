@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Tests for Phase 3D: Adaptive Compute Efficiency.
 
 Tests that the think loop adapts its frequency and consciousness layer

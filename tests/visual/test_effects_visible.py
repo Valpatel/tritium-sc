@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Verify combat effects are visible and positioned near units.
 
 Tests the threeEffectsRoot fix — effects should render in observe mode

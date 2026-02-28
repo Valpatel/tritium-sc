@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """End-to-end test for the full escalation pipeline.
 
 Hostile appears -> enters zone -> ThreatClassifier escalates ->

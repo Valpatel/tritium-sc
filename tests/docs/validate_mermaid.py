@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Validate all Mermaid diagrams in docs/ by rendering them in a real browser.
 
 Uses Playwright to load mermaid.js, render each diagram, and capture

@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """Unit tests for RobotFSMBridge — bridges MQTT robots to the FSM system.
 
 TDD: tests written first, implementation follows.

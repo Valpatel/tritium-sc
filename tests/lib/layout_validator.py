@@ -1,3 +1,6 @@
+# Created by Matthew Valancy
+# Copyright 2026 Valpatel Software LLC
+# Licensed under AGPL-3.0 — see LICENSE for details.
 """BoundingBoxValidator -- reusable spatial validation for Playwright pages.
 
 Wraps a Playwright sync_api page object and provides:
