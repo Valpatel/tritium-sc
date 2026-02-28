@@ -175,3 +175,4 @@ docs/screenshots/demo/
 # ==================
 # Real-world safety mission docs - never commit
 sensitive-docs/
+tests/engine/.test-results/
