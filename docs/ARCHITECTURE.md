@@ -245,17 +245,17 @@ Amy runs multiple daemon threads coordinated through the EventBus:
 |------|---------|
 | `src/app/main.py` | FastAPI lifespan, boot sequence |
 | `src/amy/commander.py` | Commander, VisionThread, AudioThread |
-| `src/amy/comms/event_bus.py` | EventBus — thread-safe pub/sub for all internal events |
+| `src/engine/comms/event_bus.py` | EventBus — thread-safe pub/sub for all internal events |
 | `src/amy/brain/thinking.py` | ThinkingThread, GoalStack |
 | `src/amy/brain/sensorium.py` | Temporal sensor fusion, narrative |
-| `src/amy/tactical/target_tracker.py` | Unified real+virtual target registry |
-| `src/amy/tactical/escalation.py` | ThreatClassifier, AutoDispatcher |
-| `src/amy/comms/mqtt_bridge.py` | MQTT broker bridge |
-| `src/amy/simulation/engine.py` | SimulationEngine (10Hz tick loop) |
-| `src/amy/simulation/target.py` | SimulationTarget dataclass |
-| `src/amy/simulation/ambient.py` | AmbientSpawner (neutral targets) |
-| `src/amy/simulation/loader.py` | TritiumLevelFormat parser |
-| `src/amy/tactical/geo.py` | WGS84 coordinate reference + transforms |
+| `src/engine/tactical/target_tracker.py` | Unified real+virtual target registry |
+| `src/engine/tactical/escalation.py` | ThreatClassifier, AutoDispatcher |
+| `src/engine/comms/mqtt_bridge.py` | MQTT broker bridge |
+| `src/engine/simulation/engine.py` | SimulationEngine (10Hz tick loop) |
+| `src/engine/simulation/target.py` | SimulationTarget dataclass |
+| `src/engine/simulation/ambient.py` | AmbientSpawner (neutral targets) |
+| `src/engine/simulation/loader.py` | TritiumLevelFormat parser |
+| `src/engine/tactical/geo.py` | WGS84 coordinate reference + transforms |
 | `src/amy/brain/perception.py` | Layered frame analysis (L0-L2) |
 | `src/app/routers/ws.py` | WebSocket bridge + TelemetryBatcher |
 | `frontend/js/war.js` | War Room canvas renderer |

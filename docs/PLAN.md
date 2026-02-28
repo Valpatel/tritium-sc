@@ -173,11 +173,11 @@ COMPLETE (Phase 0-4)      PHASE 5 (Active)          FUTURE (Phase 6+)
 - [x] War Room audio: Web Audio API, event-to-sound mapping, volume controls
 - [x] Synthetic camera PIP: MJPEG feed in War Room (V to toggle, M to mute)
 - [x] Synthetic feed manager: MJPEG streaming, snapshot, CRUD API
-- [x] ModelRouter: task-aware model selection with two-stage failover (`src/amy/inference/model_router.py`)
-- [x] OllamaFleet: multi-host discovery from conf/env/Tailscale (`src/amy/inference/fleet.py`)
+- [x] ModelRouter: task-aware model selection with two-stage failover (`src/engine/inference/model_router.py`)
+- [x] OllamaFleet: multi-host discovery from conf/env/Tailscale (`src/engine/inference/fleet.py`)
 - [x] LuaActionRegistry: dynamic action registration for robots/plugins (`src/amy/actions/lua_registry.py`)
 - [x] Multi-action Lua: compound behavior parsing + sequence validation (`src/amy/actions/lua_multi.py`)
-- [x] RobotThinker (server-side): LLM-powered robot thinking with registry (`src/amy/inference/robot_thinker.py`)
+- [x] RobotThinker (server-side): LLM-powered robot thinking with registry (`src/engine/inference/robot_thinker.py`)
 
 ### Phase 5: Hardware Integration + Sim-to-Real [IN PROGRESS]
 

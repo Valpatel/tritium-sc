@@ -129,9 +129,9 @@ def infer(self, task_type: TaskType, messages: list[dict],
     raise AllHostsFailedError(task_type)
 ```
 
-### 2. Fleet Integration (`src/amy/inference/fleet.py`)
+### 2. Fleet Integration (`src/engine/inference/fleet.py`)
 
-Promote `tests/lib/ollama_fleet.py` to production at `src/amy/inference/fleet.py`.
+Promote `tests/lib/ollama_fleet.py` to production at `src/engine/inference/fleet.py`.
 Same discovery logic — no changes needed:
 
 - `conf/ollama-fleet.conf` (gitignored) — explicit host list
@@ -302,9 +302,9 @@ extension is:
 
 ### Phase 1: ModelRouter + Fleet (core infrastructure) [COMPLETE]
 
-1. [x] `src/amy/inference/model_router.py` — TaskType enum, ModelProfile dataclass, ModelRouter
+1. [x] `src/engine/inference/model_router.py` — TaskType enum, ModelProfile dataclass, ModelRouter
    with classify_task(), select_chain(), infer() with two-stage failover
-2. [x] `src/amy/inference/fleet.py` — OllamaFleet promoted from tests/lib, with FleetHost
+2. [x] `src/engine/inference/fleet.py` — OllamaFleet promoted from tests/lib, with FleetHost
    dataclass, auto-discovery (conf/env/Tailscale/localhost), parallel probing
 3. [x] Fleet configuration via `conf/ollama-fleet.conf` (gitignored),
    `OLLAMA_HOSTS` env var, and Tailscale auto-discovery
@@ -325,7 +325,7 @@ extension is:
 
 ### Phase 3: Robot Thinker (autonomous robots) [COMPLETE]
 
-13. [x] `src/amy/inference/robot_thinker.py` — RobotThinker with LuaActionRegistry integration,
+13. [x] `src/engine/inference/robot_thinker.py` — RobotThinker with LuaActionRegistry integration,
     ModelRouter support, thought history, MQTT message generation
 14. [x] `examples/robot-template/brain/thinker.py` — standalone RobotThinker
     (no src/amy/ dependency), built-in Lua parser, action dispatch handlers
@@ -373,7 +373,7 @@ the reality gap between Amy's simulation engine and actual deployment.
     single-robot dispatch to coordinated multi-robot behaviors. Amy
     assigns roles (scout, overwatch, interceptor), robots negotiate
     waypoints via MQTT, fleet-level state machine tracks mission progress.
-    Requires: `src/amy/inference/fleet_coordinator.py`, extended MQTT topics for
+    Requires: `src/engine/inference/fleet_coordinator.py`, extended MQTT topics for
     inter-robot communication (`tritium/{site}/robots/fleet/plan`).
 
 ### Phase 6: Advanced Intelligence [PLANNED]

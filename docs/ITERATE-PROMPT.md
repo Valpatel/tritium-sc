@@ -23,10 +23,10 @@ frontend/js/editor/TritiumEditorPlugin.js.
 ### What exists (read before changing)
 
 Backend simulation:
-- src/amy/simulation/target.py — SimulationTarget dataclass with tick(), waypoints, battery
-- src/amy/simulation/engine.py — 10Hz tick loop, hostile spawner, EventBus telemetry
-- src/amy/simulation/loader.py — reads TritiumLevelFormat JSON into simulation targets
-- src/amy/tactical/target_tracker.py — unified TargetTracker merging sim + YOLO detections
+- src/engine/simulation/target.py — SimulationTarget dataclass with tick(), waypoints, battery
+- src/engine/simulation/engine.py — 10Hz tick loop, hostile spawner, EventBus telemetry
+- src/engine/simulation/loader.py — reads TritiumLevelFormat JSON into simulation targets
+- src/engine/tactical/target_tracker.py — unified TargetTracker merging sim + YOLO detections
 - src/amy/commander.py — _sim_bridge_loop feeds EventBus events into TargetTracker
 - src/amy/brain/thinking.py — battlespace context in thinking prompt, dispatch/alert/patrol actions
 - src/amy/actions/lua_motor.py — dispatch(), alert(), patrol() Lua actions

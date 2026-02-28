@@ -347,8 +347,8 @@ The `MQTTBridge` lives in the `comms/` package alongside `EventBus`:
    Amy orchestrates it but does not own it — the bridge would exist
    even without Amy (e.g., for a headless sensor aggregator).
 
-2. **Clean dependency direction.** `src/amy/comms/` depends on `src/amy/tactical/`
-   (TargetTracker) for data injection. Amy modules depend on `src/amy/comms/`
+2. **Clean dependency direction.** `src/engine/comms/` depends on `src/engine/tactical/`
+   (TargetTracker) for data injection. Amy modules depend on `src/engine/comms/`
    (EventBus) for pub/sub. No circular imports.
 
 ### Reconnection Behavior

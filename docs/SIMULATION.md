@@ -2,7 +2,7 @@
 
 The simulation engine is the system's continuous integration test. It drives virtual targets across the tactical map at 10 Hz — hostile intruders, friendly units (rovers, drones, turrets), and ambient neighborhood activity (neighbors, cars, dogs, cats, delivery people). All simulated targets flow through the same TargetTracker and EventBus as real hardware, exercising the exact pipelines Amy uses in normal operation.
 
-Source: `src/amy/simulation/`
+Source: `src/engine/simulation/`
 
 ## Target Lifecycle
 
@@ -401,7 +401,7 @@ A real neighborhood deployment: 30+ cameras, 10 robots, 100+ people/hour, 20+ zo
 
 ## TritiumLevelFormat Specification
 
-Layout files define the static starting state of a neighborhood. The loader (`src/amy/simulation/loader.py`) reads these at boot and populates the simulation engine.
+Layout files define the static starting state of a neighborhood. The loader (`src/engine/simulation/loader.py`) reads these at boot and populates the simulation engine.
 
 ### File Structure
 

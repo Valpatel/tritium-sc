@@ -9,7 +9,7 @@ TRITIUM-SC uses a local coordinate system anchored to a real-world geo-reference
 - **1 unit = 1 meter**
 - **Heading 0 = North**, clockwise in degrees
 
-The same coordinate math is implemented on both server (`src/amy/tactical/geo.py`) and client (`frontend/js/geo.js`).
+The same coordinate math is implemented on both server (`src/engine/tactical/geo.py`) and client (`frontend/js/geo.js`).
 
 ## Position Sources
 

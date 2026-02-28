@@ -22,7 +22,7 @@ Every feature below is defined by what the **test report** shows when it passes.
 
 Pull road segments from Overpass API for the configured geo-reference, build a NetworkX graph with intersections as nodes and road segments as edges.
 
-**File**: `src/amy/tactical/street_graph.py`
+**File**: `src/engine/tactical/street_graph.py`
 
 **Test report shows**:
 | Test | Assertion |
@@ -38,7 +38,7 @@ Pull road segments from Overpass API for the configured geo-reference, build a N
 
 Pull building polygons from Overpass API. Units cannot path through buildings.
 
-**File**: `src/amy/tactical/obstacles.py`
+**File**: `src/engine/tactical/obstacles.py`
 
 **Test report shows**:
 | Test | Assertion |
@@ -52,7 +52,7 @@ Pull building polygons from Overpass API. Units cannot path through buildings.
 
 Replace straight-line waypoint following with A* on the street graph. Different unit types use different strategies.
 
-**File**: `src/amy/simulation/pathfinding.py`
+**File**: `src/engine/simulation/pathfinding.py`
 
 **Test report shows**:
 | Test | Assertion |
@@ -359,9 +359,9 @@ When the operator wakes up and runs `./test.sh fast`, all tiers pass. When they 
 ## Files Created/Modified
 
 **New files**:
-- `src/amy/tactical/street_graph.py` — OSM street graph extraction
-- `src/amy/tactical/obstacles.py` — Building footprint obstacles
-- `src/amy/simulation/pathfinding.py` — A* on street graph
+- `src/engine/tactical/street_graph.py` — OSM street graph extraction
+- `src/engine/tactical/obstacles.py` — Building footprint obstacles
+- `src/engine/simulation/pathfinding.py` — A* on street graph
 - `frontend/js/command/unit-icons.js` — Procedural unit icon drawing
 - `tests/amy/simulation/test_pathfinding.py` — Pathfinding tests
 - `tests/amy/simulation/test_street_graph.py` — Street graph tests
@@ -370,9 +370,9 @@ When the operator wakes up and runs `./test.sh fast`, all tiers pass. When they 
 - `docs/overnight-status/*.md` — Agent status files
 
 **Modified files**:
-- `src/amy/simulation/engine.py` — Use pathfinder for unit movement
-- `src/amy/simulation/behaviors.py` — Road-aware hostile approach
-- `src/amy/simulation/target.py` — Smooth heading interpolation
+- `src/engine/simulation/engine.py` — Use pathfinder for unit movement
+- `src/engine/simulation/behaviors.py` — Road-aware hostile approach
+- `src/engine/simulation/target.py` — Smooth heading interpolation
 - `scenarios/neighborhood_default.json` — Road-aligned positions
 - `frontend/js/command/map.js` — Unit icon rendering, fog of war
 - `test.sh` — Add tier 12

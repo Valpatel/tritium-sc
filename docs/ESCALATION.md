@@ -237,7 +237,7 @@ configurable per operational posture.
 
 ## File Organization
 
-Canonical location: `src/amy/tactical/escalation.py` containing both
+Canonical location: `src/engine/tactical/escalation.py` containing both
 ThreatClassifier and AutoDispatcher.
 
 The two classes are tightly coupled (the dispatcher exists only because the

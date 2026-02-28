@@ -56,7 +56,7 @@ flowchart TD
 2. **EventBus** receives `sim_telemetry` events containing the full target list
    with positions, headings, health, battery, alliance, and combat state.
 
-3. **TargetTracker** (`src/amy/tactical/target_tracker.py`) ingests telemetry via
+3. **TargetTracker** (`src/engine/tactical/target_tracker.py`) ingests telemetry via
    `update_from_simulation()`. Each target becomes a TrackedTarget in the
    unified registry alongside real YOLO detections.
 
@@ -92,7 +92,7 @@ The system uses a dual-speed processing pipeline:
 | Layer | Speed | Purpose | Implementation |
 |-------|-------|---------|----------------|
 | **YOLO fast-path** | 10 fps | Reactive detection: bounding boxes, tracking IDs, position | `src/app/ai/detector.py`, `src/amy/brain/perception.py` |
-| **LLM slow-path** | ~5s cycles | Strategic reasoning: threat assessment, dispatch decisions, dialogue | `src/amy/brain/thinking.py`, `src/amy/inference/robot_thinker.py` |
+| **LLM slow-path** | ~5s cycles | Strategic reasoning: threat assessment, dispatch decisions, dialogue | `src/amy/brain/thinking.py`, `src/engine/inference/robot_thinker.py` |
 
 **VisionBridge** (`examples/robot-template/brain/vision_bridge.py`) bridges
 the two speeds on the robot side:

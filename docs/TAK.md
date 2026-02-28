@@ -48,8 +48,8 @@ TAK server (OpenTAKServer, FreeTAKServer, TAK Server official).
 
 | File | Purpose |
 |------|---------|
-| `src/amy/comms/cot.py` | Pure CoT XML generation/parsing (zero external deps) |
-| `src/amy/comms/tak_bridge.py` | TAKBridge class (pytak + EventBus integration) |
+| `src/engine/comms/cot.py` | Pure CoT XML generation/parsing (zero external deps) |
+| `src/engine/comms/tak_bridge.py` | TAKBridge class (pytak + EventBus integration) |
 | `src/app/routers/tak.py` | FastAPI `/api/tak/*` endpoints |
 | `src/app/config.py` | TAK settings (environment variables) |
 
@@ -544,7 +544,7 @@ ATAK user places hostile marker
 
 ### How TAK Feeds Escalation
 
-1. The `ThreatClassifier` (in `src/amy/tactical/escalation.py`) scans the
+1. The `ThreatClassifier` (in `src/engine/tactical/escalation.py`) scans the
    TargetTracker at 2Hz for hostile targets.
 2. TAK-originated hostiles appear in the tracker with `source="tak"` and
    `alliance="hostile"`.

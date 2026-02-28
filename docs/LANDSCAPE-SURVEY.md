@@ -245,7 +245,7 @@ All levels: local storage only, auto-expire, audit logging, "forget entity" for 
 
 ### Integration with TRITIUM-SC
 
-Add `reid_embedding: list[float]` to `TrackedTarget`. Extend MQTT detection messages with embedding field. Cross-camera matching in `TargetTracker` using cosine similarity > 0.7 threshold. Natural integration point: `TargetTracker.update_from_detection()` in `src/amy/tactical/target_tracker.py`.
+Add `reid_embedding: list[float]` to `TrackedTarget`. Extend MQTT detection messages with embedding field. Cross-camera matching in `TargetTracker` using cosine similarity > 0.7 threshold. Natural integration point: `TargetTracker.update_from_detection()` in `src/engine/tactical/target_tracker.py`.
 
 ---
 
@@ -646,8 +646,8 @@ The `tritium/{site}/{category}/{device_id}/{action}` hierarchy follows AWS IoT C
 | Addition | Model/Library | Where |
 |---|---|---|
 | Pose estimation | RTMPose-m (Apache 2.0) | New: `src/amy/brain/pose.py` |
-| Rule-based behaviors | Tracker data (no model) | `src/amy/tactical/escalation.py` |
-| Statistical baseline | Poisson counts per zone/hour | New: `src/amy/tactical/baseline.py` |
+| Rule-based behaviors | Tracker data (no model) | `src/engine/tactical/escalation.py` |
+| Statistical baseline | Poisson counts per zone/hour | New: `src/engine/tactical/baseline.py` |
 | Entity Registry | HA-inspired pattern | Wrap `TargetTracker` |
 | Supervision library | Roboflow (MIT) | Replace `SimpleTracker` |
 | Motion pre-filter | OpenCV MOG2 | `src/app/ai/detector.py` |
@@ -660,14 +660,14 @@ The `tritium/{site}/{category}/{device_id}/{action}` hierarchy follows AWS IoT C
 | Multi-frame analysis | Frigate lifecycle pattern | `src/amy/brain/sensorium.py` |
 | YOLO-World | Open-vocab detection | Event-triggered |
 | Activity classification | X3D-M via MMAction2 + TensorRT | New: `src/amy/brain/activity.py` |
-| Trigger-Condition-Action rules | HA-inspired JSON rules | New: `src/amy/tactical/rules.py` |
+| Trigger-Condition-Action rules | HA-inspired JSON rules | New: `src/engine/tactical/rules.py` |
 
 ### Phase 5: Re-Identification (4-8 Weeks)
 
 | Addition | Model/Library | Where |
 |---|---|---|
-| Person ReID embeddings | OSNet (MIT, 2.2M params) | New: `src/amy/tactical/reid.py` |
-| Cross-camera matching | Cosine similarity | `src/amy/tactical/target_tracker.py` |
+| Person ReID embeddings | OSNet (MIT, 2.2M params) | New: `src/engine/tactical/reid.py` |
+| Cross-camera matching | Cosine similarity | `src/engine/tactical/target_tracker.py` |
 | Vehicle LPR | fast-alpr (MIT, ONNX) | New integration |
 | Entity graph | Neo4j CE or Memgraph | New: entity persistence |
 | Trajectory clustering | MovingPandas | New: pattern analysis |
