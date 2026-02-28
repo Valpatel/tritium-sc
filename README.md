@@ -282,7 +282,7 @@ See [docs/PLUGIN-SPEC.md](docs/PLUGIN-SPEC.md) for the plugin architecture.
 
 ```
 PHASE 0-3  ████████████████████ COMPLETE — Foundation, Amy, Simulation, Dispatch
-PHASE 4    ████████████████████ COMPLETE — War Room RTS + Combat
+PHASE 4    ████████████░░░░░░░░ IN PROGRESS — SFX, VFX, Unit AI, Pathfinding, City Life
 PHASE 5    ████████░░░░░░░░░░░░ IN PROGRESS — Hardware + Sim-to-Real + Mission Generator
 PHASE 6    ░░░░░░░░░░░░░░░░░░░░ THE GARDEN MATURES — Graphlings, Terrain, Window Manager
 ```
