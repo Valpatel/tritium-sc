@@ -331,6 +331,8 @@ def start_headless_event_bridge(event_bus, loop: asyncio.AbstractEventLoop):
                     "announcer",
                     "npc_thought",
                     "npc_thought_clear",
+                    "mission_progress",
+                    "scenario_generated",
                 ):
                     asyncio.run_coroutine_threadsafe(
                         broadcast_amy_event(event_type, data), loop

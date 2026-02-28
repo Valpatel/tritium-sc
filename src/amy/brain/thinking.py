@@ -483,7 +483,48 @@ class ThinkingThread:
             else:
                 response = ollama_chat(model=self._model, messages=messages)
         except Exception as e:
-            print(f"  [thinking LLM error: {e}]")
+            print(f"  [thinking LLM error: {e}] — using fallback")
+            # Use fallback thought generator when LLM is unavailable
+            from engine.simulation.llm_fallback import FallbackThoughtGenerator
+            if not hasattr(self, "_fallback"):
+                self._fallback = FallbackThoughtGenerator()
+            hostile_count = len(tracker.get_hostiles()) if tracker else 0
+            friendly_count = len(tracker.get_friendlies()) if tracker else 0
+            game_active = game_mode is not None and getattr(game_mode, "state", None) == "active"
+            gm_wave = getattr(game_mode, "current_wave", 1) if game_mode else 1
+            gm_score = getattr(game_mode, "score", 0) if game_mode else 0
+            fb_friendlies = []
+            fb_hostiles = []
+            if tracker:
+                for f in tracker.get_friendlies()[:5]:
+                    fb_friendlies.append({
+                        "name": f.name, "type": getattr(f, "asset_type", ""),
+                        "x": f.position[0], "y": f.position[1],
+                    })
+                for h in tracker.get_hostiles()[:5]:
+                    fb_hostiles.append({
+                        "name": h.name, "x": h.position[0], "y": h.position[1],
+                    })
+            response_text = self._fallback.generate({
+                "hostile_count": hostile_count,
+                "friendly_count": friendly_count,
+                "game_active": game_active,
+                "wave": gm_wave,
+                "score": gm_score,
+                "friendlies": fb_friendlies,
+                "hostiles": fb_hostiles,
+            })
+            dt = time.monotonic() - t0
+            # Fall through to parse the fallback output
+            result = parse_motor_output(response_text)
+            self._think_count += 1
+            if result.valid:
+                formatted = format_motor_output(result)
+                if result.action == "think":
+                    print(f"  [fallback think]: {result.params[0]}")
+                else:
+                    print(f"  [fallback->{formatted}]")
+                self._dispatch(result)
             return
 
         response_text = response.get("message", {}).get("content", "").strip()

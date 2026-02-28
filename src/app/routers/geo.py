@@ -1121,3 +1121,37 @@ async def validate_wms(body: WMSValidateRequest):
         raise HTTPException(status_code=400, detail="URL is required")
 
     return validate_wms_url(body.url)
+
+
+# ---------------------------------------------------------------------------
+# POI (Points of Interest) from OpenStreetMap
+# ---------------------------------------------------------------------------
+
+@router.get("/pois")
+async def get_pois(
+    lat: float = Query(..., description="Center latitude"),
+    lng: float = Query(..., description="Center longitude"),
+    radius: float = Query(400.0, description="Search radius in meters", ge=50, le=2000),
+):
+    """Fetch POIs (amenities, shops, landmarks, buildings) from OpenStreetMap.
+
+    Returns list of POI dicts with name, type, category, address, lat/lng, local coords.
+    Results cached on disk by the underlying fetch_pois function.
+    """
+    from engine.simulation.poi_data import fetch_pois
+
+    pois = fetch_pois(lat, lng, radius)
+    return [
+        {
+            "name": p.name,
+            "poi_type": p.poi_type,
+            "category": p.category,
+            "address": p.address,
+            "lat": p.lat,
+            "lng": p.lng,
+            "local_x": p.local_x,
+            "local_y": p.local_y,
+            "osm_id": p.osm_id,
+        }
+        for p in pois
+    ]

@@ -304,3 +304,65 @@ async def set_action(target_id: str, body: ActionRequest, request: Request):
         "thought": body.thought,
         "waypoints": body.waypoints,
     }
+
+
+@router.get("/{target_id}")
+async def get_npc_detail(target_id: str, request: Request):
+    """Get full detail for a single NPC including thoughts, brain state, personality."""
+    mgr = _get_npc_manager(request)
+    engine = getattr(request.app.state, "simulation_engine", None)
+    amy = getattr(request.app.state, "amy", None)
+    if amy is not None:
+        engine = getattr(amy, "simulation_engine", engine)
+
+    # Find the target
+    target = None
+    if engine is not None:
+        for t in engine.get_targets():
+            if t.target_id == target_id:
+                target = t
+                break
+
+    if target is None:
+        raise HTTPException(404, f"NPC {target_id} not found")
+
+    result = target.to_dict()
+
+    # Thought from registry
+    try:
+        registry = _get_thought_registry(request)
+        thought = registry.get_thought(target_id)
+        controller = registry.get_controller(target_id)
+    except Exception:
+        thought = None
+        controller = None
+
+    result["thought"] = (
+        {"text": thought.text, "emotion": thought.emotion} if thought else None
+    )
+    result["controller"] = controller
+
+    # Brain state from plugin
+    plugin = getattr(request.app.state, "npc_intelligence_plugin", None)
+    brain = plugin.get_brain(target_id) if plugin else None
+
+    if brain is not None:
+        result["brain_state"] = brain.get_state()
+        result["personality"] = brain.personality.to_dict()
+        result["memory_events"] = brain.memory.recent(10)
+    else:
+        result["brain_state"] = None
+        result["personality"] = None
+        result["memory_events"] = None
+
+    # NPC mission and vehicle type from NPCManager
+    mission = mgr.get_mission(target_id) if target_id in mgr._npc_ids else None
+    result["npc_mission"] = (
+        {"type": mission.mission_type, "completed": mission.completed}
+        if mission else None
+    )
+    result["npc_vehicle_type"] = (
+        mgr.get_vehicle_type(target_id) if target_id in mgr._npc_ids else None
+    )
+
+    return result

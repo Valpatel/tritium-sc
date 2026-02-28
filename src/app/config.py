@@ -72,8 +72,8 @@ class Settings(BaseSettings):
     # Geo reference — real-world origin for the local coordinate system.
     # Set from geocoding or manually.  All simulation/target coordinates
     # are meters from this point.  (0, 0) local = (lat, lng) real.
-    map_center_lat: float = 37.7749
-    map_center_lng: float = -122.4194
+    map_center_lat: float = 37.7159
+    map_center_lng: float = -121.8960
     map_center_alt: float = 16.0  # meters above sea level
 
     # Simulation engine
@@ -89,8 +89,8 @@ class Settings(BaseSettings):
 
     # NPC world population
     npc_enabled: bool = True
-    npc_max_vehicles: int = 30       # Peak vehicle count (scaled by time-of-day)
-    npc_max_pedestrians: int = 40    # Peak pedestrian count (scaled by time-of-day)
+    npc_max_vehicles: int = 150      # Peak vehicle count (scaled by time-of-day)
+    npc_max_pedestrians: int = 200   # Peak pedestrian count (scaled by time-of-day)
 
     # Amy AI Commander
     amy_enabled: bool = True

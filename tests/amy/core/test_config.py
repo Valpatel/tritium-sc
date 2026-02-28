@@ -77,8 +77,8 @@ class TestSettingsDefaults:
     def test_map_center_defaults(self):
         with patch.dict(os.environ, {}, clear=True):
             s = Settings(_env_file=None)
-            assert s.map_center_lat == 37.7749
-            assert s.map_center_lng == -122.4194
+            assert s.map_center_lat == 37.7159
+            assert s.map_center_lng == -121.8960
             assert s.map_center_alt == 16.0
 
 

@@ -11,9 +11,14 @@ pytestmark = [pytest.mark.integration, pytest.mark.slow]
 @pytest.fixture(scope="module")
 def yolo_model():
     """Load YOLO model once for the module (slow)."""
-    from ultralytics import YOLO
-
-    return YOLO("yolo11n.pt")
+    try:
+        from ultralytics import YOLO
+    except (RuntimeError, ImportError) as e:
+        pytest.skip(f"YOLO import failed (torch library conflict): {e}")
+    try:
+        return YOLO("yolo11n.pt")
+    except Exception as e:
+        pytest.skip(f"YOLO model load failed: {e}")
 
 
 class TestYOLODetection:

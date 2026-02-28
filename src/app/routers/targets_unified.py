@@ -73,3 +73,23 @@ async def get_friendlies(request: Request):
         return {"targets": [t.to_dict() for t in targets]}
 
     return {"targets": []}
+
+
+@router.post("/sighting")
+async def report_sighting(request: Request):
+    """Accept a sighting report from camera or robot."""
+    engine = _get_sim_engine(request)
+    if engine is None:
+        return {"error": "No simulation engine"}
+    body = await request.json()
+    from engine.simulation.vision import SightingReport
+    report = SightingReport(
+        observer_id=body.get("observer_id", "unknown"),
+        target_id=body.get("target_id", ""),
+        observer_type=body.get("observer_type", "camera"),
+        confidence=body.get("confidence", 1.0),
+        position=tuple(body["position"]) if "position" in body else None,
+        timestamp=body.get("timestamp", 0.0),
+    )
+    engine.vision_system.add_sighting(report)
+    return {"status": "accepted"}

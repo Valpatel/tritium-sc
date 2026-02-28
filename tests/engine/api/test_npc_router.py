@@ -163,3 +163,190 @@ class TestDensity:
         assert 0.0 < data["density"] <= 1.0
         assert "vehicle_types" in data
         assert len(data["vehicle_types"]) == 7
+
+
+# ---- Fixtures for detail endpoint ----
+
+@pytest.fixture
+def app_with_plugin() -> FastAPI:
+    """Create a test app with NPC router, engine, AND intelligence plugin."""
+    from engine.simulation.npc_intelligence.plugin import NPCIntelligencePlugin
+    from engine.simulation.npc_intelligence.thought_registry import ThoughtRegistry
+
+    from app.routers.npc import router
+
+    test_app = FastAPI()
+    test_app.include_router(router)
+
+    event_bus = EventBus()
+    engine = SimulationEngine(event_bus, map_bounds=200.0)
+    engine._npc_manager = NPCManager(engine)
+
+    plugin = NPCIntelligencePlugin()
+    thought_registry = ThoughtRegistry(event_bus=event_bus, plugin=plugin)
+
+    test_app.state.simulation_engine = engine
+    test_app.state.amy = None
+    test_app.state.npc_intelligence_plugin = plugin
+    test_app.state.npc_thought_registry = thought_registry
+
+    # Wire plugin's internal references
+    plugin._engine = engine
+    plugin._event_bus = event_bus
+    plugin._thought_registry = thought_registry
+
+    return test_app
+
+
+@pytest.fixture
+def client_with_plugin(app_with_plugin: FastAPI) -> TestClient:
+    return TestClient(app_with_plugin)
+
+
+@pytest.fixture
+def engine_with_plugin(app_with_plugin: FastAPI) -> SimulationEngine:
+    return app_with_plugin.state.simulation_engine
+
+
+class TestNPCDetail:
+    """Tests for GET /api/npc/{target_id} detail endpoint."""
+
+    def test_detail_nonexistent_returns_404(self, client_with_plugin: TestClient) -> None:
+        resp = client_with_plugin.get("/api/npc/nonexistent-id")
+        assert resp.status_code == 404
+
+    def test_detail_returns_target_fields(self, client_with_plugin: TestClient) -> None:
+        resp = client_with_plugin.post("/api/npc/spawn/vehicle")
+        assert resp.status_code == 200
+        tid = resp.json()["target_id"]
+        resp = client_with_plugin.get(f"/api/npc/{tid}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["target_id"] == tid
+        assert "position" in data
+        assert "alliance" in data
+        assert data["alliance"] == "neutral"
+        assert "speed" in data
+        assert "health" in data
+
+    def test_detail_includes_thought(self, client_with_plugin: TestClient) -> None:
+        resp = client_with_plugin.post("/api/npc/spawn/pedestrian")
+        tid = resp.json()["target_id"]
+
+        # Set a thought
+        client_with_plugin.post(
+            f"/api/npc/{tid}/thought",
+            json={"text": "Nice day!", "emotion": "happy", "duration": 10.0},
+        )
+
+        resp = client_with_plugin.get(f"/api/npc/{tid}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["thought"] is not None
+        assert data["thought"]["text"] == "Nice day!"
+        assert data["thought"]["emotion"] == "happy"
+
+    def test_detail_includes_controller(
+        self, client_with_plugin: TestClient, app_with_plugin: FastAPI
+    ) -> None:
+        resp = client_with_plugin.post("/api/npc/spawn/vehicle")
+        tid = resp.json()["target_id"]
+
+        # Attach a brain (required for take_control to succeed)
+        plugin = app_with_plugin.state.npc_intelligence_plugin
+        plugin.attach_brain(tid, "vehicle", "neutral")
+
+        # Take control
+        resp_ctrl = client_with_plugin.post(
+            f"/api/npc/{tid}/control",
+            json={"controller_id": "operator-1"},
+        )
+        assert resp_ctrl.status_code == 200
+
+        resp = client_with_plugin.get(f"/api/npc/{tid}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["controller"] == "operator-1"
+
+    def test_detail_no_thought_returns_null(self, client_with_plugin: TestClient) -> None:
+        resp = client_with_plugin.post("/api/npc/spawn/vehicle")
+        tid = resp.json()["target_id"]
+        resp = client_with_plugin.get(f"/api/npc/{tid}")
+        data = resp.json()
+        assert data["thought"] is None
+
+    def test_detail_includes_brain_state_when_available(
+        self, client_with_plugin: TestClient, app_with_plugin: FastAPI
+    ) -> None:
+        resp = client_with_plugin.post("/api/npc/spawn/pedestrian")
+        tid = resp.json()["target_id"]
+
+        # Attach brain via plugin
+        plugin = app_with_plugin.state.npc_intelligence_plugin
+        brain = plugin.attach_brain(tid, "person", "neutral")
+
+        resp = client_with_plugin.get(f"/api/npc/{tid}")
+        data = resp.json()
+        assert data["brain_state"] is not None
+        assert "fsm_state" in data["brain_state"]
+        assert "personality" in data["brain_state"]
+        assert "danger_level" in data["brain_state"]
+        assert "interest_level" in data["brain_state"]
+        assert "is_bound" in data["brain_state"]
+
+    def test_detail_no_brain_returns_null_brain_state(self, client_with_plugin: TestClient) -> None:
+        resp = client_with_plugin.post("/api/npc/spawn/vehicle")
+        tid = resp.json()["target_id"]
+        resp = client_with_plugin.get(f"/api/npc/{tid}")
+        data = resp.json()
+        assert data["brain_state"] is None
+
+    def test_detail_includes_personality(
+        self, client_with_plugin: TestClient, app_with_plugin: FastAPI
+    ) -> None:
+        resp = client_with_plugin.post("/api/npc/spawn/pedestrian")
+        tid = resp.json()["target_id"]
+
+        plugin = app_with_plugin.state.npc_intelligence_plugin
+        plugin.attach_brain(tid, "person", "neutral")
+
+        resp = client_with_plugin.get(f"/api/npc/{tid}")
+        data = resp.json()
+        assert data["personality"] is not None
+        assert "curiosity" in data["personality"]
+        assert "caution" in data["personality"]
+        assert "sociability" in data["personality"]
+        assert "aggression" in data["personality"]
+
+    def test_detail_includes_memory_events(
+        self, client_with_plugin: TestClient, app_with_plugin: FastAPI
+    ) -> None:
+        resp = client_with_plugin.post("/api/npc/spawn/pedestrian")
+        tid = resp.json()["target_id"]
+
+        plugin = app_with_plugin.state.npc_intelligence_plugin
+        brain = plugin.attach_brain(tid, "person", "neutral")
+
+        # Add some memory events
+        brain.memory.add_event("saw_person", {"detail": "neighbor"})
+        brain.memory.add_event("heard_noise", {"detail": "dog barking"})
+
+        resp = client_with_plugin.get(f"/api/npc/{tid}")
+        data = resp.json()
+        assert data["memory_events"] is not None
+        assert len(data["memory_events"]) == 2
+
+    def test_detail_includes_npc_mission(self, client_with_plugin: TestClient) -> None:
+        resp = client_with_plugin.post("/api/npc/spawn/vehicle")
+        tid = resp.json()["target_id"]
+        resp = client_with_plugin.get(f"/api/npc/{tid}")
+        data = resp.json()
+        # Mission might be None if none assigned, or a dict
+        assert "npc_mission" in data
+
+    def test_detail_includes_npc_vehicle_type(self, client_with_plugin: TestClient) -> None:
+        resp = client_with_plugin.post("/api/npc/spawn/vehicle?vehicle_type=pickup")
+        tid = resp.json()["target_id"]
+        resp = client_with_plugin.get(f"/api/npc/{tid}")
+        data = resp.json()
+        assert data["npc_vehicle_type"] == "pickup"
