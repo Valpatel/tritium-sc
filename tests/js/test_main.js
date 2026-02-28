@@ -73,8 +73,8 @@ console.log('\n--- Module Imports ---');
 })();
 
 (function testImportsMenuBar() {
-    assert(mainSrc.includes("import { createMenuBar, focusSaveInput, getSelectedScenario } from './menu-bar.js'"),
-        'Imports createMenuBar, focusSaveInput, and getSelectedScenario from menu-bar.js');
+    assert(mainSrc.includes("import { createMenuBar, focusSaveInput } from './menu-bar.js'"),
+        'Imports createMenuBar and focusSaveInput from menu-bar.js');
 })();
 
 (function testImportsPanelDefinitions() {
@@ -706,7 +706,6 @@ console.log('\n--- API Endpoints ---');
         '/api/amy/chat',
         '/api/amy/status',
         '/api/amy/command',
-        '/api/game/begin',
         '/api/game/reset',
     ];
     for (const endpoint of expectedEndpoints) {
@@ -983,9 +982,9 @@ console.log('\n--- Error Handling ---');
         'Chat catches fetch errors and shows system message');
 })();
 
-(function testBeginWarErrorHandling() {
-    assert(mainSrc.includes("showToast('Failed to start game', 'alert')"),
-        'beginWar catches errors and shows toast');
+(function testBeginWarDelegatesToModal() {
+    assert(mainSrc.includes("MissionModal.show()"),
+        'beginWar delegates to MissionModal');
 })();
 
 (function testResetGameErrorHandling() {

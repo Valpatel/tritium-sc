@@ -305,7 +305,7 @@ function makeMockMapActions() {
     const state = {
         showSatellite: true, showRoads: false, showBuildings: true,
         showWaterways: false, showParks: false, showGrid: false,
-        showModels3d: false, showLabels: true, showMesh: true, showFog: false,
+        showModels3d: false, showLabels: true, showMesh: true, showThoughts: true, showFog: false,
         showTerrain: false, tiltMode: 'flat',
         showTracers: true, showExplosions: true, showParticles: true,
         showHitFlashes: true, showFloatingText: true,
@@ -324,6 +324,7 @@ function makeMockMapActions() {
         toggleModels() { state.showModels3d = !state.showModels3d; calls.push('toggleModels'); },
         toggleLabels() { state.showLabels = !state.showLabels; calls.push('toggleLabels'); },
         toggleMesh() { state.showMesh = !state.showMesh; calls.push('toggleMesh'); },
+        toggleThoughts() { state.showThoughts = !state.showThoughts; calls.push('toggleThoughts'); },
         toggleFog() { state.showFog = !state.showFog; calls.push('toggleFog'); },
         toggleTerrain() { state.showTerrain = !state.showTerrain; calls.push('toggleTerrain'); },
         toggleTilt() { state.tiltMode = state.tiltMode === 'flat' ? 'tilted' : 'flat'; calls.push('toggleTilt'); },
@@ -1302,8 +1303,9 @@ console.log('\n--- Dropdown items structure ---');
     //           Kill Feed, Screen FX, Banners, Layer HUD, sep,
     //           Fog, Terrain, 3D Mode, sep,
     //           Center on Action, Reset Camera, Zoom In, Zoom Out = 32
-    assert(mapDropdown.children.length === 35,
-        'MAP dropdown has 35 items, got ' + mapDropdown.children.length);
+    //           + Thought Bubbles = 36
+    assert(mapDropdown.children.length === 36,
+        'MAP dropdown has 36 items, got ' + mapDropdown.children.length);
 
     // First item: Toggle All (action, not checkable)
     const toggleAllItem = mapDropdown.children[0];
@@ -1373,11 +1375,11 @@ console.log('\n--- Dropdown items structure ---');
     // Separators at indices 1, 8, 12, 18, 23, 27 (shifted +2 from Toggle All + sep at top)
     assert(mapDropdown.children[1].className === 'menu-separator', 'MAP has separator at index 1 (after Toggle All)');
     assert(mapDropdown.children[8].className === 'menu-separator', 'MAP has separator at index 8');
-    assert(mapDropdown.children[12].className === 'menu-separator', 'MAP has separator at index 12');
-    assert(mapDropdown.children[18].className === 'menu-separator', 'MAP has separator at index 18');
-    assert(mapDropdown.children[23].className === 'menu-separator', 'MAP has separator at index 23');
-    assert(mapDropdown.children[26].className === 'menu-separator', 'MAP has separator at index 26 (after unit decorations)');
-    assert(mapDropdown.children[30].className === 'menu-separator', 'MAP has separator at index 30');
+    assert(mapDropdown.children[13].className === 'menu-separator', 'MAP has separator at index 13');
+    assert(mapDropdown.children[19].className === 'menu-separator', 'MAP has separator at index 19');
+    assert(mapDropdown.children[24].className === 'menu-separator', 'MAP has separator at index 24');
+    assert(mapDropdown.children[27].className === 'menu-separator', 'MAP has separator at index 27 (after unit decorations)');
+    assert(mapDropdown.children[31].className === 'menu-separator', 'MAP has separator at index 31');
 })();
 
 (function testHelpMenuItems() {
@@ -1763,7 +1765,7 @@ console.log('\n--- Menu item row structure ---');
 })();
 
 // ============================================================
-// GAME Menu Tests
+// GAME Menu Tests (simplified -- no scenario radio buttons)
 // ============================================================
 
 console.log('\n--- GAME menu ---');
@@ -1782,7 +1784,7 @@ console.log('\n--- GAME menu ---');
     assert(gameTrigger.textContent === 'GAME', 'GAME menu trigger exists at index 4');
 })();
 
-(function testGameMenuHasBeginBattleItem() {
+(function test_game_menu_has_new_mission_item() {
     clearDocListeners(); clearEventBus();
     const container = createMockElement('div');
     const pm = makeMockPanelManager(defaultPanels);
@@ -1795,13 +1797,55 @@ console.log('\n--- GAME menu ---');
     const gameDropdown = left.children[4].children[1];
 
     gameTrigger.click();
-    // First item should be "Begin Battle"
+    // First item should be "New Mission" with shortcut "B"
     const firstItem = gameDropdown.children[0];
     const label = firstItem.children[1]; // check(0), label(1)
-    assert(label.textContent === 'Begin Battle', 'First item is Begin Battle, got "' + label.textContent + '"');
+    assert(label.textContent === 'New Mission', 'First item is New Mission, got "' + label.textContent + '"');
+    // Check shortcut
+    let shortcutText = '';
+    for (const child of firstItem.children) {
+        if (child.className === 'menu-item-shortcut') shortcutText = child.textContent;
+    }
+    assert(shortcutText === 'B', 'New Mission shortcut is B, got "' + shortcutText + '"');
 })();
 
-(function testGameMenuHasScenarioItems() {
+(function test_game_menu_has_reset_item() {
+    clearDocListeners(); clearEventBus();
+    const container = createMockElement('div');
+    const pm = makeMockPanelManager(defaultPanels);
+    const lm = makeMockLayoutManager();
+    const ma = makeMockMapActions();
+    ctx.container = container; ctx.pm = pm; ctx.lm = lm; ctx.ma = ma;
+    const bar = vm.runInContext('createMenuBar(container, pm, lm, ma)', ctx);
+    const left = bar.children[0];
+    const gameTrigger = left.children[4].children[0];
+    const gameDropdown = left.children[4].children[1];
+
+    gameTrigger.click();
+    // Find Reset Game item and verify shortcut
+    const labels = [];
+    for (const child of gameDropdown.children) {
+        if (child.className === 'menu-separator') continue;
+        const lbl = child.children[1];
+        if (lbl) labels.push(lbl.textContent);
+    }
+    assert(labels.includes('Reset Game'), 'GAME menu has Reset Game item');
+
+    // Find Reset Game and check shortcut is R
+    for (const child of gameDropdown.children) {
+        if (child.className === 'menu-separator') continue;
+        const lbl = child.children[1];
+        if (lbl && lbl.textContent === 'Reset Game') {
+            let sc = '';
+            for (const c of child.children) {
+                if (c.className === 'menu-item-shortcut') sc = c.textContent;
+            }
+            assert(sc === 'R', 'Reset Game shortcut is R, got "' + sc + '"');
+        }
+    }
+})();
+
+(function test_game_menu_no_scenario_radios() {
     clearDocListeners(); clearEventBus();
     const container = createMockElement('div');
     const pm = makeMockPanelManager(defaultPanels);
@@ -1818,95 +1862,24 @@ console.log('\n--- GAME menu ---');
     const labels = [];
     for (const child of gameDropdown.children) {
         if (child.className === 'menu-separator') continue;
-        const lbl = child.children[1]; // check(0), label(1)
-        if (lbl) labels.push(lbl.textContent);
-    }
-    assert(labels.includes('Classic 10-Wave'), 'GAME menu has Classic 10-Wave item');
-    assert(labels.includes('Street Combat'), 'GAME menu has Street Combat item');
-    assert(labels.includes('Riot'), 'GAME menu has Riot item');
-})();
-
-(function testScenarioSelectionIsExclusive() {
-    clearDocListeners(); clearEventBus();
-    const container = createMockElement('div');
-    const pm = makeMockPanelManager(defaultPanels);
-    const lm = makeMockLayoutManager();
-    const ma = makeMockMapActions();
-    ctx.container = container; ctx.pm = pm; ctx.lm = lm; ctx.ma = ma;
-    const bar = vm.runInContext('createMenuBar(container, pm, lm, ma)', ctx);
-    const left = bar.children[0];
-    const gameTrigger = left.children[4].children[0];
-    const gameDropdown = left.children[4].children[1];
-
-    // Open and click Street Combat (after separator at [1], Classic at [2], Street at [3])
-    gameTrigger.click();
-    // Find scenario items: skip non-checkable items and separators
-    const checkableItems = [];
-    for (const child of gameDropdown.children) {
-        if (child.className === 'menu-separator') continue;
-        const check = child.children[0]; // menu-item-check
-        const lbl = child.children[1];
-        if (lbl && (lbl.textContent === 'Classic 10-Wave' ||
-                    lbl.textContent === 'Street Combat' ||
-                    lbl.textContent === 'Riot')) {
-            checkableItems.push({ item: child, check, label: lbl.textContent });
-        }
-    }
-
-    assert(checkableItems.length === 3, 'Found 3 scenario items, got ' + checkableItems.length);
-
-    // Classic should be checked by default (null scenario = classic)
-    assert(checkableItems[0].check.textContent !== '', 'Classic 10-Wave is checked by default');
-
-    // Click Street Combat
-    checkableItems[1].item.click();
-
-    // Re-open to see updated state
-    gameTrigger.click();
-    gameTrigger.click();
-
-    // Now read updated scenario from getSelectedScenario
-    const scenario = vm.runInContext('getSelectedScenario()', ctx);
-    assert(scenario === 'street_combat', 'getSelectedScenario returns street_combat after selection, got "' + scenario + '"');
-})();
-
-(function testGetSelectedScenarioDefaultNull() {
-    clearDocListeners(); clearEventBus();
-    const container = createMockElement('div');
-    const pm = makeMockPanelManager(defaultPanels);
-    const lm = makeMockLayoutManager();
-    const ma = makeMockMapActions();
-    ctx.container = container; ctx.pm = pm; ctx.lm = lm; ctx.ma = ma;
-    // Reset selected scenario by re-evaluating
-    vm.runInContext('_selectedScenario = null', ctx);
-    const scenario = vm.runInContext('getSelectedScenario()', ctx);
-    assert(scenario === null, 'getSelectedScenario returns null by default, got "' + scenario + '"');
-})();
-
-(function testResetGameItemExists() {
-    clearDocListeners(); clearEventBus();
-    const container = createMockElement('div');
-    const pm = makeMockPanelManager(defaultPanels);
-    const lm = makeMockLayoutManager();
-    const ma = makeMockMapActions();
-    ctx.container = container; ctx.pm = pm; ctx.lm = lm; ctx.ma = ma;
-    const bar = vm.runInContext('createMenuBar(container, pm, lm, ma)', ctx);
-    const left = bar.children[0];
-    const gameTrigger = left.children[4].children[0];
-    const gameDropdown = left.children[4].children[1];
-
-    gameTrigger.click();
-    // Find Reset Game item
-    const labels = [];
-    for (const child of gameDropdown.children) {
-        if (child.className === 'menu-separator') continue;
         const lbl = child.children[1];
         if (lbl) labels.push(lbl.textContent);
     }
-    assert(labels.includes('Reset Game'), 'GAME menu has Reset Game item');
+    // Should NOT have any scenario radio items
+    assert(!labels.includes('Classic 10-Wave'), 'GAME menu does NOT have Classic 10-Wave');
+    assert(!labels.includes('Street Combat'), 'GAME menu does NOT have Street Combat');
+    assert(!labels.includes('Riot'), 'GAME menu does NOT have Riot');
+    // Should have exactly 2 items: New Mission and Reset Game
+    assert(labels.length === 2, 'GAME menu has 2 items (New Mission + Reset Game), got ' + labels.length);
 })();
 
-(function testGameMenuBeginBattleCallsMapActions() {
+(function test_getSelectedScenario_always_null() {
+    clearDocListeners(); clearEventBus();
+    const scenario = vm.runInContext('getSelectedScenario()', ctx);
+    assert(scenario === null, 'getSelectedScenario always returns null, got "' + scenario + '"');
+})();
+
+(function testGameMenuNewMissionCallsMapActions() {
     clearDocListeners(); clearEventBus();
     const container = createMockElement('div');
     const pm = makeMockPanelManager(defaultPanels);
@@ -1921,13 +1894,13 @@ console.log('\n--- GAME menu ---');
     const gameDropdown = left.children[4].children[1];
 
     gameTrigger.click();
-    // Click Begin Battle (first non-separator item)
+    // Click New Mission (first non-separator item)
     const beginItem = gameDropdown.children[0];
     beginItem.click();
-    assert(beginCalled, 'Begin Battle calls mapActions.beginWar()');
+    assert(beginCalled, 'New Mission calls mapActions.beginWar()');
 })();
 
-(function testGameMenuHasSeparators() {
+(function testGameMenuHasOneSeparator() {
     clearDocListeners(); clearEventBus();
     const container = createMockElement('div');
     const pm = makeMockPanelManager(defaultPanels);
@@ -1944,15 +1917,17 @@ console.log('\n--- GAME menu ---');
     for (const child of gameDropdown.children) {
         if (child.className === 'menu-separator') sepCount++;
     }
-    assert(sepCount === 2, 'GAME menu has 2 separators, got ' + sepCount);
+    assert(sepCount === 1, 'GAME menu has 1 separator, got ' + sepCount);
 })();
 
-(function testBeginBattleShortcutIsB() {
+(function testGameMenuResetCallsMapActions() {
     clearDocListeners(); clearEventBus();
     const container = createMockElement('div');
     const pm = makeMockPanelManager(defaultPanels);
     const lm = makeMockLayoutManager();
+    let resetCalled = false;
     const ma = makeMockMapActions();
+    ma.resetGame = () => { resetCalled = true; };
     ctx.container = container; ctx.pm = pm; ctx.lm = lm; ctx.ma = ma;
     const bar = vm.runInContext('createMenuBar(container, pm, lm, ma)', ctx);
     const left = bar.children[0];
@@ -1960,13 +1935,16 @@ console.log('\n--- GAME menu ---');
     const gameDropdown = left.children[4].children[1];
 
     gameTrigger.click();
-    const beginItem = gameDropdown.children[0];
-    // Find shortcut span
-    let shortcutText = '';
-    for (const child of beginItem.children) {
-        if (child.className === 'menu-item-shortcut') shortcutText = child.textContent;
+    // Find and click Reset Game (after separator)
+    for (const child of gameDropdown.children) {
+        if (child.className === 'menu-separator') continue;
+        const lbl = child.children[1];
+        if (lbl && lbl.textContent === 'Reset Game') {
+            child.click();
+            break;
+        }
     }
-    assert(shortcutText === 'B', 'Begin Battle shortcut is B, got "' + shortcutText + '"');
+    assert(resetCalled, 'Reset Game calls mapActions.resetGame()');
 })();
 
 // ============================================================
@@ -2041,17 +2019,17 @@ console.log('\n--- MAP menu — Combat FX layer toggles ---');
 
 // Verify each new toggle item exists and calls the right action
 const _fxToggleTests = [
-    { label: 'Tracers', stateKey: 'showTracers', action: 'toggleTracers', index: 13 },
-    { label: 'Explosions', stateKey: 'showExplosions', action: 'toggleExplosions', index: 14 },
-    { label: 'Particles', stateKey: 'showParticles', action: 'toggleParticles', index: 15 },
-    { label: 'Hit Flashes', stateKey: 'showHitFlashes', action: 'toggleHitFlashes', index: 16 },
-    { label: 'Floating Text', stateKey: 'showFloatingText', action: 'toggleFloatingText', index: 17 },
-    { label: 'Kill Feed', stateKey: 'showKillFeed', action: 'toggleKillFeed', index: 19 },
-    { label: 'Screen FX', stateKey: 'showScreenFx', action: 'toggleScreenFx', index: 20 },
-    { label: 'Banners', stateKey: 'showBanners', action: 'toggleBanners', index: 21 },
-    { label: 'Layer HUD', stateKey: 'showLayerHud', action: 'toggleLayerHud', index: 22 },
-    { label: 'Health Bars', stateKey: 'showHealthBars', action: 'toggleHealthBars', index: 24 },
-    { label: 'Selection FX', stateKey: 'showSelectionFx', action: 'toggleSelectionFx', index: 25 },
+    { label: 'Tracers', stateKey: 'showTracers', action: 'toggleTracers', index: 14 },
+    { label: 'Explosions', stateKey: 'showExplosions', action: 'toggleExplosions', index: 15 },
+    { label: 'Particles', stateKey: 'showParticles', action: 'toggleParticles', index: 16 },
+    { label: 'Hit Flashes', stateKey: 'showHitFlashes', action: 'toggleHitFlashes', index: 17 },
+    { label: 'Floating Text', stateKey: 'showFloatingText', action: 'toggleFloatingText', index: 18 },
+    { label: 'Kill Feed', stateKey: 'showKillFeed', action: 'toggleKillFeed', index: 20 },
+    { label: 'Screen FX', stateKey: 'showScreenFx', action: 'toggleScreenFx', index: 21 },
+    { label: 'Banners', stateKey: 'showBanners', action: 'toggleBanners', index: 22 },
+    { label: 'Layer HUD', stateKey: 'showLayerHud', action: 'toggleLayerHud', index: 23 },
+    { label: 'Health Bars', stateKey: 'showHealthBars', action: 'toggleHealthBars', index: 25 },
+    { label: 'Selection FX', stateKey: 'showSelectionFx', action: 'toggleSelectionFx', index: 26 },
 ];
 
 for (const tt of _fxToggleTests) {

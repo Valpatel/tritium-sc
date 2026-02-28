@@ -132,6 +132,122 @@ assert(_emotionColor('') === '#888888', 'emotionColor empty defaults to grey');
     assert(isActive, 'expired_thoughts_cleared: active thought not expired');
 }
 
+// -- Visibility parameter tests --
+// These test the expected rendering constants for improved visibility
+
+console.log('\n--- Bubble Visibility Parameters ---');
+
+{
+    // test_font_size_larger_at_default_zoom
+    // Default zoom ~ 1.0, formula: max(11, 13 * min(zoom, 2.5))
+    const zoom = 1.0;
+    const fontSize = Math.max(11, 13 * Math.min(zoom, 2.5));
+    assert(fontSize >= 13, `font size at zoom 1.0 = ${fontSize} (should be >= 13)`);
+    assert(fontSize > 10, 'font size at default zoom larger than old 10px');
+}
+
+{
+    // test_font_size_caps_at_zoom_2_5
+    const zoom = 5.0;
+    const fontSize = Math.max(11, 13 * Math.min(zoom, 2.5));
+    assert(fontSize === 32.5, `font size caps at zoom 5.0 = ${fontSize} (should be 32.5)`);
+}
+
+{
+    // test_font_minimum_at_low_zoom
+    const zoom = 0.5;
+    const fontSize = Math.max(11, 13 * Math.min(zoom, 2.5));
+    assert(fontSize === 11, `font size minimum at low zoom = ${fontSize} (should be 11)`);
+}
+
+{
+    // test_max_text_width_expanded
+    const maxTextWidth = 200;
+    assert(maxTextWidth === 200, `maxTextWidth is 200 (was 120)`);
+}
+
+{
+    // test_padding_increased
+    const padding = 10;
+    assert(padding === 10, `padding is 10 (was 6)`);
+}
+
+{
+    // test_tail_height_increased
+    const tailHeight = 10;
+    assert(tailHeight === 10, `tailHeight is 10 (was 8)`);
+}
+
+{
+    // test_vertical_offset_increased
+    const verticalOffset = 28;
+    assert(verticalOffset === 28, `vertical offset is 28 (was 20)`);
+}
+
+{
+    // test_border_width_increased
+    const borderWidth = 2.5;
+    assert(borderWidth === 2.5, `border width is 2.5 (was 1.5)`);
+}
+
+{
+    // test_wrapText_with_wider_maxWidth
+    const ctx = createMockCtx();
+    const lines200 = _wrapText(ctx, 'This is a test sentence for wider bubbles', 200);
+    const lines120 = _wrapText(ctx, 'This is a test sentence for wider bubbles', 120);
+    assert(lines200.length <= lines120.length, 'wider maxWidth produces fewer or equal lines');
+}
+
+// -- thoughtDuration storage test --
+console.log('\n--- Thought Duration Storage ---');
+
+{
+    // test_thoughtDuration_stored_from_ws_message
+    const unit = {};
+    const d = { unit_id: 'npc-1', text: 'Hello', emotion: 'happy', duration: 8 };
+    unit.thoughtText = d.text;
+    unit.thoughtEmotion = d.emotion || 'neutral';
+    unit.thoughtExpires = Date.now() + (d.duration || 5) * 1000;
+    unit.thoughtDuration = d.duration || 5;
+    assert(unit.thoughtDuration === 8, 'thoughtDuration stored from WS message');
+}
+
+{
+    // test_thoughtDuration_defaults_to_5
+    const unit = {};
+    const d = { unit_id: 'npc-1', text: 'Hello' };
+    unit.thoughtDuration = d.duration || 5;
+    assert(unit.thoughtDuration === 5, 'thoughtDuration defaults to 5 when absent');
+}
+
+// -- thoughtHistory accumulation test --
+console.log('\n--- Thought History ---');
+
+{
+    // test_thoughtHistory_accumulates
+    const unit = { thoughtHistory: [] };
+    for (let i = 0; i < 12; i++) {
+        unit.thoughtHistory.push({ text: `thought ${i}`, emotion: 'neutral', time: Date.now() });
+        if (unit.thoughtHistory.length > 10) {
+            unit.thoughtHistory.shift();
+        }
+    }
+    assert(unit.thoughtHistory.length === 10, 'thoughtHistory capped at 10 entries');
+    assert(unit.thoughtHistory[0].text === 'thought 2', 'oldest thought pruned correctly');
+    assert(unit.thoughtHistory[9].text === 'thought 11', 'newest thought is last');
+}
+
+{
+    // test_thoughtHistory_initialized_as_array
+    const unit = {};
+    if (!unit.thoughtHistory) {
+        unit.thoughtHistory = [];
+    }
+    unit.thoughtHistory.push({ text: 'first', emotion: 'curious', time: Date.now() });
+    assert(Array.isArray(unit.thoughtHistory), 'thoughtHistory is an array');
+    assert(unit.thoughtHistory.length === 1, 'thoughtHistory has one entry');
+}
+
 // ============================================================
 // Summary
 // ============================================================

@@ -73,11 +73,16 @@ const ctx = vm.createContext({
             return mockElements[id];
         },
         createElement(tag) {
-            return {
-                textContent: '',
-                innerHTML: '',
-                get innerHTML_() { return this.textContent; },
-            };
+            const el = { _text: '' };
+            Object.defineProperty(el, 'textContent', {
+                get() { return el._text; },
+                set(v) { el._text = String(v); },
+            });
+            Object.defineProperty(el, 'innerHTML', {
+                get() { return el._text; },
+                set(v) { el._text = String(v); },
+            });
+            return el;
         },
     },
 });
@@ -186,6 +191,50 @@ w.warHudShowWaveBanner(1, null, null);
 const b2 = mockElements['war-wave-banner'];
 assert(b2.innerHTML.includes('WAVE 1'), 'wave 1 shown');
 assert(!b2.innerHTML.includes('null'), 'no null in banner');
+
+// With briefing data
+resetElements();
+timeouts = [];
+w.warHudShowWaveBanner(3, 'Heavy Contact', 8, {
+    briefing: 'Enemy reinforcements approaching from the east.',
+    threat_level: 'heavy',
+    intel: 'Estimated 8 hostiles with vehicles.',
+});
+const b3 = mockElements['war-wave-banner'];
+assert(b3.innerHTML.includes('WAVE 3'), 'wave 3 with briefing');
+assert(b3.innerHTML.includes('reinforcements'), 'briefing text in banner');
+assert(b3.innerHTML.includes('THREAT: HEAVY'), 'threat level in banner');
+assert(b3.innerHTML.includes('threat-heavy'), 'threat-heavy CSS class');
+assert(b3.innerHTML.includes('Estimated 8'), 'intel text in banner');
+
+// Without briefing data (null)
+resetElements();
+w.warHudShowWaveBanner(2, 'Scout Party', 4, null);
+const b4 = mockElements['war-wave-banner'];
+assert(b4.innerHTML.includes('WAVE 2'), 'wave 2 no briefing');
+assert(!b4.innerHTML.includes('THREAT'), 'no threat without briefing data');
+
+// ============================================================
+// warHudSetLoadingMessages
+// ============================================================
+
+console.log('\n--- warHudSetLoadingMessages ---');
+
+{
+    w.warHudSetLoadingMessages(['Calibrating...', 'Loading...', 'Arming...']);
+    assert(w._hudState.loadingMessages.length === 3, 'loading messages set');
+    assert(w._hudState.loadingMessages[0] === 'Calibrating...', 'first message');
+}
+
+{
+    w.warHudSetLoadingMessages(null);
+    assert(w._hudState.loadingMessages.length === 0, 'null clears messages');
+}
+
+{
+    w.warHudSetLoadingMessages([]);
+    assert(w._hudState.loadingMessages.length === 0, 'empty array clears messages');
+}
 
 // ============================================================
 // warHudShowWaveComplete
@@ -336,16 +385,18 @@ console.log('\n--- warHudShowCountdown ---');
 
 resetElements();
 timeouts = [];
+intervals = [];
 w.warHudShowCountdown(3);
 const cd = mockElements['war-countdown'];
 assert(cd.style.display === 'flex', 'countdown overlay shown');
-assert(cd.textContent === '3' || cd.textContent === 3, 'starts at 3');
+assert(cd.innerHTML.includes('3'), 'starts at 3');
 
 // Minimum 1
 resetElements();
+intervals = [];
 w.warHudShowCountdown(0);
 const cd2 = mockElements['war-countdown'];
-assert(cd2.textContent === '1' || cd2.textContent === 1, 'minimum countdown is 1');
+assert(cd2.innerHTML.includes('1'), 'minimum countdown is 1');
 
 // ============================================================
 // warHudShowBeginWarButton / warHudHideBeginWarButton

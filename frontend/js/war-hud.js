@@ -21,7 +21,20 @@ const _hudState = {
     announcements: [], // queued amy announcements
     countdownTimer: null,
     waveBannerTimer: null,
+    loadingMessages: [],       // from scenario generation
+    loadingMessageTimer: null,
 };
+
+// ============================================================
+// Utility
+// ============================================================
+
+function _hudEscapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = String(text || '');
+    return div.innerHTML;
+}
+
 
 // ============================================================
 // Audio helpers (reuse war.js audioCtx pattern)
@@ -95,9 +108,22 @@ function warHudShowCountdown(seconds) {
     el.style.display = 'flex';
     el.classList.add('active');
 
+    // Start rotating loading messages if available
+    let msgIdx = 0;
+    const msgs = _hudState.loadingMessages;
+    clearInterval(_hudState.loadingMessageTimer);
+    if (msgs.length > 0) {
+        _hudState.loadingMessageTimer = setInterval(() => {
+            msgIdx = (msgIdx + 1) % msgs.length;
+        }, 800);
+    }
+
     function tick() {
         if (count > 0) {
-            el.textContent = count;
+            const msgLine = msgs.length > 0
+                ? `<div class="war-countdown-msg">${_hudEscapeHtml(msgs[msgIdx])}</div>`
+                : '';
+            el.innerHTML = `<div class="war-countdown-number">${count}</div>${msgLine}`;
             el.className = 'war-countdown active war-countdown-pulse';
             _hudPlayTone(440 - count * 40, 'sine', 0.15, 0.08);
 
@@ -108,7 +134,8 @@ function warHudShowCountdown(seconds) {
             count--;
             _hudState.countdownTimer = setTimeout(tick, 1000);
         } else {
-            el.textContent = 'ENGAGE!';
+            clearInterval(_hudState.loadingMessageTimer);
+            el.innerHTML = '<div class="war-countdown-number">ENGAGE!</div>';
             el.className = 'war-countdown active war-countdown-engage';
             _hudPlayTone(880, 'sine', 0.4, 0.1);
 
@@ -122,29 +149,57 @@ function warHudShowCountdown(seconds) {
     tick();
 }
 
+/**
+ * Set loading messages for display during countdown.
+ * Called when a scenario is generated/applied.
+ */
+function warHudSetLoadingMessages(messages) {
+    _hudState.loadingMessages = Array.isArray(messages) ? messages : [];
+}
+
 // ============================================================
 // Wave banner
 // ============================================================
 
-function warHudShowWaveBanner(waveNum, waveName, hostileCount) {
+function warHudShowWaveBanner(waveNum, waveName, hostileCount, briefingData) {
     const el = document.getElementById('war-wave-banner');
     if (!el) return;
 
     const name = waveName ? `: ${waveName.toUpperCase()}` : '';
     const hostiles = hostileCount ? ` -- ${hostileCount} HOSTILES INCOMING` : '';
+
+    // Build briefing lines if available
+    let briefingHtml = '';
+    if (briefingData) {
+        if (briefingData.briefing) {
+            briefingHtml += `<div class="war-wave-briefing-text">${_hudEscapeHtml(briefingData.briefing)}</div>`;
+        }
+        if (briefingData.threat_level) {
+            const threatClass = briefingData.threat_level === 'heavy' ? 'threat-heavy' :
+                               briefingData.threat_level === 'moderate' ? 'threat-moderate' : 'threat-light';
+            briefingHtml += `<div class="war-wave-threat ${threatClass}">THREAT: ${briefingData.threat_level.toUpperCase()}</div>`;
+        }
+        if (briefingData.intel) {
+            briefingHtml += `<div class="war-wave-intel">${_hudEscapeHtml(briefingData.intel)}</div>`;
+        }
+    }
+
     el.innerHTML = `<div class="war-wave-title">WAVE ${waveNum}${name}</div>
-                     <div class="war-wave-sub">${hostiles}</div>`;
+                     <div class="war-wave-sub">${hostiles}</div>
+                     ${briefingHtml}`;
     el.style.display = 'block';
     el.className = 'war-wave-banner war-wave-slide-in';
 
     _hudPlayTone(220, 'sawtooth', 0.3, 0.05);
     setTimeout(() => _hudPlayTone(330, 'sawtooth', 0.2, 0.04), 150);
 
+    // Extended display time when briefing is present (5s vs 3s)
+    const displayTime = briefingData ? 5000 : 3000;
     clearTimeout(_hudState.waveBannerTimer);
     _hudState.waveBannerTimer = setTimeout(() => {
         el.className = 'war-wave-banner war-wave-slide-out';
         setTimeout(() => { el.style.display = 'none'; }, 500);
-    }, 3000);
+    }, displayTime);
 }
 
 function warHudShowWaveComplete(waveNum, eliminations, scoreBonus) {
@@ -536,3 +591,4 @@ window.warHudPlayAgain = warHudPlayAgain;
 window.warHudShowAmyAnnouncement = warHudShowAmyAnnouncement;
 window.warHudDrawCanvasCountdown = warHudDrawCanvasCountdown;
 window.warHudDrawFriendlyHealthBars = warHudDrawFriendlyHealthBars;
+window.warHudSetLoadingMessages = warHudSetLoadingMessages;

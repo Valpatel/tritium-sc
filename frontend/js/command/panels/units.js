@@ -214,6 +214,20 @@ export const UnitsPanelDef = {
                     <span class="panel-stat-label">SQUAD</span>
                     <span class="panel-stat-value">${_esc(u.squadId)}</span>
                 </div>` : ''}
+                ${u.thoughtText ? `
+                <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
+                    <div class="panel-section-label">THOUGHT</div>
+                    <div style="display:flex;align-items:center;gap:4px;margin-top:2px">
+                        <span style="display:inline-block;padding:1px 4px;border-radius:2px;font-size:0.4rem;text-transform:uppercase;background:${
+                            {curious:'#00f0ff',afraid:'#fcee0a',angry:'#ff2a6d',happy:'#05ffa1',neutral:'#888888'}[u.thoughtEmotion||'neutral']||'#888888'
+                        };color:#000">${_esc(u.thoughtEmotion || 'neutral')}</span>
+                        <q style="font-style:italic;color:var(--text-primary);font-size:0.5rem">${_esc(u.thoughtText)}</q>
+                    </div>
+                </div>` : ''}
+                ${alliance === 'neutral' && ['person','animal','vehicle'].includes(u.type || u.asset_type) ? `
+                <div style="margin-top:6px">
+                    <button class="panel-action-btn panel-npc-detail-btn" style="width:100%;font-size:0.5rem">VIEW NPC DETAILS</button>
+                </div>` : ''}
                 ${alliance === 'friendly' ? `
                 <div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--border)">
                     <div class="panel-section-label">SEND COMMAND</div>
@@ -250,6 +264,14 @@ export const UnitsPanelDef = {
                 cmdSend.addEventListener('click', sendCmd);
                 cmdInput.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') sendCmd();
+                });
+            }
+
+            // Wire NPC detail button
+            const npcBtn = detailEl.querySelector('.panel-npc-detail-btn');
+            if (npcBtn && selectedId) {
+                npcBtn.addEventListener('click', () => {
+                    EventBus.emit('device:open-modal', { id: selectedId });
                 });
             }
         }

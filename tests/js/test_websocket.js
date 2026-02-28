@@ -1407,6 +1407,96 @@ console.log('\n--- Edge Cases ---');
 })();
 
 // ============================================================
+// 22. Missing telemetry fields: visible, squad_id, detected_by
+// ============================================================
+
+console.log('\n--- Missing Telemetry Fields ---');
+
+(function testVisibleFieldForwardedToStore() {
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws._updateUnit({
+        target_id: 'h-01',
+        alliance: 'hostile',
+        visible: false,
+    });
+    const unit = vm.runInContext('TritiumStore.units.get("h-01")', ctx);
+    assertEqual(unit.visible, false, 'visible=false forwarded to store');
+})();
+
+(function testVisibleTrueForwardedToStore() {
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws._updateUnit({
+        target_id: 'h-02',
+        alliance: 'hostile',
+        visible: true,
+    });
+    const unit = vm.runInContext('TritiumStore.units.get("h-02")', ctx);
+    assertEqual(unit.visible, true, 'visible=true forwarded to store');
+})();
+
+(function testVisibleUndefinedNotSet() {
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws._updateUnit({
+        target_id: 'h-03',
+        alliance: 'friendly',
+    });
+    const unit = vm.runInContext('TritiumStore.units.get("h-03")', ctx);
+    assertEqual(unit.visible, undefined, 'visible not set when absent from telemetry');
+})();
+
+(function testSquadIdForwardedToStore() {
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws._updateUnit({
+        target_id: 'h-04',
+        alliance: 'hostile',
+        squad_id: 'squad-alpha',
+    });
+    const unit = vm.runInContext('TritiumStore.units.get("h-04")', ctx);
+    assertEqual(unit.squadId, 'squad-alpha', 'squad_id forwarded as squadId');
+})();
+
+(function testSquadIdNullNotSet() {
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws._updateUnit({
+        target_id: 'h-05',
+        alliance: 'hostile',
+    });
+    const unit = vm.runInContext('TritiumStore.units.get("h-05")', ctx);
+    assertEqual(unit.squadId, undefined, 'squadId not set when squad_id absent');
+})();
+
+(function testDetectedByForwardedToStore() {
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws._updateUnit({
+        target_id: 'h-06',
+        alliance: 'hostile',
+        detected_by: ['turret-01', 'drone-01'],
+    });
+    const unit = vm.runInContext('TritiumStore.units.get("h-06")', ctx);
+    assert(Array.isArray(unit.detectedBy), 'detectedBy is an array');
+    assertEqual(unit.detectedBy.length, 2, 'detectedBy has 2 entries');
+    assertEqual(unit.detectedBy[0], 'turret-01', 'detectedBy[0] is turret-01');
+})();
+
+(function testDetectedFieldForwarded() {
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws._updateUnit({
+        target_id: 'h-07',
+        alliance: 'hostile',
+        detected: true,
+    });
+    const unit = vm.runInContext('TritiumStore.units.get("h-07")', ctx);
+    assertEqual(unit.detected, true, 'detected field forwarded to store');
+})();
+
+// ============================================================
 // Summary
 // ============================================================
 
