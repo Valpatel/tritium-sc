@@ -45,6 +45,28 @@ def _find_bcc950_alsa_card() -> int | None:
     return None
 
 
+def _find_bcc950_alsa_card() -> int | None:
+    """Find the BCC950/Conexant ALSA capture card number via ``arecord -l``.
+
+    PortAudio sometimes reports 0 input channels for the Conexant chip,
+    so we fall back to ALSA which sees it correctly.
+    """
+    try:
+        r = subprocess.run(
+            ["arecord", "-l"],
+            capture_output=True, text=True, timeout=5,
+        )
+        for line in r.stdout.splitlines():
+            upper = line.upper()
+            if ("BCC950" in upper or "CONEXANT" in upper) and line.startswith("card "):
+                # Format: "card 1: CX20590 [CONEXANT USB AUDIO], device 0: ..."
+                card_str = line.split(":")[0].replace("card ", "").strip()
+                return int(card_str)
+    except Exception:
+        pass
+    return None
+
+
 def _find_bcc950_device() -> str | None:
     """Scan /dev/video* for the BCC950 by V4L2 device name.
 
