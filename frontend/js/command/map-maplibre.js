@@ -19,6 +19,8 @@
 import { TritiumStore } from './store.js';
 import { EventBus } from './events.js';
 import { drawMinimapContent } from './panels/minimap.js';
+import { DeviceModalManager } from './device-modal.js';
+import { FrontendVisionSystem } from './vision-system.js';
 
 // ============================================================
 // Constants
@@ -124,6 +126,7 @@ const _state = {
     showScreenFx: true,        // screen shake + flash overlay
     showBanners: true,         // wave/game state announcements
     showLayerHud: true,        // top-center status bar
+    showThoughts: true,        // NPC thought bubbles above markers
 
     tiltMode: 'tilted',        // 'tilted' or 'top-down'
     currentMode: 'observe',    // 'observe', 'tactical', or 'setup'
@@ -145,6 +148,9 @@ const _state = {
     effects: [],            // active effect objects
     effectsActive: false,   // repaint loop running
     effectAnimId: null,     // rAF handle
+
+    // Vision system (fog of war + cones)
+    visionSystem: null,
 };
 
 // Expose for automated testing (layer isolation, coordinate checks)
@@ -259,6 +265,11 @@ function _createMap(mapDiv) {
         EventBus.on('units:updated', _onUnitsUpdated);
         EventBus.on('unit:dispatched', _onDispatched);
         EventBus.on('minimap:pan', _onMinimapPan);
+        EventBus.on('device:open-modal', (data) => {
+            if (!data || !data.id) return;
+            const u = TritiumStore.units.get(data.id);
+            if (u) DeviceModalManager.open(data.id, _resolveModalType(u), u);
+        });
 
         // Listen for map mode changes
         EventBus.on('map:mode', (data) => {
@@ -538,10 +549,20 @@ function _addThreeJsLayer() {
             const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
             dirLight.position.set(100, 200, 100);
             _state.threeScene.add(dirLight);
+
+            // Vision system (fog of war overlay)
+            _state.visionSystem = new FrontendVisionSystem();
+            _state.visionSystem.init(_state.threeScene, _state);
         },
 
         render(gl, args) {
             if (!_state.threeScene || !_state.threeCamera) return;
+
+            // Update vision system (fog of war overlay)
+            if (_state.visionSystem) {
+                const units = [...TritiumStore.units.values()];
+                _state.visionSystem.update(units, TritiumStore.get('game.phase') || 'idle', 0.016);
+            }
 
             // Update combat effects before rendering
             _tickEffects();
@@ -682,6 +703,13 @@ function _updateUnits() {
         const allianceOk = !_state.allianceFilter ||
             _state.allianceFilter.includes(unit.alliance || 'unknown');
         el.style.display = (_state.showUnits && allianceOk) ? '' : 'none';
+
+        // Fog of war: dim invisible hostiles
+        if (unit.alliance === 'hostile' && unit.visible === false && _state.showFog) {
+            el.classList.add('fog-hidden');
+        } else {
+            el.classList.remove('fog-hidden');
+        }
     });
 
     // Remove markers for deleted units
@@ -694,6 +722,13 @@ function _updateUnits() {
 
     // Sync Three.js 3D unit meshes
     _sync3DUnits();
+}
+
+function _resolveModalType(unit) {
+    const type = unit.asset_type || unit.type || 'generic';
+    const alliance = unit.alliance || 'unknown';
+    const npcTypes = ['person', 'animal', 'vehicle'];
+    return (npcTypes.includes(type) && alliance === 'neutral') ? 'npc' : type;
 }
 
 function _createUnitMarker(id, unit, lngLat) {
@@ -732,6 +767,16 @@ function _createUnitMarker(id, unit, lngLat) {
     outer.addEventListener('click', (e) => {
         e.stopPropagation();
         TritiumStore.set('map.selectedUnitId', id);
+    });
+
+    // Double-click handler for device modal
+    outer.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        const u = TritiumStore.units.get(id);
+        if (u) {
+            const modalType = _resolveModalType(u);
+            DeviceModalManager.open(id, modalType, u);
+        }
     });
 
     return marker;
@@ -996,6 +1041,98 @@ function _updateMarkerElement(marker, unit) {
     _applyMarkerStyle(inner, unit);
     // No setRotation — labels stay screen-aligned for readability.
     // Heading is shown by the 3D model's orientation instead.
+
+    // Thought bubble above marker
+    _updateThoughtBubble(el, unit);
+}
+
+const _EMOTION_COLORS = {
+    curious: '#00f0ff', afraid: '#fcee0a', angry: '#ff2a6d',
+    happy: '#05ffa1', neutral: '#888888',
+};
+
+function _updateThoughtBubble(outerEl, unit) {
+    let bubble = outerEl.querySelector('.thought-bubble');
+
+    // Should we show a thought?
+    const now = Date.now();
+    const hasThought = _state.showThoughts && unit.thoughtText && unit.thoughtExpires && unit.thoughtExpires > now;
+
+    if (!hasThought) {
+        if (bubble) bubble.style.display = 'none';
+        return;
+    }
+
+    // Compute opacity (fade in/out)
+    const duration = (unit.thoughtDuration || 5) * 1000;
+    const created = unit.thoughtExpires - duration;
+    const age = now - created;
+    const timeLeft = unit.thoughtExpires - now;
+    let alpha = 1.0;
+    if (age < 300) alpha = age / 300;
+    if (timeLeft < 1000) alpha = Math.min(alpha, timeLeft / 1000);
+    alpha = Math.max(0, Math.min(1, alpha));
+
+    const emotion = unit.thoughtEmotion || 'neutral';
+    const borderColor = _EMOTION_COLORS[emotion] || '#888888';
+    const text = unit.thoughtText;
+
+    if (!bubble) {
+        bubble = document.createElement('div');
+        bubble.className = 'thought-bubble';
+        outerEl.appendChild(bubble);
+    }
+
+    bubble.style.cssText = `
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        margin-bottom: 8px;
+        padding: 6px 10px;
+        background: rgba(18, 22, 36, 0.92);
+        border: 2.5px solid ${borderColor};
+        border-radius: 6px;
+        box-shadow: 0 0 12px ${borderColor}88, 0 0 4px ${borderColor}44;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.95);
+        max-width: 200px;
+        white-space: normal;
+        word-wrap: break-word;
+        line-height: 1.3;
+        pointer-events: none;
+        z-index: 10;
+        opacity: ${alpha};
+        display: block;
+    `;
+
+    // Tail triangle (pure CSS, using ::after pseudo-element not possible in inline, so use a child)
+    let tail = bubble.querySelector('.thought-tail');
+    if (!tail) {
+        tail = document.createElement('div');
+        tail.className = 'thought-tail';
+        bubble.appendChild(tail);
+    }
+    tail.style.cssText = `
+        position: absolute;
+        bottom: -8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 0; height: 0;
+        border-left: 6px solid transparent;
+        border-right: 6px solid transparent;
+        border-top: 8px solid ${borderColor};
+    `;
+
+    // Content
+    let content = bubble.querySelector('.thought-text');
+    if (!content) {
+        content = document.createElement('span');
+        content.className = 'thought-text';
+        bubble.insertBefore(content, tail);
+    }
+    content.textContent = text;
 }
 
 // ============================================================
@@ -3093,6 +3230,11 @@ export function destroyMap() {
         _dispose3DUnit(group);
     }
     _state.unitMeshes = {};
+    // Clean up vision system
+    if (_state.visionSystem) {
+        _state.visionSystem.dispose();
+        _state.visionSystem = null;
+    }
     _state._meterScale = null;
     _state.initialized = false;
     console.log('[MAP-ML] Map destroyed');
@@ -3151,19 +3293,11 @@ export function toggleGrid() {
 
 export function toggleFog() {
     _state.showFog = !_state.showFog;
-    if (_state.map) {
-        if (typeof _state.map.setFog === 'function') {
-            if (_state.showFog) {
-                _state.map.setFog({
-                    range: [1, 10],
-                    color: '#060609',
-                    'horizon-blend': 0.1,
-                });
-            } else {
-                _state.map.setFog(null);
-            }
+    if (_state.visionSystem) {
+        if (_state.showFog) {
+            _state.visionSystem.enable();
         } else {
-            console.warn('[MAP-ML] map.setFog() not available in this MapLibre version');
+            _state.visionSystem.disable();
         }
     }
     _updateLayerHud();
@@ -3266,6 +3400,20 @@ export function toggleMesh() {
     // Mesh overlay is drawn on the canvas overlay, not a MapLibre layer,
     // so just toggle the state flag and the render loop will pick it up.
     console.log(`[MAP-ML] Mesh network ${_state.showMesh ? 'ON' : 'OFF'}`);
+}
+
+/**
+ * Toggle NPC thought bubbles on/off.
+ */
+export function toggleThoughts() {
+    _state.showThoughts = !_state.showThoughts;
+    // Immediately hide/show existing bubbles
+    for (const id of Object.keys(_state.unitMarkers)) {
+        const el = _state.unitMarkers[id].getElement();
+        const bubble = el.querySelector('.thought-bubble');
+        if (bubble && !_state.showThoughts) bubble.style.display = 'none';
+    }
+    console.log(`[MAP-ML] Thought bubbles ${_state.showThoughts ? 'ON' : 'OFF'}`);
 }
 
 export function toggleAllLayers() {
@@ -3442,6 +3590,7 @@ export function getMapState() {
         showWaterways: _state.showWaterways,
         showParks: _state.showParks,
         showMesh: _state.showMesh,
+        showThoughts: _state.showThoughts,
         showTracers: _state.showTracers,
         showExplosions: _state.showExplosions,
         showParticles: _state.showParticles,

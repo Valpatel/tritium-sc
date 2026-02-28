@@ -2233,6 +2233,387 @@ body.v2 {
 .go-stat-label { font-size: 0.55rem; color: var(--text-dim); letter-spacing: 0.1em; display: block; margin-bottom: 4px; }
 .go-stat-value { font-size: 1.2rem; color: var(--text-primary); font-weight: 600; }
 
+/* Mission Generation Modal */
+.mission-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(2, 2, 6, 0.9);
+    backdrop-filter: blur(16px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 600;
+}
+
+.mission-modal-panel {
+    width: min(640px, 90vw);
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 24px 32px;
+    background: linear-gradient(135deg, var(--surface-2) 0%, var(--surface-1) 100%);
+    border: 1px solid var(--cyan);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 0 40px rgba(0, 240, 255, 0.1), inset 0 0 60px rgba(0, 240, 255, 0.02);
+}
+
+.mission-modal-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.mission-modal-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--cyan);
+    text-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+    letter-spacing: 0.15em;
+    margin-bottom: 6px;
+}
+
+.mission-status {
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+}
+
+/* Game mode selector buttons */
+.mission-mode-select {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.mission-mode-btn {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.2s, background 0.2s;
+    color: var(--text-secondary);
+}
+
+.mission-mode-btn:hover {
+    border-color: var(--cyan);
+    background: rgba(0, 240, 255, 0.05);
+}
+
+.mission-mode-btn.active {
+    border-color: var(--cyan);
+    background: rgba(0, 240, 255, 0.08);
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.1);
+}
+
+.mission-mode-btn .mode-icon {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    line-height: 20px;
+    text-align: center;
+    background: var(--cyan);
+    color: var(--bg);
+    font-weight: 700;
+    font-size: 0.6rem;
+    border-radius: 3px;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+.mission-mode-btn .mode-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.08em;
+}
+
+.mission-mode-btn .mode-desc {
+    display: block;
+    font-size: 0.5rem;
+    color: var(--text-dim);
+    margin-top: 4px;
+    padding-left: 28px;
+}
+
+/* Progress bar */
+.mission-progress-bar {
+    height: 3px;
+    background: var(--surface-1);
+    border-radius: 2px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.mission-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--cyan), var(--green));
+    border-radius: 2px;
+    transition: width 0.4s ease;
+    box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+}
+
+/* Generation steps log */
+.mission-steps {
+    max-height: 250px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+.mission-step {
+    padding: 8px 10px;
+    margin-bottom: 4px;
+    border-radius: var(--radius-sm);
+    border-left: 2px solid var(--border);
+    background: rgba(0, 0, 0, 0.2);
+    transition: border-color 0.3s;
+}
+
+.mission-step.step-active {
+    border-left-color: var(--yellow);
+    animation: step-pulse 1.5s ease-in-out infinite;
+}
+
+.mission-step.step-complete {
+    border-left-color: var(--green);
+}
+
+.mission-step.step-failed {
+    border-left-color: var(--magenta);
+}
+
+@keyframes step-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.step-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.step-icon {
+    font-size: 0.7rem;
+    color: var(--cyan);
+    width: 16px;
+    text-align: center;
+}
+
+.step-label {
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    flex: 1;
+}
+
+.step-status-indicator {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--border);
+}
+
+.step-status-indicator.active {
+    background: var(--yellow);
+    box-shadow: 0 0 6px var(--yellow);
+    animation: indicator-pulse 1s ease-in-out infinite;
+}
+
+.step-status-indicator.complete {
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+}
+
+.step-status-indicator.failed {
+    background: var(--magenta);
+    box-shadow: 0 0 6px var(--magenta);
+}
+
+@keyframes indicator-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+.step-prompt {
+    font-size: 0.45rem;
+    color: var(--text-dim);
+    margin-top: 4px;
+    padding-left: 24px;
+    max-height: 40px;
+    overflow: hidden;
+    opacity: 0.6;
+}
+
+.step-result {
+    font-size: 0.45rem;
+    color: var(--green);
+    margin-top: 4px;
+    padding-left: 24px;
+    max-height: 60px;
+    overflow: hidden;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* Mission briefing */
+.mission-briefing {
+    padding: 16px;
+    margin-bottom: 12px;
+    background: rgba(0, 240, 255, 0.03);
+    border: 1px solid rgba(0, 240, 255, 0.15);
+    border-radius: var(--radius-sm);
+}
+
+.briefing-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--cyan);
+    letter-spacing: 0.12em;
+    margin-bottom: 12px;
+    text-align: center;
+}
+
+.briefing-section {
+    margin-bottom: 8px;
+}
+
+.briefing-label {
+    font-size: 0.5rem;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    margin-bottom: 2px;
+}
+
+.briefing-text {
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+/* Model selector */
+.mission-model-select {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    margin-bottom: 6px;
+}
+
+.model-select-label {
+    font-size: 0.5rem;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+}
+
+.mission-model-dropdown {
+    flex: 1;
+    background: rgba(0, 240, 255, 0.06);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    color: var(--text-secondary);
+    padding: 4px 6px;
+    font-size: 0.5rem;
+    cursor: pointer;
+}
+
+.mission-model-dropdown:focus {
+    border-color: var(--neon-cyan);
+    outline: none;
+}
+
+.model-recommendation {
+    font-size: 0.45rem;
+    color: var(--neon-green);
+    white-space: nowrap;
+}
+
+.briefing-sub {
+    font-size: 0.5rem;
+    color: var(--text-dim);
+    margin-top: 2px;
+    opacity: 0.8;
+}
+
+.wave-breakdown {
+    margin-top: 4px;
+    padding: 4px 6px;
+    background: rgba(0, 240, 255, 0.04);
+    border-left: 1px solid var(--neon-cyan);
+}
+
+.wave-line {
+    font-size: 0.48rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.bonus-line {
+    font-size: 0.5rem;
+    color: var(--neon-green);
+    line-height: 1.5;
+}
+
+.briefing-source {
+    font-size: 0.45rem;
+    color: var(--text-dim);
+    text-align: right;
+    margin-top: 8px;
+    opacity: 0.6;
+}
+
+/* Action buttons */
+.mission-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.mission-btn-generate {
+    background: rgba(0, 240, 255, 0.1);
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+}
+
+.mission-btn-generate:hover {
+    background: rgba(0, 240, 255, 0.2);
+}
+
+.mission-btn-scripted {
+    background: rgba(5, 255, 161, 0.1);
+    border: 1px solid var(--green);
+    color: var(--green);
+}
+
+.mission-btn-scripted:hover {
+    background: rgba(5, 255, 161, 0.2);
+}
+
+.mission-btn-launch {
+    background: rgba(252, 238, 10, 0.1);
+    border: 1px solid var(--yellow);
+    color: var(--yellow);
+    font-weight: 700;
+}
+
+.mission-btn-launch:hover {
+    background: rgba(252, 238, 10, 0.2);
+    box-shadow: 0 0 12px rgba(252, 238, 10, 0.2);
+}
+
+.mission-btn-cancel {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+}
+
+.mission-btn-cancel:hover {
+    border-color: var(--magenta);
+    color: var(--magenta);
+}
+
 /* Analytics panel (sidebar) */
 .analytics-row { display: flex; justify-content: space-between; padding: 3px 0; }
 .analytics-label { font-size: 0.55rem; color: var(--text-dim); }

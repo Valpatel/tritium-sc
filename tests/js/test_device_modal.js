@@ -378,6 +378,157 @@ console.log('\n--- EventBus Integration ---');
 }
 
 // =====================================================================
+// Tests: NPCControl
+// =====================================================================
+console.log('\n--- NPCControl ---');
+
+{
+    const registry = ctx.DeviceControlRegistry;
+    const npcCtrl = registry.get('npc');
+    assert(npcCtrl !== null && npcCtrl !== undefined, 'NPCControl registered');
+    assertEqual(npcCtrl.type, 'npc', 'NPCControl type is "npc"');
+    assert(typeof npcCtrl.title === 'string' && npcCtrl.title.length > 0, 'NPCControl has title');
+}
+
+{
+    const registry = ctx.DeviceControlRegistry;
+    const npcCtrl = registry.get('npc');
+    assertEqual(typeof npcCtrl.render, 'function', 'NPCControl has render()');
+    assertEqual(typeof npcCtrl.bind, 'function', 'NPCControl has bind()');
+    assertEqual(typeof npcCtrl.update, 'function', 'NPCControl has update()');
+    assertEqual(typeof npcCtrl.destroy, 'function', 'NPCControl has destroy()');
+}
+
+{
+    // NPCControl renders unit info section
+    const registry = ctx.DeviceControlRegistry;
+    const npcCtrl = registry.get('npc');
+    const device = {
+        id: 'npc-ped-01',
+        name: 'Sarah',
+        type: 'person',
+        asset_type: 'person',
+        alliance: 'neutral',
+        position: { x: 50, y: 60 },
+        heading: 180,
+        speed: 1.2,
+        health: 100,
+        max_health: 100,
+        status: 'active',
+        fsm_state: 'idle',
+    };
+    const html = npcCtrl.render(device);
+    assert(typeof html === 'string', 'render returns string');
+    assert(html.length > 50, 'render returns substantial HTML');
+    assert(html.includes('Sarah') || html.includes('npc-ped-01'), 'render includes NPC name or ID');
+    assert(html.includes('person') || html.includes('PERSON'), 'render includes asset type');
+    assert(html.includes('neutral') || html.includes('NEUTRAL'), 'render includes alliance');
+}
+
+{
+    // NPCControl renders thought section
+    const registry = ctx.DeviceControlRegistry;
+    const npcCtrl = registry.get('npc');
+    const device = {
+        id: 'npc-ped-02',
+        name: 'Mike',
+        type: 'person',
+        alliance: 'neutral',
+        position: { x: 10, y: 20 },
+        health: 100,
+        max_health: 100,
+        thoughtText: 'Nice weather today',
+        thoughtEmotion: 'happy',
+    };
+    const html = npcCtrl.render(device);
+    assert(html.includes('Nice weather today'), 'render includes current thought text');
+}
+
+{
+    // NPCControl renders thought history
+    const registry = ctx.DeviceControlRegistry;
+    const npcCtrl = registry.get('npc');
+    const device = {
+        id: 'npc-ped-03',
+        name: 'Tina',
+        type: 'person',
+        alliance: 'neutral',
+        position: { x: 0, y: 0 },
+        health: 100,
+        max_health: 100,
+        thoughtHistory: [
+            { text: 'First thought', emotion: 'neutral', time: Date.now() - 5000 },
+            { text: 'Second thought', emotion: 'curious', time: Date.now() },
+        ],
+    };
+    const html = npcCtrl.render(device);
+    assert(html.includes('First thought'), 'render includes first history entry');
+    assert(html.includes('Second thought'), 'render includes second history entry');
+}
+
+{
+    // NPCControl renders SET THOUGHT controls
+    const registry = ctx.DeviceControlRegistry;
+    const npcCtrl = registry.get('npc');
+    const device = {
+        id: 'npc-v-01',
+        name: 'Sedan',
+        type: 'vehicle',
+        alliance: 'neutral',
+        position: { x: 0, y: 0 },
+        health: 100,
+        max_health: 100,
+    };
+    const html = npcCtrl.render(device);
+    assert(html.includes('SET') || html.includes('set'), 'render includes SET thought button');
+    assert(html.includes('TAKE CONTROL') || html.includes('take_control'), 'render includes TAKE CONTROL action');
+}
+
+{
+    // NPCControl modal opens via DeviceModalManager
+    const manager = ctx.DeviceModalManager;
+    manager.close();
+    const device = {
+        id: 'npc-ped-04',
+        name: 'Jess',
+        type: 'person',
+        alliance: 'neutral',
+        position: { x: 10, y: 20 },
+        health: 100,
+        max_health: 100,
+    };
+    manager.open('npc-ped-04', 'npc', device);
+    assert(manager.isOpen(), 'NPC modal opens via DeviceModalManager');
+    manager.close();
+    assert(!manager.isOpen(), 'NPC modal closes');
+}
+
+// =====================================================================
+// Tests: NPC type routing
+// =====================================================================
+console.log('\n--- NPC Type Routing ---');
+
+{
+    // Alias check: person/animal/vehicle used to route to 'sensor', now 'npc' for neutrals
+    const registry = ctx.DeviceControlRegistry;
+    // person alias should now resolve to npc for neutral units
+    // but in the registry itself, 'person' still has the old alias;
+    // the routing logic is in map.js _resolveModalType
+    // Here we just verify 'npc' returns NPCControl
+    const npc = registry.get('npc');
+    assert(npc.type === 'npc', 'direct "npc" lookup returns NPCControl');
+}
+
+{
+    // Verify old aliases still work for non-NPC types
+    const registry = ctx.DeviceControlRegistry;
+    const scout = registry.get('scout_drone');
+    assert(scout !== null && scout !== undefined, 'scout_drone alias still resolves');
+    const tank = registry.get('tank');
+    assert(tank !== null && tank !== undefined, 'tank alias still resolves');
+}
+
+// =====================================================================
 // Summary
 // =====================================================================
 console.log(`\n=== Device Modal Tests: ${passed} passed, ${failed} failed ===`);

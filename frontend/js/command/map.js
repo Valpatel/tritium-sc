@@ -160,6 +160,9 @@ const _state = {
     // Mesh radio overlay
     showMesh: true,
 
+    // NPC thought bubbles
+    showThoughts: true,
+
     // Screen shake tracking
     _shakeActive: false,
 
@@ -508,7 +511,7 @@ function _draw() {
     _drawLabels(ctx);
 
     // Layer 5.15: NPC thought bubbles
-    _drawThoughtBubbles(ctx);
+    if (_state.showThoughts) _drawThoughtBubbles(ctx);
 
     // Layer 5.2: Hovered unit tooltip
     _drawTooltip(ctx);
@@ -1012,11 +1015,11 @@ function _drawThoughtBubbles(ctx) {
     if (!units || units.size === 0) return;
 
     const now = Date.now();
-    const fontSize = Math.max(9, 10 * Math.min(_state.cam.zoom, 2));
+    const fontSize = Math.max(11, 13 * Math.min(_state.cam.zoom, 2.5));
     const lineHeight = fontSize + 4;
-    const padding = 6;
-    const maxTextWidth = 120;
-    const tailHeight = 8;
+    const padding = 10;
+    const maxTextWidth = 200;
+    const tailHeight = 10;
     const fadeInDuration = 300;
     const fadeOutStart = 1000; // start fading 1s before expiry
 
@@ -1062,13 +1065,17 @@ function _drawThoughtBubbles(ctx) {
 
         // Position: centered above unit
         const bx = screen.x - bubbleW / 2;
-        const by = screen.y - bubbleH - tailHeight - 20; // 20px above unit icon
+        const by = screen.y - bubbleH - tailHeight - 28; // 28px above unit icon
         const radius = 4;
 
         ctx.globalAlpha = alpha;
 
+        // Glow effect behind bubble
+        ctx.shadowColor = borderColor;
+        ctx.shadowBlur = 12;
+
         // Bubble background
-        ctx.fillStyle = 'rgba(6, 6, 9, 0.85)';
+        ctx.fillStyle = 'rgba(18, 22, 36, 0.92)';
         ctx.beginPath();
         ctx.moveTo(bx + radius, by);
         ctx.lineTo(bx + bubbleW - radius, by);
@@ -1090,9 +1097,13 @@ function _drawThoughtBubbles(ctx) {
         ctx.closePath();
         ctx.fill();
 
+        // Reset shadow so border/text don't double-glow
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+
         // Border
         ctx.strokeStyle = borderColor;
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 2.5;
         // Re-draw bubble path for stroke
         ctx.beginPath();
         ctx.moveTo(bx + radius, by);
@@ -1115,7 +1126,7 @@ function _drawThoughtBubbles(ctx) {
         ctx.stroke();
 
         // Text
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
         for (let i = 0; i < lines.length; i++) {
             ctx.fillText(lines[i], bx + padding, by + padding + i * lineHeight);
         }
@@ -1975,6 +1986,13 @@ function _onWheel(e) {
     _state.cam.targetZoom = newZoom;
 }
 
+function _resolveModalType(unit) {
+    const type = unit.asset_type || unit.type || 'generic';
+    const alliance = unit.alliance || 'unknown';
+    const npcTypes = ['person', 'animal', 'vehicle'];
+    return (npcTypes.includes(type) && alliance === 'neutral') ? 'npc' : type;
+}
+
 function _onDblClick(e) {
     const rect = _state.canvas.getBoundingClientRect();
     const sx = e.clientX - rect.left;
@@ -1984,7 +2002,7 @@ function _onDblClick(e) {
     if (hitId) {
         const unit = TritiumStore.units.get(hitId);
         if (unit) {
-            DeviceModalManager.open(hitId, unit.asset_type || unit.type || 'generic', unit);
+            DeviceModalManager.open(hitId, _resolveModalType(unit), unit);
         }
     }
 }
@@ -2333,7 +2351,7 @@ function _onDeviceOpenModal(data) {
     if (!data || !data.id) return;
     const unit = TritiumStore.units.get(data.id);
     if (unit) {
-        DeviceModalManager.open(data.id, unit.asset_type || unit.type || 'generic', unit);
+        DeviceModalManager.open(data.id, _resolveModalType(unit), unit);
     }
 }
 
@@ -2690,6 +2708,14 @@ export function toggleMesh() {
     console.log(`[MAP] Mesh network ${_state.showMesh ? 'ON' : 'OFF'}`);
 }
 
+/**
+ * Toggle NPC thought bubbles on/off.
+ */
+export function toggleThoughts() {
+    _state.showThoughts = !_state.showThoughts;
+    console.log(`[MAP] Thought bubbles ${_state.showThoughts ? 'ON' : 'OFF'}`);
+}
+
 export function getMapState() {
     return {
         showSatellite: _state.showSatellite,
@@ -2697,6 +2723,7 @@ export function getMapState() {
         showGrid: _state.showGrid,
         fogEnabled: _state.fogEnabled,
         showMesh: _state.showMesh,
+        showThoughts: _state.showThoughts,
     };
 }
 

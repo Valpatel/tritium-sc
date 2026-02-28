@@ -7,10 +7,10 @@
 import { TritiumStore } from './store.js';
 import { EventBus } from './events.js';
 import { WebSocketManager } from './websocket.js';
-import { initMap, destroyMap, toggleSatellite, toggleRoads, toggleGrid, toggleBuildings, toggleFog, toggleTerrain, toggleLabels, toggleModels, toggleWaterways, toggleParks, toggleMesh, toggleAllLayers, toggleTracers, toggleExplosions, toggleParticles, toggleHitFlashes, toggleFloatingText, toggleKillFeed, toggleScreenFx, toggleBanners, toggleLayerHud, toggleHealthBars, toggleSelectionFx, getMapState, centerOnAction, resetCamera, zoomIn, zoomOut, toggleTilt, setLayers, setMapMode } from './map-maplibre.js';
+import { initMap, destroyMap, toggleSatellite, toggleRoads, toggleGrid, toggleBuildings, toggleFog, toggleTerrain, toggleLabels, toggleModels, toggleWaterways, toggleParks, toggleMesh, toggleThoughts, toggleAllLayers, toggleTracers, toggleExplosions, toggleParticles, toggleHitFlashes, toggleFloatingText, toggleKillFeed, toggleScreenFx, toggleBanners, toggleLayerHud, toggleHealthBars, toggleSelectionFx, getMapState, centerOnAction, resetCamera, zoomIn, zoomOut, toggleTilt, setLayers, setMapMode } from './map-maplibre.js';
 import { PanelManager } from './panel-manager.js';
 import { LayoutManager } from './layout-manager.js';
-import { createMenuBar, focusSaveInput, getSelectedScenario } from './menu-bar.js';
+import { createMenuBar, focusSaveInput } from './menu-bar.js';
 import { AmyPanelDef } from './panels/amy.js';
 import { UnitsPanelDef } from './panels/units.js';
 import { AlertsPanelDef } from './panels/alerts.js';
@@ -23,6 +23,7 @@ import { PatrolPanelDef } from './panels/patrol.js';
 import { ScenariosPanelDef } from './panels/scenarios.js';
 import { SystemPanelDef } from './panels/system.js';
 import { MinimapPanelDef } from './panels/minimap.js';
+import { MissionModal, initMissionModal } from './mission-modal.js';
 
 // Make available on window for console debugging
 window.TritiumStore = TritiumStore;
@@ -91,7 +92,7 @@ function init() {
         renderUnitList();
     });
 
-    // Game state updates (header + game over overlay)
+    // Game state updates (header + game over overlay + auto-fog)
     TritiumStore.on('game.phase', (phase) => {
         // Show/hide game score in header
         const scoreArea = document.getElementById('game-score-area');
@@ -100,6 +101,14 @@ function init() {
         // Game over overlay
         if (phase === 'victory' || phase === 'defeat') {
             showGameOver(phase);
+        }
+
+        // Auto-enable fog of war during battle, disable when idle
+        const mapState = getMapState();
+        if (phase === 'countdown' || phase === 'active') {
+            if (!mapState.showFog) toggleFog();
+        } else if (phase === 'idle' || phase === 'setup') {
+            if (mapState.showFog) toggleFog();
         }
     });
 
@@ -135,6 +144,9 @@ function init() {
 
     // Modal
     initModal();
+
+    // Mission generation modal
+    initMissionModal(EventBus);
 
     // Map mode buttons
     initMapModes();
@@ -367,6 +379,7 @@ function initPanelSystem(container) {
             toggleTilt: () => (_activeMapModule ? _activeMapModule.toggleTilt() : toggleTilt()),
             toggleBuildings: () => (_activeMapModule ? _activeMapModule.toggleBuildings() : toggleBuildings()),
             toggleMesh: () => (_activeMapModule ? _activeMapModule.toggleMesh() : toggleMesh()),
+            toggleThoughts: () => (_activeMapModule ? _activeMapModule.toggleThoughts() : toggleThoughts()),
             toggleAllLayers: () => (_activeMapModule ? _activeMapModule.toggleAllLayers() : toggleAllLayers()),
             toggleTracers: () => (_activeMapModule ? _activeMapModule.toggleTracers() : toggleTracers()),
             toggleExplosions: () => (_activeMapModule ? _activeMapModule.toggleExplosions() : toggleExplosions()),
@@ -712,19 +725,7 @@ function initGameControls() {
 }
 
 async function beginWar() {
-    try {
-        const scenario = getSelectedScenario();
-        let resp;
-        if (scenario) {
-            resp = await fetch(`/api/game/battle/${encodeURIComponent(scenario)}`, { method: 'POST' });
-        } else {
-            resp = await fetch('/api/game/begin', { method: 'POST' });
-        }
-        const data = await resp.json();
-        if (data.error) showToast(data.error, 'alert');
-    } catch (e) {
-        showToast('Failed to start game', 'alert');
-    }
+    MissionModal.show();
 }
 
 async function resetGame() {
@@ -866,6 +867,7 @@ function initKeyboard() {
                 document.getElementById('help-overlay').hidden = true;
                 document.getElementById('modal-overlay').hidden = true;
                 document.getElementById('game-over-overlay').hidden = true;
+                MissionModal.hide();
                 break;
             case '/':
                 e.preventDefault();
@@ -891,6 +893,15 @@ function initKeyboard() {
             case 'B':
                 if (TritiumStore.game.phase === 'idle' || TritiumStore.game.phase === 'setup') {
                     beginWar();
+                }
+                break;
+            case 'n':
+            case 'N':
+                // Mission generation modal (open/close)
+                if (MissionModal.isVisible()) {
+                    MissionModal.hide();
+                } else if (TritiumStore.game.phase === 'idle' || TritiumStore.game.phase === 'setup') {
+                    MissionModal.show();
                 }
                 break;
             // Panel toggles (unified layout)

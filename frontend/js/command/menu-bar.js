@@ -8,18 +8,13 @@
 
 import { EventBus } from './events.js';
 
-// ---------------------------------------------------------------------------
-// Scenario selection state (module-level)
-// ---------------------------------------------------------------------------
-
-let _selectedScenario = null;
-
 /**
- * Get the currently selected battle scenario name, or null for classic.
- * @returns {string|null}
+ * Get the currently selected battle scenario name.
+ * Deprecated: always returns null. All missions route through MissionModal.
+ * @returns {null}
  */
 export function getSelectedScenario() {
-    return _selectedScenario;
+    return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -128,6 +123,7 @@ function _mapMenuItems(mapActions) {
         { label: '3D Models', checkable: true, checked: () => s().showModels3d, action: () => mapActions.toggleModels() },
         { label: 'Labels', checkable: true, checked: () => s().showLabels, action: () => mapActions.toggleLabels() },
         { label: 'Mesh Network', checkable: true, checked: () => s().showMesh, action: () => mapActions.toggleMesh() },
+        { label: 'Thought Bubbles', checkable: true, checked: () => s().showThoughts, action: () => mapActions.toggleThoughts() },
         { separator: true },
         // Combat FX layers
         { label: 'Tracers', checkable: true, checked: () => s().showTracers, action: () => mapActions.toggleTracers() },
@@ -160,27 +156,13 @@ function _mapMenuItems(mapActions) {
 }
 
 function _gameMenuItems(mapActions) {
-    const scenarios = [
-        { id: null, label: 'Classic 10-Wave' },
-        { id: 'street_combat', label: 'Street Combat' },
-        { id: 'riot', label: 'Riot' },
-    ];
-    const items = [
-        { label: 'Begin Battle', shortcut: 'B',
+    return [
+        { label: 'New Mission', shortcut: 'B',
           action: () => { if (mapActions.beginWar) mapActions.beginWar(); } },
         { separator: true },
+        { label: 'Reset Game', shortcut: 'R',
+          action: () => { if (mapActions.resetGame) mapActions.resetGame(); } },
     ];
-    for (const sc of scenarios) {
-        items.push({
-            label: sc.label, checkable: true,
-            checked: () => _selectedScenario === sc.id,
-            action: () => { _selectedScenario = sc.id; },
-        });
-    }
-    items.push({ separator: true });
-    items.push({ label: 'Reset Game', shortcut: 'R',
-        action: () => { if (mapActions.resetGame) mapActions.resetGame(); } });
-    return items;
 }
 
 function _helpMenuItems() {

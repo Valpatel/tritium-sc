@@ -1315,3 +1315,82 @@
     max-height: 200px;
     object-fit: contain;
 }
+
+/* NPC Intel modal */
+.dc-npc-thought {
+    padding: 6px 8px;
+    margin: 4px 0;
+    background: var(--surface-3);
+    border-radius: var(--radius-sm);
+    font-size: 0.55rem;
+    line-height: 1.4;
+}
+
+.dc-npc-thought q {
+    font-style: italic;
+    color: var(--text-primary);
+}
+
+.dc-npc-emotion {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 2px;
+    font-size: 0.4rem;
+    text-transform: uppercase;
+    color: #000;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
+.dc-npc-history {
+    max-height: 120px;
+    overflow-y: auto;
+    margin: 4px 0;
+    padding: 4px;
+    background: var(--surface-3);
+    border-radius: var(--radius-sm);
+}
+
+.dc-npc-history::-webkit-scrollbar {
+    width: 4px;
+}
+
+.dc-npc-history::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+}
+
+.dc-npc-history-item {
+    font-size: 0.5rem;
+    padding: 2px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.dc-npc-history-item:last-child {
+    border-bottom: none;
+}
+
+.dc-npc-ago {
+    font-size: 0.4rem;
+    color: var(--text-ghost);
+    margin-left: 4px;
+}
+
+.dc-npc-emotion-select {
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    color: var(--text-primary);
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 4px;
+    outline: none;
+}
+
+.dc-npc-emotion-select:focus {
+    border-color: rgba(0, 240, 255, 0.3);
+}
+
+.dc-npc-personality {
+    margin: 4px 0;
+}

@@ -126,6 +126,11 @@ export class WebSocketManager {
         if (t.degradation !== undefined) update.degradation = t.degradation;
         if (t.weapon_range !== undefined) update.weaponRange = t.weapon_range;
         if (t.is_combatant !== undefined) update.isCombatant = t.is_combatant;
+        // Vision and squad fields
+        if (t.visible !== undefined) update.visible = t.visible;
+        if (t.squad_id !== undefined) update.squadId = t.squad_id;
+        if (t.detected_by !== undefined) update.detectedBy = t.detected_by;
+        if (t.detected !== undefined) update.detected = t.detected;
         TritiumStore.updateUnit(t.target_id, update);
 
         // Clean up terminal-state units after a delay so effects/animations complete.
@@ -251,7 +256,15 @@ export class WebSocketManager {
                 if (unit) {
                     unit.thoughtText = d.text;
                     unit.thoughtEmotion = d.emotion || 'neutral';
-                    unit.thoughtExpires = Date.now() + (d.duration || 5) * 1000;
+                    unit.thoughtDuration = d.duration || 5;
+                    unit.thoughtExpires = Date.now() + unit.thoughtDuration * 1000;
+                    if (!unit.thoughtHistory) unit.thoughtHistory = [];
+                    unit.thoughtHistory.push({
+                        text: d.text,
+                        emotion: d.emotion || 'neutral',
+                        time: Date.now(),
+                    });
+                    if (unit.thoughtHistory.length > 10) unit.thoughtHistory.shift();
                 }
                 EventBus.emit('npc:thought', d);
                 break;
@@ -324,7 +337,10 @@ export class WebSocketManager {
             case 'amy_wave_start': {
                 if (typeof warHudShowWaveBanner === 'function') {
                     const d = msg.data || msg;
-                    warHudShowWaveBanner(d.wave || d.wave_number, d.wave_name, d.hostile_count);
+                    const briefingData = (d.briefing || d.threat_level || d.intel)
+                        ? { briefing: d.briefing, threat_level: d.threat_level, intel: d.intel }
+                        : null;
+                    warHudShowWaveBanner(d.wave || d.wave_number, d.wave_name, d.hostile_count, briefingData);
                 }
                 EventBus.emit('game:wave_start', msg.data || msg);
                 break;
@@ -360,6 +376,16 @@ export class WebSocketManager {
             case 'mesh_disconnected':
                 TritiumStore.set('mesh.connected', false);
                 EventBus.emit('mesh:disconnected', msg.data || msg);
+                break;
+
+            case 'mission_progress':
+            case 'amy_mission_progress':
+                EventBus.emit('mission:progress', msg.data || msg);
+                break;
+
+            case 'scenario_generated':
+            case 'amy_scenario_generated':
+                EventBus.emit('mission:scenario', msg.data || msg);
                 break;
 
             default:
