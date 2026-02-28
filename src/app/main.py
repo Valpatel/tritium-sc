@@ -221,6 +221,15 @@ def _start_plugins(app, amy_instance, sim_engine) -> object | None:
 
         mgr = PluginManager()
 
+        # Register built-in plugins first (so external plugins can depend on them)
+        try:
+            from engine.simulation.npc_intelligence.plugin import NPCIntelligencePlugin
+            npc_intel = NPCIntelligencePlugin()
+            mgr.register(npc_intel)
+        except Exception as e:
+            logger.warning(f"NPC Intelligence plugin failed to register: {e}")
+            npc_intel = None
+
         # Discover from plugins/ directory and env var
         plugins_dir = Path(__file__).parent.parent.parent / "plugins"
         scan_paths = []
@@ -240,6 +249,8 @@ def _start_plugins(app, amy_instance, sim_engine) -> object | None:
 
         # Build context factory
         event_bus = amy_instance.event_bus if amy_instance else None
+        if event_bus is None and sim_engine is not None:
+            event_bus = sim_engine.event_bus
         target_tracker = amy_instance.target_tracker if amy_instance else None
 
         def ctx_factory(plugin_id: str) -> PluginContext:
@@ -255,6 +266,13 @@ def _start_plugins(app, amy_instance, sim_engine) -> object | None:
 
         mgr.configure_all(ctx_factory)
         results = mgr.start_all()
+
+        # Wire NPC intelligence into the engine tick loop and app state
+        if npc_intel is not None and sim_engine is not None:
+            if results.get("tritium.npc-intelligence"):
+                sim_engine.set_npc_intelligence(npc_intel)
+                app.state.npc_intelligence_plugin = npc_intel
+                logger.info("NPC Intelligence wired into engine tick loop")
 
         started = sum(1 for v in results.values() if v)
         failed = sum(1 for v in results.values() if not v)
@@ -569,6 +587,8 @@ async def lifespan(app: FastAPI):
     plugin_manager = _start_plugins(app, amy_instance, sim_engine)
     if plugin_manager is not None:
         app.state.plugin_manager = plugin_manager
+        if sim_engine is not None:
+            sim_engine.set_plugin_manager(plugin_manager)
 
     logger.info("=" * 60)
     logger.info("  TRITIUM-SC ONLINE")

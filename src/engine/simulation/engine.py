@@ -160,6 +160,12 @@ class SimulationEngine:
         # NPC world population (vehicles + pedestrians)
         self._npc_manager: NPCManager | None = None
 
+        # NPC intelligence plugin (brains + thoughts, set externally)
+        self._npc_intelligence = None
+
+        # Plugin manager for ticking plugins that have tick() methods
+        self._plugin_manager = None
+
         # Idle-unit telemetry throttling — track per-target state snapshots
         # to detect no-change ticks.  After 5 consecutive identical ticks,
         # downgrade to 2Hz (publish every 5th tick) until something changes.
@@ -252,7 +258,19 @@ class SimulationEngine:
         if target.is_combatant:
             self.weapon_system.assign_default_weapon(target.target_id, target.asset_type)
 
+        # Attach NPC brain for neutral units (person, vehicle, animal)
+        if (
+            self._npc_intelligence is not None
+            and target.alliance == "neutral"
+            and target.asset_type in ("person", "vehicle", "animal")
+        ):
+            self._npc_intelligence.attach_brain(
+                target.target_id, target.asset_type, target.alliance,
+            )
+
     def remove_target(self, target_id: str) -> bool:
+        if self._npc_intelligence is not None:
+            self._npc_intelligence.detach_brain(target_id)
         self._fsms.pop(target_id, None)
         with self._lock:
             return self._targets.pop(target_id, None) is not None
@@ -272,6 +290,33 @@ class SimulationEngine:
     @property
     def npc_manager(self) -> NPCManager | None:
         return self._npc_manager
+
+    @property
+    def npc_intelligence(self):
+        """NPC intelligence plugin reference (or None)."""
+        return self._npc_intelligence
+
+    def set_npc_intelligence(self, plugin) -> None:
+        """Wire the NPC intelligence plugin into the engine tick loop.
+
+        Retroactively attaches brains to any existing neutral targets that
+        were added before the plugin was registered (boot order issue).
+        """
+        self._npc_intelligence = plugin
+        # Attach brains to existing neutral NPCs
+        with self._lock:
+            targets = list(self._targets.values())
+        for t in targets:
+            if (
+                t.alliance == "neutral"
+                and t.asset_type in ("person", "vehicle", "animal")
+                and plugin.get_brain(t.target_id) is None
+            ):
+                plugin.attach_brain(t.target_id, t.asset_type, t.alliance)
+
+    def set_plugin_manager(self, mgr) -> None:
+        """Set the plugin manager for ticking plugins each frame."""
+        self._plugin_manager = mgr
 
     @property
     def spawners_paused(self) -> bool:
@@ -482,6 +527,31 @@ class SimulationEngine:
         # Tick NPC manager (mission lifecycle, cleanup)
         if self._npc_manager is not None:
             self._npc_manager.tick(dt)
+
+        # Tick NPC intelligence (brains, thoughts, crowd dynamics)
+        if self._npc_intelligence is not None:
+            twp = [
+                (tid, (t.position[0], t.position[1]))
+                for tid, t in targets_dict.items()
+                if t.alliance == "neutral" and t.asset_type in ("person", "vehicle", "animal")
+            ]
+            self._npc_intelligence.tick(dt, targets_with_positions=twp)
+
+        # Tick external plugins that have tick() methods (e.g. npc_thoughts)
+        if self._plugin_manager is not None:
+            for info in self._plugin_manager.list_plugins():
+                if info["status"] != "running":
+                    continue
+                p = self._plugin_manager.get_plugin(info["id"])
+                # Skip NPC intelligence (already ticked above)
+                if p is self._npc_intelligence:
+                    continue
+                tick_fn = getattr(p, "tick", None)
+                if tick_fn is not None:
+                    try:
+                        tick_fn(dt)
+                    except Exception:
+                        pass  # Plugin tick errors don't crash the engine
 
         # Tick FSMs with enriched context and sync state back to targets
         self._tick_fsms(dt, targets_dict)
