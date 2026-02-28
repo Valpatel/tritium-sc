@@ -211,10 +211,19 @@ async def list_controllable(request: Request):
     except Exception:
         registry = None
 
+    # Also check the intelligence plugin for brain-tracked NPCs
+    npc_plugin = getattr(request.app.state, "npc_intelligence_plugin", None)
+    brain_ids = set()
+    if npc_plugin is not None:
+        brain_ids = set(npc_plugin._brains.keys())
+
+    # Merge NPCManager IDs + intelligence plugin brain IDs
+    npc_ids = set(mgr._npc_ids) | brain_ids
+
     result = []
     if engine is not None:
         for target in engine.get_targets():
-            if target.target_id in mgr._npc_ids:
+            if target.target_id in npc_ids:
                 thought = registry.get_thought(target.target_id) if registry else None
                 controller = registry.get_controller(target.target_id) if registry else None
                 result.append({
