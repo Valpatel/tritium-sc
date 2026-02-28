@@ -59,6 +59,10 @@ class GraphlingsPlugin(PluginInterface):
         # Compute stats: soul_id -> {think_count, total_latency, models_used}
         self._compute_stats: dict[str, dict] = {}
 
+        # Agency: pending actions + mood timing
+        self._last_pending_poll: float = 0.0
+        self._last_mood_check: float = 0.0
+
     # ── PluginInterface identity ─────────────────────────────────
 
     @property
@@ -328,6 +332,16 @@ class GraphlingsPlugin(PluginInterface):
                         self._think_cycle(soul_id)
                         self._last_think[soul_id] = now
 
+                # 2b. Poll server-generated autonomous actions (every 10s)
+                if now - self._last_pending_poll >= 10.0:
+                    self._poll_pending_actions()
+                    self._last_pending_poll = now
+
+                # 2c. Check graphling moods for auto-recall (every 60s)
+                if now - self._last_mood_check >= 60.0:
+                    self._check_moods()
+                    self._last_mood_check = now
+
                 # 3. Periodic heartbeat
                 if now - self._last_heartbeat >= self._config.heartbeat_interval:
                     self._heartbeat_all()
@@ -366,6 +380,16 @@ class GraphlingsPlugin(PluginInterface):
         # Route game state changes to lifecycle handler
         if event_type == "game_state_change" and self._lifecycle:
             self._lifecycle.on_game_state_change(event)
+
+        # Route threat events to set defensive objectives
+        if event_type == "threat_detected" and self._bridge:
+            threat_level = event.get("threat_level", "unknown")
+            for soul_id in self._deployed:
+                self._bridge.set_objective(soul_id, {
+                    "description": f"Defend against {threat_level} threat",
+                    "priority": 0.8,
+                    "deadline_seconds": 300,
+                })
 
         # Feed event to perception engine for recent_events
         if self._perception:
@@ -452,10 +476,36 @@ class GraphlingsPlugin(PluginInterface):
                 self._logger.debug("Think timeout for %s, will retry", soul_id)
             return
 
-        # 8. Execute the action in the simulation
+        # 8. Execute the action in the simulation and report feedback
         action = response.get("action", "")
         if action and self._motor:
-            self._motor.execute(target_id, action)
+            success = self._motor.execute(target_id, action)
+
+            # Close the RL loop — tell the server if the action worked
+            if self._bridge:
+                self._bridge.feedback(
+                    soul_id=soul_id,
+                    action=action,
+                    success=success,
+                    outcome="executed" if success else "failed",
+                )
+
+        # 8b. Report perceived entities to build the graphling's mental model
+        if self._bridge and perception:
+            entities = perception.get("nearby_entities", [])
+            for entity in entities:
+                if entity.get("is_threat") or entity.get("alliance") == "hostile":
+                    self._bridge.report_entity(soul_id, {
+                        "entity_id": entity.get("target_id", ""),
+                        "entity_type": entity.get("alliance", "unknown"),
+                        "position": [
+                            entity.get("distance", 0.0),
+                            entity.get("heading_to", 0.0),
+                        ],
+                        "threat_level": 1 if entity.get("is_threat") else 0,
+                        "asset_type": entity.get("asset_type", ""),
+                        "name": entity.get("name", ""),
+                    })
 
         # 9. Set emotion if provided
         emotion = response.get("emotion", "")
@@ -468,6 +518,59 @@ class GraphlingsPlugin(PluginInterface):
             return
         for soul_id in list(self._deployed.keys()):
             self._bridge.heartbeat(soul_id)
+
+    # ── Agency: pending actions, mood, world model ────────────────
+
+    def _poll_pending_actions(self) -> None:
+        """Poll and execute server-generated autonomous actions for each graphling.
+
+        The server's tickDeployedAutonomous() generates proactive goals and
+        queues actions. We poll them here and execute via MotorOutput.
+        """
+        if not self._bridge or not self._motor:
+            return
+
+        for soul_id in list(self._deployed.keys()):
+            info = self._deployed.get(soul_id)
+            if not info:
+                continue
+
+            target_id = info["target_id"]
+            actions = self._bridge.get_pending_actions(soul_id)
+
+            for pending in actions:
+                action_str = pending.get("action", "")
+                if action_str:
+                    success = self._motor.execute(target_id, action_str)
+                    self._bridge.feedback(
+                        soul_id=soul_id,
+                        action=action_str,
+                        success=success,
+                        outcome="autonomous_executed" if success else "autonomous_failed",
+                    )
+
+    def _check_moods(self) -> None:
+        """Check graphling moods and auto-recall those that are too stressed.
+
+        Protects graphlings from emotional damage during long deployments.
+        Threshold: stress > 0.8 triggers recall.
+        """
+        if not self._bridge:
+            return
+
+        for soul_id in list(self._deployed.keys()):
+            mood = self._bridge.get_mood(soul_id)
+            if mood is None:
+                continue
+
+            stress = mood.get("stress", 0.0)
+            if stress > 0.8:
+                if self._logger:
+                    self._logger.warning(
+                        "Graphling %s stress %.2f > 0.8 — auto-recalling",
+                        soul_id, stress,
+                    )
+                self._recall_agent(soul_id, f"high_stress_{stress:.2f}")
 
     # ── Adaptive compute efficiency ───────────────────────────────
 

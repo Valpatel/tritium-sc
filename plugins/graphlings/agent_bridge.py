@@ -119,6 +119,77 @@ class AgentBridge:
             return 0
         return result.get("recorded", 0)
 
+    # ── Feedback (RL loop) ────────────────────────────────────────
+
+    def feedback(
+        self,
+        soul_id: str,
+        action: str,
+        success: bool,
+        outcome: str = "",
+    ) -> Optional[dict]:
+        """Report action success/failure to close the RL reinforcement loop.
+
+        The server uses this to update Thompson Sampling arms and adjust
+        future model selection for this graphling.
+
+        Returns server response dict, or None on error.
+        """
+        return self._post(
+            f"/deployment/{soul_id}/feedback",
+            json={"action": action, "success": success, "outcome": outcome},
+        )
+
+    # ── Pending Actions (server autonomy) ──────────────────────
+
+    def get_pending_actions(self, soul_id: str) -> list[dict]:
+        """Poll server-generated autonomous actions.
+
+        The server's tickDeployedAutonomous() generates proactive goals
+        and actions. External apps poll this to discover what the graphling
+        wants to do on its own initiative.
+
+        Returns list of action dicts (empty on error).
+        """
+        result = self._get(f"/deployment/{soul_id}/pending-actions")
+        if result is None:
+            return []
+        return result.get("actions", [])
+
+    # ── World Model ────────────────────────────────────────────
+
+    def report_entity(self, soul_id: str, entity: dict) -> Optional[dict]:
+        """Report a perceived entity to update the graphling's mental model.
+
+        Builds persistent world knowledge that persists across think cycles,
+        allowing the graphling to remember entities it has seen before.
+
+        Returns server response dict, or None on error.
+        """
+        return self._post(f"/deployment/{soul_id}/world/entity", json=entity)
+
+    # ── Mood ───────────────────────────────────────────────────
+
+    def get_mood(self, soul_id: str) -> Optional[dict]:
+        """Get the graphling's current emotional state.
+
+        Returns mood dict (happiness, stress, engagement, confidence),
+        or None on error. Use for adaptive behavior and auto-recall.
+        """
+        return self._get(f"/deployment/{soul_id}/mood")
+
+    # ── Objectives ─────────────────────────────────────────────
+
+    def set_objective(self, soul_id: str, objective: dict) -> Optional[dict]:
+        """Set a goal for the graphling to pursue autonomously.
+
+        Game events can drive objectives (e.g., "protect village" when
+        enemies approach). The server's autonomous tick will work toward it.
+
+        Returns created objective dict, or None on error.
+        """
+        return self._post(f"/deployment/{soul_id}/objectives", json=objective)
+
     # ── Status ───────────────────────────────────────────────────
 
     def get_status(self, soul_id: str) -> Optional[dict]:
