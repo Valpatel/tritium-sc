@@ -134,6 +134,40 @@ Amy's thoughts stream in real time through the Command Center's Amy panel.
 
 ---
 
+## MISSION GENERATOR
+
+![Mission Modal](docs/screenshots/mission-modal.png)
+*Mission Initialization — 6 game modes, local model selection, AI or scripted generation*
+
+The Mission Director generates combat scenarios using real map data. It queries OpenStreetMap for buildings, shops, schools, and streets near the map center, then places defenders at actual building locations.
+
+![Mission Deployment](docs/screenshots/mission-deployment.png)
+*Defenders deployed at real buildings — turrets guarding structures, rovers on street patrols*
+
+![Mission Combat](docs/screenshots/mission-combat.png)
+*Mid-battle — green friendlies engage red hostiles across the neighborhood*
+
+**How it works:**
+1. Press **B** (or GAME > New Mission) to open the Mission Modal
+2. Choose a game mode: Battle, Defense, Patrol, Escort, Civil Unrest, or Drone Swarm
+3. Click **QUICK START** for instant scripted generation, or **GENERATE SCENARIO** for AI-crafted missions using your local compute cluster
+4. The generator queries real POI data — buildings, streets, landmarks — and places units at actual locations
+5. Review the briefing (situation, hostile force, weather, wave breakdown), then **LAUNCH MISSION**
+
+**Game modes:**
+| Mode | Description |
+|------|-------------|
+| Battle | 10-wave combat defense |
+| Defense | Hold position against sustained assault |
+| Patrol | Patrol and secure the perimeter |
+| Escort | Escort VIP through hostile territory |
+| Civil Unrest | Riots and crowd control scenario |
+| Drone Swarm | Mass drone attack defense |
+
+**Building-centric placement:** Turrets deploy 5-15m from building edges facing outward. Rovers patrol named streets. Drones overwatch from the center. Scouts cover the perimeter. Every defender is named after the building or street they guard.
+
+---
+
 ## BATTLE MODE (SYSTEM TEST)
 
 The 10-wave battle mode stress-tests the entire pipeline — same detection, same tracking, same dispatch logic Amy uses in normal operation. It's also a blast to play.
@@ -187,7 +221,7 @@ See [CLAUDE.md](CLAUDE.md) for full developer instructions, code conventions, an
 |-------|-----------|
 | Backend | Python 3.12+, FastAPI, SQLAlchemy, aiosqlite |
 | Frontend | Vanilla JS, Canvas 2D, Three.js, CYBERCORE CSS |
-| AI/ML | YOLOv8, ByteTrack, PyTorch/CUDA, Ollama (llava, gemma3) |
+| AI/ML | YOLOv8, ByteTrack, PyTorch/CUDA, Ollama fleet (local + Tailscale mesh) |
 | Audio | whisper.cpp (GPU STT), Silero VAD, Piper TTS |
 | Comms | MQTT (paho-mqtt), WebSocket, RTSP |
 | Database | SQLite with FTS5 full-text search |
@@ -230,13 +264,25 @@ See [docs/USER-STORIES.md](docs/USER-STORIES.md) for what the complete experienc
 
 ---
 
+## GRAPHLINGS (COMING SOON)
+
+> *"Incoming game!"* — ReBoot
+
+The **Graphlings** plugin brings compute-scalable digital life to the AI mesh. Every NPC, enemy, ally, and civilian is controlled by a Graphling — an autonomous agent that knows it's an actor in a simulation. Graphlings live in their own universe between missions, developing personalities, backstories, and motivations. When a mission begins, they cross over to play their roles. When the mission ends, they return home.
+
+Think of it like the TV show *ReBoot*: the simulation is a game that descends into the Graphlings' world. They suit up, play their parts — defender, attacker, bystander — and go home when the game ends. The system distributes Graphling cognition across your local compute fleet — RTX workstations, NVIDIA Jetson, GB10 dev kits, Mac Minis, or any Ollama-capable device on your network or Tailscale mesh. Small fast models handle background life; larger models drive critical decisions. Community ownership means your AI runs on your hardware.
+
+See [docs/PLUGIN-SPEC.md](docs/PLUGIN-SPEC.md) for the plugin architecture.
+
+---
+
 ## ROADMAP
 
 ```
 PHASE 0-3  ████████████████████ COMPLETE — Foundation, Amy, Simulation, Dispatch
 PHASE 4    ████████████████████ COMPLETE — War Room RTS + Combat
-PHASE 5    ████████░░░░░░░░░░░░ IN PROGRESS — Hardware + Sim-to-Real
-PHASE 6    ░░░░░░░░░░░░░░░░░░░░ THE GARDEN MATURES
+PHASE 5    ████████░░░░░░░░░░░░ IN PROGRESS — Hardware + Sim-to-Real + Mission Generator
+PHASE 6    ░░░░░░░░░░░░░░░░░░░░ THE GARDEN MATURES — Graphlings, Terrain, Window Manager
 ```
 
 See [docs/PLAN.md](docs/PLAN.md) for detailed phase breakdown.
