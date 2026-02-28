@@ -29,7 +29,7 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-00f0ff?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-ff2a6d?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![YOLO](https://img.shields.io/badge/YOLO-v8-05ffa1?style=flat-square)](https://ultralytics.com)
-[![License](https://img.shields.io/badge/license-MIT-fcee0a?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-fcee0a?style=flat-square)](LICENSE)
 
 For educational purposes only with Nerf blasters and toy systems.
 </div>
@@ -291,7 +291,7 @@ See [docs/PLAN.md](docs/PLAN.md) for detailed phase breakdown.
 
 ## LICENSE
 
-MIT License - See [LICENSE](LICENSE) for details.
+AGPL-3.0 License - See [LICENSE](LICENSE) for details.
 
 ---
 
