@@ -2674,6 +2674,21 @@ console.log('\n--- State Refresh on Connect ---');
     );
 })();
 
+(function testRefreshStateWiresEliminationsAndModeType() {
+    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/websocket.js', 'utf8');
+    const refreshIdx = src.indexOf('async _refreshState');
+    assert(refreshIdx >= 0, 'async _refreshState method exists (eliminations check)');
+    const refreshBlock = src.slice(refreshIdx, refreshIdx + 1500);
+    assert(
+        refreshBlock.includes("game.total_eliminations") || refreshBlock.includes("total_eliminations"),
+        '_refreshState hydrates total_eliminations on reconnect'
+    );
+    assert(
+        refreshBlock.includes("game.modeType") || refreshBlock.includes("game_mode_type"),
+        '_refreshState hydrates game_mode_type on reconnect'
+    );
+})();
+
 // ============================================================
 // Store: default game state fields
 // ============================================================

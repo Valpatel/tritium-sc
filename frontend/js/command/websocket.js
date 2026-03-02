@@ -203,10 +203,12 @@ export class WebSocketManager {
                 if (game.wave !== undefined) TritiumStore.set('game.wave', game.wave);
                 if (game.total_waves !== undefined) TritiumStore.set('game.totalWaves', game.total_waves);
                 if (game.score !== undefined) TritiumStore.set('game.score', game.score);
+                if (game.total_eliminations !== undefined) TritiumStore.set('game.eliminations', game.total_eliminations);
                 if (game.wave_name !== undefined) TritiumStore.set('game.waveName', game.wave_name);
                 if (game.countdown !== undefined) TritiumStore.set('game.countdown', game.countdown);
                 if (game.wave_hostiles_remaining !== undefined) TritiumStore.set('game.waveHostilesRemaining', game.wave_hostiles_remaining);
                 if (game.difficulty_multiplier !== undefined) TritiumStore.set('game.difficultyMultiplier', game.difficulty_multiplier);
+                if (game.game_mode_type) TritiumStore.set('game.modeType', game.game_mode_type);
             }
             if (targetsRes.ok) {
                 const data = await targetsRes.json();
