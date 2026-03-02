@@ -595,11 +595,10 @@ console.log('\n--- RoverControl button events ---');
 
     findButton(container, 'stop').click();
 
-    const call = _fetchCalls.find(c => c.url === '/api/amy/command');
-    assert(call !== undefined, 'STOP calls /api/amy/command');
+    const call = _fetchCalls.find(c => c.url === '/api/devices/rover-stop-test/command');
+    assert(call !== undefined, 'STOP calls /api/devices/{id}/command');
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'stop()', 'STOP sends stop() Lua command');
-    assert(body.target_id === 'rover-stop-test', 'STOP sends correct unit id');
+    assert(body.command === 'stop()', 'STOP sends stop() device command');
 })();
 
 (function testRoverStopSetsStatusText() {
@@ -620,11 +619,10 @@ console.log('\n--- RoverControl button events ---');
 
     findButton(container, 'fire').click();
 
-    const call = _fetchCalls.find(c => c.url === '/api/amy/command');
-    assert(call !== undefined, 'FIRE calls /api/amy/command');
+    const call = _fetchCalls.find(c => c.url === '/api/devices/rover-fire-test/command');
+    assert(call !== undefined, 'FIRE calls /api/devices/{id}/command');
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'fire_nerf()', 'FIRE sends fire_nerf() Lua command');
-    assert(body.target_id === 'rover-fire-test', 'FIRE sends correct unit id');
+    assert(body.command === 'fire_nerf()', 'FIRE sends fire_nerf() device command');
 })();
 
 (function testRoverFireSetsStatusText() {
@@ -652,11 +650,10 @@ console.log('\n--- RoverControl SEND custom Lua ---');
     container._inputEl.value = 'motor.rotate(45)';
     findButton(container, 'send').click();
 
-    const call = _fetchCalls.find(c => c.url === '/api/amy/command');
-    assert(call !== undefined, 'SEND calls /api/amy/command');
+    const call = _fetchCalls.find(c => c.url === '/api/devices/rover-send-test/command');
+    assert(call !== undefined, 'SEND calls /api/devices/{id}/command');
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'motor.rotate(45)', 'SEND sends the typed Lua command');
-    assert(body.target_id === 'rover-send-test', 'SEND sends correct unit id');
+    assert(body.command === 'motor.rotate(45)', 'SEND sends the typed Lua command as device command');
 })();
 
 (function testRoverSendIgnoresEmptyInput() {
@@ -745,9 +742,9 @@ console.log('\n--- DroneControl ---');
     DroneControl.bind(container, device, DeviceAPI);
 
     findButton(container, 'stop').click();
-    const call = _fetchCalls.find(c => c.url === '/api/amy/command');
+    const call = _fetchCalls.find(c => c.url === '/api/devices/drone-stop-01/command');
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'stop()', 'Drone STOP sends stop()');
+    assert(body.command === 'stop()', 'Drone STOP sends stop()');
 })();
 
 // ============================================================
@@ -808,11 +805,10 @@ console.log('\n--- TurretControl ---');
 
     findButton(container, 'auto').click();
 
-    const call = _fetchCalls.find(c => c.url === '/api/amy/command');
-    assert(call !== undefined, 'AUTO TARGET calls /api/amy/command');
+    const call = _fetchCalls.find(c => c.url === '/api/devices/turret-auto-01/command');
+    assert(call !== undefined, 'AUTO TARGET calls /api/devices/{id}/command');
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'auto_target()', 'AUTO TARGET sends auto_target() Lua command');
-    assert(body.target_id === 'turret-auto-01', 'AUTO TARGET sends correct unit id');
+    assert(body.command === 'auto_target()', 'AUTO TARGET sends auto_target() device command');
 })();
 
 (function testTurretAutoTargetSetsStatus() {
@@ -833,11 +829,10 @@ console.log('\n--- TurretControl ---');
 
     findButton(container, 'manual').click();
 
-    const call = _fetchCalls.find(c => c.url === '/api/amy/command');
-    assert(call !== undefined, 'MANUAL calls /api/amy/command');
+    const call = _fetchCalls.find(c => c.url === '/api/devices/turret-manual-01/command');
+    assert(call !== undefined, 'MANUAL calls /api/devices/{id}/command');
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'manual_target()', 'MANUAL sends manual_target() Lua command');
-    assert(body.target_id === 'turret-manual-01', 'MANUAL sends correct unit id');
+    assert(body.command === 'manual_target()', 'MANUAL sends manual_target() device command');
 })();
 
 (function testTurretManualSetsStatus() {
@@ -857,9 +852,9 @@ console.log('\n--- TurretControl ---');
     TurretControl.bind(container, device, DeviceAPI);
 
     findButton(container, 'fire').click();
-    const call = _fetchCalls.find(c => c.url === '/api/amy/command');
+    const call = _fetchCalls.find(c => c.url === '/api/devices/turret-fire-01/command');
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'fire_nerf()', 'Turret FIRE sends fire_nerf()');
+    assert(body.command === 'fire_nerf()', 'Turret FIRE sends fire_nerf()');
 })();
 
 (function testTurretStopCallsAPI() {
@@ -869,9 +864,9 @@ console.log('\n--- TurretControl ---');
     TurretControl.bind(container, device, DeviceAPI);
 
     findButton(container, 'stop').click();
-    const call = _fetchCalls.find(c => c.url === '/api/amy/command');
+    const call = _fetchCalls.find(c => c.url === '/api/devices/turret-stop-01/command');
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'stop()', 'Turret STOP sends stop()');
+    assert(body.command === 'stop()', 'Turret STOP sends stop()');
 })();
 
 // ============================================================
@@ -1162,11 +1157,10 @@ console.log('\n--- CameraControl ---');
     CameraControl.bind(container, device, DeviceAPI);
 
     findButton(container, 'ptz_left').click();
-    const call = _fetchCalls.find(c => c.url === '/api/amy/command');
-    assert(call !== undefined, 'PTZ LEFT calls /api/amy/command');
+    const call = _fetchCalls.find(c => c.url === '/api/devices/cam-ptz-left/command');
+    assert(call !== undefined, 'PTZ LEFT calls /api/devices/{id}/command');
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'motor.aim(-10,0)', 'PTZ LEFT sends motor.aim(-10,0)');
-    assert(body.target_id === 'cam-ptz-left', 'PTZ LEFT sends correct device id');
+    assert(body.command === 'motor.aim(-10,0)', 'PTZ LEFT sends motor.aim(-10,0)');
 })();
 
 (function testCameraPtzRightCallsAPI() {
@@ -1176,9 +1170,9 @@ console.log('\n--- CameraControl ---');
     CameraControl.bind(container, device, DeviceAPI);
 
     findButton(container, 'ptz_right').click();
-    const call = _fetchCalls.find(c => c.url === '/api/amy/command');
+    const call = _fetchCalls.find(c => c.url === '/api/devices/cam-ptz-right/command');
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'motor.aim(10,0)', 'PTZ RIGHT sends motor.aim(10,0)');
+    assert(body.command === 'motor.aim(10,0)', 'PTZ RIGHT sends motor.aim(10,0)');
 })();
 
 (function testCameraPtzUpCallsAPI() {
@@ -1188,9 +1182,9 @@ console.log('\n--- CameraControl ---');
     CameraControl.bind(container, device, DeviceAPI);
 
     findButton(container, 'ptz_up').click();
-    const call = _fetchCalls.find(c => c.url === '/api/amy/command');
+    const call = _fetchCalls.find(c => c.url === '/api/devices/cam-ptz-up/command');
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'motor.aim(0,10)', 'PTZ UP sends motor.aim(0,10)');
+    assert(body.command === 'motor.aim(0,10)', 'PTZ UP sends motor.aim(0,10)');
 })();
 
 (function testCameraPtzDownCallsAPI() {
@@ -1200,9 +1194,9 @@ console.log('\n--- CameraControl ---');
     CameraControl.bind(container, device, DeviceAPI);
 
     findButton(container, 'ptz_down').click();
-    const call = _fetchCalls.find(c => c.url === '/api/amy/command');
+    const call = _fetchCalls.find(c => c.url === '/api/devices/cam-ptz-down/command');
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'motor.aim(0,-10)', 'PTZ DOWN sends motor.aim(0,-10)');
+    assert(body.command === 'motor.aim(0,-10)', 'PTZ DOWN sends motor.aim(0,-10)');
 })();
 
 (function testCameraOffCallsDeviceCommand() {
@@ -1527,7 +1521,7 @@ console.log('\n--- DeviceAPI sendCommand ---');
     DeviceAPI.sendCommand('unit-42', 'fire_nerf()');
     const call = _fetchCalls[0];
     assert(call !== undefined, 'sendCommand makes a fetch call');
-    assert(call && call.url === '/api/amy/command', 'sendCommand calls /api/amy/command');
+    assert(call && call.url === '/api/devices/unit-42/command', 'sendCommand delegates to /api/devices/{id}/command');
     assert(call && call.opts.method === 'POST', 'sendCommand uses POST method');
 })();
 
@@ -1536,8 +1530,8 @@ console.log('\n--- DeviceAPI sendCommand ---');
     DeviceAPI.sendCommand('rover-07', 'patrol({10,20},{30,40})');
     const call = _fetchCalls[0];
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'patrol({10,20},{30,40})', 'sendCommand body.action contains Lua string');
-    assert(body.target_id === 'rover-07', 'sendCommand body.target_id is correct');
+    assert(body.command === 'patrol({10,20},{30,40})', 'sendCommand body.command contains Lua string');
+    assert(!body.target_id, 'sendCommand does not send target_id (device id is in URL)');
 })();
 
 (function testSendCommandHeaders() {
@@ -1617,8 +1611,8 @@ console.log('\n--- DeviceAPI convenience methods ---');
     DeviceAPI.stop('unit-s1');
     const call = _fetchCalls[0];
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'stop()', 'DeviceAPI.stop sends stop()');
-    assert(body.target_id === 'unit-s1', 'DeviceAPI.stop sends correct unit id');
+    assert(body.command === 'stop()', 'DeviceAPI.stop sends stop() via device route');
+    assert(call && call.url === '/api/devices/unit-s1/command', 'DeviceAPI.stop routes to device endpoint');
 })();
 
 (function testFireCallsSendCommand() {
@@ -1626,8 +1620,8 @@ console.log('\n--- DeviceAPI convenience methods ---');
     DeviceAPI.fire('unit-f1', 10, 20);
     const call = _fetchCalls[0];
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'fire_nerf()', 'DeviceAPI.fire sends fire_nerf()');
-    assert(body.target_id === 'unit-f1', 'DeviceAPI.fire sends correct unit id');
+    assert(body.command === 'fire_nerf()', 'DeviceAPI.fire sends fire_nerf() via device route');
+    assert(call && call.url === '/api/devices/unit-f1/command', 'DeviceAPI.fire routes to device endpoint');
 })();
 
 (function testAimCallsSendCommand() {
@@ -1635,8 +1629,8 @@ console.log('\n--- DeviceAPI convenience methods ---');
     DeviceAPI.aim('unit-a1', 45, -10);
     const call = _fetchCalls[0];
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'motor.aim(45,-10)', 'DeviceAPI.aim sends motor.aim(45,-10)');
-    assert(body.target_id === 'unit-a1', 'DeviceAPI.aim sends correct unit id');
+    assert(body.command === 'motor.aim(45,-10)', 'DeviceAPI.aim sends motor.aim(45,-10) via device route');
+    assert(call && call.url === '/api/devices/unit-a1/command', 'DeviceAPI.aim routes to device endpoint');
 })();
 
 (function testPatrolUsesParamsFormat() {

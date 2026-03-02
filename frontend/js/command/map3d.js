@@ -1408,8 +1408,18 @@ function _dispatchToScreen(e) {
             fetch('/api/amy/command', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'dispatch', target_id: unitId, x: worldX, y: worldY }),
-            }).catch(() => {});
+                body: JSON.stringify({ action: 'dispatch', params: [unitId, worldX, worldY] }),
+            }).then(r => {
+                if (!r.ok) {
+                    r.json().then(d => {
+                        EventBus.emit('toast:show', { message: (d && d.detail) || 'Dispatch failed', type: 'alert' });
+                    }).catch(() => {
+                        EventBus.emit('toast:show', { message: 'Dispatch failed', type: 'alert' });
+                    });
+                }
+            }).catch(() => {
+                EventBus.emit('toast:show', { message: 'Dispatch failed', type: 'alert' });
+            });
         }
 
         _state.dispatchMode = false;

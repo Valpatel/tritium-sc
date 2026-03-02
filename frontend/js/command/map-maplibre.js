@@ -5861,15 +5861,14 @@ function _onMapClick(e) {
         return;
     }
 
-    // Aim mode: set turret aim direction via Amy command (no control lock needed)
+    // Aim mode: set turret aim direction via device command
     if (_state.aimMode && _state.aimUnitId) {
         const game = _lngLatToGame(e.lngLat.lng, e.lngLat.lat);
-        fetch('/api/amy/command', {
+        fetch(`/api/devices/${_state.aimUnitId}/command`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                action: `motor.aim(${game.x.toFixed(1)},${game.y.toFixed(1)})`,
-                target_id: _state.aimUnitId,
+                command: `motor.aim(${game.x.toFixed(1)},${game.y.toFixed(1)})`,
             }),
         }).then(resp => {
             if (resp.ok) EventBus.emit('toast:show', { message: 'Aim set', type: 'info' });

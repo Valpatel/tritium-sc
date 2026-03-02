@@ -59,11 +59,7 @@ const DeviceAPI = {
     },
 
     sendCommand(unitId, luaString) {
-        return fetch('/api/amy/command', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: luaString, target_id: unitId }),
-        });
+        return this.sendDeviceCommand(unitId, 'command', { command: luaString });
     },
 
     sendDeviceCommand(deviceId, topicSuffix, payload) {

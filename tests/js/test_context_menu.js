@@ -644,13 +644,14 @@ console.log('\n--- map:marker / map:waypoint subscription ---');
     assert(!patrolBlock.includes('/api/npc/'), 'patrol mode does NOT use NPC action endpoint (would need control lock)');
 })();
 
-// Aim mode should send via /api/amy/command not /api/npc/action
-(function testAimModeUsesAmyCommand() {
+// Aim mode should send via /api/devices/{id}/command (device route for hardware commands)
+(function testAimModeUsesDeviceCommand() {
     const source = fs.readFileSync(__dirname + '/../../frontend/js/command/map-maplibre.js', 'utf8');
     const aimIdx = source.indexOf('aimMode && _state.aimUnitId');
     assert(aimIdx >= 0, 'aim mode click handler exists');
     const aimBlock = source.slice(aimIdx, aimIdx + 600);
-    assert(aimBlock.includes('/api/amy/command'), 'aim mode sends via Amy command endpoint');
+    assert(aimBlock.includes('/api/devices/'), 'aim mode sends via device command endpoint');
+    assert(aimBlock.includes('command:'), 'aim mode sends command field (not action)');
     assert(!aimBlock.includes('/api/npc/'), 'aim mode does NOT use NPC action endpoint (would need control lock)');
 })();
 

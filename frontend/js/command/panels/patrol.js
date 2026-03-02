@@ -132,10 +132,13 @@ export const PatrolPanelDef = {
                     e.stopPropagation();
                     const uid = btn.dataset.unitId;
                     if (!uid) return;
+                    const unit = TritiumStore.units.get(uid);
+                    const ux = unit && unit.x != null ? unit.x : 0;
+                    const uy = unit && unit.y != null ? unit.y : 0;
                     fetch('/api/amy/command', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'stand_down', target_id: uid }),
+                        body: JSON.stringify({ action: 'dispatch', params: [uid, ux, uy] }),
                     }).then(() => {
                         EventBus.emit('toast:show', { message: `${uid}: patrol cleared`, type: 'info' });
                     }).catch(() => {});

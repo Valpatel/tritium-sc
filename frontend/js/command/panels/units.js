@@ -840,10 +840,13 @@ export const UnitsPanelDef = {
                     const cmd = cmdInput.value.trim();
                     if (!cmd) return;
                     if (cmdStatus) cmdStatus.textContent = 'Sending...';
+                    const payload = cmd.includes('(')
+                        ? { action: cmd }
+                        : { action: cmd, params: [selectedId] };
                     fetch('/api/amy/command', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: cmd, target_id: selectedId }),
+                        body: JSON.stringify(payload),
                     }).then(r => {
                         if (cmdStatus) cmdStatus.textContent = r.ok ? 'Sent' : 'Failed';
                         if (r.ok) cmdInput.value = '';
