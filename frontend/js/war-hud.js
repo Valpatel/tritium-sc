@@ -419,7 +419,11 @@ function warHudShowGameOver(result, score, waves, eliminations, modeData) {
             ? 'CRITICAL INFRASTRUCTURE LOST' : '';
     } else {
         title = isVictory ? 'NEIGHBORHOOD SECURED' : 'NEIGHBORHOOD OVERRUN';
-        defeatReason = '';
+        if (!isVictory && modeData && modeData.reason === 'all_friendlies_eliminated') {
+            defeatReason = 'ALL DEFENDERS ELIMINATED';
+        } else {
+            defeatReason = '';
+        }
     }
 
     const titleColor = isVictory ? '#05ffa1' : '#ff2a6d';

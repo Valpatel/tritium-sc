@@ -679,6 +679,24 @@ console.log('\n--- warHudShowGameOver edge cases ---');
 
 {
     resetElements();
+    // Battle defeat with reason=all_friendlies_eliminated shows reason
+    w.warHudShowGameOver('defeat', 0, 5, 3, { reason: 'all_friendlies_eliminated' });
+    const goEl = ctx.document.getElementById('war-game-over');
+    assert(goEl.innerHTML.includes('ALL DEFENDERS ELIMINATED'),
+        'Battle defeat shows reason when all friendlies eliminated');
+}
+
+{
+    resetElements();
+    // Battle defeat without specific reason does NOT show reason text
+    w.warHudShowGameOver('defeat', 0, 5, 3, { reason: '' });
+    const goEl = ctx.document.getElementById('war-game-over');
+    assert(!goEl.innerHTML.includes('ALL DEFENDERS ELIMINATED'),
+        'Battle defeat with no specific reason shows no reason text');
+}
+
+{
+    resetElements();
     // Game over with modeData containing infrastructure mode
     w._hudState.gameModeType = 'infrastructure_defense';
     w.warHudShowGameOver('VICTORY', 2000, 5, 10, {

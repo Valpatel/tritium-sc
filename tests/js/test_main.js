@@ -1015,6 +1015,15 @@ console.log('\n--- Error Handling ---');
         'dispatchUnit catches errors and shows toast');
 })();
 
+(function testDispatchUnitSendsParamsArray() {
+    // dispatchUnit must send { action: 'dispatch', params: [targetId, x, y] }
+    // NOT { action: 'dispatch', target_id: targetId, x, y } (which silently drops args)
+    assert(mainSrc.includes("params: [targetId, x, y]"),
+        'dispatchUnit sends params array [targetId, x, y] to /api/amy/command');
+    assert(!mainSrc.includes("action: 'dispatch', target_id: targetId, x, y"),
+        'dispatchUnit does NOT send target_id/x/y as flat fields (would be ignored by API)');
+})();
+
 (function testNullGuardedDOMAccess() {
     // Many DOM accesses are guarded with "if (el)"
     const guardCount = (mainSrc.match(/if\s*\(\s*el\s*\)/g) || []).length;

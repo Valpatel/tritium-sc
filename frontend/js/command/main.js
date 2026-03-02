@@ -991,7 +991,7 @@ async function dispatchUnit(targetId, x, y) {
         await fetch('/api/amy/command', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'dispatch', target_id: targetId, x, y }),
+            body: JSON.stringify({ action: 'dispatch', params: [targetId, x, y] }),
         });
     } catch (e) {
         showToast('Dispatch failed', 'alert');
