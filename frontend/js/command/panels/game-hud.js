@@ -1030,8 +1030,10 @@ export const GameHudPanelDef = {
             }),
             EventBus.on('npc:thought', (d) => {
                 // NPC thoughts surfaced as subtle toast (not intrusive)
-                if (d && d.thought && d.name) {
-                    EventBus.emit('toast:show', { message: `${d.name}: "${d.thought}"`, type: 'info', duration: 4000 });
+                if (d && d.text && d.unit_id) {
+                    const unit = TritiumStore.units.get(d.unit_id);
+                    const name = (unit && unit.name) ? unit.name : d.unit_id;
+                    EventBus.emit('toast:show', { message: `${name}: "${d.text}"`, type: 'info', duration: 4000 });
                 }
             }),
             EventBus.on('npc:alliance_change', (d) => {

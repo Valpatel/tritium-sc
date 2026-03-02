@@ -5722,7 +5722,7 @@ function _onDispatchModeEnter(data) {
     if (!data || !data.id) return;
     _state.dispatchMode = true;
     _state.dispatchUnitId = data.id;
-    if (_state.mapContainer) _state.mapContainer.style.cursor = 'crosshair';
+    if (_state.container) _state.container.style.cursor = 'crosshair';
     console.log(`[MAP-ML] Dispatch mode: click map to send ${data.id}`);
 }
 
@@ -5735,7 +5735,7 @@ function _onPatrolModeEnter(data) {
     _state.patrolMode = true;
     _state.patrolUnitId = data.id;
     _state.patrolWaypoints = [];
-    if (_state.mapContainer) _state.mapContainer.style.cursor = 'crosshair';
+    if (_state.container) _state.container.style.cursor = 'crosshair';
     console.log(`[MAP-ML] Patrol mode: click map to set patrol points for ${data.id}`);
 }
 
@@ -5747,7 +5747,7 @@ function _onAimModeEnter(data) {
     if (!data || !data.id) return;
     _state.aimMode = true;
     _state.aimUnitId = data.id;
-    if (_state.mapContainer) _state.mapContainer.style.cursor = 'crosshair';
+    if (_state.container) _state.container.style.cursor = 'crosshair';
     console.log(`[MAP-ML] Aim mode: click map to aim ${data.id}`);
 }
 
@@ -5818,7 +5818,7 @@ function _onMapClick(e) {
         });
         _state.dispatchMode = false;
         _state.dispatchUnitId = null;
-        if (_state.mapContainer) _state.mapContainer.style.cursor = '';
+        if (_state.container) _state.container.style.cursor = '';
         return;
     }
 
@@ -5848,7 +5848,7 @@ function _onMapClick(e) {
             _state.patrolMode = false;
             _state.patrolUnitId = null;
             _state.patrolWaypoints = [];
-            if (_state.mapContainer) _state.mapContainer.style.cursor = '';
+            if (_state.container) _state.container.style.cursor = '';
         }
         return;
     }
@@ -5871,7 +5871,7 @@ function _onMapClick(e) {
         });
         _state.aimMode = false;
         _state.aimUnitId = null;
-        if (_state.mapContainer) _state.mapContainer.style.cursor = '';
+        if (_state.container) _state.container.style.cursor = '';
         return;
     }
 

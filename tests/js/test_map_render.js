@@ -2609,6 +2609,24 @@ console.log('\n--- Coordinate transform DPR consistency ---');
 })();
 
 // ============================================================
+// MapLibre cursor uses _state.container (not _state.mapContainer)
+// ============================================================
+
+console.log('\n--- MapLibre cursor references ---');
+
+(function testMapLibreCursorUsesStateContainer() {
+    var mlSrc = require('fs').readFileSync('frontend/js/command/map-maplibre.js', 'utf8');
+    // Every cursor change should reference _state.container, not _state.mapContainer
+    assert(
+        !mlSrc.includes('_state.mapContainer'),
+        'map-maplibre.js does NOT use _state.mapContainer (wrong property name — must use _state.container)'
+    );
+    // Verify cursor crosshair references exist and use correct property
+    var crosshairRefs = (mlSrc.match(/_state\.container\.style\.cursor/g) || []).length;
+    assert(crosshairRefs >= 3, 'map-maplibre.js has cursor crosshair references using _state.container (' + crosshairRefs + ' found)');
+})();
+
+// ============================================================
 // Summary
 // ============================================================
 

@@ -596,8 +596,8 @@ console.log('\n--- Combat status event wiring ---');
 (function testNpcThoughtToastFormat() {
     const source = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
     const block = source.split("npc:thought")[1] || '';
-    assert(block.includes('d.thought'), 'npc:thought handler uses d.thought');
-    assert(block.includes('d.name'), 'npc:thought handler uses d.name');
+    assert(block.includes('d.text'), 'npc:thought handler uses d.text (matches backend field name)');
+    assert(block.includes('d.unit_id'), 'npc:thought handler uses d.unit_id (matches backend field name)');
 })();
 
 (function testAllianceChangeToastFormat() {
@@ -865,14 +865,23 @@ console.log('\n--- Event handler behavior ---');
     assert(toastEvents[0].message.includes('expired'), 'expired toast says expired');
 
     toastEvents = [];
-    EB.emit('npc:thought', { name: 'Civilian Bob', thought: 'This is scary' });
+    // Backend sends {unit_id, text, emotion, duration, importance} — NOT {name, thought}
+    Store.units.set('civilian-bob', { id: 'civilian-bob', name: 'Civilian Bob' });
+    EB.emit('npc:thought', { unit_id: 'civilian-bob', text: 'This is scary' });
     assert(toastEvents.length >= 1, 'npc:thought emits toast:show');
-    assert(toastEvents[0].message.includes('Civilian Bob'), 'npc thought includes name');
-    assert(toastEvents[0].message.includes('This is scary'), 'npc thought includes text');
+    assert(toastEvents[0].message.includes('Civilian Bob'), 'npc thought resolves name from store');
+    assert(toastEvents[0].message.includes('This is scary'), 'npc thought includes text field');
 
     toastEvents = [];
-    EB.emit('npc:thought', {}); // No name/thought — should not emit
+    EB.emit('npc:thought', {}); // No unit_id/text — should not emit
     assert(toastEvents.length === 0, 'npc:thought with missing data does NOT emit toast');
+
+    // Falls back to unit_id when unit not in store
+    toastEvents = [];
+    EB.emit('npc:thought', { unit_id: 'unknown-npc-99', text: 'Where am I?' });
+    assert(toastEvents.length >= 1, 'npc:thought with unknown unit still emits toast');
+    assert(toastEvents[0].message.includes('unknown-npc-99'), 'npc thought falls back to unit_id when name not in store');
+    Store.units.delete('civilian-bob');
 
     toastEvents = [];
     EB.emit('npc:alliance_change', { unit_name: 'Villager', new_alliance: 'hostile' });
