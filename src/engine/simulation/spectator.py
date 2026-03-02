@@ -24,10 +24,11 @@ Seek model:
     matching wave_number, then maps its timestamp to the nearest frame.
 
 Data flow:
-  Frontend (JS) --|POST /api/game/spectator/play|--> game.py router
+  Frontend (JS) --|POST /api/game/replay/play|--> game.py router
   game.py --|engine.spectator.play()|--> SpectatorMode
-  Frontend polls --|GET /api/game/spectator/state|--> SpectatorMode.get_state()
-  Frontend renders frame data from get_frame() or tick() return value.
+  Engine tick loop (10Hz) --|spectator.tick(dt)|--> SpectatorMode (advances playhead)
+  Frontend polls --|GET /api/game/replay/frame|--> game.py --> SpectatorMode.get_state()
+  Frontend renders frame data from the response.
 """
 
 from __future__ import annotations

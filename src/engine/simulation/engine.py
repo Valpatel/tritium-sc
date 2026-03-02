@@ -81,6 +81,7 @@ from .npc import NPCManager
 from .pursuit import PursuitSystem
 from .replay import ReplayRecorder
 from .sensors import SensorSimulator
+from .spectator import SpectatorMode
 from .squads import SquadManager
 from .stats import StatsTracker
 from .target import SimulationTarget
@@ -181,6 +182,7 @@ class SimulationEngine:
         self.hostile_commander = HostileCommander(event_bus=event_bus)
         self.unit_missions = UnitMissionSystem(map_bounds=self._map_bounds)
         self.replay_recorder = ReplayRecorder(event_bus)
+        self.spectator = SpectatorMode(self.replay_recorder)
         self.hazard_manager = HazardManager(event_bus)
 
         # Wire pathfinding router into all subsystems that assign waypoints
@@ -630,6 +632,7 @@ class SimulationEngine:
             self.vision_system.reset()
             self.lod_system.reset()
             self.replay_recorder.clear()
+            self.spectator.stop()
             self.hazard_manager.clear()
             # Reset mission-type subsystems
             self._crowd_density_tracker = None
@@ -962,6 +965,14 @@ class SimulationEngine:
         # Record replay snapshot at 2Hz (every 5 ticks at 10Hz)
         if self._tick_counter % 5 == 0 and self.replay_recorder.is_recording:
             self.replay_recorder.record_snapshot(targets)
+
+        # Advance spectator playback (post-game replay).  Without this,
+        # SpectatorMode.tick() was never called from the engine loop and
+        # replay playback never advanced.  The spectator's internal
+        # accumulator handles the 2Hz frame rate correctly -- at 10Hz
+        # engine ticks with dt=0.1, it takes 5 ticks to accumulate one
+        # frame advance (0.5s at 2Hz).  tick() is a no-op when paused.
+        self.spectator.tick(dt)
 
         # Tick FSMs with enriched context and sync state back to targets
         self._tick_fsms(dt, targets_dict)

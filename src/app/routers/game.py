@@ -594,109 +594,87 @@ class SeekWaveRequest(BaseModel):
     wave: int
 
 
-def _get_spectator(engine):
-    """Get or create SpectatorMode from engine."""
-    from engine.simulation.spectator import SpectatorMode
-
-    if not hasattr(engine, '_spectator'):
-        engine._spectator = SpectatorMode(engine.replay_recorder)
-    return engine._spectator
-
-
 @router.post("/replay/play")
 async def replay_play(request: Request):
     """Start or resume replay playback."""
     engine = _get_engine(request)
-    spectator = _get_spectator(engine)
-    spectator.play()
-    return spectator.get_state()
+    engine.spectator.play()
+    return engine.spectator.get_state()
 
 
 @router.post("/replay/pause")
 async def replay_pause(request: Request):
     """Pause replay playback."""
     engine = _get_engine(request)
-    spectator = _get_spectator(engine)
-    spectator.pause()
-    return spectator.get_state()
+    engine.spectator.pause()
+    return engine.spectator.get_state()
 
 
 @router.post("/replay/stop")
 async def replay_stop(request: Request):
     """Stop playback and return to live."""
     engine = _get_engine(request)
-    spectator = _get_spectator(engine)
-    spectator.stop()
-    return spectator.get_state()
+    engine.spectator.stop()
+    return engine.spectator.get_state()
 
 
 @router.post("/replay/seek")
 async def replay_seek(body: SeekRequest, request: Request):
     """Seek to a specific time in the replay."""
     engine = _get_engine(request)
-    spectator = _get_spectator(engine)
-    spectator.seek_time(body.time)
-    return spectator.get_state()
+    engine.spectator.seek_time(body.time)
+    return engine.spectator.get_state()
 
 
 @router.post("/replay/speed")
 async def replay_speed(body: SpeedRequest, request: Request):
     """Set replay playback speed (0.25, 0.5, 1, 2, 4)."""
     engine = _get_engine(request)
-    spectator = _get_spectator(engine)
-    spectator.set_speed(body.speed)
-    return spectator.get_state()
+    engine.spectator.set_speed(body.speed)
+    return engine.spectator.get_state()
 
 
 @router.post("/replay/step-forward")
 async def replay_step_forward(request: Request):
     """Advance one frame."""
     engine = _get_engine(request)
-    spectator = _get_spectator(engine)
-    spectator.step_forward()
-    return spectator.get_state()
+    engine.spectator.step_forward()
+    return engine.spectator.get_state()
 
 
 @router.post("/replay/step-backward")
 async def replay_step_backward(request: Request):
     """Go back one frame."""
     engine = _get_engine(request)
-    spectator = _get_spectator(engine)
-    spectator.step_backward()
-    return spectator.get_state()
+    engine.spectator.step_backward()
+    return engine.spectator.get_state()
 
 
 @router.post("/replay/seek-wave")
 async def replay_seek_wave(body: SeekWaveRequest, request: Request):
     """Jump to the start of a specific wave."""
     engine = _get_engine(request)
-    spectator = _get_spectator(engine)
-    spectator.seek_wave(body.wave)
-    return spectator.get_state()
+    engine.spectator.seek_wave(body.wave)
+    return engine.spectator.get_state()
 
 
 @router.get("/replay/state")
 async def replay_state(request: Request):
     """Get current spectator playback state."""
     engine = _get_engine(request)
-    spectator = _get_spectator(engine)
-    return spectator.get_state()
+    return engine.spectator.get_state()
 
 
 @router.get("/replay/frame")
 async def replay_frame(request: Request):
     """Get the current frame data at the spectator playhead position.
 
-    When the spectator is playing, calling this endpoint advances the
-    playhead by *dt* seconds (0.25s at the frontend's 4Hz poll rate).
-    This is the only caller of ``spectator.tick()`` — without it the
-    playhead stays at frame 0 forever.
+    The engine tick loop calls spectator.tick(dt) at 10Hz, so the
+    playhead advances automatically during playback.  This endpoint
+    just reads the current state -- it no longer drives advancement.
     """
     engine = _get_engine(request)
-    spectator = _get_spectator(engine)
-    # Advance playhead when playing (frontend polls at ~4Hz = 250ms)
-    if spectator._playing:
-        spectator.tick(0.25)
+    spectator = engine.spectator
     frame = spectator.get_frame(spectator.current_frame)
     state = spectator.get_state()
     return {"state": state, "frame": frame}

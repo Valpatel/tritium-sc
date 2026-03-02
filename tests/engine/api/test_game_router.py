@@ -615,20 +615,17 @@ class TestReplayFrameAdvance:
             "current_time": frame_index / 2.0,
             "progress": frame_index / max(1, total_frames - 1),
         }
-        engine._spectator = spectator
+        engine.spectator = spectator
         return engine, spectator
 
-    def test_frame_endpoint_calls_tick_when_playing(self):
-        """When spectator is playing, /replay/frame should call tick(0.25)."""
-        engine, spectator = self._make_spectator_engine(playing=True)
-        client = TestClient(_make_app(engine=engine))
-        resp = client.get("/api/game/replay/frame")
-        assert resp.status_code == 200
-        spectator.tick.assert_called_once_with(0.25)
+    def test_frame_endpoint_does_not_tick(self):
+        """The /replay/frame endpoint reads state but does not call tick().
 
-    def test_frame_endpoint_does_not_tick_when_paused(self):
-        """When spectator is paused, /replay/frame should NOT call tick()."""
-        engine, spectator = self._make_spectator_engine(playing=False)
+        Playback advancement is now handled by the engine tick loop
+        (SimulationEngine._do_tick calls spectator.tick(dt) at 10Hz).
+        The HTTP endpoint is purely a read-only state accessor.
+        """
+        engine, spectator = self._make_spectator_engine(playing=True)
         client = TestClient(_make_app(engine=engine))
         resp = client.get("/api/game/replay/frame")
         assert resp.status_code == 200
@@ -646,21 +643,11 @@ class TestReplayFrameAdvance:
         assert data["frame"]["targets"][0]["target_id"] == "t1"
         assert data["state"]["total_frames"] == 20
 
-    def test_frame_endpoint_returns_updated_state_after_tick(self):
-        """After tick advances, the returned state should reflect new position."""
+    def test_frame_endpoint_returns_current_state(self):
+        """The returned state reflects the spectator's current position."""
         engine, spectator = self._make_spectator_engine(playing=True, frame_index=5)
-        # After tick, get_state will return the post-tick state
-        spectator.get_state.return_value = {
-            "playing": True,
-            "speed": 1.0,
-            "current_frame": 6,
-            "total_frames": 20,
-            "duration": 9.5,
-            "current_time": 3.0,
-            "progress": 6 / 19,
-        }
         client = TestClient(_make_app(engine=engine))
         resp = client.get("/api/game/replay/frame")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["state"]["current_frame"] == 6
+        assert data["state"]["current_frame"] == 5

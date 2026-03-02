@@ -245,7 +245,7 @@ def _make_spectator_engine(playing=False, speed=1.0, frame=0, total=20):
         "current_time": frame / 2.0,
         "progress": frame / max(1, total - 1),
     }
-    engine._spectator = spectator
+    engine.spectator = spectator
     return engine, spectator
 
 
