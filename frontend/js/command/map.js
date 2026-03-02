@@ -1054,7 +1054,7 @@ function _drawUnitSignals(ctx) {
         // Expanding ring effect
         const expansion = 1 - frac;  // 0 -> 1 as signal ages
         const radiusWorld = (sig.signal_range || 50) * expansion;
-        const radiusPx = radiusWorld * (_state.zoom / 100) * (_state.canvas.width / _state.dpr / 800);
+        const radiusPx = radiusWorld * (_state.cam.zoom / 100) * (_state.canvas.width / _state.dpr / 800);
 
         if (radiusPx < 2) continue;
 
@@ -2948,7 +2948,12 @@ function _doDispatch(unitId, wx, wy) {
             EventBus.emit('unit:dispatched', { id: unitId, target: { x: wx, y: wy } });
             EventBus.emit('toast:show', { message: 'Dispatch command sent', type: 'info' });
         } else {
-            EventBus.emit('toast:show', { message: 'Dispatch failed', type: 'alert' });
+            resp.json().then(data => {
+                const reason = (data && data.detail) || 'Dispatch failed';
+                EventBus.emit('toast:show', { message: reason, type: 'alert' });
+            }).catch(() => {
+                EventBus.emit('toast:show', { message: 'Dispatch failed', type: 'alert' });
+            });
         }
     }).catch(() => {
         EventBus.emit('toast:show', { message: 'Dispatch failed: network error', type: 'alert' });

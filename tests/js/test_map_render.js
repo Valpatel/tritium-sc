@@ -2627,6 +2627,58 @@ console.log('\n--- MapLibre cursor references ---');
 })();
 
 // ============================================================
+// Signal ring zoom uses _state.cam.zoom (not _state.zoom)
+// ============================================================
+
+(function testSignalRingUsesCorrectZoomPath() {
+    const code = require('fs').readFileSync(
+        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'map.js'), 'utf8'
+    );
+    const signalSection = code.split('function _drawUnitSignals')[1];
+    assert(signalSection, '_drawUnitSignals function exists');
+    // Must use _state.cam.zoom for pixel conversion
+    const beforeNextFn = signalSection.split('\nfunction ')[0];
+    assert(
+        beforeNextFn.includes('_state.cam.zoom'),
+        '_drawUnitSignals uses _state.cam.zoom (not _state.zoom)'
+    );
+    // Must NOT use bare _state.zoom (which is undefined)
+    const bareZoomRefs = (beforeNextFn.match(/_state\.zoom\b/g) || []).length;
+    const camZoomRefs = (beforeNextFn.match(/_state\.cam\.zoom/g) || []).length;
+    assert(
+        bareZoomRefs === 0 && camZoomRefs >= 1,
+        '_drawUnitSignals has no bare _state.zoom (' + bareZoomRefs + ' bare, ' + camZoomRefs + ' cam.zoom)'
+    );
+})();
+
+// ============================================================
+// Dispatch error shows backend detail message
+// ============================================================
+
+(function testDispatchErrorShowsDetail() {
+    const code = require('fs').readFileSync(
+        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'map.js'), 'utf8'
+    );
+    const dispatchSection = code.split('function _doDispatch')[1];
+    assert(dispatchSection, '_doDispatch function exists');
+    const beforeNextFn = dispatchSection.split('\nfunction ')[0];
+    // On failure, should parse response body for detail
+    assert(
+        beforeNextFn.includes('resp.json()'),
+        '_doDispatch parses response body on failure'
+    );
+    assert(
+        beforeNextFn.includes('data.detail'),
+        '_doDispatch extracts detail field from error response'
+    );
+    // Should have a fallback for parse failure
+    assert(
+        beforeNextFn.includes('.catch('),
+        '_doDispatch has fallback if response body parse fails'
+    );
+})();
+
+// ============================================================
 // Summary
 // ============================================================
 
