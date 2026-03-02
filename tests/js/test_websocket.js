@@ -1407,7 +1407,10 @@ console.log('\n--- Edge Cases ---');
         warHudShowWaveBanner = function(w, n, h) { _bridge.waveBannerCalled = true; };
         warHudShowWaveComplete = function(w, e, s) { _bridge.waveCompleteCalled = true; };
         // warHandle* wrappers (preferred — include audio hooks)
+        warHandleGameState = function(d) { _bridge.handleGameStateCalled = true; };
+        warHandleGameOver = function(d) { _bridge.handleGameOverCalled = true; };
         warHandleWaveStart = function(d) { _bridge.handleWaveStartCalled = true; };
+        warHandleWaveComplete = function(d) { _bridge.handleWaveCompleteCalled = true; };
         warHandleProjectileFired = function(d) { _bridge.handleProjectileCalled = true; };
         warHandleProjectileHit = function(d) { _bridge.handleHitCalled = true; };
         warHandleTargetEliminated = function(d) { _bridge.handleElimCalled = true; };
@@ -1425,10 +1428,11 @@ console.log('\n--- Edge Cases ---');
     createdSockets[0]._simulateOpen();
 
     createdSockets[0]._simulateMessage({ type: 'game_state', data: { state: 'active' } });
-    assert(_bridge.gameStateCalled, 'warHudUpdateGameState called for game_state');
+    assert(_bridge.handleGameStateCalled, 'warHandleGameState called for game_state (includes audio hooks)');
 
     createdSockets[0]._simulateMessage({ type: 'amy_game_over', data: { result: 'victory', score: 100, waves: 10, total_eliminations: 5 } });
-    assert(_bridge.gameOverCalled, 'warHudShowGameOver called for amy_game_over');
+    assert(_bridge.handleGameOverCalled, 'warHandleGameOver called for amy_game_over (includes audio hooks)');
+    assert(_bridge.gameOverCalled, 'warHudShowGameOver also called for amy_game_over');
 
     createdSockets[0]._simulateMessage({ type: 'announcer', data: { text: 'test', category: 'streak' } });
     assert(_bridge.announcerCalled, 'warHudShowAmyAnnouncement called for announcer');
@@ -1438,6 +1442,7 @@ console.log('\n--- Edge Cases ---');
     assert(_bridge.waveBannerCalled, 'warHudShowWaveBanner called for wave_start');
 
     createdSockets[0]._simulateMessage({ type: 'wave_complete', data: { wave: 1, eliminations: 3, score_bonus: 50 } });
+    assert(_bridge.handleWaveCompleteCalled, 'warHandleWaveComplete called for wave_complete (includes audio hooks)');
     assert(_bridge.waveCompleteCalled, 'warHudShowWaveComplete called for wave_complete');
 
     // Combat events should prefer warHandle* (with audio) over warCombat* (visual-only)

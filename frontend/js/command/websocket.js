@@ -334,7 +334,10 @@ export class WebSocketManager {
                 if (d.civilian_harm_limit !== undefined) TritiumStore.set('game.civilianHarmLimit', d.civilian_harm_limit);
                 if (d.weighted_total_score !== undefined) TritiumStore.set('game.weightedTotalScore', d.weighted_total_score);
                 EventBus.emit('game:state', d);
-                if (typeof warHudUpdateGameState === 'function') {
+                // Route through warHandle* for audio hooks
+                if (typeof warHandleGameState === 'function') {
+                    warHandleGameState(d);
+                } else if (typeof warHudUpdateGameState === 'function') {
                     warHudUpdateGameState(d);
                 }
                 break;
@@ -348,8 +351,13 @@ export class WebSocketManager {
                 if (d.total_eliminations !== undefined) TritiumStore.set('game.eliminations', d.total_eliminations);
                 else if (d.total_kills !== undefined) TritiumStore.set('game.eliminations', d.total_kills);
                 EventBus.emit('game:state', { ...d, state: phase });
+                // Route through warHandle* for audio hooks (victory/defeat sounds)
+                if (typeof warHandleGameOver === 'function') {
+                    warHandleGameOver(d);
+                }
                 if (typeof warHudShowGameOver === 'function') {
-                    // Pass mode-specific data as 5th argument
+                    // Pass mode-specific data as 5th argument for
+                    // civil_unrest/drone_swarm game mode HUD rendering
                     const modeData = {
                         game_mode_type: d.game_mode_type,
                         reason: d.reason,
@@ -545,11 +553,15 @@ export class WebSocketManager {
 
             case 'wave_complete':
             case 'amy_wave_complete': {
+                const d = msg.data || msg;
+                // Route through warHandle* for audio hooks
+                if (typeof warHandleWaveComplete === 'function') {
+                    warHandleWaveComplete(d);
+                }
                 if (typeof warHudShowWaveComplete === 'function') {
-                    const d = msg.data || msg;
                     warHudShowWaveComplete(d.wave || d.wave_number, d.eliminations, d.score_bonus);
                 }
-                EventBus.emit('game:wave_complete', msg.data || msg);
+                EventBus.emit('game:wave_complete', d);
                 break;
             }
 
