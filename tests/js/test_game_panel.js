@@ -1004,6 +1004,36 @@ console.log('\n--- Wave start ---');
 })();
 
 // ============================================================
+// Countdown display tests
+// ============================================================
+console.log('\n--- Countdown display ---');
+
+(function testCountdownElementExists() {
+    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    assert(
+        src.includes('data-bind="countdown"'),
+        'Game HUD has a data-bind="countdown" element'
+    );
+})();
+
+(function testCountdownStoreSubscription() {
+    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    assert(
+        src.includes("game.countdown"),
+        'Game HUD subscribes to game.countdown store key'
+    );
+})();
+
+(function testCountdownShownDuringCountdownPhase() {
+    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    // Countdown element should be shown when phase === 'countdown'
+    assert(
+        src.includes("'countdown'") && src.includes('countdownEl'),
+        'Countdown display is wired to countdown phase'
+    );
+})();
+
+// ============================================================
 // Summary
 // ============================================================
 

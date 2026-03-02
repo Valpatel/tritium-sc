@@ -486,6 +486,7 @@ export const GameHudPanelDef = {
         el.className = 'game-hud-panel-inner';
         el.innerHTML = `
             <div class="ghud-status">
+                <div class="ghud-countdown" data-bind="countdown" style="display:none"></div>
                 <div class="ghud-row">
                     <span class="ghud-label mono">PHASE</span>
                     <span class="ghud-value mono" data-bind="phase">IDLE</span>
@@ -550,6 +551,7 @@ export const GameHudPanelDef = {
             panel._applyTransform();
         }
 
+        const countdownEl = bodyEl.querySelector('[data-bind="countdown"]');
         const phaseEl = bodyEl.querySelector('[data-bind="phase"]');
         const waveEl = bodyEl.querySelector('[data-bind="wave"]');
         const waveNameEl = bodyEl.querySelector('[data-bind="waveName"]');
@@ -906,9 +908,24 @@ export const GameHudPanelDef = {
         panel._unsubs.push(
             TritiumStore.on('game.phase', (phase) => {
                 if (phaseEl) phaseEl.textContent = (phase || 'IDLE').toUpperCase();
+                // Show/hide countdown overlay based on phase
+                if (countdownEl) {
+                    countdownEl.style.display = phase === 'countdown' ? '' : 'none';
+                }
                 updateVisibility();
                 // Trigger immediate dashboard refresh on phase change
                 refreshDashboard();
+            }),
+            TritiumStore.on('game.countdown', (count) => {
+                if (countdownEl) {
+                    const n = typeof count === 'number' ? count : 0;
+                    if (n > 0) {
+                        countdownEl.textContent = String(n);
+                        countdownEl.style.display = '';
+                    } else {
+                        countdownEl.style.display = 'none';
+                    }
+                }
             }),
             TritiumStore.on('game.wave', (wave) => {
                 if (waveEl) waveEl.textContent = `${wave}/${TritiumStore.game.totalWaves}`;

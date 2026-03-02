@@ -1174,6 +1174,36 @@ class TestSubsystemInit:
         engine, bus = _make_engine()
         assert engine.sensor_sim is not None
 
+    def test_sensor_sim_seeded_with_perimeter_sensors(self):
+        engine, bus = _make_engine()
+        sensors = engine.sensor_sim.sensors
+        assert len(sensors) == 8, f"Expected 8 perimeter sensors, got {len(sensors)}"
+        ids = {s.sensor_id for s in sensors}
+        assert "sen-north" in ids
+        assert "sen-south" in ids
+        assert "sen-east" in ids
+        assert "sen-west" in ids
+
+    def test_sensor_sim_ticked_in_engine(self):
+        """sensor_sim.tick() is called during _do_tick when sensors exist."""
+        engine, bus = _make_engine()
+        # Verify sensors exist (they're seeded by default now)
+        assert len(engine.sensor_sim.sensors) > 0
+        # Add a hostile near a sensor and tick — sensor should trigger
+        sensor = engine.sensor_sim.sensors[0]
+        hostile = SimulationTarget(
+            target_id="test-hostile-1",
+            name="TestHostile",
+            asset_type="person",
+            alliance="hostile",
+            position=(sensor.position[0], sensor.position[1]),
+            speed=0.0,
+        )
+        engine.add_target(hostile)
+        engine._do_tick(0.1)
+        # The sensor should now be active (hostile is inside radius)
+        assert sensor.active, "Sensor should be active after tick with hostile inside radius"
+
 
 # ==========================================================================
 # Edge Cases

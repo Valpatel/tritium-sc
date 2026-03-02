@@ -204,8 +204,21 @@ class SimulationEngine:
         self._street_graph = None
         self._obstacles = None
 
-        # Sensor simulation
+        # Sensor simulation — seed perimeter sensors at entry points
         self.sensor_sim = SensorSimulator(event_bus)
+        _half = self._map_bounds * 0.9
+        _perimeter_sensors = [
+            ("sen-north", "North Gate", "motion", (0.0, _half), 40.0),
+            ("sen-south", "South Gate", "motion", (0.0, -_half), 40.0),
+            ("sen-east", "East Approach", "tripwire", (_half, 0.0), 35.0),
+            ("sen-west", "West Approach", "tripwire", (-_half, 0.0), 35.0),
+            ("sen-ne", "NE Corner", "motion", (_half * 0.7, _half * 0.7), 30.0),
+            ("sen-nw", "NW Corner", "motion", (-_half * 0.7, _half * 0.7), 30.0),
+            ("sen-se", "SE Corner", "door", (_half * 0.7, -_half * 0.7), 30.0),
+            ("sen-sw", "SW Corner", "door", (-_half * 0.7, -_half * 0.7), 30.0),
+        ]
+        for sid, name, stype, pos, radius in _perimeter_sensors:
+            self.sensor_sim.add_sensor(sid, name, stype, pos, radius)
 
         # NPC world population (vehicles + pedestrians)
         self._npc_manager: NPCManager | None = None
@@ -908,6 +921,10 @@ class SimulationEngine:
             # Legacy interception check (non-game-mode)
             if self.game_mode.state == "setup":
                 self._check_interceptions(targets)
+
+        # Tick sensor network (always, regardless of game state)
+        if self.sensor_sim.sensors:
+            self.sensor_sim.tick(dt, targets)
 
         # Tick hazard manager (always, regardless of game state)
         self.hazard_manager.tick(dt)
