@@ -209,11 +209,11 @@ export class WebSocketManager {
                 if (game.difficulty_multiplier !== undefined) TritiumStore.set('game.difficultyMultiplier', game.difficulty_multiplier);
             }
             if (targetsRes.ok) {
-                const targets = await targetsRes.json();
-                if (Array.isArray(targets)) {
-                    for (const t of targets) {
-                        this._updateUnit(t);
-                    }
+                const data = await targetsRes.json();
+                // API returns { targets: [...], summary: "..." }
+                const targets = Array.isArray(data) ? data : (data.targets || []);
+                for (const t of targets) {
+                    this._updateUnit(t);
                 }
             }
         } catch (e) {
@@ -293,23 +293,21 @@ export class WebSocketManager {
                 if (d.countdown !== undefined) TritiumStore.set('game.countdown', d.countdown);
                 if (d.wave_hostiles_remaining !== undefined) TritiumStore.set('game.waveHostilesRemaining', d.wave_hostiles_remaining);
                 if (d.difficulty_multiplier !== undefined) TritiumStore.set('game.difficultyMultiplier', d.difficulty_multiplier);
-                // Idle = initial state before any game.  Clear units so stale
-                // data from a previous session is wiped.  Setup = backend reset
-                // after a game; do NOT clear units because defenders are being
-                // placed.  Both states clear per-game overlays.
+                // Idle = initial state before any game.  Full reset clears
+                // units, score, overlays, and all per-game state so stale
+                // data from a previous session cannot leak into the next game.
+                // Setup = backend reset after a game; do NOT clear units
+                // because defenders are being placed, but still clear overlays.
                 if (d.state === 'idle') {
-                    TritiumStore.units.clear();
-                    TritiumStore._notify('units', TritiumStore.units);
-                }
-                if (d.state === 'idle' || d.state === 'setup') {
-                    // Clear per-game overlays to prevent leaking into next game
+                    TritiumStore.resetGameState();
+                } else if (d.state === 'setup') {
+                    // Clear per-game overlays but preserve units
                     TritiumStore.set('hazards', new Map());
                     TritiumStore.set('game.hostileIntel', null);
                     TritiumStore.set('game.hostileObjectives', null);
                     TritiumStore.set('game.crowdDensity', null);
                     TritiumStore.set('game.coverPoints', []);
                     TritiumStore.set('game.signals', []);
-                    // Clear mission-mode-specific state
                     TritiumStore.set('game.modeType', null);
                     TritiumStore.set('game.infrastructureHealth', null);
                     TritiumStore.set('game.infrastructureMax', null);

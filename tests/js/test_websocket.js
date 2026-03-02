@@ -2780,6 +2780,223 @@ console.log('\n--- hostile_intel handler ---');
 })();
 
 // ============================================================
+// Audio-relevant EventBus emissions
+// Verify that combat events emitted by the WebSocket handler
+// match the events that the audio system in main.js listens to.
+// ============================================================
+
+console.log('\n--- Audio-relevant EventBus emissions ---');
+
+(function testWeaponJamEmitsCombatWeaponJam() {
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws.connect();
+    createdSockets[0]._simulateOpen();
+    listenEvent(ctx, 'combat:weapon_jam');
+    createdSockets[0]._simulateMessage({
+        type: 'weapon_jam',
+        data: { unit_id: 'turret-01', weapon: 'nerf_turret_gun' },
+    });
+    assertDefined(_bridge['combat:weapon_jam'], 'weapon_jam emits combat:weapon_jam event');
+    assertEqual(_bridge['combat:weapon_jam'].unit_id, 'turret-01', 'weapon_jam data has unit_id');
+})();
+
+(function testAmyWeaponJamAlias() {
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws.connect();
+    createdSockets[0]._simulateOpen();
+    listenEvent(ctx, 'combat:weapon_jam');
+    createdSockets[0]._simulateMessage({
+        type: 'amy_weapon_jam',
+        data: { unit_id: 'rover-01' },
+    });
+    assertDefined(_bridge['combat:weapon_jam'], 'amy_weapon_jam also emits combat:weapon_jam');
+})();
+
+(function testAmmoLowEmitsCombatAmmoLow() {
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws.connect();
+    createdSockets[0]._simulateOpen();
+    listenEvent(ctx, 'combat:ammo_low');
+    createdSockets[0]._simulateMessage({
+        type: 'ammo_low',
+        data: { unit_id: 'turret-02' },
+    });
+    assertDefined(_bridge['combat:ammo_low'], 'ammo_low emits combat:ammo_low event');
+})();
+
+(function testAmmoDepletedEmitsCombatAmmoDepleted() {
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws.connect();
+    createdSockets[0]._simulateOpen();
+    listenEvent(ctx, 'combat:ammo_depleted');
+    createdSockets[0]._simulateMessage({
+        type: 'ammo_depleted',
+        data: { unit_id: 'rover-03' },
+    });
+    assertDefined(_bridge['combat:ammo_depleted'], 'ammo_depleted emits combat:ammo_depleted event');
+})();
+
+(function testHazardSpawnedEmitsHazardEvent() {
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws.connect();
+    createdSockets[0]._simulateOpen();
+    listenEvent(ctx, 'hazard:spawned');
+    createdSockets[0]._simulateMessage({
+        type: 'hazard_spawned',
+        data: {
+            hazard_id: 'haz-01',
+            hazard_type: 'fire',
+            position: { x: 10, y: 20 },
+            radius: 5,
+        },
+    });
+    assertDefined(_bridge['hazard:spawned'], 'hazard_spawned emits hazard:spawned event');
+    assertEqual(_bridge['hazard:spawned'].hazard_type, 'fire', 'hazard:spawned data has hazard_type');
+})();
+
+(function testSensorTriggeredEmitsSensorEvent() {
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws.connect();
+    createdSockets[0]._simulateOpen();
+    listenEvent(ctx, 'sensor:triggered');
+    createdSockets[0]._simulateMessage({
+        type: 'sensor_triggered',
+        data: { sensor_id: 'sensor-01', target_id: 'hostile-05' },
+    });
+    assertDefined(_bridge['sensor:triggered'], 'sensor_triggered emits sensor:triggered event');
+})();
+
+(function testProjectileFiredEmitsCombatProjectile() {
+    // Verify the specific EventBus event that audio wiring listens to
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws.connect();
+    createdSockets[0]._simulateOpen();
+    listenEvent(ctx, 'combat:projectile');
+    createdSockets[0]._simulateMessage({
+        type: 'projectile_fired',
+        data: {
+            projectile_type: 'nerf_missile_launcher',
+            source_pos: { x: 5, y: 10 },
+            target_pos: { x: 15, y: 20 },
+        },
+    });
+    const d = _bridge['combat:projectile'];
+    assertDefined(d, 'projectile_fired emits combat:projectile for audio system');
+    assertEqual(d.projectile_type, 'nerf_missile_launcher', 'projectile_type passed through for weapon-specific audio');
+    assertDefined(d.source_pos, 'source_pos passed through for positional audio');
+})();
+
+(function testEliminationEmitsBothGameAndCombatEvents() {
+    // Audio listens to combat:elimination; HUD listens to game:elimination
+    // Both must fire for the same WebSocket message
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws.connect();
+    createdSockets[0]._simulateOpen();
+    listenEvent(ctx, 'combat:elimination');
+    listenEvent(ctx, 'game:elimination');
+    createdSockets[0]._simulateMessage({
+        type: 'target_eliminated',
+        data: { target_id: 'hostile-01', position: { x: 10, y: 20 } },
+    });
+    assertDefined(_bridge['combat:elimination'], 'target_eliminated emits combat:elimination (audio)');
+    assertDefined(_bridge['game:elimination'], 'target_eliminated emits game:elimination (HUD)');
+})();
+
+(function testGameStateActiveEmitsForAmbientAudio() {
+    // Audio wiring starts ambient on 'active' state
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws.connect();
+    createdSockets[0]._simulateOpen();
+    listenEvent(ctx, 'game:state');
+    createdSockets[0]._simulateMessage({
+        type: 'game_state',
+        data: { state: 'active', wave: 1, total_waves: 10 },
+    });
+    const d = _bridge['game:state'];
+    assertDefined(d, 'game_state emits game:state for audio ambient management');
+    assertEqual(d.state, 'active', 'game:state carries state field for audio branching');
+})();
+
+(function testGameOverVictoryEmitsGameState() {
+    // Audio plays victory_fanfare when game:state has state='victory'
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws.connect();
+    createdSockets[0]._simulateOpen();
+    listenEvent(ctx, 'game:state');
+    createdSockets[0]._simulateMessage({
+        type: 'amy_game_over',
+        data: { result: 'victory', score: 5000 },
+    });
+    const d = _bridge['game:state'];
+    assertDefined(d, 'amy_game_over emits game:state for audio victory/defeat');
+    assertEqual(d.state, 'victory', 'game_over victory maps to game:state state=victory');
+})();
+
+(function testGameOverDefeatEmitsGameState() {
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws.connect();
+    createdSockets[0]._simulateOpen();
+    listenEvent(ctx, 'game:state');
+    createdSockets[0]._simulateMessage({
+        type: 'amy_game_over',
+        data: { result: 'defeat', score: 1200 },
+    });
+    const d = _bridge['game:state'];
+    assertDefined(d, 'amy_game_over defeat emits game:state');
+    assertEqual(d.state, 'defeat', 'game_over defeat maps to game:state state=defeat');
+})();
+
+(function testAlertNewEmitsForAudioWiring() {
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws.connect();
+    createdSockets[0]._simulateOpen();
+    listenEvent(ctx, 'alert:new');
+    createdSockets[0]._simulateMessage({
+        type: 'escalation_change',
+        data: { message: 'THREAT LEVEL ELEVATED' },
+    });
+    assertDefined(_bridge['alert:new'], 'escalation_change emits alert:new for audio');
+})();
+
+(function testAnnouncerEmitsForAudioWiring() {
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws.connect();
+    createdSockets[0]._simulateOpen();
+    listenEvent(ctx, 'announcer');
+    createdSockets[0]._simulateMessage({
+        type: 'announcer',
+        data: { text: 'DOUBLE KILL', category: 'elimination' },
+    });
+    assertDefined(_bridge['announcer'], 'announcer event emits announcer for audio wiring');
+})();
+
+(function testDispatchSpeechEmitsForAudioWiring() {
+    const ctx = createFreshContext();
+    const ws = vm.runInContext('new WebSocketManager()', ctx);
+    ws.connect();
+    createdSockets[0]._simulateOpen();
+    listenEvent(ctx, 'dispatch:speech');
+    createdSockets[0]._simulateMessage({
+        type: 'auto_dispatch_speech',
+        data: { text: 'Rover-01 dispatched to sector 3' },
+    });
+    assertDefined(_bridge['dispatch:speech'], 'auto_dispatch_speech emits dispatch:speech for audio');
+})();
+
+// ============================================================
 // Summary
 // ============================================================
 
