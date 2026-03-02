@@ -188,6 +188,11 @@ function handleAction(action, gamePos, selectedUnitId) {
                         message: 'Suggestion sent to Amy',
                         type: 'info',
                     });
+                } else {
+                    EventBus.emit('toast:show', {
+                        message: 'Amy rejected suggestion',
+                        type: 'alert',
+                    });
                 }
             }).catch(() => {
                 EventBus.emit('toast:show', {
@@ -209,6 +214,11 @@ function handleAction(action, gamePos, selectedUnitId) {
                     EventBus.emit('toast:show', {
                         message: 'Suggestion sent to Amy',
                         type: 'info',
+                    });
+                } else {
+                    EventBus.emit('toast:show', {
+                        message: 'Amy rejected suggestion',
+                        type: 'alert',
                     });
                 }
             }).catch(() => {
