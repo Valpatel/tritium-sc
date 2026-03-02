@@ -78,7 +78,6 @@ console.log('\n--- Initial State Structure ---');
     assertEqual(store.amy.mood, 'calm', 'Initial amy.mood is calm');
     assertEqual(store.amy.lastThought, '', 'Initial amy.lastThought is empty string');
     assertEqual(store.amy.speaking, false, 'Initial amy.speaking is false');
-    assertEqual(store.amy.nodeCount, 0, 'Initial amy.nodeCount is 0');
 })();
 
 (function testInitialConnectionState() {
@@ -96,6 +95,35 @@ console.log('\n--- Initial State Structure ---');
     const store = createStore();
     assert(Array.isArray(store.cameras), 'Initial cameras is an array');
     assertEqual(store.cameras.length, 0, 'Initial cameras is empty');
+})();
+
+(function testInitialHazards() {
+    const store = createStore();
+    assert(store.hazards instanceof Map, 'Initial hazards is a Map');
+    assertEqual(store.hazards.size, 0, 'Initial hazards is empty');
+})();
+
+(function testInitialMeshState() {
+    const store = createStore();
+    assertEqual(store.mesh.connected, false, 'Initial mesh.connected is false');
+})();
+
+(function testInitialReplayState() {
+    const store = createStore();
+    assertEqual(store.replay.active, false, 'Initial replay.active is false');
+})();
+
+(function testInitialTakState() {
+    const store = createStore();
+    assertEqual(store.tak.connected, false, 'Initial tak.connected is false');
+})();
+
+(function testInitialGameModeKeys() {
+    const store = createStore();
+    assertEqual(store.game.hostileIntel, null, 'Initial game.hostileIntel is null');
+    assertEqual(store.game.modeType, null, 'Initial game.modeType is null');
+    assert(Array.isArray(store.game.coverPoints), 'Initial game.coverPoints is array');
+    assert(Array.isArray(store.game.signals), 'Initial game.signals is array');
 })();
 
 (function testListenersMapExists() {
@@ -570,12 +598,11 @@ console.log('\n--- Bulk State Updates ---');
 
 (function testSetEntireAmyObject() {
     const store = createStore();
-    store.set('amy', { state: 'thinking', mood: 'alert', lastThought: 'Scanning...', speaking: true, nodeCount: 3 });
+    store.set('amy', { state: 'thinking', mood: 'alert', lastThought: 'Scanning...', speaking: true });
     assertEqual(store.amy.state, 'thinking', 'bulk set amy.state');
     assertEqual(store.amy.mood, 'alert', 'bulk set amy.mood');
     assertEqual(store.amy.lastThought, 'Scanning...', 'bulk set amy.lastThought');
     assertEqual(store.amy.speaking, true, 'bulk set amy.speaking');
-    assertEqual(store.amy.nodeCount, 3, 'bulk set amy.nodeCount');
 })();
 
 (function testMultipleRapidSetsAllNotify() {

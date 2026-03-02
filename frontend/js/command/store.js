@@ -27,6 +27,20 @@ export const TritiumStore = {
         countdown: 0,
         waveHostilesRemaining: 0,
         difficultyMultiplier: 1.0,
+        // Overlay data (reset per game)
+        hostileIntel: null,
+        hostileObjectives: null,
+        crowdDensity: null,
+        coverPoints: [],
+        signals: [],
+        // Mission-mode-specific state
+        modeType: null,
+        infrastructureHealth: null,
+        infrastructureMax: null,
+        deEscalationScore: null,
+        civilianHarmCount: null,
+        civilianHarmLimit: null,
+        weightedTotalScore: null,
     },
 
     // Units -- single source of truth (from WebSocket sim_telemetry)
@@ -39,11 +53,22 @@ export const TritiumStore = {
         mood: 'calm',
         lastThought: '',
         speaking: false,
-        nodeCount: 0,
     },
 
     // Operator unit control (TAKE CONTROL / RELEASE)
     controlledUnitId: null,   // unit id when operator has direct control
+
+    // Environmental hazards (from WebSocket hazard_spawned/hazard_expired events)
+    hazards: new Map(),
+
+    // Mesh radio state (from WebSocket mesh_* events)
+    mesh: { connected: false },
+
+    // Replay mode (from replay panel)
+    replay: { active: false },
+
+    // TAK state (from TAK panel)
+    tak: { connected: false },
 
     // Connection state
     connection: {

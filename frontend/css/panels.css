@@ -1165,6 +1165,73 @@
 
 
 /* ========================================
+   Sensor Net Panel — Sensor Event Log
+   ======================================== */
+
+.sensor-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2px;
+}
+
+.sensor-active-count {
+    font-size: 0.85rem;
+    color: var(--text-dim, #8892b0);
+}
+
+.sensor-log {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.sensor-entry {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 0.8rem;
+}
+
+.sensor-entry[data-state="triggered"] {
+    background: rgba(255, 42, 109, 0.08);
+}
+
+.sensor-ts {
+    flex-shrink: 0;
+    color: var(--text-dim, #8892b0);
+    width: 5.5em;
+}
+
+.sensor-badge {
+    flex-shrink: 0;
+    width: 1.4em;
+    text-align: center;
+    border: 1px solid;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    line-height: 1.4;
+}
+
+.sensor-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text, #ccd6f6);
+}
+
+.sensor-state {
+    flex-shrink: 0;
+    font-weight: 600;
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+}
+
+
+/* ========================================
    Meshtastic Panel — Tabbed Interface
    ======================================== */
 

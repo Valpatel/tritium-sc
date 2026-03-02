@@ -35,7 +35,7 @@ const TritiumStore = {
     map: { viewport: { x: 0, y: 0, zoom: 1 }, selectedUnitId: null, mode: 'observe' },
     game: { phase: 'idle', wave: 0, totalWaves: 10, score: 0, eliminations: 0 },
     units: new Map(),
-    amy: { state: 'idle', mood: 'calm', lastThought: '', speaking: false, nodeCount: 0 },
+    amy: { state: 'idle', mood: 'calm', lastThought: '', speaking: false },
     connection: { status: 'disconnected' },
     alerts: [],
     cameras: [],
