@@ -280,6 +280,7 @@ function init() {
                     'hostile_detected', 'alert_tone', 'escalation_siren',
                     'killing_spree', 'rampage', 'dominating', 'godlike',
                     'ambient_wind',
+                    'weapon_jam', 'sensor_triggered',
                 ]);
 
                 // Wire EventBus combat events to weapon-specific audio
@@ -356,6 +357,37 @@ function init() {
                     if (d.state === 'countdown') audioMgr.play('countdown_tick');
                     if (d.state === 'victory') audioMgr.play('victory_fanfare');
                     else if (d.state === 'defeat') audioMgr.play('defeat_sting');
+                });
+
+                // Weapon malfunction audio cues
+                EventBus.on('combat:weapon_jam', () => {
+                    audioMgr.play('weapon_jam');
+                });
+                EventBus.on('combat:ammo_low', () => {
+                    audioMgr.play('reload');
+                });
+                EventBus.on('combat:ammo_depleted', () => {
+                    audioMgr.play('weapon_jam');
+                });
+
+                // Environment and tactical audio cues
+                EventBus.on('hazard:spawned', () => {
+                    audioMgr.play('alert_tone');
+                });
+                EventBus.on('sensor:triggered', () => {
+                    audioMgr.play('sensor_triggered');
+                });
+                EventBus.on('dispatch:speech', () => {
+                    audioMgr.play('dispatch_ack');
+                });
+                EventBus.on('alert:new', () => {
+                    audioMgr.play('alert_tone');
+                });
+                EventBus.on('announcer', () => {
+                    audioMgr.play('dispatch_ack');
+                });
+                EventBus.on('escalation:change', () => {
+                    audioMgr.play('escalation_siren');
                 });
 
                 console.log('[TRITIUM] Audio initialized + combat events wired');
@@ -947,6 +979,8 @@ async function resetGame() {
         await fetch('/api/game/reset', { method: 'POST' });
         const overlay = document.getElementById('game-over-overlay');
         if (overlay) overlay.hidden = true;
+        // Clear all game-related state so stale data does not leak into the next game
+        TritiumStore.resetGameState();
     } catch (e) {
         showToast('Failed to reset game', 'alert');
     }

@@ -884,6 +884,122 @@ console.log('\n--- Realistic Scenario ---');
 })();
 
 // ============================================================
+// 14. resetGameState
+// ============================================================
+
+console.log('\n--- resetGameState ---');
+
+(function testResetGameStateExists() {
+    const store = createStore();
+    assertEqual(typeof store.resetGameState, 'function', 'resetGameState is a function');
+})();
+
+(function testResetGameStateClearsScore() {
+    const store = createStore();
+    store.set('game.score', 5000);
+    store.set('game.eliminations', 42);
+    store.set('game.wave', 7);
+    store.set('game.waveName', 'HEAVY ASSAULT');
+    store.set('game.countdown', 3);
+    store.set('game.waveHostilesRemaining', 5);
+    store.set('game.difficultyMultiplier', 1.8);
+    store.resetGameState();
+    assertEqual(store.game.phase, 'idle', 'resetGameState sets phase to idle');
+    assertEqual(store.game.score, 0, 'resetGameState clears score');
+    assertEqual(store.game.eliminations, 0, 'resetGameState clears eliminations');
+    assertEqual(store.game.wave, 0, 'resetGameState clears wave');
+    assertEqual(store.game.totalWaves, 10, 'resetGameState resets totalWaves to 10');
+    assertEqual(store.game.waveName, '', 'resetGameState clears waveName');
+    assertEqual(store.game.countdown, 0, 'resetGameState clears countdown');
+    assertEqual(store.game.waveHostilesRemaining, 0, 'resetGameState clears waveHostilesRemaining');
+    assertEqual(store.game.difficultyMultiplier, 1.0, 'resetGameState resets difficultyMultiplier');
+})();
+
+(function testResetGameStateClearsUnits() {
+    const store = createStore();
+    store.updateUnit('turret-1', { type: 'turret', health: 100 });
+    store.updateUnit('hostile-1', { type: 'hostile_person', health: 50 });
+    assertEqual(store.units.size, 2, 'units populated before reset');
+    store.resetGameState();
+    assertEqual(store.units.size, 0, 'resetGameState clears all units');
+})();
+
+(function testResetGameStateClearsOverlays() {
+    const store = createStore();
+    store.set('game.hostileIntel', { threat_level: 'high' });
+    store.set('game.hostileObjectives', [{ name: 'Capture' }]);
+    store.set('game.crowdDensity', { grid: [] });
+    store.set('game.coverPoints', [{ x: 1, y: 2 }]);
+    store.set('game.signals', [{ type: 'distress' }]);
+    store.set('game.modeType', 'civil_unrest');
+    store.set('game.infrastructureHealth', 80);
+    store.set('game.infrastructureMax', 100);
+    store.set('game.deEscalationScore', 42);
+    store.set('game.civilianHarmCount', 3);
+    store.set('game.civilianHarmLimit', 10);
+    store.set('game.weightedTotalScore', 1500);
+    store.resetGameState();
+    assertEqual(store.get('game.hostileIntel'), null, 'resetGameState clears hostileIntel');
+    assertEqual(store.get('game.hostileObjectives'), null, 'resetGameState clears hostileObjectives');
+    assertEqual(store.get('game.crowdDensity'), null, 'resetGameState clears crowdDensity');
+    assertDeepEqual(store.get('game.coverPoints'), [], 'resetGameState clears coverPoints');
+    assertDeepEqual(store.get('game.signals'), [], 'resetGameState clears signals');
+    assertEqual(store.get('game.modeType'), null, 'resetGameState clears modeType');
+    assertEqual(store.get('game.infrastructureHealth'), null, 'resetGameState clears infrastructureHealth');
+    assertEqual(store.get('game.infrastructureMax'), null, 'resetGameState clears infrastructureMax');
+    assertEqual(store.get('game.deEscalationScore'), null, 'resetGameState clears deEscalationScore');
+    assertEqual(store.get('game.civilianHarmCount'), null, 'resetGameState clears civilianHarmCount');
+    assertEqual(store.get('game.civilianHarmLimit'), null, 'resetGameState clears civilianHarmLimit');
+    assertEqual(store.get('game.weightedTotalScore'), null, 'resetGameState clears weightedTotalScore');
+})();
+
+(function testResetGameStateNotifiesListeners() {
+    const store = createStore();
+    store.set('game.phase', 'active');
+    store.set('game.score', 5000);
+    store.set('game.wave', 7);
+    const notifications = [];
+    store.on('game.phase', (val) => notifications.push('phase:' + val));
+    store.on('game.score', (val) => notifications.push('score:' + val));
+    store.on('game.wave', (val) => notifications.push('wave:' + val));
+    store.on('units', () => notifications.push('units'));
+    store.resetGameState();
+    assert(notifications.includes('phase:idle'), 'resetGameState notifies game.phase');
+    assert(notifications.includes('score:0'), 'resetGameState notifies game.score');
+    assert(notifications.includes('wave:0'), 'resetGameState notifies game.wave');
+    assert(notifications.includes('units'), 'resetGameState notifies units');
+})();
+
+(function testResetGameStateDoesNotClearNonGameState() {
+    const store = createStore();
+    store.set('amy.state', 'thinking');
+    store.set('amy.mood', 'excited');
+    store.set('map.mode', 'tactical');
+    store.set('connection.status', 'connected');
+    store.addAlert({ type: 'test', message: 'Alert' });
+    store.resetGameState();
+    assertEqual(store.amy.state, 'thinking', 'resetGameState preserves amy.state');
+    assertEqual(store.amy.mood, 'excited', 'resetGameState preserves amy.mood');
+    assertEqual(store.map.mode, 'tactical', 'resetGameState preserves map.mode');
+    assertEqual(store.connection.status, 'connected', 'resetGameState preserves connection.status');
+    assertEqual(store.alerts.length, 1, 'resetGameState preserves alerts');
+})();
+
+(function testResetGameStateDeselectsUnit() {
+    const store = createStore();
+    store.set('map.selectedUnitId', 'turret-1');
+    store.resetGameState();
+    assertEqual(store.map.selectedUnitId, null, 'resetGameState deselects unit');
+})();
+
+(function testResetGameStateClearsControlledUnit() {
+    const store = createStore();
+    store.set('controlledUnitId', 'drone-1');
+    store.resetGameState();
+    assertEqual(store.controlledUnitId, null, 'resetGameState clears controlled unit');
+})();
+
+// ============================================================
 // Summary
 // ============================================================
 

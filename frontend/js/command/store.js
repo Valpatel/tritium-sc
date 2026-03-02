@@ -212,6 +212,50 @@ export const TritiumStore = {
     },
 
     /**
+     * Reset all game-related state to initial values.
+     * Call this when a game ends and a new one begins, or on explicit reset.
+     * Clears: game counters, units, overlay data, selection, controlled unit.
+     * Preserves: amy, map.mode, connection, alerts, cameras, graphlings.
+     */
+    resetGameState() {
+        // Core game counters
+        this.set('game.phase', 'idle');
+        this.set('game.wave', 0);
+        this.set('game.totalWaves', 10);
+        this.set('game.score', 0);
+        this.set('game.eliminations', 0);
+        this.set('game.waveName', '');
+        this.set('game.countdown', 0);
+        this.set('game.waveHostilesRemaining', 0);
+        this.set('game.difficultyMultiplier', 1.0);
+
+        // Per-game overlay data
+        this.set('hazards', new Map());
+        this.set('game.hostileIntel', null);
+        this.set('game.hostileObjectives', null);
+        this.set('game.crowdDensity', null);
+        this.set('game.coverPoints', []);
+        this.set('game.signals', []);
+
+        // Mission-mode-specific state
+        this.set('game.modeType', null);
+        this.set('game.infrastructureHealth', null);
+        this.set('game.infrastructureMax', null);
+        this.set('game.deEscalationScore', null);
+        this.set('game.civilianHarmCount', null);
+        this.set('game.civilianHarmLimit', null);
+        this.set('game.weightedTotalScore', null);
+
+        // Clear all units (stale data from previous game)
+        this.units.clear();
+        this._notify('units', this.units);
+
+        // Deselect unit and release control
+        this.set('map.selectedUnitId', null);
+        this.set('controlledUnitId', null);
+    },
+
+    /**
      * Notify subscribers for a path and wildcard listeners.
      * @param {string} path
      * @param {*} value
