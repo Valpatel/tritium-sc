@@ -219,6 +219,33 @@ console.log('\n--- unmount() ---');
 (function() { let threw = false; try { TakPanelDef.unmount(createMockElement('div')); } catch (e) { threw = true; } assert(!threw, 'unmount() does not throw'); })();
 
 // ============================================================
+// 12. API contract correctness
+// ============================================================
+console.log('\n--- API contracts ---');
+
+(function testChatSendsToCallsign() {
+    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/tak.js', 'utf8');
+    assert(src.includes('to_callsign'), 'Chat sends to_callsign (matches backend ChatRequest model)');
+    assert(!src.includes("channel: 'All'"), 'Chat does NOT send channel: All (wrong field name for backend)');
+})();
+
+(function testBackendClientsIncludesCotType() {
+    const py = fs.readFileSync(__dirname + '/../../src/app/routers/tak.py', 'utf8');
+    assert(py.includes('"cot_type"'), 'Backend clients response includes cot_type field');
+})();
+
+(function testAlertRequestFields() {
+    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/tak.js', 'utf8');
+    const alertIdx = src.indexOf("'/api/tak/alert'");
+    if (alertIdx < 0) { assert(false, 'Alert endpoint exists'); return; }
+    const alertBlock = src.slice(alertIdx, alertIdx + 300);
+    assert(alertBlock.includes('callsign'), 'Alert sends callsign');
+    assert(alertBlock.includes('lat'), 'Alert sends lat');
+    assert(alertBlock.includes('lng'), 'Alert sends lng');
+    assert(alertBlock.includes('remarks'), 'Alert sends remarks');
+})();
+
+// ============================================================
 // Summary
 // ============================================================
 console.log('\n' + '='.repeat(40));

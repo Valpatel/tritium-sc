@@ -566,7 +566,7 @@ export const TakPanelDef = {
                 await fetch('/api/tak/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text, channel: 'All' }),
+                    body: JSON.stringify({ message: text, to_callsign: 'All Chat Rooms' }),
                 });
             } catch (_) {}
         }

@@ -72,6 +72,7 @@ async def tak_clients(request: Request):
             "asset_type": info.get("asset_type", "person"),
             "speed": info.get("speed", 0.0),
             "heading": info.get("heading", 0.0),
+            "cot_type": info.get("cot_type", ""),
             "last_seen": info.get("last_seen", 0),
         }
         for uid, info in clients.items()

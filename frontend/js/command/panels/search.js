@@ -232,11 +232,10 @@ export const SearchPanelDef = {
 
             try {
                 // Fetch target detail, sightings, similar, and label in parallel
-                const [targetResp, sightingsResp, similarResp, labelResp] = await Promise.all([
+                const [targetResp, sightingsResp, similarResp] = await Promise.all([
                     fetch(`/api/search/target/${encodeURIComponent(tid)}`),
-                    fetch(`/api/search/sightings?thumbnail_id=${encodeURIComponent(tid)}&limit=10`).catch(() => null),
-                    fetch(`/api/search/similar?thumbnail_id=${encodeURIComponent(tid)}&limit=4`).catch(() => null),
-                    fetch(`/api/search/label?thumbnail_id=${encodeURIComponent(tid)}`).catch(() => null),
+                    fetch(`/api/search/sightings/${encodeURIComponent(tid)}?limit=10`).catch(() => null),
+                    fetch(`/api/search/similar/${encodeURIComponent(tid)}?limit=4`).catch(() => null),
                 ]);
                 if (!targetResp.ok) { detailEl.style.display = 'none'; return; }
                 const item = await targetResp.json();
@@ -255,12 +254,8 @@ export const SearchPanelDef = {
                     similar = simData.results || simData.similar || similar;
                 }
 
-                // Parse label
+                // Label comes from the target detail response
                 let currentLabel = item.label || '';
-                if (labelResp && labelResp.ok) {
-                    const labelData = await labelResp.json();
-                    currentLabel = labelData.label || currentLabel;
-                }
 
                 detailEl.innerHTML = `
                     <div class="search-detail-header">
@@ -359,7 +354,7 @@ export const SearchPanelDef = {
                         await fetch('/api/search/feedback', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ thumbnail_id: tid, correct: true }),
+                            body: JSON.stringify({ thumbnail_id: tid, feedback_type: 'correct' }),
                         });
                         EventBus.emit('toast:show', { message: 'Marked as correct', type: 'info' });
                     } catch (_) {}
@@ -369,7 +364,7 @@ export const SearchPanelDef = {
                         await fetch('/api/search/feedback', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ thumbnail_id: tid, correct: false }),
+                            body: JSON.stringify({ thumbnail_id: tid, feedback_type: 'wrong_type' }),
                         });
                         EventBus.emit('toast:show', { message: 'Marked as incorrect', type: 'info' });
                     } catch (_) {}
