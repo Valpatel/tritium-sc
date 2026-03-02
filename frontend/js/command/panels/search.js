@@ -344,7 +344,7 @@ export const SearchPanelDef = {
                         await fetch('/api/search/merge', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ source_id: tid, target_id: otherTid.trim() }),
+                            body: JSON.stringify({ primary_id: tid, duplicate_ids: [otherTid.trim()] }),
                         });
                         EventBus.emit('toast:show', { message: 'Targets merged', type: 'info' });
                         fetchPeople();

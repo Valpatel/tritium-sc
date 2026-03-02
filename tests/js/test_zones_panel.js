@@ -171,6 +171,18 @@ console.log('\n--- unmount() ---');
 (function() { let threw = false; try { ZonesPanelDef.unmount(createMockElement('div')); } catch (e) { threw = true; } assert(!threw, 'unmount() does not throw'); })();
 
 // ============================================================
+// Zone toggle uses PUT (not PATCH) to match backend
+// ============================================================
+console.log('\n--- Zone toggle HTTP method ---');
+
+(function testZoneToggleUsesPut() {
+    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/zones.js', 'utf8');
+    // Backend route is @router.put("/{zone_id}") — frontend must use PUT
+    assert(src.includes("method: 'PUT'"), 'Zone toggle uses PUT method (matches backend @router.put)');
+    assert(!src.includes("method: 'PATCH'"), 'Zone toggle does NOT use PATCH (backend has no PATCH route)');
+})();
+
+// ============================================================
 // Summary
 // ============================================================
 console.log('\n' + '='.repeat(40));

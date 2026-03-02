@@ -186,6 +186,20 @@ console.log('\n--- unmount() ---');
 (function() { let threw = false; try { SearchPanelDef.unmount(createMockElement('div')); } catch (e) { threw = true; } assert(!threw, 'unmount() does not throw'); })();
 
 // ============================================================
+// Merge request uses correct field names (primary_id, duplicate_ids)
+// ============================================================
+console.log('\n--- Merge request format ---');
+
+(function testMergeRequestUsesCorrectFieldNames() {
+    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/search.js', 'utf8');
+    // Backend MergeRequest model expects {primary_id: str, duplicate_ids: list[str]}
+    assert(src.includes('primary_id'), 'Merge request uses primary_id (matches backend MergeRequest model)');
+    assert(src.includes('duplicate_ids'), 'Merge request uses duplicate_ids array (matches backend MergeRequest model)');
+    assert(!src.includes('source_id'), 'Merge request does NOT use source_id (wrong field name for backend)');
+    assert(!src.includes('target_id: otherTid'), 'Merge request does NOT use target_id for merge target');
+})();
+
+// ============================================================
 // Summary
 // ============================================================
 console.log('\n' + '='.repeat(40));

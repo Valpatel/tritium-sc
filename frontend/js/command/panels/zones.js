@@ -132,7 +132,7 @@ export const ZonesPanelDef = {
             zoneDetailEl.querySelector('[data-action="toggle-zone"]')?.addEventListener('click', async () => {
                 try {
                     await fetch(`/api/zones/${zoneId}`, {
-                        method: 'PATCH',
+                        method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ enabled: !zone.enabled }),
                     });
