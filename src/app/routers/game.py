@@ -305,12 +305,17 @@ async def generate_mission(body: MissionRequest, request: Request):
     if body.use_llm:
         # Start LLM generation in background thread
         def _gen():
-            result = md.generate_via_llm(
-                game_mode=body.game_mode,
-                model=body.model,
-            )
-            if result is None:
-                # LLM failed, fall back to scripted
+            try:
+                result = md.generate_via_llm(
+                    game_mode=body.game_mode,
+                    model=body.model,
+                )
+                if result is None:
+                    # LLM failed, fall back to scripted
+                    md.generate_scripted(game_mode=body.game_mode)
+            except Exception:
+                # LLM crashed — fall back to scripted so frontend
+                # receives a completion event instead of hanging.
                 md.generate_scripted(game_mode=body.game_mode)
 
         thread = threading.Thread(target=_gen, daemon=True, name="mission-gen")

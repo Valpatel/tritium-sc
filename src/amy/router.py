@@ -270,6 +270,28 @@ async def amy_node_video(request: Request, node_id: str):
     )
 
 
+@router.get("/nodes/{node_id}/snapshot")
+async def amy_node_snapshot(request: Request, node_id: str):
+    """Single JPEG snapshot from a camera node."""
+    amy = _get_amy(request)
+    if amy is None:
+        return JSONResponse({"error": "Amy is not running"}, status_code=503)
+
+    node = amy.nodes.get(node_id)
+    if node is None or not node.has_camera:
+        return JSONResponse({"error": f"No camera node '{node_id}'"}, status_code=404)
+
+    if node == amy.primary_camera:
+        frame = amy.grab_mjpeg_frame()
+    else:
+        frame = node.get_jpeg()
+
+    if frame is None:
+        return JSONResponse({"error": "No frame available"}, status_code=503)
+
+    return Response(content=frame, media_type="image/jpeg")
+
+
 @router.post("/command")
 async def amy_command(request: Request, body: CommandRequest):
     """Execute a Lua-style action (look_at, scan, etc.)."""
