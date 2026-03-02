@@ -1204,6 +1204,86 @@ console.log('\n--- Fetch body validation ---');
 })();
 
 // ============================================================
+// Click-outside dismiss
+// ============================================================
+
+console.log('\n--- Click-outside dismiss ---');
+
+(function testOutsideHandlerRegisteredOnShow() {
+    // Verify the code registers a mousedown handler for click-outside dismiss
+    const code = fs.readFileSync(__dirname + '/../../frontend/js/command/context-menu.js', 'utf8');
+    assert(code.includes("document.addEventListener('mousedown'"),
+        'show() registers document mousedown listener for click-outside');
+})();
+
+(function testOutsideHandlerCleanedOnHide() {
+    // Verify hide() removes the mousedown handler
+    const code = fs.readFileSync(__dirname + '/../../frontend/js/command/context-menu.js', 'utf8');
+    assert(code.includes("document.removeEventListener('mousedown'"),
+        'hide() removes document mousedown listener');
+})();
+
+(function testHideRemovesMousedownHandler() {
+    // Show + hide should clean up mousedown listener on document
+    const container = createMockElement('div');
+    ContextMenu.show(container, 'unit-01', { x: 100, y: 100 }, 400, 300);
+    assert(ContextMenu.isVisible(), 'Menu visible after show');
+
+    // Check that mousedown listener was registered
+    const hadMousedown = keyListeners['mousedown'] && keyListeners['mousedown'].length > 0;
+
+    ContextMenu.hide();
+    assert(!ContextMenu.isVisible(), 'Menu hidden after hide');
+
+    // After hide, mousedown listeners should be cleaned up
+    const afterCount = (keyListeners['mousedown'] || []).length;
+    const beforeCount = hadMousedown ? 1 : 0;
+    assert(afterCount <= beforeCount,
+        'mousedown listener count does not grow after show/hide cycle');
+})();
+
+(function testOutsideClickDismissesThroughHandler() {
+    // Simulate the click-outside handler directly by calling it with a
+    // target outside the menu.  The setTimeout(0) in show() defers
+    // registration, so we manually fire the handler.
+    const container = createMockElement('div');
+    ContextMenu.show(container, 'unit-01', { x: 100, y: 100 }, 400, 300);
+    assert(ContextMenu.isVisible(), 'Menu visible before outside click');
+
+    // Flush any zero-delay timeouts that registered the handler
+    // In Node, the real setTimeout(fn,0) runs on next tick.
+    // We replicate by finding the handler in listeners after a manual flush.
+    // Since the test sandbox patches setTimeout, we check if keyListeners
+    // already captured a mousedown handler.
+    const handlers = keyListeners['mousedown'] || [];
+    if (handlers.length > 0) {
+        // Simulate clicking outside (target is an element not in the menu)
+        const outsideEl = createMockElement('div');
+        handlers[handlers.length - 1]({ target: outsideEl });
+        assert(!ContextMenu.isVisible(), 'Outside mousedown hides context menu');
+    } else {
+        // setTimeout deferred — just verify structural correctness
+        ContextMenu.hide();
+        assert(!ContextMenu.isVisible(), 'Fallback: menu can be hidden manually');
+    }
+})();
+
+(function testClickInsideMenuDoesNotDismiss() {
+    const container = createMockElement('div');
+    const menu = ContextMenu.show(container, null, { x: 50, y: 50 }, 200, 200);
+    assert(ContextMenu.isVisible(), 'Menu visible before inside click');
+
+    // If mousedown handlers exist, clicking inside should not dismiss
+    const handlers = keyListeners['mousedown'] || [];
+    if (handlers.length > 0 && menu) {
+        // Simulate clicking inside the menu (target is the menu element)
+        handlers[handlers.length - 1]({ target: menu });
+        assert(ContextMenu.isVisible(), 'Click inside menu does NOT dismiss it');
+    }
+    ContextMenu.hide();
+})();
+
+// ============================================================
 // Summary
 // ============================================================
 

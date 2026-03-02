@@ -470,7 +470,8 @@ console.log('\n--- RoverControl render ---');
 })();
 
 (function testRoverRenderShowsBattery() {
-    const html = RoverControl.render(makeDevice({ battery: 0.73 }));
+    // battery is already 0-100 in the store (websocket.js converts from 0-1)
+    const html = RoverControl.render(makeDevice({ battery: 73 }));
     assert(html.includes('73%'), 'RoverControl render shows battery percentage');
 })();
 
@@ -1782,9 +1783,10 @@ console.log('\n--- Helper functions ---');
 })();
 
 (function testBatteryStrFunction() {
+    // battery values are already 0-100 in the store (websocket.js converts from backend 0-1)
     const _batteryStr = vm.runInContext('_batteryStr', ctx);
-    assert(_batteryStr(0.85) === '85%', '_batteryStr(0.85) is "85%"');
-    assert(_batteryStr(1.0) === '100%', '_batteryStr(1.0) is "100%"');
+    assert(_batteryStr(85) === '85%', '_batteryStr(85) is "85%"');
+    assert(_batteryStr(100) === '100%', '_batteryStr(100) is "100%"');
     assert(_batteryStr(0) === '0%', '_batteryStr(0) is "0%"');
     assert(_batteryStr(null) === '--', '_batteryStr(null) is "--"');
     assert(_batteryStr(undefined) === '--', '_batteryStr(undefined) is "--"');
@@ -1889,6 +1891,56 @@ console.log('\n--- TAKE CONTROL sets store + emits event ---');
     const code = fs.readFileSync(__dirname + '/../../frontend/js/command/device-modal.js', 'utf8');
     assert(code.includes("EventBus.emit('unit:control-released'"),
         'RELEASE handler emits unit:control-released event');
+})();
+
+// ============================================================
+// Battery display (double-multiplication regression)
+// ============================================================
+
+console.log('\n--- Battery display ---');
+
+(function testBatteryStrNotDoubleMultiplied() {
+    // websocket.js converts 0-1 to 0-100 before storing.
+    // _batteryStr must NOT multiply by 100 again.
+    const code = fs.readFileSync(__dirname + '/../../frontend/js/command/device-modal.js', 'utf8');
+    // The function should use Math.round(bat) not Math.round(bat * 100)
+    assert(!code.includes('Math.round(bat * 100)'),
+        '_batteryStr does not double-multiply battery by 100');
+    assert(code.includes('Math.round(bat)'),
+        '_batteryStr uses Math.round(bat) for already-converted percentage');
+})();
+
+(function testBatteryStrRendersCorrectValue() {
+    // Render a rover with battery=75 (already 0-100 from websocket.js)
+    const roverControl = DeviceControlRegistry.get('rover');
+    const html = roverControl.render({
+        id: 'rover-bat', name: 'Rover Battery Test', type: 'rover',
+        alliance: 'friendly', position: { x: 0, y: 0 }, heading: 0,
+        speed: 0, battery: 75, health: 100, maxHealth: 100, status: 'active',
+    });
+    // Should show "75%" not "7500%"
+    assert(html.includes('75%'), 'Rover battery renders as 75% not 7500%');
+    assert(!html.includes('7500%'), 'Battery is not doubled to 7500%');
+})();
+
+(function testBatteryStrNull() {
+    const roverControl = DeviceControlRegistry.get('rover');
+    const html = roverControl.render({
+        id: 'rover-no-bat', name: 'No Battery', type: 'rover',
+        alliance: 'friendly', position: { x: 0, y: 0 }, heading: 0,
+        speed: 0, battery: null, health: 100, maxHealth: 100, status: 'active',
+    });
+    assert(html.includes('--'), 'Null battery shows -- placeholder');
+})();
+
+(function testBatteryStrUndefined() {
+    const roverControl = DeviceControlRegistry.get('rover');
+    const html = roverControl.render({
+        id: 'rover-undef-bat', name: 'Undef Battery', type: 'rover',
+        alliance: 'friendly', position: { x: 0, y: 0 }, heading: 0,
+        speed: 0, health: 100, maxHealth: 100, status: 'active',
+    });
+    assert(html.includes('--'), 'Undefined battery shows -- placeholder');
 })();
 
 // ============================================================

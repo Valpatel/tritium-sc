@@ -898,6 +898,58 @@ console.log('\n--- warHudDrawHostileIntel ---');
 }
 
 // ============================================================
+// Watch Replay dismisses game-over-overlay
+// ============================================================
+
+{
+    // Set up game-over overlay with hidden property
+    const goOverlay = mockElements['game-over-overlay'] || {};
+    goOverlay.hidden = false;
+    mockElements['game-over-overlay'] = goOverlay;
+
+    // Set up war-game-over
+    mockElements['war-game-over'] = mockElements['war-game-over'] || {
+        style: { display: 'flex' }, textContent: '', innerHTML: '', className: '',
+        classList: { _classes: [], add() {}, remove() {} }, onclick: null, offsetWidth: 100,
+    };
+    mockElements['war-game-over'].style.display = 'flex';
+
+    w.warHudWatchReplay();
+
+    assert(mockElements['war-game-over'].style.display === 'none',
+        'warHudWatchReplay hides war-game-over HUD');
+    assert(mockElements['game-over-overlay'].hidden === true,
+        'warHudWatchReplay hides game-over-overlay (not just HUD)');
+}
+
+// ============================================================
+// Threat level escaping in wave banner
+// ============================================================
+
+{
+    const code = fs.readFileSync(__dirname + '/../../frontend/js/war-hud.js', 'utf8');
+    // threat_level should be escaped before .toUpperCase()
+    assert(code.includes('_hudEscapeHtml(briefingData.threat_level)'),
+        'Wave banner escapes threat_level before injecting into HTML');
+    // No unescaped threat_level injection
+    assert(!code.includes('${briefingData.threat_level.toUpperCase()}'),
+        'No unescaped threat_level.toUpperCase() in HTML template');
+}
+
+// ============================================================
+// Play Again clears countdown timers
+// ============================================================
+
+{
+    const code = fs.readFileSync(__dirname + '/../../frontend/js/war-hud.js', 'utf8');
+    // warHudPlayAgain should clear both timers
+    assert(code.includes('clearTimeout(_hudState.countdownTimer)'),
+        'warHudPlayAgain clears countdownTimer');
+    assert(code.includes('clearInterval(_hudState.loadingMessageTimer)'),
+        'warHudPlayAgain clears loadingMessageTimer');
+}
+
+// ============================================================
 // Summary
 // ============================================================
 

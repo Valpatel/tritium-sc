@@ -26,6 +26,7 @@ import { EventBus } from './events.js';
 
 let _menuEl = null;       // Current menu DOM element
 let _keyHandler = null;   // Escape key handler reference
+let _outsideHandler = null; // Click-outside dismiss handler
 
 // ============================================================
 // Menu item definitions
@@ -299,6 +300,17 @@ function createMenuElement(container, selectedUnitId, gamePos, screenX, screenY)
     };
     document.addEventListener('keydown', _keyHandler);
 
+    // Click outside menu dismisses it (panels, menu bar, etc.)
+    _outsideHandler = (e) => {
+        if (_menuEl && !_menuEl.contains(e.target)) {
+            hide();
+        }
+    };
+    // Use setTimeout so the current right-click event doesn't immediately dismiss
+    setTimeout(() => {
+        document.addEventListener('mousedown', _outsideHandler);
+    }, 0);
+
     // Append to container
     container.appendChild(menu);
 
@@ -334,6 +346,10 @@ function hide() {
     if (_keyHandler) {
         document.removeEventListener('keydown', _keyHandler);
         _keyHandler = null;
+    }
+    if (_outsideHandler) {
+        document.removeEventListener('mousedown', _outsideHandler);
+        _outsideHandler = null;
     }
 }
 

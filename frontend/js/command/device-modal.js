@@ -94,7 +94,8 @@ function _healthColor(pct) {
 
 function _batteryStr(bat) {
     if (bat === null || bat === undefined) return '--';
-    return Math.round(bat * 100) + '%';
+    // battery is already 0-100 (converted by websocket.js from 0-1 float)
+    return Math.round(bat) + '%';
 }
 
 /**

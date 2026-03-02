@@ -215,7 +215,7 @@ function warHudShowWaveBanner(waveNum, waveName, hostileCount, briefingData) {
         if (briefingData.threat_level) {
             const threatClass = briefingData.threat_level === 'heavy' ? 'threat-heavy' :
                                briefingData.threat_level === 'moderate' ? 'threat-moderate' : 'threat-light';
-            briefingHtml += `<div class="war-wave-threat ${threatClass}">THREAT: ${briefingData.threat_level.toUpperCase()}</div>`;
+            briefingHtml += `<div class="war-wave-threat ${threatClass}">THREAT: ${_hudEscapeHtml(briefingData.threat_level).toUpperCase()}</div>`;
         }
         if (briefingData.intel) {
             briefingHtml += `<div class="war-wave-intel">${_hudEscapeHtml(briefingData.intel)}</div>`;
@@ -571,6 +571,9 @@ function warHudPlayAgain() {
     _hudState.weightedTotalScore = 0;
     _hudState.loadingMessages = [];
     _hudState.bonusObjectives = [];
+    // Clear countdown timers to prevent stale ticks
+    if (_hudState.countdownTimer) { clearTimeout(_hudState.countdownTimer); _hudState.countdownTimer = null; }
+    if (_hudState.loadingMessageTimer) { clearInterval(_hudState.loadingMessageTimer); _hudState.loadingMessageTimer = null; }
     _renderEliminationFeed();
     _updateScoreDisplay();
 
@@ -598,6 +601,9 @@ function warHudPlayAgain() {
 function warHudWatchReplay() {
     const el = document.getElementById('war-game-over');
     if (el) el.style.display = 'none';
+    // Also dismiss the main game-over overlay
+    const goOverlay = document.getElementById('game-over-overlay');
+    if (goOverlay) goOverlay.hidden = true;
 
     // Notify the replay panel that we want to enter replay mode
     TritiumStore.set('replay.active', true);
