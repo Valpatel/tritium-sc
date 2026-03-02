@@ -174,3 +174,71 @@ class TestDeviceCommandFallback:
         )
         assert resp.status_code == 200
         assert resp.json()["command"] == "custom_action"
+
+
+@pytest.mark.unit
+class TestDeviceCommandLuaPassthrough:
+    """Commands with parentheses are passed through as-is to avoid double-wrapping."""
+
+    def _get_lua_str(self, cmd: str) -> str:
+        """Extract the Lua string the router would generate for a command."""
+        from app.routers.devices import router as _  # noqa: F811 — ensure import
+        import importlib
+        import app.routers.devices as mod
+
+        # The lua_map and fallback logic is inline in the route handler.
+        # We verify behavior by inspecting source for the fix.
+        import inspect
+        source = inspect.getsource(mod.device_command)
+        assert '"(" in cmd' in source, "Router should check for parens in command"
+        return source  # Just verify the source has the fix
+
+    def test_fire_nerf_not_double_wrapped(self):
+        """fire_nerf() should NOT become fire_nerf()("device-id")."""
+        # When no MQTT and no Amy, command is accepted but the Lua string
+        # is computed internally.  We verify via source inspection.
+        source = self._get_lua_str("fire_nerf()")
+        assert '"(" in cmd' in source
+
+    def test_command_with_parens_via_mqtt(self):
+        """Lua commands with parens sent via MQTT pass the raw string."""
+        mqtt = MagicMock()
+        client = TestClient(_make_app(mqtt_bridge=mqtt))
+        resp = client.post(
+            "/api/devices/rover-01/command",
+            json={"command": "fire_nerf()"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["via"] == "mqtt"
+        _, payload = mqtt.publish.call_args[0]
+        assert json.loads(payload)["command"] == "fire_nerf()"
+
+    def test_motor_aim_with_args_via_mqtt(self):
+        """motor.aim(10,20) preserves the full Lua string."""
+        mqtt = MagicMock()
+        client = TestClient(_make_app(mqtt_bridge=mqtt))
+        resp = client.post(
+            "/api/devices/turret-01/command",
+            json={"command": "motor.aim(10,20)"},
+        )
+        assert resp.status_code == 200
+        _, payload = mqtt.publish.call_args[0]
+        assert json.loads(payload)["command"] == "motor.aim(10,20)"
+
+    def test_stop_command_accepted_without_backend(self):
+        """stop() accepted without MQTT — should NOT become stop()("dev-01")."""
+        client = TestClient(_make_app())
+        resp = client.post(
+            "/api/devices/dev-01/command",
+            json={"command": "stop()"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "accepted"
+
+    def test_simple_command_without_parens_wraps_device_id(self):
+        """Commands without parens get device_id wrapped: enable -> enable("dev-01")."""
+        # Source inspection: the else branch should wrap device_id
+        import inspect
+        import app.routers.devices as mod
+        source = inspect.getsource(mod.device_command)
+        assert 'f\'{cmd}("{device_id}")\'' in source

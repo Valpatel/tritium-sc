@@ -158,20 +158,17 @@ export const GraphlingsPanelDef = {
         fetchStatus();
         const statusInterval = setInterval(fetchStatus, 5000);
 
-        // Store cleanup references on bodyEl for unmount access
-        bodyEl._glCleanup = () => {
+        // Register cleanup via standard _unsubs pattern
+        panel._unsubs.push(() => {
             if (eventSource) {
                 eventSource.close();
                 eventSource = null;
             }
             clearInterval(statusInterval);
-        };
+        });
     },
 
     unmount(bodyEl) {
-        if (bodyEl && bodyEl._glCleanup) {
-            bodyEl._glCleanup();
-            delete bodyEl._glCleanup;
-        }
+        // _unsubs cleaned up by Panel base class
     },
 };

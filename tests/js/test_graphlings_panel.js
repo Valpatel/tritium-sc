@@ -97,26 +97,32 @@ test('panel cleans up SSE on unmount', () => {
     );
 });
 
-// Test 7b: Cleanup is stored on bodyEl (not panel) so unmount can access it
-test('cleanup stored on bodyEl for unmount access', () => {
+// Test 7b: Cleanup uses standard _unsubs pattern
+test('cleanup uses panel._unsubs pattern', () => {
     const content = fs.readFileSync(
         path.join(__dirname, '../../frontend/js/command/panels/graphlings.js'), 'utf8'
     );
     assert.ok(
-        content.includes('bodyEl._glCleanup'),
-        'cleanup should be stored on bodyEl, not panel (bodyEl is passed to unmount)'
+        content.includes('panel._unsubs.push'),
+        'cleanup should use panel._unsubs.push() (standard pattern)'
+    );
+    assert.ok(
+        !content.includes('bodyEl._glCleanup'),
+        'should not store cleanup on bodyEl (non-standard)'
     );
 });
 
-// Test 7c: unmount actually calls the cleanup function
-test('unmount calls _glCleanup', () => {
+// Test 7c: _unsubs cleanup closes EventSource and clears interval
+test('_unsubs cleanup closes EventSource and interval', () => {
     const content = fs.readFileSync(
         path.join(__dirname, '../../frontend/js/command/panels/graphlings.js'), 'utf8'
     );
-    assert.ok(
-        content.includes('unmount(bodyEl)') && content.includes('bodyEl._glCleanup()'),
-        'unmount should call bodyEl._glCleanup()'
-    );
+    // The cleanup function inside _unsubs.push should close eventSource and clearInterval
+    const pushIdx = content.indexOf('panel._unsubs.push');
+    const closingParen = content.indexOf('});', pushIdx);
+    const pushBlock = content.substring(pushIdx, closingParen + 3);
+    assert.ok(pushBlock.includes('eventSource.close()'), '_unsubs should close EventSource');
+    assert.ok(pushBlock.includes('clearInterval'), '_unsubs should clearInterval');
 });
 
 // Test 7d: cleanup includes clearInterval

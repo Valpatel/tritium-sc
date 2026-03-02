@@ -73,8 +73,13 @@ async def device_command(
 
     lua_str = lua_map.get(cmd)
     if lua_str is None:
-        # Generic fallback: forward as Lua with device_id
-        lua_str = f'{cmd}("{device_id}")'
+        # If the command already contains parentheses (e.g. "fire_nerf()",
+        # "motor.aim(10,20)"), pass it as-is to the Lua parser.  Otherwise
+        # wrap the device_id as the first argument.
+        if "(" in cmd:
+            lua_str = cmd
+        else:
+            lua_str = f'{cmd}("{device_id}")'
 
     # Try MQTT bridge first for real hardware
     mqtt_bridge = getattr(request.app.state, "mqtt_bridge", None)
