@@ -74,6 +74,9 @@ class _MockEngine:
         self._targets.append(t)
         return t
 
+    def spawn_hostile_typed(self, asset_type: str = "person", **kwargs):
+        return self.spawn_hostile(**kwargs)
+
 
 def _make_game_mode(infinite: bool = False):
     """Create a GameMode with optional infinite mode enabled."""

@@ -597,3 +597,107 @@ class TestVisibilityState:
         targets = [turret, enemy]
         state = vs.tick(0.1, _targets_dict(targets), _build_grid(targets))
         assert "h1" not in state.friendly_visible
+
+
+# ===========================================================================
+# TestRadioDetection
+# ===========================================================================
+
+
+class TestRadioDetection:
+    """Radio detection: BLE/WiFi/cell signals through walls at 100m range."""
+
+    def test_radio_detected_within_range(self):
+        """Target with bluetooth_mac within 100m is radio-detected."""
+        from engine.simulation.target import UnitIdentity
+        turret = _make_target("t1", "friendly", "turret", (0, 0))
+        enemy = _make_target("h1", "hostile", "person", (0, 80))
+        # Ensure enemy has a bluetooth MAC
+        enemy.identity = UnitIdentity(bluetooth_mac="AA:BB:CC:DD:EE:FF")
+        vs = VisionSystem()
+        targets = [turret, enemy]
+        state = vs.tick(0.1, _targets_dict(targets), _build_grid(targets))
+        assert "h1" in state.radio_detected
+
+    def test_radio_not_detected_beyond_range(self):
+        """Target at 110m is beyond 100m radio range."""
+        from engine.simulation.target import UnitIdentity
+        turret = _make_target("t1", "friendly", "turret", (0, 0))
+        enemy = _make_target("h1", "hostile", "person", (0, 110))
+        enemy.identity = UnitIdentity(bluetooth_mac="AA:BB:CC:DD:EE:FF")
+        vs = VisionSystem()
+        targets = [turret, enemy]
+        state = vs.tick(0.1, _targets_dict(targets), _build_grid(targets))
+        assert "h1" not in state.radio_detected
+
+    def test_radio_requires_identity(self):
+        """Target without identity is not radio-detected."""
+        turret = _make_target("t1", "friendly", "turret", (0, 0))
+        enemy = _make_target("h1", "hostile", "person", (0, 50))
+        enemy.identity = None
+        vs = VisionSystem()
+        targets = [turret, enemy]
+        state = vs.tick(0.1, _targets_dict(targets), _build_grid(targets))
+        assert "h1" not in state.radio_detected
+
+    def test_radio_requires_mac_or_cell_id(self):
+        """Identity with no bluetooth/wifi/cell is not radio-detected."""
+        from engine.simulation.target import UnitIdentity
+        turret = _make_target("t1", "friendly", "turret", (0, 0))
+        enemy = _make_target("h1", "hostile", "person", (0, 50))
+        enemy.identity = UnitIdentity()  # empty identity, no MACs
+        vs = VisionSystem()
+        targets = [turret, enemy]
+        state = vs.tick(0.1, _targets_dict(targets), _build_grid(targets))
+        assert "h1" not in state.radio_detected
+
+    def test_radio_signal_strength_close(self):
+        """Signal strength near 1.0 at very close range."""
+        from engine.simulation.target import UnitIdentity
+        turret = _make_target("t1", "friendly", "turret", (0, 0))
+        enemy = _make_target("h1", "hostile", "person", (0, 5))
+        enemy.identity = UnitIdentity(wifi_mac="11:22:33:44:55:66")
+        vs = VisionSystem()
+        targets = [turret, enemy]
+        state = vs.tick(0.1, _targets_dict(targets), _build_grid(targets))
+        assert state.radio_signal_strength["h1"] > 0.95
+
+    def test_radio_signal_strength_far(self):
+        """Signal strength weak at edge of range."""
+        from engine.simulation.target import UnitIdentity
+        turret = _make_target("t1", "friendly", "turret", (0, 0))
+        enemy = _make_target("h1", "hostile", "person", (0, 90))
+        enemy.identity = UnitIdentity(cell_id="310260123456789")
+        vs = VisionSystem()
+        targets = [turret, enemy]
+        state = vs.tick(0.1, _targets_dict(targets), _build_grid(targets))
+        assert state.radio_signal_strength["h1"] < 0.3
+
+    def test_radio_ignores_los(self):
+        """Radio detection works through buildings (no LOS check)."""
+        from engine.simulation.target import UnitIdentity
+        terrain = TerrainMap(200.0)
+        # Place building between turret and enemy
+        terrain.set_cell(0, 5, "building")
+        vs = VisionSystem(terrain_map=terrain)
+        turret = _make_target("t1", "friendly", "turret", (0, 0))
+        enemy = _make_target("h1", "hostile", "person", (0, 30))
+        enemy.identity = UnitIdentity(bluetooth_mac="AA:BB:CC:DD:EE:FF")
+        targets = [turret, enemy]
+        state = vs.tick(0.1, _targets_dict(targets), _build_grid(targets))
+        # Building blocks visual detection but NOT radio
+        assert "h1" not in state.friendly_visible  # visually blocked
+        assert "h1" in state.radio_detected  # radio sees through walls
+
+    def test_radio_keeps_strongest_signal(self):
+        """When multiple friendlies detect same target, keep strongest signal."""
+        from engine.simulation.target import UnitIdentity
+        t1 = _make_target("t1", "friendly", "turret", (0, 0))
+        t2 = _make_target("t2", "friendly", "turret", (0, 50))
+        enemy = _make_target("h1", "hostile", "person", (0, 60))
+        enemy.identity = UnitIdentity(bluetooth_mac="AA:BB:CC:DD:EE:FF")
+        vs = VisionSystem()
+        targets = [t1, t2, enemy]
+        state = vs.tick(0.1, _targets_dict(targets), _build_grid(targets))
+        # t2 is 10m from enemy, t1 is 60m — t2's signal should be stronger
+        assert state.radio_signal_strength["h1"] > 0.9  # 10m away → very strong

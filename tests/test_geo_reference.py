@@ -1,12 +1,12 @@
 # Created by Matthew Valancy
 # Copyright 2026 Valpatel Software LLC
 # Licensed under AGPL-3.0 — see LICENSE for details.
-"""Tests for amy.tactical.geo — server-side geo-reference and coordinate transforms."""
+"""Tests for engine.tactical.geo — server-side geo-reference and coordinate transforms."""
 
 import math
 import pytest
 
-from amy.tactical.geo import (
+from engine.tactical.geo import (
     GeoReference,
     METERS_PER_DEG_LAT,
     init_reference,
@@ -26,7 +26,7 @@ TEST_LNG = -122.4194
 @pytest.fixture(autouse=True)
 def reset_reference():
     """Reset the geo reference before each test."""
-    import amy.tactical.geo as geo_mod
+    import engine.tactical.geo as geo_mod
     geo_mod._ref = GeoReference()
     yield
     geo_mod._ref = GeoReference()
@@ -171,7 +171,7 @@ class TestSimTargetGeoIntegration:
     def test_to_dict_includes_latlng(self):
         init_reference(TEST_LAT, TEST_LNG)
 
-        from amy.simulation.target import SimulationTarget
+        from engine.simulation.target import SimulationTarget
         target = SimulationTarget(
             target_id="test-1",
             name="Test Rover",
@@ -193,7 +193,7 @@ class TestSimTargetGeoIntegration:
     def test_to_dict_at_origin(self):
         init_reference(TEST_LAT, TEST_LNG)
 
-        from amy.simulation.target import SimulationTarget
+        from engine.simulation.target import SimulationTarget
         target = SimulationTarget(
             target_id="test-2",
             name="Origin",
@@ -213,7 +213,7 @@ class TestTrackedTargetGeoIntegration:
     def test_to_dict_includes_latlng(self):
         init_reference(TEST_LAT, TEST_LNG)
 
-        from amy.tactical.target_tracker import TrackedTarget
+        from engine.tactical.target_tracker import TrackedTarget
         target = TrackedTarget(
             target_id="track-1",
             name="Tracked Rover",

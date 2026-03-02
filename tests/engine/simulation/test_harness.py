@@ -231,12 +231,10 @@ class GameTestHarness(SimulationTestHarness):
         })
         for i in range(config.count):
             hostile = self._engine_stub.spawn_hostile()
+            # Apply wave multipliers (profile already applied by spawn_hostile)
             hostile.speed *= config.speed_mult
-            hostile.health = 80.0 * config.health_mult
-            hostile.max_health = 80.0 * config.health_mult
-            hostile.apply_combat_profile()
-            hostile.health = 80.0 * config.health_mult
-            hostile.max_health = 80.0 * config.health_mult
+            hostile.health *= config.health_mult
+            hostile.max_health *= config.health_mult
             self._game_mode._wave_hostile_ids.add(hostile.target_id)
 
     def begin_war(self) -> None:

@@ -965,8 +965,8 @@ class TestToDict:
         expected_keys = {
             "target_id", "name", "alliance", "asset_type", "position",
             "lat", "lng", "alt", "heading", "speed", "battery",
-            "status", "waypoints", "health", "max_health", "kills",
-            "is_combatant", "fsm_state", "squad_id", "morale",
+            "status", "waypoints", "loop_waypoints", "health", "max_health",
+            "kills", "is_combatant", "fsm_state", "squad_id", "morale",
             "degradation", "detected",
         }
         assert expected_keys.issubset(set(d.keys()))
@@ -989,6 +989,21 @@ class TestToDict:
         t = _friendly_rover()
         d = t.to_dict()
         assert d["waypoints"] == []
+
+    def test_loop_waypoints_false_by_default(self):
+        t = _friendly_rover()
+        d = t.to_dict()
+        assert d["loop_waypoints"] is False
+
+    def test_loop_waypoints_true_when_set(self):
+        t = SimulationTarget(
+            target_id="r1", name="Rover", alliance="friendly",
+            asset_type="rover", position=(0.0, 0.0), speed=1.0,
+            waypoints=[(5.0, 3.0), (10.0, 8.0)],
+            loop_waypoints=True,
+        )
+        d = t.to_dict()
+        assert d["loop_waypoints"] is True
 
     def test_battery_rounded_to_4_places(self):
         t = _friendly_rover()

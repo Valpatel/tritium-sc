@@ -229,3 +229,146 @@ class TestGetFriendlies:
         resp = client.get("/api/targets/friendlies")
         assert resp.status_code == 200
         assert len(resp.json()["targets"]) == 2
+
+
+# ---------------------------------------------------------------------------
+# Source filtering consistency (headless vs tracker)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestSourceFilterConsistency:
+    """GET /api/targets?source= — source filter works in both code paths."""
+
+    def test_headless_source_sim_matches(self):
+        """?source=sim should match SimulationTarget.source='sim' in headless."""
+        t1 = _mock_target("sim-1", "friendly")
+        t1.source = "sim"
+        t1.to_dict.return_value["source"] = "sim"
+        engine = _mock_engine(targets=[t1])
+        client = TestClient(_make_app(engine=engine))
+
+        resp = client.get("/api/targets?source=sim")
+        assert resp.status_code == 200
+        assert len(resp.json()["targets"]) == 1
+
+    def test_headless_source_real_no_match(self):
+        """?source=real should not match sim targets in headless mode."""
+        t1 = _mock_target("sim-1", "friendly")
+        t1.source = "sim"
+        t1.to_dict.return_value["source"] = "sim"
+        engine = _mock_engine(targets=[t1])
+        client = TestClient(_make_app(engine=engine))
+
+        resp = client.get("/api/targets?source=real")
+        assert resp.status_code == 200
+        assert len(resp.json()["targets"]) == 0
+
+    def test_headless_source_graphling_matches(self):
+        """?source=graphling should match graphling targets."""
+        t1 = _mock_target("g-1", "friendly")
+        t1.source = "graphling"
+        t1.to_dict.return_value["source"] = "graphling"
+        engine = _mock_engine(targets=[t1])
+        client = TestClient(_make_app(engine=engine))
+
+        resp = client.get("/api/targets?source=graphling")
+        assert resp.status_code == 200
+        assert len(resp.json()["targets"]) == 1
+
+    def test_tracker_source_real_maps_to_yolo(self):
+        """?source=real should filter TrackedTarget.source='yolo' in tracker."""
+        yolo_t = _mock_target("det-1", "hostile")
+        yolo_t.to_dict.return_value["source"] = "yolo"
+        sim_t = _mock_target("sim-1", "friendly")
+        sim_t.to_dict.return_value["source"] = "simulation"
+        tracker = _mock_tracker(all_targets=[yolo_t, sim_t])
+        amy = _amy_with_tracker(tracker)
+        client = TestClient(_make_app(amy=amy))
+
+        resp = client.get("/api/targets?source=real")
+        assert resp.status_code == 200
+        targets = resp.json()["targets"]
+        assert len(targets) == 1
+        assert targets[0]["source"] == "yolo"
+
+    def test_no_source_returns_all(self):
+        """No ?source parameter should return all targets."""
+        t1 = _mock_target("sim-1", "friendly")
+        t1.source = "sim"
+        t2 = _mock_target("g-1", "hostile")
+        t2.source = "graphling"
+        engine = _mock_engine(targets=[t1, t2])
+        client = TestClient(_make_app(engine=engine))
+
+        resp = client.get("/api/targets")
+        assert resp.status_code == 200
+        assert len(resp.json()["targets"]) == 2
+
+
+# ---------------------------------------------------------------------------
+# POST /api/sighting — sighting works with and without Amy
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestReportSighting:
+    """POST /api/sighting — sighting report acceptance."""
+
+    def test_sighting_headless(self):
+        """Sighting works when only headless engine is available."""
+        engine = _mock_engine()
+        engine.vision_system = MagicMock()
+        client = TestClient(_make_app(engine=engine))
+
+        resp = client.post("/api/sighting", json={
+            "observer_id": "cam-1",
+            "target_id": "intruder-1",
+            "observer_type": "camera",
+            "confidence": 0.9,
+            "position": [10.0, 20.0],
+        })
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "accepted"
+        engine.vision_system.add_sighting.assert_called_once()
+
+    def test_sighting_with_amy(self):
+        """Sighting works when Amy provides the simulation engine."""
+        amy = MagicMock()
+        amy_engine = _mock_engine()
+        amy_engine.vision_system = MagicMock()
+        amy.simulation_engine = amy_engine
+        client = TestClient(_make_app(amy=amy))
+
+        resp = client.post("/api/sighting", json={
+            "observer_id": "robot-1",
+            "target_id": "suspect-1",
+            "observer_type": "robot",
+            "confidence": 0.75,
+            "position": [30.0, -15.0],
+        })
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "accepted"
+        amy_engine.vision_system.add_sighting.assert_called_once()
+
+    def test_sighting_no_engine(self):
+        """Sighting returns error when no engine is available."""
+        client = TestClient(_make_app())
+        resp = client.post("/api/sighting", json={
+            "observer_id": "cam-1",
+            "target_id": "t-1",
+            "position": [0, 0],
+        })
+        assert resp.status_code == 200
+        assert "error" in resp.json()
+
+    def test_sighting_minimal_payload(self):
+        """Sighting with minimal required fields."""
+        engine = _mock_engine()
+        engine.vision_system = MagicMock()
+        client = TestClient(_make_app(engine=engine))
+
+        resp = client.post("/api/sighting", json={
+            "observer_id": "cam-1",
+            "position": [5.0, 5.0],
+        })
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "accepted"

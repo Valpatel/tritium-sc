@@ -228,9 +228,9 @@ class TestPredefinedAbilities:
     def test_emp_burst_exists(self):
         a = ABILITIES["emp_burst"]
         assert a.cooldown == 40.0
-        assert a.duration == 4.0
+        assert a.duration == 5.0
         assert a.effect == "emp"
-        assert a.magnitude == 0.5
+        assert a.magnitude == 0.0
 
     def test_overclock_exists(self):
         a = ABILITIES["overclock"]
@@ -582,27 +582,27 @@ class TestShield:
 
 
 class TestEMPBurst:
-    """EMP Burst: slow enemies in 15m radius by 50% for 4s."""
+    """EMP Burst: stun hostile flying units in 150m radius for 5s."""
 
     def test_emp_creates_effect_on_enemies(self):
         sys = UpgradeSystem()
         sys.grant_ability("d1", "emp_burst")
         drone = _make_target(target_id="d1", asset_type="drone", position=(0.0, 0.0))
-        # Hostile within 15m
+        # Hostile flying drone within 150m radius
         hostile = _make_target(
             target_id="h1", name="Hostile", alliance="hostile",
-            asset_type="person", position=(10.0, 0.0), speed=3.0,
+            asset_type="swarm_drone", position=(10.0, 0.0), speed=3.0,
         )
         targets = _make_targets_dict(drone, hostile)
         sys.use_ability("d1", "emp_burst", targets)
         effects = sys.get_active_effects("h1")
-        assert any(e.effect == "emp" for e in effects)
+        assert any(e.effect == "emp_stun" for e in effects)
 
-    def test_emp_does_not_affect_distant_enemies(self):
+    def test_emp_does_not_affect_ground_enemies(self):
         sys = UpgradeSystem()
         sys.grant_ability("d1", "emp_burst")
         drone = _make_target(target_id="d1", asset_type="drone", position=(0.0, 0.0))
-        # Hostile at 20m -- outside 15m radius
+        # Ground hostile person -- EMP only affects flying units
         hostile = _make_target(
             target_id="h1", name="Hostile", alliance="hostile",
             asset_type="person", position=(20.0, 0.0), speed=3.0,
@@ -967,20 +967,20 @@ class TestEdgeCases:
         assert len(effects) == 1
         assert effects[0].effect == "overclock"
 
-    def test_emp_radius_15m(self):
-        """EMP affects enemies within exactly 15m."""
+    def test_emp_radius_150m(self):
+        """EMP stuns hostile flying enemies within exactly 150m."""
         sys = UpgradeSystem()
         sys.grant_ability("d1", "emp_burst")
         drone = _make_target(target_id="d1", asset_type="drone", position=(0.0, 0.0))
-        # Right at 15m boundary
+        # Hostile flying drone right at 150m boundary
         hostile = _make_target(
             target_id="h1", name="Hostile", alliance="hostile",
-            asset_type="person", position=(15.0, 0.0), speed=3.0,
+            asset_type="swarm_drone", position=(150.0, 0.0), speed=3.0,
         )
         targets = _make_targets_dict(drone, hostile)
         sys.use_ability("d1", "emp_burst", targets)
         effects = sys.get_active_effects("h1")
-        assert any(e.effect == "emp" for e in effects)
+        assert any(e.effect == "emp_stun" for e in effects)
 
     def test_repair_at_full_health(self):
         """Emergency repair at full health does nothing harmful."""

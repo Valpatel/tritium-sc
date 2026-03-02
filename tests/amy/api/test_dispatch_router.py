@@ -161,3 +161,31 @@ class TestDispatchEndpoint:
         body = resp.json()
         assert body["target"]["x"] == -15.5
         assert body["target"]["y"] == 30.2
+
+    def test_dispatch_stationary_unit_returns_422(self):
+        """Dispatch a stationary unit (speed=0) returns 422."""
+        turret = _make_sim_target("turret-1", "friendly", "turret", 0, 0)
+        turret.speed = 0
+        engine = _mock_engine(targets=[turret], running=True)
+        client = TestClient(_make_app(engine=engine))
+
+        resp = client.post("/api/amy/simulation/dispatch", json={
+            "unit_id": "turret-1",
+            "target": {"x": 10.0, "y": 20.0},
+        })
+        assert resp.status_code == 422
+        assert "stationary" in resp.json()["error"].lower()
+
+    def test_dispatch_mobile_unit_with_speed_succeeds(self):
+        """Dispatch a mobile unit (speed>0) succeeds."""
+        rover = _make_sim_target("rover-2", "friendly", "rover", 0, 0)
+        rover.speed = 3.0
+        engine = _mock_engine(targets=[rover], running=True)
+        client = TestClient(_make_app(engine=engine))
+
+        resp = client.post("/api/amy/simulation/dispatch", json={
+            "unit_id": "rover-2",
+            "target": {"x": 50.0, "y": 60.0},
+        })
+        assert resp.status_code == 200
+        engine.dispatch_unit.assert_called_once()

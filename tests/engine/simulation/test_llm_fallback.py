@@ -33,7 +33,8 @@ class TestFallbackThoughtGenerator:
         from engine.simulation.llm_fallback import FallbackThoughtGenerator
         gen = FallbackThoughtGenerator()
         result = gen.generate({})
-        assert "think(" in result
+        # generate({}) can return think("...") or wait(...) when idle
+        assert "think(" in result or "wait(" in result
 
     def test_generate_with_hostiles(self):
         """When hostiles are present, thoughts should be combat-aware."""

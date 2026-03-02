@@ -162,7 +162,12 @@ class TestEscalationFromDetection:
         assert records["h1"].threat_level in ("unknown", "suspicious", "hostile")
 
     def test_escalation_events_published(self):
-        """ThreatClassifier publishes escalation_change events."""
+        """ThreatClassifier publishes threat_escalation events.
+
+        The engine publishes 'threat_escalation' / 'threat_deescalation';
+        the WS bridge normalises these to 'escalation_change' before
+        forwarding to the frontend.
+        """
         bus = EventBus()
         sub = bus.subscribe()
 
@@ -198,7 +203,7 @@ class TestEscalationFromDetection:
         while not sub.empty():
             events.append(sub.get_nowait())
 
-        escalation_events = [e for e in events if e.get("type") in ("escalation_change", "zone_violation")]
+        escalation_events = [e for e in events if e.get("type") in ("threat_escalation", "zone_violation")]
         assert len(escalation_events) > 0
 
         bus.unsubscribe(sub)

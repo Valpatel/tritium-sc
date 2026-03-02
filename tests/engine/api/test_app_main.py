@@ -92,6 +92,10 @@ class TestRouterRegistration:
         "/api/telemetry",
         "/api/mesh",
         "/api/geo/layers",
+        "/api/npc",
+        "/api/plugins",
+        "/api/devices",
+        "/api/tak",
     ]
 
     def test_router_count(self, app):
@@ -137,6 +141,18 @@ class TestRouterRegistration:
     def test_telemetry_router_included(self, app):
         paths = [r.path for r in app.routes if hasattr(r, "path")]
         assert any("/api/telemetry" in p for p in paths)
+
+    def test_tak_router_included(self, app):
+        paths = [r.path for r in app.routes if hasattr(r, "path")]
+        assert any("/api/tak" in p for p in paths)
+
+    def test_npc_router_included(self, app):
+        paths = [r.path for r in app.routes if hasattr(r, "path")]
+        assert any("/api/npc" in p for p in paths)
+
+    def test_devices_router_included(self, app):
+        paths = [r.path for r in app.routes if hasattr(r, "path")]
+        assert any("/api/devices" in p for p in paths)
 
 
 # ---------------------------------------------------------------------------

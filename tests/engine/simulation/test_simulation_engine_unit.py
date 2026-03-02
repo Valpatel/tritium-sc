@@ -307,9 +307,9 @@ class TestSpawnHostile:
 
     def test_spawn_hostile_has_legacy_waypoints(self):
         engine, bus = _make_engine()
-        # Without street graph, should get 2 waypoints: objective + escape_edge
+        # With grid pathfinder, hostiles get grid-routed paths (more waypoints)
         h = engine.spawn_hostile()
-        assert len(h.waypoints) == 2
+        assert len(h.waypoints) >= 2  # Grid A* produces multi-waypoint paths
 
     def test_spawn_hostile_combat_profile_applied(self):
         engine, bus = _make_engine()
@@ -465,9 +465,11 @@ class TestDispatchUnit:
         )
         engine.add_target(t)
         engine.dispatch_unit("r1", (20.0, 20.0))
-        # Without street graph, rover moves directly
-        assert len(t.waypoints) == 1
-        assert t.waypoints[0] == (20.0, 20.0)
+        # Grid A* routes the rover (may have intermediate waypoints)
+        assert len(t.waypoints) >= 1
+        # Last waypoint should be near the destination
+        import math
+        assert math.hypot(t.waypoints[-1][0] - 20.0, t.waypoints[-1][1] - 20.0) < 10.0
         assert t._waypoint_index == 0
         assert t.status == "active"
 
@@ -692,46 +694,47 @@ class TestGameModeInterface:
         hostiles = [t for t in engine.get_targets() if t.alliance == "hostile"]
         assert len(hostiles) == 0
 
-    def test_reset_game_heals_friendlies(self):
+    def test_reset_game_clears_all_friendlies(self):
+        """reset_game() clears ALL targets to prevent accumulation across scenarios."""
         engine, bus = _make_engine()
         t = _make_target(target_id="r1", alliance="friendly")
         t.health = 20.0
         t.max_health = 150.0
         engine.add_target(t)
         engine.reset_game()
-        assert t.health == t.max_health
+        assert engine.get_target("r1") is None
 
-    def test_reset_game_revives_eliminated_friendlies(self):
+    def test_reset_game_clears_eliminated_friendlies(self):
+        """reset_game() clears eliminated friendlies — next scenario places fresh ones."""
         engine, bus = _make_engine()
         t = _make_target(target_id="r1", alliance="friendly")
         t.status = "eliminated"
         t.health = 0.0
-        t.max_health = 150.0
         engine.add_target(t)
         engine.reset_game()
-        assert t.status == "active"
-        assert t.health == t.max_health
+        assert engine.get_target("r1") is None
 
-    def test_reset_game_removes_game_units(self):
+    def test_reset_game_removes_all_unit_types(self):
+        """reset_game() removes ALL unit types regardless of ID prefix."""
         engine, bus = _make_engine()
-        # Game units (turret-*, drone-*, rover-*) are removed on reset
         t1 = _make_target(target_id="turret-1", alliance="friendly", asset_type="turret", speed=0.0)
         t2 = _make_target(target_id="drone-1", alliance="friendly", asset_type="drone", speed=5.0)
         t3 = _make_target(target_id="rover-1", alliance="friendly", asset_type="rover")
-        for t in [t1, t2, t3]:
+        t4 = _make_target(target_id="heavy_turret-1", alliance="friendly", asset_type="heavy_turret", speed=0.0)
+        for t in [t1, t2, t3, t4]:
             engine.add_target(t)
         engine.reset_game()
-        assert engine.get_target("turret-1") is None
-        assert engine.get_target("drone-1") is None
-        assert engine.get_target("rover-1") is None
+        for tid in ["turret-1", "drone-1", "rover-1", "heavy_turret-1"]:
+            assert engine.get_target(tid) is None
 
-    def test_reset_game_keeps_non_game_friendlies(self):
+    def test_reset_game_clears_non_standard_ids(self):
+        """reset_game() clears targets with non-standard IDs (UUIDs, etc.)."""
         engine, bus = _make_engine()
-        # Non-game friendly (not turret-/drone-/rover- prefix) should survive
         t = _make_target(target_id="real-rover-1", alliance="friendly")
         engine.add_target(t)
         engine.reset_game()
-        assert engine.get_target("real-rover-1") is t
+        assert engine.get_target("real-rover-1") is None
+        assert len(engine.get_targets()) == 0
 
     def test_reset_game_clears_fsms(self):
         engine, bus = _make_engine()
@@ -1259,17 +1262,17 @@ class TestEdgeCases:
         assert h2.status == "neutralized"
 
     def test_generate_hostile_waypoints_legacy(self):
-        """Legacy waypoint generation (no street graph)."""
+        """Hostile waypoint generation uses grid A* (more waypoints than legacy)."""
         engine, bus = _make_engine(map_bounds=100.0)
         wps = engine._generate_hostile_waypoints((100.0, 0.0))
-        assert len(wps) == 2  # objective + escape_edge
-        # Last waypoint should be on map edge
+        assert len(wps) >= 2  # Grid A* produces multi-waypoint paths
+        # Last waypoint should be near map edge (escape point)
         ex, ey = wps[-1]
-        on_edge = (
-            abs(abs(ex) - 100.0) < 0.01
-            or abs(abs(ey) - 100.0) < 0.01
+        near_edge = (
+            abs(ex) >= 90.0
+            or abs(ey) >= 90.0
         )
-        assert on_edge, f"Escape point ({ex}, {ey}) not on edge"
+        assert near_edge, f"Escape point ({ex}, {ey}) not near edge"
 
     def test_ambient_spawner_property(self):
         engine, bus = _make_engine()

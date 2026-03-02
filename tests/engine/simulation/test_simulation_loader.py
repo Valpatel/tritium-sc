@@ -365,3 +365,66 @@ class TestSampleLayout:
         zone_types = {z["type"] for z in zones}
         assert "activity_zone" in zone_types
         assert "restricted_area" in zone_types
+
+
+class TestLoaderMapBounds:
+    """Tests for loader reading map_bounds from level metadata."""
+
+    def test_load_layout_reads_map_bounds(self, tmp_path):
+        """Loader expands engine bounds from level meta.map_bounds."""
+        layout = {
+            "format": "TritiumLevelFormat",
+            "version": 1,
+            "meta": {"map_bounds": [-400, 400]},
+            "objects": [
+                {
+                    "type": "sentry_turret",
+                    "name": "T1",
+                    "position": {"x": 300.0, "y": 0.0, "z": 200.0},
+                    "properties": {"name": "T1"},
+                }
+            ],
+        }
+        path = tmp_path / "test_layout.json"
+        path.write_text(json.dumps(layout))
+
+        bus = SimpleEventBus()
+        engine = SimulationEngine(bus, map_bounds=200.0)
+        assert engine._map_bounds == 200.0
+
+        count = load_layout(str(path), engine)
+        assert count == 1
+        # map_bounds should be expanded to 400
+        assert engine._map_bounds == 400.0
+
+    def test_load_layout_does_not_shrink_bounds(self, tmp_path):
+        """Loader does not shrink engine bounds from level meta."""
+        layout = {
+            "format": "TritiumLevelFormat",
+            "version": 1,
+            "meta": {"map_bounds": [-100, 100]},
+            "objects": [],
+        }
+        path = tmp_path / "test_layout.json"
+        path.write_text(json.dumps(layout))
+
+        bus = SimpleEventBus()
+        engine = SimulationEngine(bus, map_bounds=500.0)
+        load_layout(str(path), engine)
+        assert engine._map_bounds == 500.0  # not shrunk
+
+    def test_load_layout_no_bounds_metadata(self, tmp_path):
+        """Loader keeps existing bounds when level has no map_bounds."""
+        layout = {
+            "format": "TritiumLevelFormat",
+            "version": 1,
+            "meta": {},
+            "objects": [],
+        }
+        path = tmp_path / "test_layout.json"
+        path.write_text(json.dumps(layout))
+
+        bus = SimpleEventBus()
+        engine = SimulationEngine(bus, map_bounds=200.0)
+        load_layout(str(path), engine)
+        assert engine._map_bounds == 200.0

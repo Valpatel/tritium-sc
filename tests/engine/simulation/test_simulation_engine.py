@@ -159,8 +159,8 @@ class TestHostileMultiWaypoints:
         bus = SimpleEventBus()
         engine = SimulationEngine(bus)
         h = engine.spawn_hostile()
-        # Should have 2 waypoints: objective + escape_edge
-        assert len(h.waypoints) == 2
+        # Grid A* produces multi-waypoint routed paths
+        assert len(h.waypoints) >= 2
 
 
 class TestBatteryDeadCleanup:
@@ -180,3 +180,168 @@ class TestBatteryDeadCleanup:
         # After 60s at battery=0, should become destroyed
         # This is done in the tick loop — just verify the attribute exists
         assert "r1" in engine._destroyed_at
+
+
+class TestSetMapBounds:
+    """Tests for dynamic map bounds adjustment."""
+
+    def test_set_map_bounds_updates_derived(self):
+        """set_map_bounds updates _map_min, _map_max, _map_bounds."""
+        bus = SimpleEventBus()
+        engine = SimulationEngine(bus, map_bounds=200.0)
+        assert engine._map_bounds == 200.0
+        assert engine._map_min == -200.0
+        assert engine._map_max == 200.0
+
+        engine.set_map_bounds(500.0)
+        assert engine._map_bounds == 500.0
+        assert engine._map_min == -500.0
+        assert engine._map_max == 500.0
+
+    def test_default_bounds_preserved(self):
+        """Engine remembers initial bounds for reset."""
+        bus = SimpleEventBus()
+        engine = SimulationEngine(bus, map_bounds=200.0)
+        assert engine._default_map_bounds == 200.0
+
+    def test_reset_restores_default_bounds(self):
+        """reset_game restores original map bounds."""
+        bus = SimpleEventBus()
+        engine = SimulationEngine(bus, map_bounds=200.0)
+        engine.set_map_bounds(500.0)
+        assert engine._map_bounds == 500.0
+        engine.reset_game()
+        assert engine._map_bounds == 200.0
+
+    def test_load_scenario_expands_bounds(self):
+        """GameMode.load_scenario expands engine bounds from scenario."""
+        from engine.simulation.scenario import BattleScenario, WaveDefinition, SpawnGroup
+        bus = SimpleEventBus()
+        engine = SimulationEngine(bus, map_bounds=200.0)
+        scenario = BattleScenario(
+            scenario_id="test",
+            name="Test",
+            description="Test",
+            map_bounds=400.0,
+            waves=[WaveDefinition(
+                name="Wave 1",
+                groups=[SpawnGroup(asset_type="person", count=3)],
+            )],
+        )
+        engine.game_mode.load_scenario(scenario)
+        assert engine._map_bounds == 400.0
+
+    def test_load_scenario_does_not_shrink_bounds(self):
+        """Scenario with smaller bounds does not shrink engine area."""
+        from engine.simulation.scenario import BattleScenario, WaveDefinition, SpawnGroup
+        bus = SimpleEventBus()
+        engine = SimulationEngine(bus, map_bounds=500.0)
+        scenario = BattleScenario(
+            scenario_id="test",
+            name="Test",
+            description="Test",
+            map_bounds=200.0,
+            waves=[WaveDefinition(
+                name="Wave 1",
+                groups=[SpawnGroup(asset_type="person", count=3)],
+            )],
+        )
+        engine.game_mode.load_scenario(scenario)
+        assert engine._map_bounds == 500.0  # not shrunk
+
+    def test_hostile_not_escaped_within_expanded_bounds(self):
+        """Hostiles within expanded bounds are not marked escaped."""
+        bus = SimpleEventBus()
+        engine = SimulationEngine(bus, map_bounds=200.0)
+        engine.set_map_bounds(500.0)
+        hostile = SimulationTarget(
+            target_id="h1", name="Hostile",
+            alliance="hostile", asset_type="person",
+            position=(350.0, 100.0), status="active",
+        )
+        engine.add_target(hostile)
+        # Position is within 500m bounds but outside old 200m
+        assert hostile.status == "active"
+        x, y = hostile.position
+        assert abs(x) <= engine._map_bounds
+        assert abs(y) <= engine._map_bounds
+
+
+class TestGameStateLocking:
+    """Verify begin_war and reset_game hold _lock to prevent tick-thread races."""
+
+    def test_begin_war_holds_lock(self):
+        """begin_war() must hold self._lock to prevent partial state reads."""
+        import inspect
+        src = inspect.getsource(SimulationEngine.begin_war)
+        assert "with self._lock:" in src, "begin_war must hold _lock"
+
+    def test_reset_game_holds_lock(self):
+        """reset_game() must hold self._lock for the entire method."""
+        import inspect
+        src = inspect.getsource(SimulationEngine.reset_game)
+        assert "with self._lock:" in src, "reset_game must hold _lock"
+        # The lock should wrap targets.clear() — one lock acquisition
+        lines = src.splitlines()
+        lock_count = sum(1 for l in lines if "with self._lock:" in l)
+        assert lock_count == 1, (
+            f"reset_game should have exactly 1 lock acquisition (got {lock_count})"
+        )
+
+    def test_lock_is_reentrant(self):
+        """Engine _lock must be RLock for re-entrant subsystem calls.
+
+        GameMode.reset() -> _publish_state_change() -> get_state() ->
+        _count_wave_hostiles_alive() -> engine.get_targets() -> acquires _lock.
+        This chain requires a reentrant lock.
+        """
+        bus = SimpleEventBus()
+        engine = SimulationEngine(bus)
+        # threading.RLock is a factory function, not a class, so isinstance()
+        # fails.  Check the type name and re-entrant acquire behavior instead.
+        lock_type = type(engine._lock).__name__
+        assert "RLock" in lock_type, (
+            f"_lock must be threading.RLock (got {lock_type}) to avoid deadlock "
+            "when reset_game/begin_war call back into get_targets"
+        )
+        # Prove re-entrancy: acquire twice without deadlock
+        engine._lock.acquire()
+        engine._lock.acquire()  # would deadlock on plain Lock
+        engine._lock.release()
+        engine._lock.release()
+
+    def test_begin_war_lock_wraps_game_mode_begin(self):
+        """The lock in begin_war must cover game_mode.begin_war()."""
+        import inspect
+        src = inspect.getsource(SimulationEngine.begin_war)
+        lines = src.splitlines()
+        lock_line = None
+        begin_line = None
+        for i, line in enumerate(lines):
+            if "with self._lock:" in line and lock_line is None:
+                lock_line = i
+            if "self.game_mode.begin_war()" in line:
+                begin_line = i
+        assert lock_line is not None, "begin_war must have with self._lock"
+        assert begin_line is not None, "begin_war must call game_mode.begin_war()"
+        assert begin_line > lock_line, (
+            "game_mode.begin_war() must be inside the lock block"
+        )
+
+    def test_reset_game_lock_wraps_targets_clear(self):
+        """The lock in reset_game must cover _targets.clear()."""
+        import inspect
+        src = inspect.getsource(SimulationEngine.reset_game)
+        lines = src.splitlines()
+        lock_line = None
+        clear_line = None
+        for i, line in enumerate(lines):
+            if "with self._lock:" in line and lock_line is None:
+                lock_line = i
+            if "self._targets.clear()" in line:
+                clear_line = i
+        assert lock_line is not None
+        assert clear_line is not None
+        assert clear_line > lock_line, (
+            "_targets.clear() must be inside the lock block"
+        )

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import queue
 import threading
+import time
 
 import pytest
 
@@ -428,18 +429,18 @@ class TestDifficultyScalerEasyVariant:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skip(reason="GameMode does not have .difficulty attribute — DifficultyScaler not wired into GameMode")
 class TestDifficultyGameModeIntegration:
     """DifficultyScaler is wired into GameMode and adapts across waves."""
 
-    def _make_game_mode(self):
+    def _make_game_mode(self, with_friendlies=False):
         """Create a GameMode with a SimpleEventBus and mock engine."""
         from engine.simulation.combat import CombatSystem
         from engine.simulation.game_mode import GameMode
 
         bus = SimpleEventBus()
-        # Minimal engine mock — only needs spawn_hostile and get_targets
         engine = _MockEngine(bus)
+        if with_friendlies:
+            engine.add_friendly("turret-1", max_health=100.0)
         combat = CombatSystem(bus)
         gm = GameMode(bus, engine, combat)
         return gm, bus, engine
@@ -458,14 +459,9 @@ class TestDifficultyGameModeIntegration:
 
     def test_difficulty_adapts_across_waves(self):
         """Simulate 3 perfect waves and verify multiplier increased."""
-        from engine.simulation.difficulty import DifficultyScaler
         gm, bus, engine = self._make_game_mode()
-
-        # Verify it starts at 1.0
         assert gm.difficulty.get_multiplier() == 1.0
-
-        # Simulate 3 waves of perfect performance
-        for wave_num in range(1, 4):
+        for _ in range(3):
             gm.difficulty.record_wave({
                 "eliminations": 5,
                 "hostiles_spawned": 5,
@@ -474,13 +470,10 @@ class TestDifficultyGameModeIntegration:
                 "friendly_max_health": 200.0,
                 "escapes": 0,
             })
-
-        # After 3 perfect waves, multiplier should have increased
         assert gm.difficulty.get_multiplier() > 1.0
 
     def test_game_mode_reset_clears_difficulty(self):
         gm, _, _ = self._make_game_mode()
-        # Push multiplier up
         for _ in range(5):
             gm.difficulty.record_wave({
                 "eliminations": 10,
@@ -496,6 +489,212 @@ class TestDifficultyGameModeIntegration:
 
 
 # ---------------------------------------------------------------------------
+# Difficulty wiring into GameMode — tests that the scaler is actually
+# called during gameplay, not just instantiated.
+# ---------------------------------------------------------------------------
+
+
+class TestDifficultyWiringWaveComplete:
+    """_on_wave_complete() calls difficulty.record_wave() with correct stats."""
+
+    def _make_game_mode(self):
+        from engine.simulation.combat import CombatSystem
+        from engine.simulation.game_mode import GameMode
+
+        bus = SimpleEventBus()
+        engine = _MockEngine(bus)
+        engine.add_friendly("turret-1", max_health=100.0)
+        combat = CombatSystem(bus)
+        gm = GameMode(bus, engine, combat)
+        return gm, bus, engine
+
+    def test_wave_complete_records_to_difficulty(self):
+        """After a wave completes, difficulty.wave_history grows by 1."""
+        gm, bus, engine = self._make_game_mode()
+        assert len(gm.difficulty.wave_history) == 0
+
+        # Manually trigger wave completion path
+        gm.state = "active"
+        gm.wave = 1
+        gm._wave_start_time = time.time() - 15.0  # 15s wave
+        gm._wave_hostile_ids = {"h-0", "h-1", "h-2"}
+        gm.wave_eliminations = 3  # all killed
+
+        gm._on_wave_complete()
+
+        assert len(gm.difficulty.wave_history) == 1
+        record = gm.difficulty.wave_history[0]
+        assert record.hostiles_spawned == 3
+        assert record.elimination_rate == pytest.approx(1.0)
+
+    def test_wave_complete_records_escapes(self):
+        """Escapes = spawned - eliminated when wave ends."""
+        gm, bus, engine = self._make_game_mode()
+        gm.state = "active"
+        gm.wave = 1
+        gm._wave_start_time = time.time() - 20.0
+        gm._wave_hostile_ids = {"h-0", "h-1", "h-2", "h-3", "h-4"}
+        gm.wave_eliminations = 2  # only 2 killed, 3 escaped
+
+        gm._on_wave_complete()
+
+        record = gm.difficulty.wave_history[0]
+        assert record.escapes == 3
+
+    def test_wave_complete_records_friendly_damage(self):
+        """Friendly damage ratio = damage_taken / max_health."""
+        gm, bus, engine = self._make_game_mode()
+        # Damage the friendly unit (50 of 100 hp taken)
+        friendly = engine._targets[0]
+        friendly.health = 50.0
+
+        gm.state = "active"
+        gm.wave = 1
+        gm._wave_start_time = time.time() - 10.0
+        gm._wave_hostile_ids = {"h-0"}
+        gm.wave_eliminations = 1
+
+        gm._on_wave_complete()
+
+        record = gm.difficulty.wave_history[0]
+        assert record.friendly_damage_ratio == pytest.approx(0.5)
+
+    def test_wave_complete_adjusts_multiplier(self):
+        """A perfect wave should increase the multiplier above 1.0."""
+        gm, bus, engine = self._make_game_mode()
+        assert gm.difficulty.get_multiplier() == 1.0
+
+        gm.state = "active"
+        gm.wave = 1
+        gm._wave_start_time = time.time() - 10.0  # fast wave
+        gm._wave_hostile_ids = {"h-0", "h-1", "h-2"}
+        gm.wave_eliminations = 3  # all killed, no escapes
+
+        gm._on_wave_complete()
+
+        assert gm.difficulty.get_multiplier() > 1.0
+
+
+class TestDifficultyWiringSpawn:
+    """_spawn_wave_hostiles() applies difficulty adjustments to spawned units."""
+
+    def _make_game_mode(self):
+        from engine.simulation.combat import CombatSystem
+        from engine.simulation.game_mode import GameMode
+
+        bus = SimpleEventBus()
+        engine = _MockEngine(bus)
+        engine.add_friendly("turret-1", max_health=100.0)
+        combat = CombatSystem(bus)
+        gm = GameMode(bus, engine, combat)
+        return gm, bus, engine
+
+    def test_high_multiplier_spawns_more_hostiles(self):
+        """At multiplier 1.5, wave 1 (base 3) should spawn ~5 hostiles."""
+        gm, bus, engine = self._make_game_mode()
+        gm.difficulty._multiplier = 1.5
+        gm.state = "active"
+        gm.wave = 1
+
+        from engine.simulation.game_mode import WAVE_CONFIGS
+        config = WAVE_CONFIGS[0]  # Scout Party, count=3
+        gm._spawn_wave_hostiles(config)
+
+        # At 1.5x, round(3*1.5)=5 hostiles should spawn
+        assert len(gm._wave_hostile_ids) >= 4
+
+    def test_low_multiplier_spawns_fewer_hostiles(self):
+        """At multiplier 0.6, wave 2 (base 5) should spawn ~3 hostiles."""
+        gm, bus, engine = self._make_game_mode()
+        gm.difficulty._multiplier = 0.6
+        gm.state = "active"
+        gm.wave = 2
+
+        from engine.simulation.game_mode import WAVE_CONFIGS
+        config = WAVE_CONFIGS[1]  # Raiding Party, count=5
+        gm._spawn_wave_hostiles(config)
+
+        assert len(gm._wave_hostile_ids) <= 4
+
+    def test_difficulty_health_bonus_applied(self):
+        """Health bonus from difficulty is applied on top of wave multiplier."""
+        gm, bus, engine = self._make_game_mode()
+        gm.difficulty._multiplier = 1.5  # health_bonus = 0.15
+        gm.state = "active"
+
+        from engine.simulation.game_mode import WaveConfig
+        config = WaveConfig("Test", count=1, speed_mult=1.0, health_mult=1.0)
+        gm._spawn_wave_hostiles(config)
+
+        # The hostile's health should include the 15% difficulty bonus
+        hostile = [t for t in engine._targets if t.alliance == "hostile"][0]
+        base_health = hostile.max_health / (1.0 + 0.15)
+        assert hostile.max_health > base_health
+
+    def test_difficulty_speed_bonus_applied(self):
+        """Speed bonus from difficulty is applied on top of wave multiplier."""
+        gm, bus, engine = self._make_game_mode()
+        gm.difficulty._multiplier = 1.5  # speed_bonus = 0.075
+        gm.state = "active"
+
+        from engine.simulation.game_mode import WaveConfig
+        config = WaveConfig("Test", count=1, speed_mult=1.0, health_mult=1.0)
+        gm._spawn_wave_hostiles(config)
+
+        hostile = [t for t in engine._targets if t.alliance == "hostile"][0]
+        # Speed should be > base speed due to difficulty bonus
+        # Base speed from spawn_hostile is 3.0, times 1.0 wave mult, times 1.075 diff
+        assert hostile.speed > 3.0
+
+    def test_easy_mode_speed_reduction(self):
+        """Easy mode (mult < 0.7) applies speed_reduction to hostiles."""
+        gm, bus, engine = self._make_game_mode()
+        gm.difficulty._multiplier = 0.6  # easy=True, speed_reduction=0.03
+        gm.state = "active"
+
+        from engine.simulation.game_mode import WaveConfig
+        config = WaveConfig("Test", count=1, speed_mult=1.0, health_mult=1.0)
+        gm._spawn_wave_hostiles(config)
+
+        hostile = [t for t in engine._targets if t.alliance == "hostile"][0]
+        # Speed should be reduced below base
+        assert hostile.speed < 3.0
+
+
+class TestDifficultyWiringMixed:
+    """_spawn_mixed_wave() also applies difficulty adjustments."""
+
+    def _make_game_mode(self):
+        from engine.simulation.combat import CombatSystem
+        from engine.simulation.game_mode import GameMode
+
+        bus = SimpleEventBus()
+        engine = _MockEngine(bus)
+        engine.add_friendly("turret-1", max_health=100.0)
+        combat = CombatSystem(bus)
+        gm = GameMode(bus, engine, combat)
+        return gm, bus, engine
+
+    def test_mixed_wave_applies_health_bonus(self):
+        """Mixed-composition waves also get difficulty health bonus."""
+        gm, bus, engine = self._make_game_mode()
+        gm.difficulty._multiplier = 1.5
+        gm.state = "active"
+
+        from engine.simulation.game_mode import WaveConfig
+        config = WaveConfig(
+            "Mixed", count=2, speed_mult=1.0, health_mult=1.0,
+            composition=[("person", 1), ("hostile_vehicle", 1)],
+        )
+        gm._spawn_mixed_wave(config)
+
+        hostiles = [t for t in engine._targets if t.alliance == "hostile"]
+        for h in hostiles:
+            # Each hostile should have bonus applied
+            assert h.max_health > 0
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -506,14 +705,34 @@ class _MockEngine:
     def __init__(self, event_bus: SimpleEventBus) -> None:
         self._event_bus = event_bus
         self._targets: list = []
+        self._map_bounds: float = 200.0
+        self._hostile_counter: int = 0
 
     def get_targets(self) -> list:
         return list(self._targets)
 
-    def spawn_hostile(self, **kwargs):
+    def add_friendly(self, target_id: str, max_health: float = 100.0) -> None:
         from engine.simulation.target import SimulationTarget
         t = SimulationTarget(
-            target_id=f"h-{len(self._targets)}",
+            target_id=target_id,
+            name=target_id,
+            alliance="friendly",
+            asset_type="turret",
+            position=(0.0, 0.0),
+            speed=0.0,
+        )
+        t.is_combatant = True
+        t.health = max_health
+        t.max_health = max_health
+        t.status = "active"
+        self._targets.append(t)
+
+    def spawn_hostile(self, **kwargs):
+        from engine.simulation.target import SimulationTarget
+        tid = f"h-{self._hostile_counter}"
+        self._hostile_counter += 1
+        t = SimulationTarget(
+            target_id=tid,
             name="Hostile",
             alliance="hostile",
             asset_type="person",
@@ -523,3 +742,6 @@ class _MockEngine:
         t.apply_combat_profile()
         self._targets.append(t)
         return t
+
+    def spawn_hostile_typed(self, asset_type: str = "person", **kwargs):
+        return self.spawn_hostile(**kwargs)

@@ -758,7 +758,6 @@ class TestLuaParsing:
 class TestLuaFormationParse:
     """Test Lua formation commands through parse_motor_output."""
 
-    @pytest.mark.skip(reason="formation not in VALID_ACTIONS — formation actions not registered in lua_motor")
     @pytest.mark.unit
     def test_motor_output_formation(self):
         from engine.actions.lua_motor import parse_motor_output
@@ -769,7 +768,6 @@ class TestLuaFormationParse:
 
 
 class TestLuaSquadOrderParse:
-    @pytest.mark.skip(reason="squad_order not in VALID_ACTIONS — formation actions not registered in lua_motor")
     @pytest.mark.unit
     def test_motor_output_squad_order(self):
         from engine.actions.lua_motor import parse_motor_output
@@ -779,7 +777,6 @@ class TestLuaSquadOrderParse:
 
 
 class TestLuaRallyParse:
-    @pytest.mark.skip(reason="rally not in VALID_ACTIONS — formation actions not registered in lua_motor")
     @pytest.mark.unit
     def test_motor_output_rally(self):
         from engine.actions.lua_motor import parse_motor_output

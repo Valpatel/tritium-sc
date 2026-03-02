@@ -437,9 +437,12 @@ class TestBackwardCompat:
             weapon_range=20.0, weapon_damage=15.0,
             weapon_cooldown=1.0, last_fired=0.0,
         )
+        # Empty inventory to test raw damage without armor reduction
+        from engine.simulation.inventory import UnitInventory
         target = SimulationTarget(
             target_id="h1", name="Hostile", alliance="hostile",
             asset_type="person", position=(1.0, 0.0), health=100.0,
+            inventory=UnitInventory(owner_id="h1"),
         )
 
         proj = combat.fire(source, target)

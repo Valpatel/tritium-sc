@@ -339,7 +339,6 @@ class TestPathfinderBlockedPositions:
 # 10. Engine integration — HazardManager is wired in
 # ---------------------------------------------------------------------------
 
-@pytest.mark.skip(reason="SimulationEngine does not have hazard_manager attribute")
 class TestEngineHazardIntegration:
     def test_engine_has_hazard_manager(self, engine: SimulationEngine):
         assert hasattr(engine, 'hazard_manager')

@@ -387,10 +387,12 @@ class TestCombatCycle:
         assert engine.combat.projectile_count == 1
 
     def test_projectile_hits_close_target(self):
+        from engine.simulation.inventory import UnitInventory
         bus, engine = _make_engine()
         hit_sub = bus.subscribe("projectile_hit")
         turret = _make_turret()
         hostile = _make_hostile(position=(2.0, 0.0), health=100.0)
+        hostile.inventory = UnitInventory(owner_id="hostile-1")  # empty, no armor
         engine.add_target(turret)
         engine.add_target(hostile)
         _set_perfect_accuracy(engine, "turret-1")
@@ -405,9 +407,11 @@ class TestCombatCycle:
         assert hostile.health < 100.0
 
     def test_damage_reduces_health(self):
+        from engine.simulation.inventory import UnitInventory
         bus, engine = _make_engine()
         turret = _make_turret()
         hostile = _make_hostile(position=(2.0, 0.0), health=80.0)
+        hostile.inventory = UnitInventory(owner_id="hostile-1")  # empty, no armor
         engine.add_target(turret)
         engine.add_target(hostile)
         _set_perfect_accuracy(engine, "turret-1")
@@ -1139,28 +1143,27 @@ class TestGameReset:
         hostiles_after = sum(1 for t in engine.get_targets() if t.alliance == "hostile")
         assert hostiles_after == 0
 
-    def test_reset_heals_friendlies(self):
+    def test_reset_clears_all_targets(self):
+        """reset_game() removes ALL targets to prevent accumulation across scenarios."""
         bus, engine = _make_engine()
         turret = _make_turret()
         engine.add_target(turret)
         turret.health = 10.0  # badly damaged
 
-        engine.reset_game()
-        # Turret's ID starts with "turret-" so it gets removed by reset_game
-        # Only friendlies NOT matching game unit prefixes survive
-        # Let's use a non-game-unit prefix
-        bus2, engine2 = _make_engine()
+        # Also add a non-standard ID target
         friendly = SimulationTarget(
             target_id="permanent-1", name="Base", alliance="friendly",
             asset_type="turret", position=(0.0, 0.0), speed=0.0,
             status="stationary", health=10.0, max_health=200.0,
         )
         friendly.is_combatant = True
-        engine2.add_target(friendly)
-        engine2.reset_game()
-        t = engine2.get_target("permanent-1")
-        assert t is not None
-        assert t.health == t.max_health
+        engine.add_target(friendly)
+
+        engine.reset_game()
+        # ALL targets should be cleared — next scenario places fresh units
+        assert engine.get_target("turret-1") is None
+        assert engine.get_target("permanent-1") is None
+        assert len(engine._targets) == 0
 
     def test_reset_clears_projectiles(self):
         bus, engine = _make_engine()

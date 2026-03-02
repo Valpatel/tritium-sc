@@ -192,11 +192,191 @@ class TestHeadlessBridgeCombatEvents:
         }
         self._assert_event_forwarded(bus, "game_over", data)
 
-    def test_announcer_forwarded(self):
-        """announcer events (Smash TV commentary) should reach the browser."""
+    def test_backstory_generated_forwarded(self):
+        """backstory_generated events should reach the browser."""
         bus = FakeEventBus()
         data = {
-            "text": "INCREDIBLE!",
-            "category": "streak",
+            "backstory": "The enemy approaches from the east...",
+            "wave": 1,
         }
-        self._assert_event_forwarded(bus, "announcer", data)
+        self._assert_event_forwarded(bus, "backstory_generated", data)
+
+    def test_upgrade_applied_forwarded(self):
+        """upgrade_applied events should reach the browser for HUD updates."""
+        bus = FakeEventBus()
+        data = {
+            "unit_id": "tank-01",
+            "upgrade_id": "armor_plating",
+        }
+        self._assert_event_forwarded(bus, "upgrade_applied", data)
+
+    def test_ability_activated_forwarded(self):
+        """ability_activated events should reach the browser for ability tracking."""
+        bus = FakeEventBus()
+        data = {
+            "unit_id": "rover-01",
+            "ability_id": "speed_boost",
+            "duration": 10,
+        }
+        self._assert_event_forwarded(bus, "ability_activated", data)
+
+    def test_ability_expired_forwarded(self):
+        """ability_expired events should reach the browser to clear ability state."""
+        bus = FakeEventBus()
+        data = {
+            "unit_id": "rover-01",
+            "ability_id": "speed_boost",
+        }
+        self._assert_event_forwarded(bus, "ability_expired", data)
+
+    def test_hazard_spawned_via_existing_bridge(self):
+        """hazard_spawned events should reach the browser via allowlist."""
+        bus = FakeEventBus()
+        data = {
+            "hazard_id": "h-1", "hazard_type": "roadblock",
+            "position": {"x": 10, "y": 20},
+        }
+        self._assert_event_forwarded(bus, "hazard_spawned", data)
+
+    def test_weapon_jam_via_existing_bridge(self):
+        """weapon_jam events should reach the browser via allowlist."""
+        bus = FakeEventBus()
+        data = {
+            "unit_id": "turret-01", "jam_duration": 2.5,
+        }
+        self._assert_event_forwarded(bus, "weapon_jam", data)
+
+    def test_robot_thought_forwarded(self):
+        """robot_thought events should reach the browser."""
+        bus = FakeEventBus()
+        data = {
+            "robotId": "rover-02",
+            "text": "Scanning sector 4",
+        }
+        self._assert_event_forwarded(bus, "robot_thought", data)
+
+    def test_detection_forwarded(self):
+        """detection events (YOLO camera) should reach the browser."""
+        bus = FakeEventBus()
+        data = {
+            "camera_id": "cam-01",
+            "class": "person",
+            "confidence": 0.95,
+        }
+        self._assert_event_forwarded(bus, "detection", data)
+
+
+class TestHeadlessBridgeMissingEvents:
+    """Events published by engine subsystems that the headless bridge drops.
+
+    These events are published by engine subsystems during gameplay but are
+    NOT in the headless bridge allowlist, so they never reach WebSocket
+    clients in headless mode.
+    """
+
+    def _assert_event_forwarded(self, bus, event_type, data, expected_ws_type=None):
+        """Push an event onto the bus and verify it reaches WebSocket clients."""
+        loop = asyncio.get_event_loop()
+        mgr_mock = AsyncMock()
+
+        with patch("app.routers.ws.manager", mgr_mock):
+            from app.routers.ws import start_headless_event_bridge
+            start_headless_event_bridge(bus, loop)
+
+            bus.push(event_type, data)
+            messages = _collect_broadcast(mgr_mock, timeout=2.0, count=1)
+
+        if expected_ws_type is None:
+            expected_ws_type = f"amy_{event_type}"
+
+        assert len(messages) >= 1, (
+            f"Event '{event_type}' was NOT forwarded to WebSocket. "
+            f"The headless bridge allowlist is silently dropping it."
+        )
+
+        found = any(m.get("type") == expected_ws_type for m in messages)
+        assert found, (
+            f"Expected WS message type '{expected_ws_type}', "
+            f"got types: {[m.get('type') for m in messages]}"
+        )
+
+    def test_hazard_spawned_forwarded(self):
+        """hazard_spawned events (from HazardManager) should reach the browser."""
+        bus = FakeEventBus()
+        self._assert_event_forwarded(bus, "hazard_spawned", {
+            "hazard_id": "h-1", "hazard_type": "roadblock",
+            "position": {"x": 10, "y": 20},
+        })
+
+    def test_hazard_expired_forwarded(self):
+        """hazard_expired events should reach the browser for map cleanup."""
+        bus = FakeEventBus()
+        self._assert_event_forwarded(bus, "hazard_expired", {
+            "hazard_id": "h-1", "hazard_type": "fire",
+        })
+
+    def test_ammo_depleted_forwarded(self):
+        """ammo_depleted events (from WeaponSystem) should reach the browser."""
+        bus = FakeEventBus()
+        self._assert_event_forwarded(bus, "ammo_depleted", {
+            "unit_id": "turret-01", "weapon": "turret_cannon",
+        })
+
+    def test_ammo_low_forwarded(self):
+        """ammo_low events should reach the browser for HUD warnings."""
+        bus = FakeEventBus()
+        self._assert_event_forwarded(bus, "ammo_low", {
+            "unit_id": "rover-01", "ammo": 5, "max_ammo": 30,
+        })
+
+    def test_weapon_jam_forwarded(self):
+        """weapon_jam events (from turret/drone/rover behaviors) should reach the browser."""
+        bus = FakeEventBus()
+        self._assert_event_forwarded(bus, "weapon_jam", {
+            "unit_id": "turret-01", "jam_duration": 2.0,
+        })
+
+    def test_npc_alliance_change_forwarded(self):
+        """npc_alliance_change events should reach the browser for unit color updates."""
+        bus = FakeEventBus()
+        self._assert_event_forwarded(bus, "npc_alliance_change", {
+            "unit_id": "person-01", "old_alliance": "neutral",
+            "new_alliance": "hostile",
+        })
+
+    def test_sensor_triggered_forwarded(self):
+        """sensor_triggered events should reach the browser for sensor overlay."""
+        bus = FakeEventBus()
+        self._assert_event_forwarded(bus, "sensor_triggered", {
+            "sensor_id": "tripwire-01", "triggered_by": "hostile-5",
+        })
+
+    def test_sensor_cleared_forwarded(self):
+        """sensor_cleared events should reach the browser."""
+        bus = FakeEventBus()
+        self._assert_event_forwarded(bus, "sensor_cleared", {
+            "sensor_id": "tripwire-01",
+        })
+
+    def test_target_neutralized_forwarded(self):
+        """target_neutralized events (from engine stall detection) should reach the browser."""
+        bus = FakeEventBus()
+        self._assert_event_forwarded(bus, "target_neutralized", {
+            "target_id": "hostile-12", "reason": "stalled",
+        })
+
+    def test_npc_thought_forwarded(self):
+        """npc_thought events should reach the browser for thought bubble display."""
+        bus = FakeEventBus()
+        self._assert_event_forwarded(bus, "npc_thought", {
+            "unit_id": "person-01", "text": "What was that noise?",
+            "emotion": "curious", "importance": "high", "duration": 5,
+        })
+
+    def test_infrastructure_damage_forwarded(self):
+        """infrastructure_damage events should reach the browser for health bar updates."""
+        bus = FakeEventBus()
+        self._assert_event_forwarded(bus, "infrastructure_damage", {
+            "building_id": "b-1", "damage": 50.0,
+            "remaining": 200.0,
+        })

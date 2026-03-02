@@ -196,7 +196,7 @@ class TestFriendlyDispatchWithPathfinder:
         assert rover.status == "active"
 
     def test_dispatch_fallback_without_graph(self):
-        """Without street_graph, dispatch sets direct waypoint."""
+        """Without street_graph, dispatch uses grid A* (snaps to grid cells)."""
         bus = SimpleEventBus()
         engine = SimulationEngine(bus)
 
@@ -212,8 +212,10 @@ class TestFriendlyDispatchWithPathfinder:
         engine.dispatch_unit("rover-1", (50.0, 50.0))
 
         assert len(rover.waypoints) >= 1
-        # Last waypoint should be the destination
-        assert rover.waypoints[-1] == (50.0, 50.0)
+        # Last waypoint should be near the destination (grid snaps to cell centers)
+        import math
+        assert math.hypot(rover.waypoints[-1][0] - 50.0,
+                          rover.waypoints[-1][1] - 50.0) < 10.0
 
     def test_dispatch_nonexistent_target(self):
         """Dispatching a nonexistent target is a no-op."""

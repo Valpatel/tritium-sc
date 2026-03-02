@@ -564,11 +564,13 @@ class TestCoverCombatWiring:
     def test_no_cover_full_damage(self):
         """Target without cover should take full damage."""
         from engine.simulation.combat import CombatSystem
+        from engine.simulation.inventory import UnitInventory
 
         bus = _make_bus()
         combat = CombatSystem(bus)
 
         target = _make_target("h-1", "hostile", "person", speed=1.5, position=(10.0, 10.0))
+        target.inventory = UnitInventory(owner_id="h-1")  # empty inventory, no armor
         source = _make_target("turret-1", "friendly", "turret", position=(11.0, 11.0))
 
         initial_health = target.health
@@ -1254,8 +1256,10 @@ class TestUpgradeSystemWiring:
 
         proj = combat.fire(turret, hostile)
         assert proj is not None
-        # Base damage 15 (turret weapon_damage) * 1.15 = 17.25
-        expected = turret.weapon_damage * 1.15
+        # Weapon system damage (10.0) takes priority over turret.weapon_damage (15)
+        # With precision_targeting upgrade (+15%): 10.0 * 1.15 = 11.5
+        weapon = ws.get_weapon("t1")
+        expected = weapon.damage * 1.15
         assert abs(proj.damage - expected) < 0.01
 
     def test_range_modifier_extends_firing_range(self):
@@ -1288,6 +1292,7 @@ class TestUpgradeSystemWiring:
 
     def test_damage_reduction_reduces_hit_damage(self):
         """Reinforced chassis upgrade reduces incoming damage."""
+        from engine.simulation.inventory import UnitInventory
         bus = _make_bus()
         upgrade_sys = UpgradeSystem()
         ws = WeaponSystem()
@@ -1303,6 +1308,7 @@ class TestUpgradeSystemWiring:
         hostile.apply_combat_profile()
         hostile.health = 100.0
         hostile.max_health = 100.0
+        hostile.inventory = UnitInventory(owner_id="h1")  # empty inventory, no armor
 
         # Apply reinforced_chassis to hostile (15% damage reduction)
         result = upgrade_sys.apply_upgrade("h1", "reinforced_chassis", target=hostile)
@@ -1314,8 +1320,10 @@ class TestUpgradeSystemWiring:
         targets = {"t1": turret, "h1": hostile}
         combat.tick(0.1, targets)
 
-        # Damage should be reduced: 15 * (1 - 0.15) = 12.75
-        expected_health = 100.0 - (turret.weapon_damage * 0.85)
+        # Weapon system damage (10.0) takes priority over turret.weapon_damage (15)
+        # With reinforced_chassis (-15%): 10.0 * (1 - 0.15) = 8.5
+        weapon = ws.get_weapon("t1")
+        expected_health = 100.0 - (weapon.damage * 0.85)
         assert abs(hostile.health - expected_health) < 0.01
 
     def test_no_upgrade_system_legacy_behavior(self):
@@ -1408,3 +1416,107 @@ class TestUnitCommsWiring:
         # (or at least the signal should be available to h2)
         signals = engine.unit_comms.get_signals_for_unit(h2, signal_type="distress")
         assert len(signals) >= 1
+
+
+class TestStatsTelemetryWiring:
+    """Verify per-unit stats are merged into the telemetry batch."""
+
+    def test_stats_present_in_telemetry_batch(self):
+        """Telemetry batch dicts should contain a 'stats' key with per-unit data."""
+        engine = _make_engine()
+
+        turret = _make_target("t1", "friendly", "turret", position=(0.0, 0.0))
+        turret.weapon_range = 80.0
+        turret.status = "active"
+        engine.add_target(turret)
+
+        hostile = _make_target("h1", "hostile", "person", position=(10.0, 0.0))
+        hostile.speed = 1.5
+        hostile.status = "active"
+        engine.add_target(hostile)
+
+        # Record a shot via the stats tracker
+        engine.stats_tracker.record_shot("t1")
+        engine.stats_tracker.on_shot_hit("t1", "h1", 25.0)
+
+        # Build the telemetry batch the same way engine._publish_telemetry does
+        targets = engine.get_targets()
+        batch = []
+        for target in targets:
+            tdict = target.to_dict()
+            unit_stats = engine.stats_tracker.get_unit_stats(target.target_id)
+            if unit_stats is not None:
+                tdict["stats"] = {
+                    "shots_fired": unit_stats.shots_fired,
+                    "shots_hit": unit_stats.shots_hit,
+                    "damage_dealt": round(unit_stats.damage_dealt, 1),
+                    "damage_taken": round(unit_stats.damage_taken, 1),
+                    "kills": unit_stats.kills,
+                    "deaths": unit_stats.deaths,
+                    "assists": unit_stats.assists,
+                    "distance_traveled": round(unit_stats.distance_traveled, 1),
+                    "max_speed": round(unit_stats.max_speed_reached, 1),
+                    "time_alive": round(unit_stats.time_alive, 1),
+                    "time_in_combat": round(unit_stats.time_in_combat, 1),
+                    "accuracy": round(unit_stats.accuracy, 3),
+                }
+            batch.append(tdict)
+
+        # Find t1 in the batch
+        t1_data = [d for d in batch if d["target_id"] == "t1"]
+        assert len(t1_data) == 1, "t1 should be in telemetry batch"
+        assert "stats" in t1_data[0], "t1 telemetry dict should contain 'stats' key"
+        stats = t1_data[0]["stats"]
+        assert stats["shots_fired"] == 1, f"shots_fired should be 1, got {stats['shots_fired']}"
+        assert stats["shots_hit"] == 1, f"shots_hit should be 1, got {stats['shots_hit']}"
+        assert stats["damage_dealt"] == 25.0
+        assert stats["accuracy"] == 1.0
+
+    def test_stats_absent_for_unregistered_units(self):
+        """Units not registered in StatsTracker should not have a 'stats' key."""
+        engine = _make_engine()
+
+        # Add target directly to the targets dict, bypassing add_target()
+        # (which would auto-register in StatsTracker)
+        from engine.simulation.target import SimulationTarget
+        rogue = SimulationTarget(
+            target_id="rogue1",
+            name="Rogue",
+            alliance="neutral",
+            asset_type="person",
+            position=(50.0, 50.0),
+        )
+        engine._targets["rogue1"] = rogue
+
+        targets = engine.get_targets()
+        batch = []
+        for target in targets:
+            tdict = target.to_dict()
+            unit_stats = engine.stats_tracker.get_unit_stats(target.target_id)
+            if unit_stats is not None:
+                tdict["stats"] = {"shots_fired": unit_stats.shots_fired}
+            batch.append(tdict)
+
+        rogue_data = [d for d in batch if d["target_id"] == "rogue1"]
+        assert len(rogue_data) == 1
+        assert "stats" not in rogue_data[0], "Unregistered unit should not have stats"
+
+    def test_stats_reflect_movement(self):
+        """Stats should reflect distance_traveled after ticks with position changes."""
+        engine = _make_engine()
+
+        rover = _make_target("r1", "friendly", "rover", position=(0.0, 0.0), speed=5.0)
+        rover.status = "active"
+        engine.add_target(rover)
+
+        # Tick once to establish initial position
+        targets_dict = {"r1": rover}
+        engine.stats_tracker.tick(0.1, targets_dict)
+
+        # Move the rover
+        rover.position = (10.0, 0.0)
+        engine.stats_tracker.tick(0.1, targets_dict)
+
+        unit_stats = engine.stats_tracker.get_unit_stats("r1")
+        assert unit_stats is not None
+        assert unit_stats.distance_traveled >= 9.9, f"Expected ~10m traveled, got {unit_stats.distance_traveled}"

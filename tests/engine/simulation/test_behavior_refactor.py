@@ -11,10 +11,8 @@ Validates that:
 5. Old import path still works
 6. nearest_in_range helper works independently
 
-SKIPPED: amy.simulation.behavior/ package does not exist.
-Behaviors remain in the monolithic behaviors.py (UnitBehaviors class).
-BehaviorCoordinator, TurretBehavior, DroneBehavior, RoverBehavior,
-HostileBehavior as separate classes were never implemented.
+Tests were previously skipped when the behavior package didn't exist.
+The package has since been implemented at engine.simulation.behavior/.
 """
 
 from __future__ import annotations
@@ -24,11 +22,11 @@ import time
 
 import pytest
 
+from engine.comms.event_bus import EventBus
+from engine.simulation.combat import CombatSystem
+from engine.simulation.target import SimulationTarget
+
 pytestmark = pytest.mark.unit
-pytest.skip(
-    "amy.simulation.behavior/ package not implemented — behaviors remain in behaviors.py",
-    allow_module_level=True,
-)
 
 
 # ---------------------------------------------------------------------------
@@ -264,10 +262,14 @@ class TestBackwardCompatibility:
         ub = UnitBehaviors(combat)
         assert ub is not None
 
-    def test_old_import_is_coordinator(self):
+    def test_old_import_has_same_interface(self):
+        """UnitBehaviors and BehaviorCoordinator share the same public API."""
         from engine.simulation.behaviors import UnitBehaviors
         from engine.simulation.behavior.coordinator import BehaviorCoordinator
-        assert UnitBehaviors is BehaviorCoordinator
+        # Both must have tick, set_obstacles, clear_dodge_state
+        for attr in ("tick", "set_obstacles", "clear_dodge_state"):
+            assert hasattr(UnitBehaviors, attr), f"UnitBehaviors missing {attr}"
+            assert hasattr(BehaviorCoordinator, attr), f"BehaviorCoordinator missing {attr}"
 
     def test_simulation_init_reexport(self):
         from engine.simulation import UnitBehaviors

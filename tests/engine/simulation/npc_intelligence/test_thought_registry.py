@@ -12,6 +12,13 @@ from engine.comms.event_bus import EventBus
 from engine.simulation.npc_intelligence.thought_registry import (
     ThoughtRegistry,
     UnitThought,
+    IMPORTANCE_IDLE,
+    IMPORTANCE_LOW,
+    IMPORTANCE_NORMAL,
+    IMPORTANCE_HIGH,
+    IMPORTANCE_CRITICAL,
+    IMPORTANCE_BROADCAST_THRESHOLD,
+    importance_rank,
 )
 
 pytestmark = pytest.mark.unit
@@ -28,8 +35,8 @@ def registry(event_bus: EventBus) -> ThoughtRegistry:
 
 
 class TestSetThought:
-    def test_set_thought_publishes_event(self, registry: ThoughtRegistry, event_bus: EventBus) -> None:
-        """EventBus receives `npc_thought` when a thought is set."""
+    def test_set_thought_publishes_event_high_importance(self, registry: ThoughtRegistry, event_bus: EventBus) -> None:
+        """EventBus receives `npc_thought` when a high-importance thought is set."""
         received = []
         sub = event_bus.subscribe()
 
@@ -43,7 +50,7 @@ class TestSetThought:
         t = threading.Thread(target=reader, daemon=True)
         t.start()
 
-        registry.set_thought("npc-1", "Hello world", emotion="happy", duration=5.0)
+        registry.set_thought("npc-1", "Hello world", emotion="happy", duration=5.0, importance=IMPORTANCE_HIGH)
         t.join(timeout=2.0)
 
         assert len(received) == 1
@@ -52,6 +59,79 @@ class TestSetThought:
         assert received[0]["data"]["text"] == "Hello world"
         assert received[0]["data"]["emotion"] == "happy"
         assert received[0]["data"]["duration"] == 5.0
+        assert received[0]["data"]["importance"] == "high"
+
+    def test_set_thought_no_broadcast_below_threshold(self, registry: ThoughtRegistry, event_bus: EventBus) -> None:
+        """Normal/low/idle importance thoughts are stored but NOT broadcast to EventBus."""
+        received = []
+        sub = event_bus.subscribe()
+
+        def reader():
+            try:
+                msg = sub.get(timeout=0.3)
+                received.append(msg)
+            except Exception:
+                pass
+
+        t = threading.Thread(target=reader, daemon=True)
+        t.start()
+
+        # Normal importance (default) — should NOT be broadcast
+        registry.set_thought("npc-1", "Just walking", duration=5.0)
+        t.join(timeout=0.5)
+
+        assert len(received) == 0, "Normal importance thought should not be broadcast"
+
+        # Verify it IS stored locally
+        thought = registry.get_thought("npc-1")
+        assert thought is not None
+        assert thought.text == "Just walking"
+        assert thought.importance == "normal"
+
+    def test_set_thought_low_importance_not_broadcast(self, registry: ThoughtRegistry, event_bus: EventBus) -> None:
+        """Low-importance thoughts are stored but not broadcast."""
+        received = []
+        sub = event_bus.subscribe()
+
+        def reader():
+            try:
+                msg = sub.get(timeout=0.3)
+                received.append(msg)
+            except Exception:
+                pass
+
+        t = threading.Thread(target=reader, daemon=True)
+        t.start()
+
+        registry.set_thought("npc-1", "Idle chatter", importance=IMPORTANCE_LOW)
+        t.join(timeout=0.5)
+
+        assert len(received) == 0
+        thought = registry.get_thought("npc-1")
+        assert thought is not None
+        assert thought.importance == "low"
+
+    def test_set_thought_critical_always_broadcast(self, registry: ThoughtRegistry, event_bus: EventBus) -> None:
+        """Critical thoughts are always broadcast."""
+        received = []
+        sub = event_bus.subscribe()
+
+        def reader():
+            try:
+                msg = sub.get(timeout=1.0)
+                received.append(msg)
+            except Exception:
+                pass
+
+        t = threading.Thread(target=reader, daemon=True)
+        t.start()
+
+        registry.set_thought("npc-1", "Under fire!", emotion="afraid", importance=IMPORTANCE_CRITICAL)
+        t.join(timeout=2.0)
+
+        assert len(received) == 1
+        assert received[0]["data"]["importance"] == "critical"
+        assert received[0]["data"]["text"] == "Under fire!"
 
     def test_set_thought_returns_unit_thought(self, registry: ThoughtRegistry) -> None:
         thought = registry.set_thought("npc-1", "Thinking...")
@@ -59,10 +139,16 @@ class TestSetThought:
         assert thought.unit_id == "npc-1"
         assert thought.text == "Thinking..."
         assert thought.emotion == "neutral"
+        assert thought.importance == "normal"
 
     def test_set_thought_default_emotion(self, registry: ThoughtRegistry) -> None:
         thought = registry.set_thought("npc-1", "test")
         assert thought.emotion == "neutral"
+
+    def test_set_thought_default_importance(self, registry: ThoughtRegistry) -> None:
+        """Default importance is 'normal'."""
+        thought = registry.set_thought("npc-1", "test")
+        assert thought.importance == "normal"
 
     def test_set_thought_overwrites_previous(self, registry: ThoughtRegistry) -> None:
         registry.set_thought("npc-1", "First")
@@ -78,7 +164,8 @@ class TestClearThought:
         received = []
         sub = event_bus.subscribe()
 
-        registry.set_thought("npc-1", "Hello")
+        # Use high importance so the set_thought event gets broadcast (to drain)
+        registry.set_thought("npc-1", "Hello", importance=IMPORTANCE_HIGH)
 
         # Drain the set event
         try:
@@ -250,6 +337,23 @@ class TestControl:
         reg.take_control("npc-1", "ctrl-1")
         reg.release_control("npc-1")
         assert reg.get_controller("npc-1") is None
+
+
+class TestImportanceRank:
+    def test_importance_ordering(self) -> None:
+        """Importance levels have correct numeric ordering."""
+        assert importance_rank(IMPORTANCE_IDLE) < importance_rank(IMPORTANCE_LOW)
+        assert importance_rank(IMPORTANCE_LOW) < importance_rank(IMPORTANCE_NORMAL)
+        assert importance_rank(IMPORTANCE_NORMAL) < importance_rank(IMPORTANCE_HIGH)
+        assert importance_rank(IMPORTANCE_HIGH) < importance_rank(IMPORTANCE_CRITICAL)
+
+    def test_unknown_importance_defaults_to_normal(self) -> None:
+        """Unknown importance string defaults to normal rank."""
+        assert importance_rank("bogus") == importance_rank(IMPORTANCE_NORMAL)
+
+    def test_threshold_is_high(self) -> None:
+        """Broadcast threshold is 'high'."""
+        assert IMPORTANCE_BROADCAST_THRESHOLD == IMPORTANCE_HIGH
 
 
 class TestLifecycle:

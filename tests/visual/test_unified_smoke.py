@@ -251,7 +251,10 @@ class TestUnifiedSmoke:
             if fps_str == "--":
                 pytest.skip("FPS counter not yet initialized")
             fps = int(fps_str)
-            assert fps >= 10, f"FPS too low: {fps}"
+            # MapLibre repaints on-demand (not continuously like Canvas 2D),
+            # so idle FPS in headless Playwright can be ~8-12.  Threshold of 5
+            # ensures the counter works without penalizing on-demand painting.
+            assert fps >= 5, f"FPS too low: {fps}"
             self._record(name, True, {"fps": fps})
         except pytest.skip.Exception:
             self._record(name, True, {"fps": "skipped_not_initialized"})

@@ -131,6 +131,33 @@ class TestGameModeBeginWar:
         assert gm.score == 0
         assert gm.total_eliminations == 0
 
+    def test_begin_war_sets_game_start_time(self):
+        """begin_war() records _game_start_time for total elapsed tracking."""
+        import time
+        bus = SimpleEventBus()
+        engine = SimulationEngine(bus)
+        combat = CombatSystem(bus)
+        gm = GameMode(bus, engine, combat)
+        before = time.time()
+        gm.begin_war()
+        after = time.time()
+        assert gm._game_start_time >= before
+        assert gm._game_start_time <= after
+
+    def test_game_start_time_not_reset_by_wave(self):
+        """_game_start_time persists across waves (unlike _wave_start_time)."""
+        import time
+        bus = SimpleEventBus()
+        engine = SimulationEngine(bus)
+        combat = CombatSystem(bus)
+        gm = GameMode(bus, engine, combat)
+        gm.begin_war()
+        game_start = gm._game_start_time
+        time.sleep(0.01)
+        gm._start_wave(2)
+        assert gm._game_start_time == game_start
+        assert gm._wave_start_time > game_start
+
 
 class TestGameModeCountdown:
     def test_countdown_decrements(self):

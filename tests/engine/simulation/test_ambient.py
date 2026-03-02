@@ -15,20 +15,25 @@ from engine.simulation.ambient import (
     _CAT_NAMES,
     _DELIVERY_NAMES,
     _DOG_NAMES,
-    _MAP_MAX,
-    _MAP_MIN,
+    _DEFAULT_MAP_BOUNDS,
     _NEIGHBOR_NAMES,
 )
 from engine.simulation.target import SimulationTarget, _DRAIN_RATES
 
 pytestmark = pytest.mark.unit
 
+# Derived bounds for tests (same as what AmbientSpawner computes from default engine)
+_MAP_BOUNDS = _DEFAULT_MAP_BOUNDS
+_MAP_MAX = _MAP_BOUNDS
+_MAP_MIN = -_MAP_BOUNDS
+
 
 class MockEngine:
     """Minimal engine stand-in for AmbientSpawner tests."""
 
-    def __init__(self) -> None:
+    def __init__(self, map_bounds: float = _DEFAULT_MAP_BOUNDS) -> None:
         self.targets: list[SimulationTarget] = []
+        self._map_bounds = map_bounds
 
     def add_target(self, target: SimulationTarget) -> None:
         self.targets.append(target)
@@ -554,14 +559,14 @@ class TestOppositeEdgeNonEdge:
         assert opp[0] == _MAP_MAX
 
     def test_near_edge_but_outside_threshold(self, spawner: AmbientSpawner) -> None:
-        """Position at y=27 is 3 units from north edge (threshold=2), so else branch fires."""
-        opp = spawner._opposite_edge((0.0, 27.0))
-        # 27 is 3 away from MAP_MAX=30, which is > 2, so else branch -> east
+        """Position 3 units from north edge (threshold=2), so else branch fires."""
+        opp = spawner._opposite_edge((0.0, _MAP_MAX - 3.0))
+        # 3 away from MAP_MAX, which is > 2, so else branch -> east
         assert opp[0] == _MAP_MAX
 
     def test_just_inside_threshold(self, spawner: AmbientSpawner) -> None:
-        """Position at y=28.5 is 1.5 from north edge (< 2), so matches north->south."""
-        opp = spawner._opposite_edge((0.0, 28.5))
+        """Position 1.5 from north edge (< 2), so matches north->south."""
+        opp = spawner._opposite_edge((0.0, _MAP_MAX - 1.5))
         assert opp[1] == _MAP_MIN
 
     def test_origin_y_jitter_clamped(self, spawner: AmbientSpawner) -> None:
@@ -575,18 +580,18 @@ class TestOppositeEdgeNonEdge:
 
 
 class TestRandomEdgeCoordinateRange:
-    """Variable coordinate uses 0.8 factor, so spans [-24, 24] not [-30, 30]."""
+    """Variable coordinate uses 0.9 factor to spread across full map."""
 
     def test_variable_coord_never_at_corner(self, spawner: AmbientSpawner) -> None:
-        """The non-edge coordinate should never exceed MAP_MAX * 0.8 = 24."""
+        """The non-edge coordinate should never exceed MAP_MAX * 0.9."""
         for _ in range(200):
             x, y = spawner._random_edge()
             if abs(y - _MAP_MAX) < 0.01 or abs(y - _MAP_MIN) < 0.01:
                 # y is on edge, so x is the variable coordinate
-                assert abs(x) <= _MAP_MAX * 0.8 + 0.01
+                assert abs(x) <= _MAP_MAX * 0.9 + 0.01
             else:
                 # x is on edge, so y is the variable coordinate
-                assert abs(y) <= _MAP_MAX * 0.8 + 0.01
+                assert abs(y) <= _MAP_MAX * 0.9 + 0.01
 
     def test_edge_coord_is_exactly_at_boundary(self, spawner: AmbientSpawner) -> None:
         """The fixed edge coordinate should be exactly _MAP_MAX or _MAP_MIN."""
@@ -973,13 +978,14 @@ class TestPatrolLooping:
 
 class TestClamp:
     def test_clamp_above_max(self, spawner: AmbientSpawner) -> None:
-        assert spawner._clamp(100.0) == _MAP_MAX
+        assert spawner._clamp(999.0) == _MAP_MAX
 
     def test_clamp_below_min(self, spawner: AmbientSpawner) -> None:
-        assert spawner._clamp(-100.0) == _MAP_MIN
+        assert spawner._clamp(-999.0) == _MAP_MIN
 
     def test_clamp_within_bounds(self, spawner: AmbientSpawner) -> None:
         assert spawner._clamp(0.0) == 0.0
+        assert spawner._clamp(100.0) == 100.0
 
     def test_clamp_at_boundaries(self, spawner: AmbientSpawner) -> None:
         assert spawner._clamp(_MAP_MAX) == _MAP_MAX
@@ -1162,39 +1168,52 @@ class TestNegativeDt:
 class TestStreetGrid:
     """Verify that the street grid path functions produce believable paths."""
 
+    def test_generate_street_grid_includes_zero(self) -> None:
+        from engine.simulation.ambient import _generate_street_grid
+        ns, ew = _generate_street_grid(200.0)
+        assert 0.0 in ns
+        assert 0.0 in ew
+
+    def test_generate_street_grid_spans_bounds(self) -> None:
+        from engine.simulation.ambient import _generate_street_grid
+        ns, ew = _generate_street_grid(200.0)
+        assert max(ns) >= 180.0
+        assert min(ns) <= -180.0
+
     def test_street_path_returns_two_waypoints(self) -> None:
-        from engine.simulation.ambient import _street_path
-        path = _street_path((-30.0, 0.0), (30.0, 0.0))
+        from engine.simulation.ambient import _street_path, _generate_street_grid
+        ns, ew = _generate_street_grid(200.0)
+        path = _street_path((-200.0, 0.0), (200.0, 0.0), ns, ew)
         assert len(path) == 2
 
     def test_street_path_corner_near_street(self) -> None:
         """The intermediate corner should be near a street intersection."""
-        from engine.simulation.ambient import _street_path, _STREETS_NS_X, _STREET_JITTER
-        path = _street_path((-30.0, 5.0), (30.0, -5.0))
+        from engine.simulation.ambient import _street_path, _generate_street_grid, _STREET_JITTER
+        ns, ew = _generate_street_grid(200.0)
+        path = _street_path((-200.0, 5.0), (200.0, -5.0), ns, ew)
         corner_x, corner_y = path[0]
         # Corner x should be within jitter of a NS street
-        min_dist = min(abs(corner_x - sx) for sx in _STREETS_NS_X)
+        min_dist = min(abs(corner_x - sx) for sx in ns)
         assert min_dist <= _STREET_JITTER + 0.01
 
     def test_snap_to_nearest_street(self) -> None:
-        from engine.simulation.ambient import _snap_to_nearest_street, _STREETS_NS_X, _STREETS_EW_Y, _STREET_JITTER
-        # Point at (5, 5) is closer to NS street x=10 (dist=5) and EW street y=10 (dist=5)
-        # Either snap direction is valid
+        from engine.simulation.ambient import _snap_to_nearest_street, _generate_street_grid, _STREET_JITTER
+        ns, ew = _generate_street_grid(200.0)
         for _ in range(20):
-            sx, sy = _snap_to_nearest_street(5.0, 5.0)
-            ns_match = any(abs(sx - s) <= _STREET_JITTER + 0.01 for s in _STREETS_NS_X)
-            ew_match = any(abs(sy - s) <= _STREET_JITTER + 0.01 for s in _STREETS_EW_Y)
+            sx, sy = _snap_to_nearest_street(5.0, 5.0, ns, ew)
+            ns_match = any(abs(sx - s) <= _STREET_JITTER + 0.01 for s in ns)
+            ew_match = any(abs(sy - s) <= _STREET_JITTER + 0.01 for s in ew)
             assert ns_match or ew_match
 
     def test_sidewalk_path_follows_streets(self, spawner: AmbientSpawner) -> None:
         """Sidewalk paths should now produce L-shaped street-following paths."""
-        start = (-30.0, 0.0)
+        start = (-200.0, 0.0)
         path = spawner._sidewalk_path(start)
         assert len(path) == 2  # corner + destination
         # The corner should be near a street line
-        from engine.simulation.ambient import _STREETS_NS_X, _STREET_JITTER
+        from engine.simulation.ambient import _STREET_JITTER
         corner_x = path[0][0]
-        min_dist = min(abs(corner_x - sx) for sx in _STREETS_NS_X)
+        min_dist = min(abs(corner_x - sx) for sx in spawner._streets_ns)
         assert min_dist <= _STREET_JITTER + 0.01
 
 

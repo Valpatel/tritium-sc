@@ -427,12 +427,10 @@ class TestNonCombatants:
         t = _make_target("person", alliance="neutral", name="Civilian")
         assert t.is_combatant is False
 
-    @pytest.mark.skip(reason="apply_combat_profile() does not map camera to non-combatant from registry")
     def test_camera_is_non_combatant(self):
         t = _make_target("camera", alliance="friendly", name="Front Door Cam")
         assert t.is_combatant is False
 
-    @pytest.mark.skip(reason="apply_combat_profile() does not map sensor to non-combatant from registry")
     def test_sensor_is_non_combatant(self):
         t = _make_target("sensor", alliance="friendly", name="Motion Sensor")
         assert t.is_combatant is False
@@ -598,7 +596,6 @@ class TestBehaviorDispatch:
         # Should not raise
         behaviors.tick(0.1, targets)
 
-    @pytest.mark.skip(reason="apply_combat_profile() does not set camera as non-combatant; camera fires projectiles")
     def test_non_combatants_ignored_by_behaviors(self):
         """Non-combatant types (camera, sensor, person) should not fire."""
         combat, behaviors = self._setup()

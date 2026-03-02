@@ -807,3 +807,103 @@ class TestPlayToEnd:
         frame = spec.tick(15.0)
         assert frame is not None
         assert "targets" in frame
+
+
+# ---------------------------------------------------------------------------
+# Simulated frontend polling (replay frame endpoint pattern)
+# ---------------------------------------------------------------------------
+
+class TestFrontendPolling:
+    """Simulate the frontend replay panel's 4Hz polling pattern.
+
+    The frontend calls GET /api/game/replay/frame every 250ms.
+    The endpoint calls spectator.tick(0.25) when playing.
+    This test proves the playback actually advances frame by frame.
+    """
+
+    def test_polling_advances_frames(self, replay_with_data):
+        """Simulating 4Hz polls for 2 seconds should advance ~4 frames."""
+        from engine.simulation.spectator import SpectatorMode
+        spec = SpectatorMode(replay_with_data)
+        spec.play()
+
+        # Simulate 8 polls at 250ms each = 2 seconds real time
+        for _ in range(8):
+            if spec._playing:
+                spec.tick(0.25)
+
+        # At 1x speed, 2s = 4 frames (2Hz recording rate)
+        assert spec.current_frame == 4, (
+            f"Expected frame 4 after 2s of polling, got {spec.current_frame}"
+        )
+
+    def test_polling_at_2x_advances_faster(self, replay_with_data):
+        """At 2x speed, 2 seconds of polling should advance ~8 frames."""
+        from engine.simulation.spectator import SpectatorMode
+        spec = SpectatorMode(replay_with_data)
+        spec.set_speed(2.0)
+        spec.play()
+
+        # 8 polls * 0.25s * 2x = 4s effective = 8 frames
+        for _ in range(8):
+            if spec._playing:
+                spec.tick(0.25)
+
+        assert spec.current_frame == 8, (
+            f"Expected frame 8 at 2x after 2s, got {spec.current_frame}"
+        )
+
+    def test_polling_auto_pauses_at_end(self, replay_with_data):
+        """Polling past the end auto-pauses playback."""
+        from engine.simulation.spectator import SpectatorMode
+        spec = SpectatorMode(replay_with_data)
+        spec.play()
+
+        # 20 frames at 2Hz = 10s. Poll for 12s (48 polls * 0.25s)
+        for _ in range(48):
+            if spec._playing:
+                spec.tick(0.25)
+
+        assert spec._playing is False
+        assert spec.current_frame == spec.total_frames - 1
+
+    def test_polling_returns_different_frames(self, replay_with_data):
+        """Each poll should return different frame data as units move."""
+        from engine.simulation.spectator import SpectatorMode
+        spec = SpectatorMode(replay_with_data)
+        spec.play()
+
+        frames = []
+        for _ in range(8):
+            if spec._playing:
+                f = spec.tick(0.25)
+                if f:
+                    frames.append(f)
+
+        # Should have collected frames with advancing positions
+        assert len(frames) >= 2
+        # First unit's x position should be different between first and last
+        first_x = frames[0]["targets"][0]["position"]["x"]
+        last_x = frames[-1]["targets"][0]["position"]["x"]
+        assert first_x != last_x, "Positions should differ across frames"
+
+    def test_pause_stops_advancement(self, replay_with_data):
+        """Pausing stops frame advancement even with continued polling."""
+        from engine.simulation.spectator import SpectatorMode
+        spec = SpectatorMode(replay_with_data)
+        spec.play()
+
+        # Advance 4 polls
+        for _ in range(4):
+            if spec._playing:
+                spec.tick(0.25)
+
+        frame_before_pause = spec.current_frame
+        spec.pause()
+
+        # Poll 4 more times while paused
+        for _ in range(4):
+            if spec._playing:
+                spec.tick(0.25)
+
+        assert spec.current_frame == frame_before_pause

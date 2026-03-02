@@ -484,8 +484,206 @@ class TestWeaponTypeDispatch:
             assert t in _WEAPON_TYPES, f"Missing weapon type for {t}"
 
     def test_weapon_types_values_non_empty(self):
-        """All weapon type values should be non-empty strings."""
+        """All weapon type values should be non-empty strings or None for non-firing units."""
         from engine.simulation.behaviors import _WEAPON_TYPES
+        # Units that intentionally cannot fire (None weapon type)
+        no_weapon_types = {"scout_swarm", "bomber_swarm"}
         for unit_type, weapon in _WEAPON_TYPES.items():
-            assert isinstance(weapon, str) and len(weapon) > 0, \
-                f"Weapon type for {unit_type} is invalid: {weapon!r}"
+            if unit_type in no_weapon_types:
+                assert weapon is None, \
+                    f"Non-firing unit {unit_type} should have None weapon, got: {weapon!r}"
+            else:
+                assert isinstance(weapon, str) and len(weapon) > 0, \
+                    f"Weapon type for {unit_type} is invalid: {weapon!r}"
+
+
+# --------------------------------------------------------------------------
+# Reconning speed modifier (BUG FIX: must not compound per tick)
+# --------------------------------------------------------------------------
+
+class TestReconningSpeedModifier:
+    """Verify reconning speed modifier applies once, not exponentially per tick."""
+
+    def test_reconning_speed_applied_once(self):
+        """Speed should be 0.6x base after entering reconning, not compounding."""
+        bus = SimpleEventBus()
+        combat = CombatSystem(bus)
+        behaviors = UnitBehaviors(combat)
+
+        hostile = _make_hostile("h1", (50.0, 0.0))  # out of turret range
+        base_speed = hostile.speed
+        hostile.fsm_state = "reconning"
+        targets = {"h1": hostile}
+
+        # Tick 10 times (1 second at 10Hz)
+        for _ in range(10):
+            behaviors.tick(0.1, targets)
+
+        # Speed should be exactly 0.6x base, NOT 0.6^10 * base
+        expected = base_speed * 0.6
+        assert abs(hostile.speed - expected) < 0.001, \
+            f"Speed {hostile.speed:.6f} should be {expected:.6f} (0.6x base), " \
+            f"not {base_speed * (0.6 ** 10):.6f} (exponential decay)"
+
+    def test_reconning_speed_stable_over_many_ticks(self):
+        """Speed must remain constant over 100 ticks in reconning state."""
+        bus = SimpleEventBus()
+        combat = CombatSystem(bus)
+        behaviors = UnitBehaviors(combat)
+
+        hostile = _make_hostile("h1", (50.0, 0.0))
+        base_speed = hostile.speed
+        hostile.fsm_state = "reconning"
+        targets = {"h1": hostile}
+
+        # Tick 100 times (10 seconds at 10Hz)
+        for _ in range(100):
+            behaviors.tick(0.1, targets)
+
+        expected = base_speed * 0.6
+        assert abs(hostile.speed - expected) < 0.001, \
+            f"Speed drifted to {hostile.speed:.6f} after 100 ticks, expected {expected:.6f}"
+
+    def test_reconning_speed_restored_on_exit(self):
+        """Speed should restore to base when leaving reconning state."""
+        bus = SimpleEventBus()
+        combat = CombatSystem(bus)
+        behaviors = UnitBehaviors(combat)
+
+        hostile = _make_hostile("h1", (50.0, 0.0))
+        base_speed = hostile.speed
+        hostile.fsm_state = "reconning"
+        targets = {"h1": hostile}
+
+        # Enter reconning for a few ticks
+        for _ in range(5):
+            behaviors.tick(0.1, targets)
+        assert abs(hostile.speed - base_speed * 0.6) < 0.001
+
+        # Exit reconning
+        hostile.fsm_state = "advancing"
+        behaviors.tick(0.1, targets)
+
+        assert abs(hostile.speed - base_speed) < 0.001, \
+            f"Speed {hostile.speed:.6f} should be restored to {base_speed:.6f}"
+
+    def test_reconning_reentry_applies_modifier_again(self):
+        """Re-entering reconning after leaving should apply 0.6x again."""
+        bus = SimpleEventBus()
+        combat = CombatSystem(bus)
+        behaviors = UnitBehaviors(combat)
+
+        hostile = _make_hostile("h1", (50.0, 0.0))
+        base_speed = hostile.speed
+        hostile.fsm_state = "reconning"
+        targets = {"h1": hostile}
+
+        # Enter reconning
+        behaviors.tick(0.1, targets)
+        assert abs(hostile.speed - base_speed * 0.6) < 0.001
+
+        # Exit reconning
+        hostile.fsm_state = "advancing"
+        behaviors.tick(0.1, targets)
+        assert abs(hostile.speed - base_speed) < 0.001
+
+        # Re-enter reconning
+        hostile.fsm_state = "reconning"
+        behaviors.tick(0.1, targets)
+        assert abs(hostile.speed - base_speed * 0.6) < 0.001
+
+
+# --------------------------------------------------------------------------
+# Suppressing cooldown modifier (BUG FIX: must not compound per tick)
+# --------------------------------------------------------------------------
+
+class TestSuppressingCooldownModifier:
+    """Verify suppressing cooldown modifier applies once, not exponentially per tick."""
+
+    def test_suppressing_cooldown_applied_once(self):
+        """Cooldown should be 0.5x base after entering suppressing, not compounding."""
+        bus = SimpleEventBus()
+        combat = CombatSystem(bus)
+        behaviors = UnitBehaviors(combat)
+
+        hostile = _make_hostile("h1", (50.0, 0.0))  # out of turret range
+        base_cooldown = hostile.weapon_cooldown
+        hostile.fsm_state = "suppressing"
+        targets = {"h1": hostile}
+
+        # Tick 10 times (1 second at 10Hz)
+        for _ in range(10):
+            behaviors.tick(0.1, targets)
+
+        # Cooldown should be exactly 0.5x base, NOT 0.5^10 * base
+        expected = base_cooldown * 0.5
+        assert abs(hostile.weapon_cooldown - expected) < 0.001, \
+            f"Cooldown {hostile.weapon_cooldown:.6f} should be {expected:.6f} (0.5x base), " \
+            f"not {base_cooldown * (0.5 ** 10):.6f} (exponential decay)"
+
+    def test_suppressing_cooldown_stable_over_many_ticks(self):
+        """Cooldown must remain constant over 100 ticks in suppressing state."""
+        bus = SimpleEventBus()
+        combat = CombatSystem(bus)
+        behaviors = UnitBehaviors(combat)
+
+        hostile = _make_hostile("h1", (50.0, 0.0))
+        base_cooldown = hostile.weapon_cooldown
+        hostile.fsm_state = "suppressing"
+        targets = {"h1": hostile}
+
+        # Tick 100 times (10 seconds at 10Hz)
+        for _ in range(100):
+            behaviors.tick(0.1, targets)
+
+        expected = base_cooldown * 0.5
+        assert abs(hostile.weapon_cooldown - expected) < 0.001, \
+            f"Cooldown drifted to {hostile.weapon_cooldown:.6f} after 100 ticks, expected {expected:.6f}"
+
+    def test_suppressing_cooldown_restored_on_exit(self):
+        """Cooldown should restore to base when leaving suppressing state."""
+        bus = SimpleEventBus()
+        combat = CombatSystem(bus)
+        behaviors = UnitBehaviors(combat)
+
+        hostile = _make_hostile("h1", (50.0, 0.0))
+        base_cooldown = hostile.weapon_cooldown
+        hostile.fsm_state = "suppressing"
+        targets = {"h1": hostile}
+
+        # Enter suppressing for a few ticks
+        for _ in range(5):
+            behaviors.tick(0.1, targets)
+        assert abs(hostile.weapon_cooldown - base_cooldown * 0.5) < 0.001
+
+        # Exit suppressing
+        hostile.fsm_state = "advancing"
+        behaviors.tick(0.1, targets)
+
+        assert abs(hostile.weapon_cooldown - base_cooldown) < 0.001, \
+            f"Cooldown {hostile.weapon_cooldown:.6f} should be restored to {base_cooldown:.6f}"
+
+    def test_suppressing_reentry_applies_modifier_again(self):
+        """Re-entering suppressing after leaving should apply 0.5x again."""
+        bus = SimpleEventBus()
+        combat = CombatSystem(bus)
+        behaviors = UnitBehaviors(combat)
+
+        hostile = _make_hostile("h1", (50.0, 0.0))
+        base_cooldown = hostile.weapon_cooldown
+        hostile.fsm_state = "suppressing"
+        targets = {"h1": hostile}
+
+        # Enter suppressing
+        behaviors.tick(0.1, targets)
+        assert abs(hostile.weapon_cooldown - base_cooldown * 0.5) < 0.001
+
+        # Exit suppressing
+        hostile.fsm_state = "advancing"
+        behaviors.tick(0.1, targets)
+        assert abs(hostile.weapon_cooldown - base_cooldown) < 0.001
+
+        # Re-enter suppressing
+        hostile.fsm_state = "suppressing"
+        behaviors.tick(0.1, targets)
+        assert abs(hostile.weapon_cooldown - base_cooldown * 0.5) < 0.001
