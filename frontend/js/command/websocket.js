@@ -357,7 +357,12 @@ export class WebSocketManager {
                 if (d.score !== undefined) TritiumStore.set('game.score', d.score);
                 if (d.total_eliminations !== undefined) TritiumStore.set('game.eliminations', d.total_eliminations);
                 else if (d.total_kills !== undefined) TritiumStore.set('game.eliminations', d.total_kills);
-                EventBus.emit('game:state', { ...d, state: phase });
+                const stateData = { ...d, state: phase };
+                EventBus.emit('game:state', stateData);
+                // Update HUD game state so _hudState.gameState reflects victory/defeat
+                if (typeof warHandleGameState === 'function') {
+                    warHandleGameState(stateData);
+                }
                 // Route through warHandle* for audio hooks (victory/defeat sounds)
                 if (typeof warHandleGameOver === 'function') {
                     warHandleGameOver(d);
@@ -375,7 +380,9 @@ export class WebSocketManager {
                         infrastructure_health: d.infrastructure_health,
                         infrastructure_max: d.infrastructure_max,
                     };
-                    warHudShowGameOver(d.result, d.score, d.waves || d.wave, d.total_eliminations || d.total_kills, modeData);
+                    // Backend sends 'wave' (singular); normalize to support both
+                    const wavesCompleted = d.waves || d.wave || 0;
+                    warHudShowGameOver(d.result, d.score, wavesCompleted, d.total_eliminations || d.total_kills, modeData);
                 }
                 break;
             }
@@ -421,6 +428,7 @@ export class WebSocketManager {
                 EventBus.emit('robot:thought', msg.data || msg);
                 break;
 
+            case 'npc_thought':
             case 'amy_npc_thought': {
                 const d = msg.data || msg;
                 const importance = d.importance || 'normal';
@@ -472,6 +480,7 @@ export class WebSocketManager {
                 break;
             }
 
+            case 'npc_thought_clear':
             case 'amy_npc_thought_clear': {
                 const d = msg.data || msg;
                 const units = TritiumStore.units;
