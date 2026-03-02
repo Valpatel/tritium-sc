@@ -30,12 +30,20 @@ const DeviceAPI = {
     },
 
     recall(unitId) {
-        return this.sendCommand(unitId, 'recall()');
+        return fetch('/api/amy/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'recall', params: [unitId] }),
+        });
     },
 
     patrol(unitId, waypoints) {
-        const wpStr = waypoints.map(w => `{${w.x},${w.y}}`).join(',');
-        return this.sendCommand(unitId, `patrol(${wpStr})`);
+        const wps = JSON.stringify(waypoints.map(w => [w.x, w.y]));
+        return fetch('/api/amy/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'patrol', params: [unitId, wps] }),
+        });
     },
 
     fire(unitId, targetX, targetY) {

@@ -573,8 +573,8 @@ console.log('\n--- RoverControl button events ---');
     const call = _fetchCalls.find(c => c.url === '/api/amy/command');
     assert(call !== undefined, 'RECALL calls /api/amy/command');
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'recall()', 'RECALL sends recall() Lua command');
-    assert(body.target_id === 'rover-recall-test', 'RECALL sends correct unit id');
+    assert(body.action === 'recall', 'RECALL sends recall action');
+    assert(Array.isArray(body.params) && body.params[0] === 'rover-recall-test', 'RECALL sends unit id in params array');
 })();
 
 (function testRoverRecallSetsStatusText() {
@@ -735,7 +735,7 @@ console.log('\n--- DroneControl ---');
     const call = _fetchCalls.find(c => c.url === '/api/amy/command');
     assert(call !== undefined, 'Drone RECALL calls API');
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'recall()', 'Drone RECALL sends recall()');
+    assert(body.action === 'recall', 'Drone RECALL sends recall action');
 })();
 
 (function testDroneStopCallsAPI() {
@@ -1602,13 +1602,14 @@ console.log('\n--- DeviceAPI dispatch ---');
 
 console.log('\n--- DeviceAPI convenience methods ---');
 
-(function testRecallCallsSendCommand() {
+(function testRecallUsesParamsFormat() {
     resetTracking();
     DeviceAPI.recall('unit-r1');
     const call = _fetchCalls[0];
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'recall()', 'DeviceAPI.recall sends recall()');
-    assert(body.target_id === 'unit-r1', 'DeviceAPI.recall sends correct unit id');
+    assert(body.action === 'recall', 'DeviceAPI.recall sends recall action');
+    assert(Array.isArray(body.params) && body.params[0] === 'unit-r1', 'DeviceAPI.recall sends unit id in params array');
+    assert(!body.target_id, 'DeviceAPI.recall does not send target_id (Pydantic drops it)');
 })();
 
 (function testStopCallsSendCommand() {
@@ -1638,13 +1639,17 @@ console.log('\n--- DeviceAPI convenience methods ---');
     assert(body.target_id === 'unit-a1', 'DeviceAPI.aim sends correct unit id');
 })();
 
-(function testPatrolCallsSendCommand() {
+(function testPatrolUsesParamsFormat() {
     resetTracking();
     DeviceAPI.patrol('unit-p1', [{ x: 10, y: 20 }, { x: 30, y: 40 }]);
     const call = _fetchCalls[0];
     const body = call ? JSON.parse(call.opts.body) : {};
-    assert(body.action === 'patrol({10,20},{30,40})', 'DeviceAPI.patrol sends patrol with waypoints');
-    assert(body.target_id === 'unit-p1', 'DeviceAPI.patrol sends correct unit id');
+    assert(body.action === 'patrol', 'DeviceAPI.patrol sends patrol action');
+    assert(Array.isArray(body.params), 'DeviceAPI.patrol sends params array');
+    assert(body.params && body.params[0] === 'unit-p1', 'DeviceAPI.patrol sends unit id as first param');
+    const wpsParsed = body.params ? JSON.parse(body.params[1]) : [];
+    assert(Array.isArray(wpsParsed) && wpsParsed[0][0] === 10 && wpsParsed[0][1] === 20, 'DeviceAPI.patrol sends waypoints as JSON array [[x,y],...]');
+    assert(!body.target_id, 'DeviceAPI.patrol does not send target_id');
 })();
 
 // ============================================================
