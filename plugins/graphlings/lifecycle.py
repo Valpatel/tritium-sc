@@ -4,12 +4,12 @@
 """SimulationLifecycleHandler — auto-deploy graphlings on countdown, recall on game over.
 
 Listens for game_state_change events from the EventBus and orchestrates
-batch deploy/recall of graphlings via the AgentBridge.
+batch deploy/recall of graphlings via the AgentBridge (thin HTTP adapter).
 """
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .agent_bridge import AgentBridge
@@ -24,11 +24,11 @@ class SimulationLifecycleHandler:
 
     def __init__(
         self,
-        bridge: AgentBridge,
+        bridge: Any,
         entity_factory: EntityFactory,
         config: GraphlingsConfig,
     ) -> None:
-        self._bridge = bridge
+        self._client = bridge
         self._factory = entity_factory
         self._config = config
         self._deployed = False
@@ -52,7 +52,7 @@ class SimulationLifecycleHandler:
             "consciousness_layer_max": self._config.default_consciousness_max,
             "allowed_actions": ["say", "move_to", "observe", "flee", "emote"],
         }
-        result = self._bridge.batch_deploy(
+        result = self._client.batch_deploy(
             {"config": config, "max_agents": self._config.max_agents}
         )
         if result is None:
@@ -63,7 +63,6 @@ class SimulationLifecycleHandler:
         for i, entry in enumerate(deployed):
             soul_id = entry["soul_id"]
             name = entry.get("name", soul_id)
-            # First graphling is drone_operator (combatant), rest are civilians
             is_combatant = i == 0
             spawn_point = points[i % len(points)] if points else (0.0, 0.0)
             self._factory.spawn(
@@ -77,7 +76,7 @@ class SimulationLifecycleHandler:
         """Recall all deployed graphlings."""
         if not self._deployed:
             return
-        self._bridge.batch_recall(self._config.default_service_name, reason)
+        self._client.batch_recall(self._config.default_service_name, reason)
         self._factory.despawn_all()
         self._deployed_souls.clear()
         self._deployed = False

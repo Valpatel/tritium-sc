@@ -3,7 +3,7 @@
 # Licensed under AGPL-3.0 — see LICENSE for details.
 """Tests for SimulationLifecycleHandler — auto deploy/recall on game state.
 
-TDD: Written before implementation.
+Uses mock bridge and factory (no SDK dependency).
 """
 from __future__ import annotations
 
@@ -94,7 +94,7 @@ class TestCountdownDeploy:
 
 
 class TestRoleAssignment:
-    """First graphling gets combatant role (drone_operator), rest are civilians."""
+    """First graphling gets combatant role, rest are civilians."""
 
     def test_first_graphling_is_combatant(self):
         from graphlings.lifecycle import SimulationLifecycleHandler
@@ -206,7 +206,7 @@ class TestGracefulDegradation:
     """Handler doesn't crash when things go wrong."""
 
     def test_server_unreachable_doesnt_crash(self):
-        """batch_deploy returning None should not raise."""
+        """bridge.batch_deploy returning None should not raise."""
         from graphlings.lifecycle import SimulationLifecycleHandler
 
         bridge = _make_mock_bridge()

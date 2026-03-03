@@ -9,3 +9,8 @@ from pathlib import Path
 _plugins_dir = str(Path(__file__).resolve().parent.parent.parent)
 if _plugins_dir not in sys.path:
     sys.path.insert(0, _plugins_dir)
+
+# Add project root to path so `from engine.plugins.base import ...` works
+_project_root = str(Path(__file__).resolve().parent.parent.parent.parent)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)

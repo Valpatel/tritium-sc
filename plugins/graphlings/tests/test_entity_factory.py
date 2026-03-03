@@ -43,7 +43,7 @@ class TestEntityFactory:
         target = engine.add_target.call_args[0][0]
         assert target.asset_type == "graphling"
 
-    def test_spawn_sets_non_combatant(self):
+    def test_spawn_sets_combatant(self):
         from graphlings.entity_factory import EntityFactory
 
         engine = _make_mock_engine()
@@ -51,7 +51,7 @@ class TestEntityFactory:
         factory.spawn("soul_1", "Twilight", (100.0, 200.0))
 
         target = engine.add_target.call_args[0][0]
-        assert target.is_combatant is False
+        assert target.is_combatant is True
 
     def test_spawn_sets_friendly_alliance(self):
         from graphlings.entity_factory import EntityFactory

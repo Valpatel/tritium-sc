@@ -3,7 +3,8 @@
 # Licensed under AGPL-3.0 — see LICENSE for details.
 """Tests for MemorySync — experience recording and batch sync.
 
-TDD: Written before implementation.
+Tests the local MemorySync class which queues experiences and flushes
+them via AgentBridge.record_experiences().  No SDK dependency.
 """
 from __future__ import annotations
 
@@ -11,9 +12,11 @@ import threading
 import pytest
 from unittest.mock import MagicMock
 
+from graphlings.memory_sync import MemorySync
+
 
 def _make_mock_bridge():
-    """Create a mock AgentBridge."""
+    """Create a mock AgentBridge with record_experiences."""
     bridge = MagicMock()
     bridge.record_experiences = MagicMock(return_value=3)
     return bridge
@@ -23,8 +26,6 @@ class TestMemorySync:
     """MemorySync queues experiences and flushes to AgentBridge."""
 
     def test_record_event_queues_experience(self):
-        from graphlings.memory_sync import MemorySync
-
         bridge = _make_mock_bridge()
         sync = MemorySync(bridge)
         sync.record_event("soul_1", "explosion_nearby", "Big explosion in sector 7", 0.8)
@@ -32,8 +33,6 @@ class TestMemorySync:
         assert sync.pending_count("soul_1") == 1
 
     def test_flush_sends_batch_to_bridge(self):
-        from graphlings.memory_sync import MemorySync
-
         bridge = _make_mock_bridge()
         sync = MemorySync(bridge)
         sync.record_event("soul_1", "explosion_nearby", "Explosion", 0.8)
@@ -47,8 +46,6 @@ class TestMemorySync:
         assert len(experiences) == 2
 
     def test_flush_returns_count(self):
-        from graphlings.memory_sync import MemorySync
-
         bridge = _make_mock_bridge()
         bridge.record_experiences.return_value = 2
         sync = MemorySync(bridge)
@@ -59,8 +56,6 @@ class TestMemorySync:
         assert count == 2
 
     def test_empty_flush_returns_zero(self):
-        from graphlings.memory_sync import MemorySync
-
         bridge = _make_mock_bridge()
         sync = MemorySync(bridge)
         count = sync.flush("soul_1")
@@ -69,8 +64,6 @@ class TestMemorySync:
         bridge.record_experiences.assert_not_called()
 
     def test_flush_clears_queue(self):
-        from graphlings.memory_sync import MemorySync
-
         bridge = _make_mock_bridge()
         sync = MemorySync(bridge)
         sync.record_event("soul_1", "event1", "desc", 0.5)
@@ -78,9 +71,7 @@ class TestMemorySync:
 
         assert sync.pending_count("soul_1") == 0
 
-    def test_event_type_maps_to_experience_category(self):
-        from graphlings.memory_sync import MemorySync
-
+    def test_event_type_maps_to_category(self):
         bridge = _make_mock_bridge()
         sync = MemorySync(bridge)
         sync.record_event("soul_1", "projectile_fired", "Shot fired nearby", 0.9)
@@ -90,8 +81,6 @@ class TestMemorySync:
         assert experiences[0]["category"] == "COMBAT_WITNESS"
 
     def test_npc_thought_maps_to_social(self):
-        from graphlings.memory_sync import MemorySync
-
         bridge = _make_mock_bridge()
         sync = MemorySync(bridge)
         sync.record_event("soul_1", "npc_thought", "Someone said hello", 0.5)
@@ -102,8 +91,6 @@ class TestMemorySync:
 
     def test_thread_safety_concurrent_records(self):
         """Multiple threads can record events without data loss."""
-        from graphlings.memory_sync import MemorySync
-
         bridge = _make_mock_bridge()
         sync = MemorySync(bridge)
 
@@ -129,8 +116,6 @@ class TestMemorySync:
 
     def test_bridge_error_doesnt_lose_experiences(self):
         """If bridge fails, experiences are kept in queue for retry."""
-        from graphlings.memory_sync import MemorySync
-
         bridge = _make_mock_bridge()
         bridge.record_experiences.return_value = 0  # failure
 
@@ -142,3 +127,13 @@ class TestMemorySync:
         assert count == 0
         # Experiences should still be in queue after failed flush
         assert sync.pending_count("soul_1") == 2
+
+    def test_flush_all(self):
+        bridge = _make_mock_bridge()
+        sync = MemorySync(bridge)
+        sync.record_event("soul_1", "e1", "d1", 0.5)
+        sync.record_event("soul_2", "e2", "d2", 0.5)
+
+        results = sync.flush_all()
+        assert "soul_1" in results
+        assert "soul_2" in results

@@ -38,6 +38,7 @@ class EntityFactory:
         Returns the target_id of the created entity.
         """
         target_id = f"graphling_{soul_id}_{uuid.uuid4().hex[:8]}"
+        role_name = (role_config or {}).get("role_name", "agent")
 
         target = SimulationTarget(
             target_id=target_id,
@@ -45,16 +46,20 @@ class EntityFactory:
             alliance="friendly",
             asset_type="graphling",
             position=position,
-            speed=1.0,
+            speed=3.0,
             battery=1.0,
-            is_combatant=is_combatant,
-            health=50.0,
-            max_health=50.0,
-            weapon_range=0.0,
-            weapon_cooldown=0.0,
-            weapon_damage=0.0,
+            is_combatant=True,
+            health=80.0,
+            max_health=80.0,
+            weapon_range=25.0,
+            weapon_cooldown=1.5,
+            weapon_damage=8.0,
+            ammo_count=50,
+            ammo_max=50,
             source="graphling",
         )
+        # Store role_name so the frontend can display it
+        target.role_name = role_name
 
         self._engine.add_target(target)
         self._soul_to_target[soul_id] = target_id

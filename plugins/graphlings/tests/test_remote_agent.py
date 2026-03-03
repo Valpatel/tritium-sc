@@ -1,32 +1,20 @@
 # Created by Matthew Valancy
 # Copyright 2026 Valpatel Software LLC
 # Licensed under AGPL-3.0 — see LICENSE for details.
-"""Tests for RemoteAgentRegistry — TDD: written before implementation.
+"""Tests for RemoteAgentRegistry — generic remote agent join protocol.
 
-Tests the remote agent join protocol allowing external AI agents to
-connect to a tritium-sc simulation via HTTP and WebSocket.
+Tests the local RemoteAgentRegistry class from graphlings.remote_agent.
+No SDK dependency — this is a standalone tritium-sc component.
 """
 from __future__ import annotations
 
-import asyncio
 import logging
+import threading
 from unittest.mock import MagicMock
 
 import pytest
 
-
-def _make_mock_context():
-    """Create a mock PluginContext matching tritium-sc's PluginContext shape."""
-    ctx = MagicMock()
-    ctx.event_bus = MagicMock()
-    ctx.event_bus.subscribe.return_value = MagicMock()
-    ctx.target_tracker = MagicMock()
-    ctx.simulation_engine = MagicMock()
-    ctx.app = MagicMock()
-    ctx.logger = logging.getLogger("test.graphlings.remote")
-    ctx.plugin_manager = MagicMock()
-    ctx.settings = {}
-    return ctx
+from graphlings.remote_agent import RemoteAgentRegistry
 
 
 # ── Registry basics ──────────────────────────────────────────────
@@ -36,8 +24,6 @@ class TestRemoteAgentRegistration:
     """Remote agents can register and unregister."""
 
     def test_register_agent(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         result = registry.register_agent(
             agent_id="agent-1",
@@ -52,8 +38,6 @@ class TestRemoteAgentRegistration:
         assert agents[0]["name"] == "Twilight"
 
     def test_unregister_agent(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         registry.register_agent(
             agent_id="agent-1",
@@ -65,15 +49,11 @@ class TestRemoteAgentRegistration:
         assert len(registry.get_agents()) == 0
 
     def test_unregister_unknown_agent(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         result = registry.unregister_agent("nonexistent")
         assert result is False
 
     def test_duplicate_agent_rejected(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         registry.register_agent(
             agent_id="agent-1",
@@ -86,12 +66,9 @@ class TestRemoteAgentRegistration:
             capabilities=["think"],
         )
         assert result is False
-        # Still only one agent
         assert len(registry.get_agents()) == 1
 
     def test_max_agents_limit(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=2)
         registry.register_agent(agent_id="a1", name="A1", capabilities=[])
         registry.register_agent(agent_id="a2", name="A2", capabilities=[])
@@ -100,8 +77,6 @@ class TestRemoteAgentRegistration:
         assert len(registry.get_agents()) == 2
 
     def test_agent_capabilities_stored(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         registry.register_agent(
             agent_id="agent-1",
@@ -113,8 +88,6 @@ class TestRemoteAgentRegistration:
 
     def test_agent_callback_url_optional(self):
         """Agents can register without a callback_url (they may use WebSocket)."""
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         result = registry.register_agent(
             agent_id="ws-agent",
@@ -133,8 +106,6 @@ class TestPerceptionRouting:
     """Perceptions can be routed to registered agents."""
 
     def test_route_perception_to_agent(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         registry.register_agent(
             agent_id="agent-1",
@@ -158,8 +129,6 @@ class TestPerceptionRouting:
         assert result["urgency"] == 0.3
 
     def test_route_perception_unknown_agent(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         result = registry.route_perception(
             agent_id="nonexistent",
@@ -170,9 +139,7 @@ class TestPerceptionRouting:
         assert result is None
 
     def test_route_perception_filters_by_capability(self):
-        """Agent without 'observe' capability should not receive perceptions."""
-        from graphlings.remote_agent import RemoteAgentRegistry
-
+        """Agent without 'think' capability should not receive perceptions."""
         registry = RemoteAgentRegistry(max_agents=5)
         registry.register_agent(
             agent_id="limited",
@@ -185,7 +152,6 @@ class TestPerceptionRouting:
             available_actions=["observe"],
             urgency=0.5,
         )
-        # Agent lacks 'think' capability, so perception routing is rejected
         assert result is None
 
 
@@ -196,8 +162,6 @@ class TestGracefulDisconnect:
     """Handle agent disconnection scenarios."""
 
     def test_unregister_cleans_up_state(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         registry.register_agent(
             agent_id="agent-1",
@@ -205,7 +169,6 @@ class TestGracefulDisconnect:
             capabilities=["think"],
         )
         registry.unregister_agent("agent-1")
-        # Re-registering should work after cleanup
         result = registry.register_agent(
             agent_id="agent-1",
             name="Twilight Reborn",
@@ -216,8 +179,6 @@ class TestGracefulDisconnect:
         assert agents[0]["name"] == "Twilight Reborn"
 
     def test_get_agent_by_id(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         registry.register_agent(
             agent_id="agent-1",
@@ -231,8 +192,6 @@ class TestGracefulDisconnect:
         assert agent["callback_url"] == "http://example.com/cb"
 
     def test_get_agent_unknown_returns_none(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         assert registry.get_agent("no-such") is None
 
@@ -244,10 +203,7 @@ class TestJoinRoute:
     """POST /api/graphlings/join handler."""
 
     def test_join_success(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
-        # Simulate what the route handler would do
         result = registry.register_agent(
             agent_id="ext-1",
             name="External Bot",
@@ -257,9 +213,6 @@ class TestJoinRoute:
         assert result is True
 
     def test_join_missing_agent_id_fails(self):
-        """Registering with empty agent_id should fail."""
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         result = registry.register_agent(
             agent_id="",
@@ -269,9 +222,6 @@ class TestJoinRoute:
         assert result is False
 
     def test_join_missing_name_fails(self):
-        """Registering with empty name should fail."""
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         result = registry.register_agent(
             agent_id="agent-1",
@@ -285,8 +235,6 @@ class TestLeaveRoute:
     """POST /api/graphlings/leave handler."""
 
     def test_leave_success(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         registry.register_agent(
             agent_id="ext-1",
@@ -301,8 +249,6 @@ class TestAgentsRoute:
     """GET /api/graphlings/agents handler."""
 
     def test_agents_returns_all(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         registry.register_agent(agent_id="a1", name="Bot1", capabilities=["think"])
         registry.register_agent(agent_id="a2", name="Bot2", capabilities=["observe"])
@@ -312,8 +258,6 @@ class TestAgentsRoute:
         assert ids == {"a1", "a2"}
 
     def test_agents_empty(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         agents = registry.get_agents()
         assert agents == []
@@ -326,8 +270,6 @@ class TestWebSocketMessages:
     """WebSocket message construction and validation."""
 
     def test_build_perceive_message(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         msg = registry.build_perceive_message(
             perception={"nearby_entities": [], "danger_level": 0.0},
@@ -340,8 +282,6 @@ class TestWebSocketMessages:
         assert msg["urgency"] == 0.2
 
     def test_parse_decide_message_valid(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         raw = {
             "type": "decide",
@@ -356,8 +296,6 @@ class TestWebSocketMessages:
         assert result["emotion"] == "curious"
 
     def test_parse_decide_message_invalid_type(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         raw = {"type": "wrong", "thought": "hello"}
         result = registry.parse_decide_message(raw)
@@ -365,8 +303,6 @@ class TestWebSocketMessages:
 
     def test_parse_decide_message_missing_fields(self):
         """A decide message with no thought or action is still valid but empty."""
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         raw = {"type": "decide"}
         result = registry.parse_decide_message(raw)
@@ -376,8 +312,6 @@ class TestWebSocketMessages:
         assert result["emotion"] == ""
 
     def test_build_act_result_message(self):
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=5)
         msg = registry.build_act_result_message(success=True, details="Action executed")
         assert msg["type"] == "act_result"
@@ -392,9 +326,6 @@ class TestThreadSafety:
     """Registry operations are thread-safe."""
 
     def test_concurrent_register_unregister(self):
-        import threading
-        from graphlings.remote_agent import RemoteAgentRegistry
-
         registry = RemoteAgentRegistry(max_agents=100)
         errors = []
 

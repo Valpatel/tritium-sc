@@ -43,6 +43,9 @@ class GraphlingsConfig:
         "marketplace": (100.0, 200.0),
         "watchtower": (50.0, 150.0),
         "tavern": (180.0, 220.0),
+        "center": (0.0, 0.0),
+        "north_gate": (0.0, 100.0),
+        "south_gate": (0.0, -100.0),
     })
 
     @classmethod

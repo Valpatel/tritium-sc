@@ -1,12 +1,11 @@
 # Created by Matthew Valancy
 # Copyright 2026 Valpatel Software LLC
 # Licensed under AGPL-3.0 — see LICENSE for details.
-"""Tests for GraphlingsPlugin — TDD: written before implementation."""
+"""Tests for GraphlingsPlugin — identity, config, lifecycle."""
 from __future__ import annotations
 
 import logging
 import os
-import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -115,7 +114,6 @@ class TestPluginLifecycle:
         p.start()
         try:
             assert p._running is True
-            assert p._agent_thread is not None
         finally:
             p.stop()
 
@@ -129,30 +127,20 @@ class TestPluginLifecycle:
         p.stop()
         assert p._running is False
 
-    def test_double_start_is_idempotent(self):
+    def test_stop_without_start_is_safe(self):
         from graphlings.plugin import GraphlingsPlugin
 
         p = GraphlingsPlugin()
         ctx = _make_mock_context()
         p.configure(ctx)
-        p.start()
-        thread1 = p._agent_thread
-        p.start()  # should not create a second thread
-        assert p._agent_thread is thread1
-        p.stop()
-
-    def test_stop_without_start_is_safe(self):
-        from graphlings.plugin import GraphlingsPlugin
-
-        p = GraphlingsPlugin()
-        # Should not raise
+        # Should not raise even if start() was never called
         p.stop()
 
     def test_healthy_before_start(self):
         from graphlings.plugin import GraphlingsPlugin
 
         p = GraphlingsPlugin()
-        # Not started yet, no thread — healthy is True (no failure)
+        # Not started yet, no deployed agents -- healthy is True
         assert p.healthy is True
 
     def test_healthy_while_running(self):
@@ -187,8 +175,8 @@ class TestPluginLifecycle:
         p.configure(ctx)
         p.start()
         # Simulate deployed agents
-        p._deployed["soul-1"] = "target-1"
-        p._deployed["soul-2"] = "target-2"
+        p._deployed["soul-1"] = {"soul_id": "soul-1", "target_id": "t-1"}
+        p._deployed["soul-2"] = {"soul_id": "soul-2", "target_id": "t-2"}
         p.stop()
         assert len(p._deployed) == 0
 

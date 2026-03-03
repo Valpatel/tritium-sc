@@ -1,0 +1,107 @@
+{
+  "scenario_id": "graphling_skirmish",
+  "name": "Graphling Skirmish",
+  "description": "Small-scale encounter designed for graphling NPC testing. 4 graphlings vs 4 hostiles.",
+  "map_bounds": {
+    "center": {"x": 0, "y": 0},
+    "width": 400,
+    "height": 400
+  },
+  "waves": [
+    {
+      "name": "First Contact",
+      "spawn_delay": 3,
+      "hostiles": [
+        {
+          "name": "Nerf Kid Alpha",
+          "asset_type": "person",
+          "alliance": "hostile",
+          "position": {"x": 150, "y": 100},
+          "speed": 1.5,
+          "health": 30,
+          "max_health": 30,
+          "weapon_range": 15.0,
+          "weapon_cooldown": 2.0,
+          "weapon_damage": 5.0,
+          "is_combatant": true
+        },
+        {
+          "name": "Nerf Kid Bravo",
+          "asset_type": "person",
+          "alliance": "hostile",
+          "position": {"x": -100, "y": 150},
+          "speed": 1.5,
+          "health": 30,
+          "max_health": 30,
+          "weapon_range": 15.0,
+          "weapon_cooldown": 2.0,
+          "weapon_damage": 5.0,
+          "is_combatant": true
+        }
+      ]
+    },
+    {
+      "name": "Reinforcements",
+      "spawn_delay": 3,
+      "hostiles": [
+        {
+          "name": "Nerf Kid Charlie",
+          "asset_type": "person",
+          "alliance": "hostile",
+          "position": {"x": 100, "y": -100},
+          "speed": 2.0,
+          "health": 40,
+          "max_health": 40,
+          "weapon_range": 20.0,
+          "weapon_cooldown": 1.5,
+          "weapon_damage": 8.0,
+          "is_combatant": true
+        },
+        {
+          "name": "Nerf Kid Delta",
+          "asset_type": "person",
+          "alliance": "hostile",
+          "position": {"x": -50, "y": -120},
+          "speed": 2.0,
+          "health": 40,
+          "max_health": 40,
+          "weapon_range": 20.0,
+          "weapon_cooldown": 1.5,
+          "weapon_damage": 8.0,
+          "is_combatant": true
+        }
+      ]
+    }
+  ],
+  "defenders": [
+    {
+      "name": "Patrol Rover",
+      "asset_type": "rover",
+      "alliance": "friendly",
+      "position": {"x": -50, "y": 0},
+      "speed": 2.0,
+      "health": 100,
+      "max_health": 100,
+      "weapon_range": 30.0,
+      "weapon_cooldown": 1.0,
+      "weapon_damage": 10.0,
+      "is_combatant": true,
+      "waypoints": [{"x": -100, "y": -100}, {"x": 100, "y": -100}, {"x": 100, "y": 100}, {"x": -100, "y": 100}],
+      "loop_waypoints": true
+    },
+    {
+      "name": "Guard Turret",
+      "asset_type": "turret",
+      "alliance": "friendly",
+      "position": {"x": 0, "y": -50},
+      "speed": 0,
+      "health": 150,
+      "max_health": 150,
+      "weapon_range": 50.0,
+      "weapon_cooldown": 0.8,
+      "weapon_damage": 12.0,
+      "is_combatant": true,
+      "vision_range": 60.0
+    }
+  ]
+}

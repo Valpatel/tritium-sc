@@ -1,49 +1,34 @@
 # Created by Matthew Valancy
 # Copyright 2026 Valpatel Software LLC
 # Licensed under AGPL-3.0 — see LICENSE for details.
-"""Tests for graphling thought stream and observable status — TDD first.
+"""Tests for ThoughtCollector — observable thought stream.
 
-Tests the SSE thought streaming, EventBus thought publishing, and
-per-graphling status endpoint.
+Tests the local ThoughtCollector class from graphlings.thought_stream.
+No SDK dependency — this is a standalone component.
 """
 from __future__ import annotations
 
 import logging
+import threading
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-
-def _make_mock_context():
-    """Create a mock PluginContext."""
-    ctx = MagicMock()
-    ctx.event_bus = MagicMock()
-    ctx.event_bus.subscribe.return_value = MagicMock()
-    ctx.target_tracker = MagicMock()
-    ctx.simulation_engine = MagicMock()
-    ctx.app = MagicMock()
-    ctx.logger = logging.getLogger("test.graphlings.stream")
-    ctx.plugin_manager = MagicMock()
-    ctx.settings = {}
-    return ctx
+from graphlings.thought_stream import ThoughtCollector
 
 
 # ── ThoughtCollector basics ──────────────────────────────────────
 
 
 class TestThoughtCollector:
-    """ThoughtCollector accumulates thoughts and supports SSE streaming."""
+    """ThoughtCollector accumulates thoughts and supports filtering."""
 
     def test_create_empty(self):
-        from graphlings.thought_stream import ThoughtCollector
-
         tc = ThoughtCollector(max_history=10)
         assert tc.get_recent() == []
 
     def test_record_thought(self):
-        from graphlings.thought_stream import ThoughtCollector
-
         tc = ThoughtCollector(max_history=10)
         tc.record(
             soul_id="soul-1",
@@ -64,8 +49,6 @@ class TestThoughtCollector:
         assert "timestamp" in recent[0]
 
     def test_max_history_enforced(self):
-        from graphlings.thought_stream import ThoughtCollector
-
         tc = ThoughtCollector(max_history=3)
         for i in range(5):
             tc.record(soul_id=f"s-{i}", thought=f"thought {i}")
@@ -76,8 +59,6 @@ class TestThoughtCollector:
         assert recent[2]["soul_id"] == "s-4"
 
     def test_get_recent_for_soul(self):
-        from graphlings.thought_stream import ThoughtCollector
-
         tc = ThoughtCollector(max_history=20)
         tc.record(soul_id="soul-1", thought="hello")
         tc.record(soul_id="soul-2", thought="world")
@@ -87,8 +68,6 @@ class TestThoughtCollector:
         assert all(r["soul_id"] == "soul-1" for r in recent)
 
     def test_get_recent_limit(self):
-        from graphlings.thought_stream import ThoughtCollector
-
         tc = ThoughtCollector(max_history=100)
         for i in range(10):
             tc.record(soul_id="s", thought=f"t-{i}")
@@ -103,22 +82,18 @@ class TestEventBusPublishing:
     """Thoughts are published to the EventBus when recorded."""
 
     def test_publish_on_record(self):
-        from graphlings.thought_stream import ThoughtCollector
-
-        bus = MagicMock()
-        tc = ThoughtCollector(max_history=10, event_bus=bus)
+        event_bus = MagicMock()
+        tc = ThoughtCollector(max_history=10, event_bus=event_bus)
         tc.record(soul_id="soul-1", thought="thinking", action="observe")
 
-        bus.publish.assert_called_once()
-        call_args = bus.publish.call_args
+        event_bus.publish.assert_called_once()
+        call_args = event_bus.publish.call_args
         assert call_args[0][0] == "graphling_thought"
-        data = call_args[1].get("data") or call_args[0][1]
+        data = call_args[1]["data"]
         assert data["soul_id"] == "soul-1"
         assert data["thought"] == "thinking"
 
-    def test_no_publish_without_bus(self):
-        from graphlings.thought_stream import ThoughtCollector
-
+    def test_no_publish_without_event_bus(self):
         # No event_bus -> should not raise
         tc = ThoughtCollector(max_history=10)
         tc.record(soul_id="soul-1", thought="no crash")
@@ -132,8 +107,6 @@ class TestStatusBuilder:
     """Per-graphling status endpoint returns rich observable data."""
 
     def test_build_status(self):
-        from graphlings.thought_stream import ThoughtCollector
-
         tc = ThoughtCollector(max_history=20)
         tc.record(soul_id="soul-1", thought="hello", emotion="happy")
         tc.record(soul_id="soul-1", thought="world", action="say")
@@ -149,8 +122,6 @@ class TestStatusBuilder:
         assert status["compute_stats"]["think_count"] == 5
 
     def test_build_status_unknown_soul(self):
-        from graphlings.thought_stream import ThoughtCollector
-
         tc = ThoughtCollector(max_history=20)
         status = tc.build_status(
             soul_id="unknown",
@@ -169,9 +140,6 @@ class TestThoughtCollectorThreadSafety:
     """ThoughtCollector is thread-safe for concurrent recording."""
 
     def test_concurrent_records(self):
-        import threading
-        from graphlings.thought_stream import ThoughtCollector
-
         tc = ThoughtCollector(max_history=200)
         errors = []
 
