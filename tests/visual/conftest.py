@@ -17,12 +17,24 @@ from tests.lib.ollama_fleet import OllamaFleet
 
 
 def pytest_addoption(parser):
-    """Add --update-baselines CLI option for screenshot regression tests."""
+    """Add CLI options for visual tests."""
     parser.addoption(
         "--update-baselines",
         action="store_true",
         default=False,
         help="Capture new golden baselines instead of comparing",
+    )
+    parser.addoption(
+        "--matrix-count",
+        type=int,
+        default=50,
+        help="Number of configs for combat matrix fast sweep (default: 50)",
+    )
+    parser.addoption(
+        "--full-sweep",
+        action="store_true",
+        default=False,
+        help="Run full combat matrix sweep (all loadout x ratio combos)",
     )
 from tests.lib.results_db import ResultsDB
 from tests.lib.visual_assert import VisualAssert
