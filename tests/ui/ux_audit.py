@@ -22,7 +22,7 @@ from playwright.sync_api import sync_playwright, expect
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SCREENSHOTS_DIR = os.path.join(PROJECT_ROOT, 'docs', 'screenshots')
-REPORT_DIR = os.path.join(PROJECT_ROOT, 'docs', 'overnight-status')
+REPORT_DIR = os.path.join(PROJECT_ROOT, 'tests', '.test-results', 'ux-audit')
 
 os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 os.makedirs(REPORT_DIR, exist_ok=True)

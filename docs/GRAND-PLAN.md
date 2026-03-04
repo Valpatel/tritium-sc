@@ -8,7 +8,7 @@
 
 ## Philosophy
 
-Every feature below is defined by what the **test report** shows when it passes. If there's no test, the feature doesn't exist. Agent teams work autonomously, save status to `docs/overnight-status/`, and commit frequently to dev so progress is never lost.
+Every feature below is defined by what the **test report** shows when it passes. If there's no test, the feature doesn't exist. Agent teams work autonomously and commit frequently to dev so progress is never lost.
 
 ---
 
@@ -276,15 +276,7 @@ Each test saves a timestamped screenshot to `tests/.test-results/proof/`. The te
 
 ## WORKSTREAM 6: Test Infrastructure
 
-### 6A. Overnight Status Files
-
-Each agent writes status to `docs/overnight-status/{workstream}-{timestamp}.md` with:
-- What was attempted
-- What passed / failed
-- What's left
-- Commit hashes
-
-### 6B. New Test Tier
+### 6A. New Test Tier
 
 Add `./test.sh 12` (or `--battle-proof`) that runs the full battle proof test from 5D.
 
@@ -311,8 +303,7 @@ Each agent:
 1. Writes tests FIRST (TDD)
 2. Implements until tests pass
 3. Commits to dev with descriptive message
-4. Writes status to `docs/overnight-status/`
-5. Moves to next task
+4. Moves to next task
 
 ---
 
@@ -367,8 +358,6 @@ When the operator wakes up and runs `./test.sh fast`, all tiers pass. When they 
 - `tests/engine/simulation/test_street_graph.py` — Street graph tests
 - `tests/engine/simulation/test_scale.py` — Scale verification tests
 - `tests/visual/test_battle_proof.py` — Full battle proof test
-- `docs/overnight-status/*.md` — Agent status files
-
 **Modified files**:
 - `src/engine/simulation/engine.py` — Use pathfinder for unit movement
 - `src/engine/simulation/behaviors.py` — Road-aware hostile approach
