@@ -507,8 +507,9 @@ class TestStartBattleScenario:
         client = TestClient(_make_app(engine=engine))
         resp = client.post("/api/game/battle/street_combat")
         assert resp.status_code == 200
-        # Should have called add_target for each defender
-        assert engine.add_target.call_count == resp.json()["defender_count"]
+        # Defenders are placed via load_scenario() (not direct add_target)
+        engine.game_mode.load_scenario.assert_called_once()
+        assert resp.json()["defender_count"] >= 1
 
     def test_scenario_resets_first(self):
         """Starting a scenario resets any existing game state."""

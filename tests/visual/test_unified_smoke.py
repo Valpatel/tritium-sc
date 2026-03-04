@@ -15,6 +15,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pytest
+import requests
 
 from tests.lib.results_db import ResultsDB
 from tests.lib.server_manager import TritiumServer
@@ -59,6 +60,26 @@ class TestUnifiedSmoke:
 
         browser.close()
         cls._pw.stop()
+
+    def _ensure_units(self) -> None:
+        """Spawn a few friendly units so store/header/panels have data."""
+        if getattr(self, "_units_spawned", False):
+            return
+        types = ["turret", "rover", "drone", "tank", "turret"]
+        for i, t in enumerate(types):
+            requests.post(
+                f"{self.url}/api/amy/simulation/spawn",
+                json={
+                    "asset_type": t,
+                    "name": f"Smoke-{t}-{i}",
+                    "alliance": "friendly",
+                    "position": {"x": i * 20.0, "y": 0.0},
+                },
+                timeout=5,
+            )
+        # Let WebSocket push reach the browser
+        self.page.wait_for_timeout(2000)
+        self.__class__._units_spawned = True
 
     def _record(self, name: str, passed: bool, details: dict | None = None) -> None:
         """Record result to ResultsDB and take a screenshot."""
@@ -154,6 +175,7 @@ class TestUnifiedSmoke:
     def test_04_units_in_store(self):
         name = "smoke_04_units_in_store"
         try:
+            self._ensure_units()
             self.page.wait_for_function(
                 "() => window.TritiumStore && window.TritiumStore.units.size >= 5",
                 timeout=15000,
@@ -168,6 +190,7 @@ class TestUnifiedSmoke:
     def test_05_units_render_as_colored_shapes(self):
         name = "smoke_05_units_render_as_colored_shapes"
         try:
+            self._ensure_units()
             screenshot_path = str(SCREENSHOT_DIR / f"{name}.png")
             self.page.screenshot(path=screenshot_path, full_page=False)
             img = cv2.imread(screenshot_path)
@@ -188,6 +211,7 @@ class TestUnifiedSmoke:
     def test_06_header_live_data(self):
         name = "smoke_06_header_live_data"
         try:
+            self._ensure_units()
             conn_label = self.page.locator("#connection-status .conn-label").text_content()
             assert conn_label is not None and "ONLINE" in conn_label, (
                 f"Connection status not ONLINE: '{conn_label}'"
@@ -215,6 +239,7 @@ class TestUnifiedSmoke:
     def test_07_panels_have_content(self):
         name = "smoke_07_panels_have_content"
         try:
+            self._ensure_units()
             panels = self.page.locator(".panel")
             visible_count = 0
             total = panels.count()

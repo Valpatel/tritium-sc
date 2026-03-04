@@ -154,16 +154,16 @@ const { drawUnit, UNIT_TYPES, ALLIANCE_COLORS, getVisionRadius } = sandbox.modul
     }
 }
 
-// Test 7: Hover ring arc radius is 12 * scale
+// Test 7: Hover ring arc radius is 7 * scale
 {
     const mockCtx = createMockCtx();
     const scale = 1.5;
     drawUnit(mockCtx, 'rover', 'friendly', 90, 100, 100, scale, false, 1.0, true);
     const calls = mockCtx.calls;
-    // After the dash is set, we should see an arc call with radius 12*scale = 18
-    const expectedR = 12 * scale;
+    // After the dash is set, we should see an arc call with radius 7*scale
+    const expectedR = 7 * scale;
     const hasArc = calls.some(c => c === `arc(0,0,${expectedR})`);
-    assert(hasArc, `Hover ring arc radius is 12*scale=${expectedR}`);
+    assert(hasArc, `Hover ring arc radius is 7*scale=${expectedR}`);
 }
 
 // Test 8: MapLibre marker gets unit-marker-hovered class on mouseenter

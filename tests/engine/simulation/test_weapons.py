@@ -462,9 +462,10 @@ class TestBackwardCompat:
         bus = SimpleEventBus()
         combat = CombatSystem(bus)
 
+        # Use rover (non-mortar) to verify default speed=80
         source = SimulationTarget(
-            target_id="t1", name="Turret", alliance="friendly",
-            asset_type="turret", position=(0.0, 0.0),
+            target_id="t1", name="Rover", alliance="friendly",
+            asset_type="rover", position=(0.0, 0.0),
             weapon_range=20.0, weapon_damage=15.0,
             weapon_cooldown=1.0, last_fired=0.0,
         )

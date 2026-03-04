@@ -1,0 +1,83 @@
+{
+  "scenario_id": "combat_proof",
+  "name": "Combat Proof: 4v4 Arena",
+  "description": "Tight 4v4 arena for machine-verified combat. Turret + rover + tank + drone defend center, 4 hostiles converge from edges. All units finite ammo. Small map (100m) for fast engagement.",
+  "map_bounds": 100.0,
+  "max_hostiles": 8,
+  "tags": ["proof", "combat", "4v4", "finite-ammo"],
+  "waves": [
+    {
+      "name": "Arena Assault",
+      "groups": [
+        {
+          "asset_type": "person",
+          "count": 4,
+          "speed": 8.0,
+          "health": 50.0,
+          "weapon_range": 25.0,
+          "weapon_cooldown": 1.0,
+          "weapon_damage": 12.0,
+          "ammo_count": 10,
+          "ammo_max": 10
+        }
+      ],
+      "speed_mult": 1.0,
+      "health_mult": 1.0,
+      "briefing": "Four hostiles converging from edges. Finite ammo.",
+      "threat_level": "medium"
+    }
+  ],
+  "defenders": [
+    {
+      "asset_type": "turret",
+      "position": [-8.0, -5.0],
+      "name": "Alpha Turret",
+      "health": 200.0,
+      "max_health": 200.0,
+      "weapon_range": 80.0,
+      "weapon_cooldown": 1.5,
+      "weapon_damage": 25.0,
+      "ammo_count": 15,
+      "ammo_max": 15
+    },
+    {
+      "asset_type": "rover",
+      "position": [8.0, -5.0],
+      "name": "Bravo Rover",
+      "health": 150.0,
+      "max_health": 150.0,
+      "weapon_range": 40.0,
+      "weapon_cooldown": 0.8,
+      "weapon_damage": 10.0,
+      "ammo_count": 20,
+      "ammo_max": 20,
+      "speed": 3.0
+    },
+    {
+      "asset_type": "tank",
+      "position": [-8.0, 5.0],
+      "name": "Charlie Tank",
+      "health": 300.0,
+      "max_health": 300.0,
+      "weapon_range": 60.0,
+      "weapon_cooldown": 2.0,
+      "weapon_damage": 35.0,
+      "ammo_count": 10,
+      "ammo_max": 10,
+      "speed": 2.0
+    },
+    {
+      "asset_type": "drone",
+      "position": [8.0, 5.0],
+      "name": "Delta Drone",
+      "health": 80.0,
+      "max_health": 80.0,
+      "weapon_range": 50.0,
+      "weapon_cooldown": 0.6,
+      "weapon_damage": 8.0,
+      "ammo_count": 25,
+      "ammo_max": 25,
+      "speed": 6.0
+    }
+  ]
+}

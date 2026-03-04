@@ -656,9 +656,10 @@ class TestSemiGuidedProjectiles:
         bus = SimpleEventBus()
         combat = CombatSystem(bus)
 
+        # Use rover (not mortar-capable) so projectile tracks the target
         source = SimulationTarget(
-            target_id="t1", name="Turret", alliance="friendly",
-            asset_type="turret", position=(0.0, 0.0),
+            target_id="t1", name="Rover", alliance="friendly",
+            asset_type="rover", position=(0.0, 0.0),
             weapon_range=50.0, weapon_damage=15.0,
             weapon_cooldown=1.0, last_fired=0.0,
         )
@@ -767,9 +768,10 @@ class TestProjectileSpeed:
         bus = SimpleEventBus()
         combat = CombatSystem(bus)
 
+        # Use rover (non-mortar) to test default speed=80
         source = SimulationTarget(
-            target_id="t1", name="Turret", alliance="friendly",
-            asset_type="turret", position=(0.0, 0.0),
+            target_id="t1", name="Rover", alliance="friendly",
+            asset_type="rover", position=(0.0, 0.0),
             weapon_range=50.0, weapon_damage=15.0,
             weapon_cooldown=1.0, last_fired=0.0,
         )
@@ -1065,3 +1067,169 @@ class TestStreakClearedOnElimination:
         # Turret eliminated — streak should be reset
         combat.reset_streak("t1")
         assert "t1" not in combat._elimination_streaks
+
+
+class TestMortarIndirectFire:
+    """Tests for mortar (indirect fire) system."""
+
+    def test_turret_fires_mortar_at_long_range(self):
+        """Turret fires mortar arc when target is beyond 30% of weapon_range."""
+        bus = SimpleEventBus()
+        combat = CombatSystem(bus)
+        source = SimulationTarget(
+            target_id="t1", name="Turret", alliance="friendly",
+            asset_type="turret", position=(0.0, 0.0),
+            weapon_range=80.0, weapon_damage=25.0,
+            weapon_cooldown=1.0, last_fired=0.0,
+        )
+        target = SimulationTarget(
+            target_id="h1", name="Hostile", alliance="hostile",
+            asset_type="person", position=(60.0, 0.0), health=50.0,
+        )
+        proj = combat.fire(source, target)
+        assert proj is not None
+        assert proj.is_mortar is True
+        assert proj.arc_peak > 0
+        assert proj.speed == 40.0  # mortar speed
+        assert proj.total_flight_dist > 0
+
+    def test_turret_fires_direct_at_close_range(self):
+        """Turret fires direct when target is within 30% of weapon_range."""
+        bus = SimpleEventBus()
+        combat = CombatSystem(bus)
+        source = SimulationTarget(
+            target_id="t1", name="Turret", alliance="friendly",
+            asset_type="turret", position=(0.0, 0.0),
+            weapon_range=80.0, weapon_damage=25.0,
+            weapon_cooldown=1.0, last_fired=0.0,
+        )
+        target = SimulationTarget(
+            target_id="h1", name="Hostile", alliance="hostile",
+            asset_type="person", position=(20.0, 0.0), health=50.0,
+        )
+        proj = combat.fire(source, target)
+        assert proj is not None
+        assert proj.is_mortar is False
+        assert proj.speed == 80.0
+
+    def test_mortar_z_height_peaks_at_midpoint(self):
+        """Mortar Z height is maximum at flight_progress=0.5."""
+        bus = SimpleEventBus()
+        combat = CombatSystem(bus)
+        source = SimulationTarget(
+            target_id="t1", name="Turret", alliance="friendly",
+            asset_type="turret", position=(0.0, 0.0),
+            weapon_range=100.0, weapon_damage=25.0,
+            weapon_cooldown=1.0, last_fired=0.0,
+        )
+        target = SimulationTarget(
+            target_id="h1", name="Hostile", alliance="hostile",
+            asset_type="person", position=(70.0, 0.0), health=50.0,
+        )
+        proj = combat.fire(source, target)
+        assert proj.is_mortar
+        # At launch (progress=0), z_height should be 0
+        assert proj.z_height == 0.0
+        # At midpoint, z_height should equal arc_peak
+        proj.flight_progress = 0.5
+        assert abs(proj.z_height - proj.arc_peak) < 0.01
+        # At impact (progress=1), z_height should be 0
+        proj.flight_progress = 1.0
+        assert proj.z_height == 0.0
+
+    def test_mortar_skips_los_check(self):
+        """Mortar rounds bypass terrain LOS check."""
+        bus = SimpleEventBus()
+        combat = CombatSystem(bus)
+        source = SimulationTarget(
+            target_id="t1", name="Turret", alliance="friendly",
+            asset_type="turret", position=(0.0, 0.0),
+            weapon_range=80.0, weapon_damage=25.0,
+            weapon_cooldown=1.0, last_fired=0.0,
+        )
+        target = SimulationTarget(
+            target_id="h1", name="Hostile", alliance="hostile",
+            asset_type="person", position=(60.0, 0.0), health=50.0,
+        )
+
+        # Fake terrain map that always blocks LOS
+        class BlockingTerrain:
+            def line_of_sight(self, a, b):
+                return False
+
+        # Mortar should fire despite blocked LOS
+        proj = combat.fire(source, target, terrain_map=BlockingTerrain())
+        assert proj is not None
+        assert proj.is_mortar is True
+
+    def test_rover_never_fires_mortar(self):
+        """Non-mortar-capable types always fire direct."""
+        bus = SimpleEventBus()
+        combat = CombatSystem(bus)
+        source = SimulationTarget(
+            target_id="r1", name="Rover", alliance="friendly",
+            asset_type="rover", position=(0.0, 0.0),
+            weapon_range=80.0, weapon_damage=10.0,
+            weapon_cooldown=0.5, last_fired=0.0,
+        )
+        target = SimulationTarget(
+            target_id="h1", name="Hostile", alliance="hostile",
+            asset_type="person", position=(60.0, 0.0), health=50.0,
+        )
+        proj = combat.fire(source, target)
+        assert proj is not None
+        assert proj.is_mortar is False
+        assert proj.speed == 80.0
+
+    def test_mortar_does_not_track_target(self):
+        """Mortar rounds fly to original target_pos, not current position."""
+        bus = SimpleEventBus()
+        combat = CombatSystem(bus)
+        source = SimulationTarget(
+            target_id="t1", name="Turret", alliance="friendly",
+            asset_type="turret", position=(0.0, 0.0),
+            weapon_range=80.0, weapon_damage=25.0,
+            weapon_cooldown=1.0, last_fired=0.0,
+        )
+        target = SimulationTarget(
+            target_id="h1", name="Hostile", alliance="hostile",
+            asset_type="person", position=(60.0, 0.0), health=50.0,
+        )
+        proj = combat.fire(source, target)
+        assert proj.is_mortar
+        original_target_pos = proj.target_pos
+
+        # Move target perpendicular
+        target.position = (60.0, 30.0)
+        targets = {"t1": source, "h1": target}
+        combat.tick(0.1, targets)
+
+        # Mortar should still aim at original position (y stays 0)
+        assert proj.position[1] == 0.0, \
+            f"Mortar should aim at original target_pos, not track. y={proj.position[1]}"
+
+    def test_mortar_to_dict_includes_arc_fields(self):
+        """Mortar projectile to_dict includes is_mortar, z_height, arc_peak."""
+        from engine.simulation.combat import Projectile
+        proj = Projectile(
+            id="test", source_id="t1", source_name="Turret",
+            target_id="h1", position=(0.0, 0.0), target_pos=(50.0, 0.0),
+            is_mortar=True, arc_peak=20.0, total_flight_dist=50.0,
+        )
+        proj.flight_progress = 0.5
+        d = proj.to_dict()
+        assert d["is_mortar"] is True
+        assert d["z_height"] == 20.0
+        assert d["arc_peak"] == 20.0
+        assert d["flight_progress"] == 0.5
+
+    def test_non_mortar_to_dict_excludes_arc_fields(self):
+        """Non-mortar projectile to_dict does not include arc fields."""
+        from engine.simulation.combat import Projectile
+        proj = Projectile(
+            id="test", source_id="r1", source_name="Rover",
+            target_id="h1", position=(0.0, 0.0), target_pos=(50.0, 0.0),
+        )
+        d = proj.to_dict()
+        assert "is_mortar" not in d
+        assert "z_height" not in d
