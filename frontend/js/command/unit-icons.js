@@ -420,7 +420,7 @@ function _drawFallback(ctx, scale, color) {
 
 /** Pulsing cyan selection ring */
 function _drawSelectionRing(ctx, scale) {
-    const r = 12 * scale;
+    const r = 7 * scale;
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const pulse = 0.5 + 0.5 * Math.sin(now * 0.005);
 
@@ -441,7 +441,7 @@ function _drawSelectionRing(ctx, scale) {
 
 /** Dashed white hover ring (dimmer than selection) */
 function _drawHoverRing(ctx, scale) {
-    const r = 12 * scale;
+    const r = 7 * scale;
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
     ctx.lineWidth = 1.5;
     ctx.setLineDash([4, 3]);
@@ -453,10 +453,10 @@ function _drawHoverRing(ctx, scale) {
 
 /** Health bar below unit (green -> yellow -> red gradient) */
 function _drawHealthBar(ctx, scale, health) {
-    const barW = 18 * scale;
+    const barW = 10 * scale;
     const barH = 2;
     const bx = -barW / 2;
-    const by = 10 * scale;
+    const by = 7 * scale;
 
     // Background
     ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
@@ -479,8 +479,8 @@ function _drawHealthBar(ctx, scale, health) {
 
 /** Small heading arrow */
 function _drawHeadingArrow(ctx, rad, scale, color) {
-    const arrowLen = 10 * scale;
-    const arrowW = 2.5 * scale;
+    const arrowLen = 7 * scale;
+    const arrowW = 2 * scale;
     const tipX = Math.cos(rad) * arrowLen;
     const tipY = -Math.sin(rad) * arrowLen;
 

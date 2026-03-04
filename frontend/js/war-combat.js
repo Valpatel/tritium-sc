@@ -31,6 +31,8 @@ const PROJECTILE_STYLES = {
     nerf_cannon: { color: '#fcee0a', trailColor: '#ffee80', radius: 7, trailLen: 10, speed: 22 },
     nerf_tank_cannon: { color: '#ff6600', trailColor: '#ff9930', radius: 10, trailLen: 16, speed: 15 },
     nerf_apc_mg: { color: '#05ffa1', trailColor: '#60ffc0', radius: 4, trailLen: 6, speed: 35 },
+    // Mortar rounds (arcing indirect fire)
+    nerf_mortar: { color: '#ff6600', trailColor: '#ff9930', radius: 8, trailLen: 14, speed: 15 },
     // Splash
     water_balloon: { color: '#00a0ff', trailColor: '#40c0ff', radius: 8, trailLen: 6, speed: 12 },
     // Civil unrest
@@ -57,6 +59,10 @@ function warCombatAddProjectile(data) {
         startTime: Date.now(),
         trail: [{ x: sx, y: sy }],
         speed: data.speed || style.speed,
+        // Mortar arc fields
+        isMortar: !!data.is_mortar,
+        arcPeak: data.arc_peak || 0,
+        flightProgress: 0,
     });
 
     // Muzzle flash at firing position
@@ -92,6 +98,15 @@ function warCombatUpdateProjectiles(dt) {
         p.x += dx * ratio;
         p.y += dy * ratio;
 
+        // Update mortar flight progress
+        if (p.isMortar) {
+            const totalDist = Math.sqrt((p.tx - p.sx) ** 2 + (p.ty - p.sy) ** 2);
+            if (totalDist > 0) {
+                const fromSource = Math.sqrt((p.x - p.sx) ** 2 + (p.y - p.sy) ** 2);
+                p.flightProgress = Math.min(1, fromSource / totalDist);
+            }
+        }
+
         // Record trail
         p.trail.push({ x: p.x, y: p.y });
         if (p.trail.length > p.style.trailLen) {
@@ -103,6 +118,18 @@ function warCombatUpdateProjectiles(dt) {
 function warCombatDrawProjectiles(ctx, worldToScreen) {
     for (const p of _projectiles) {
         const s = p.style;
+
+        // Mortar Z-height scale: projectile grows as it arcs up, shrinks coming down
+        // z = 4 * peak * t * (1 - t) — parabola peaking at t=0.5
+        let zScale = 1.0;
+        let zHeight = 0;
+        if (p.isMortar && p.arcPeak > 0) {
+            const t = p.flightProgress;
+            zHeight = 4 * p.arcPeak * t * (1 - t);
+            // Scale factor: 1.0 at ground, up to 3.0 at peak height
+            zScale = 1.0 + (zHeight / p.arcPeak) * 2.0;
+        }
+
         // Trail (8 segments, brighter, wider)
         for (let i = 0; i < p.trail.length; i++) {
             const t = p.trail[i];
@@ -113,23 +140,35 @@ function warCombatDrawProjectiles(ctx, worldToScreen) {
             ctx.fillStyle = s.trailColor;
             ctx.globalAlpha = a * 0.8;
             ctx.beginPath();
-            ctx.arc(sp.x, sp.y, s.radius * (0.3 + 0.7 * alpha), 0, Math.PI * 2);
+            ctx.arc(sp.x, sp.y, s.radius * (0.3 + 0.7 * alpha) * zScale, 0, Math.PI * 2);
             ctx.fill();
         }
         ctx.globalAlpha = 1.0;
 
-        // Head (larger glow)
+        // Mortar: draw ground shadow (small dark circle at ground level)
         const head = worldToScreen(p.x, p.y);
+        if (p.isMortar && zHeight > 2) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+            ctx.beginPath();
+            ctx.arc(head.x, head.y, s.radius * 0.6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Mortar: offset the head upward on screen by Z height (higher = drawn higher)
+        const headY = p.isMortar ? head.y - zHeight * 0.8 : head.y;
+
+        // Head (larger glow, scaled by Z)
+        const headRadius = s.radius * zScale;
         ctx.fillStyle = s.color;
         ctx.shadowColor = s.color;
-        ctx.shadowBlur = 12;
+        ctx.shadowBlur = 12 * zScale;
         ctx.beginPath();
-        ctx.arc(head.x, head.y, s.radius, 0, Math.PI * 2);
+        ctx.arc(head.x, headY, headRadius, 0, Math.PI * 2);
         ctx.fill();
         // Bright core
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(head.x, head.y, s.radius * 0.4, 0, Math.PI * 2);
+        ctx.arc(head.x, headY, headRadius * 0.4, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
 
@@ -138,7 +177,7 @@ function warCombatDrawProjectiles(ctx, worldToScreen) {
             const wobble = Math.sin(Date.now() * 0.02) * 2;
             ctx.fillStyle = 'rgba(0, 160, 255, 0.3)';
             ctx.beginPath();
-            ctx.arc(head.x + wobble, head.y - wobble, s.radius + 2, 0, Math.PI * 2);
+            ctx.arc(head.x + wobble, headY - wobble, s.radius + 2, 0, Math.PI * 2);
             ctx.fill();
         }
     }

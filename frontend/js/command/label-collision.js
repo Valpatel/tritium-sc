@@ -102,8 +102,8 @@ function _priorityOf(entry, selectedId) {
  * top-left corner, given the label size (tw x th) and a base unit size.
  */
 function _candidates(tw, th) {
-    const gapY  = 14;             // vertical gap below/above unit body
-    const gapX  = 12;             // horizontal gap beside unit body
+    const gapY  = 8;              // vertical gap below/above unit body
+    const gapX  = 6;              // horizontal gap beside unit body
     const halfW = tw / 2;
 
     return [
@@ -144,7 +144,7 @@ export function resolveLabels(entries, canvasW, canvasH, zoom, selectedId, world
     if (!entries || entries.length === 0) return [];
 
     // -- font size (matches map.js formula) --
-    const fontSize = Math.max(9, 11 * Math.min(zoom, 2));
+    const fontSize = Math.max(7, 8 * Math.min(zoom, 2));
     const ctx      = _getCtx();
     ctx.font       = `${fontSize}px ${FONT_FAMILY}`;
 
