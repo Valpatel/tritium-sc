@@ -241,10 +241,10 @@ class TestStaticFiles:
     """Static file mounting configuration."""
 
     def test_frontend_path_calculation(self):
-        """frontend_path resolves to <project>/frontend/."""
+        """frontend_path resolves to <project>/src/frontend/."""
         from app.main import frontend_path
         assert frontend_path.name == "frontend"
-        assert frontend_path.parent.name == "tritium-sc" or frontend_path.exists()
+        assert frontend_path.parent.name == "src" or frontend_path.exists()
 
     def test_static_mount_exists(self, app):
         """A mount at /static exists in the app routes."""

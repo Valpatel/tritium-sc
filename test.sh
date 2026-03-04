@@ -36,7 +36,7 @@ tier1_syntax() {
         fi
     done < <(find "$SCRIPT_DIR/src/" -name '*.py' -not -path '*/__pycache__/*' -not -name '*.pyc' | sort)
 
-    # JS: all .js files under frontend/js/ (dynamic discovery)
+    # JS: all .js files under src/frontend/js/ (dynamic discovery)
     while IFS= read -r f; do
         js_count=$((js_count + 1))
         if node --check "$f" 2>/dev/null; then
@@ -45,7 +45,7 @@ tier1_syntax() {
             fail "node --check: ${f#$SCRIPT_DIR/}"
             err=$((err + 1))
         fi
-    done < <(find "$SCRIPT_DIR/frontend/js/" -name '*.js' -not -path '*/node_modules/*' | sort)
+    done < <(find "$SCRIPT_DIR/src/frontend/js/" -name '*.js' -not -path '*/node_modules/*' | sort)
 
     if [ $err -eq 0 ]; then
         pass "Syntax: $ok files OK ($py_count Python, $js_count JS)"

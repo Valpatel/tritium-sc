@@ -122,9 +122,9 @@ def run_syntax_checks(db, run_id):
         "tests/lib/layout_validator.py", "tests/ui/test_layout_validation.py",
     ]
     js_files = [
-        "frontend/js/command/main.js", "frontend/js/command/websocket.js",
-        "frontend/js/command/panels/mesh.js",
-        "frontend/js/war.js", "frontend/js/app.js",
+        "src/frontend/js/command/main.js", "src/frontend/js/command/websocket.js",
+        "src/frontend/js/command/panels/mesh.js",
+        "src/frontend/js/war.js", "src/frontend/js/app.js",
     ]
 
     count = 0

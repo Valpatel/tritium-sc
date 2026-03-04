@@ -109,7 +109,7 @@ def gps_to_world(
     """Convert GPS (WGS84) to game world coordinates (meters from origin).
 
     Uses equirectangular projection — accurate enough for neighborhood scale
-    (<1km). Same math as frontend/js/geo.js latlngToGame().
+    (<1km). Same math as src/frontend/js/geo.js latlngToGame().
 
     Args:
         gps: GPS position to convert.

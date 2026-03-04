@@ -685,7 +685,7 @@ app.include_router(devices_router)
 app.include_router(tak_router)
 
 # Static files
-frontend_path = Path(__file__).parent.parent.parent / "frontend"
+frontend_path = Path(__file__).parent.parent / "frontend"
 if frontend_path.exists():
     app.mount("/static", StaticFiles(directory=frontend_path, follow_symlink=True), name="static")
 

@@ -13,7 +13,7 @@ pytestmark = pytest.mark.unit
 
 
 # ---------------------------------------------------------------------------
-# Python-side coordinate helpers (mirrors frontend/js/geo.js logic)
+# Python-side coordinate helpers (mirrors src/frontend/js/geo.js logic)
 # ---------------------------------------------------------------------------
 
 METERS_PER_DEG_LAT = 111320

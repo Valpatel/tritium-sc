@@ -254,11 +254,11 @@ tritium-sc/
 │       ├── routers/             # REST + WebSocket + game API
 │       ├── ai/                  # YOLO detector, ByteTrack, embeddings
 │       └── zones/               # Zone management, point-in-polygon
-├── frontend/
-│   ├── unified.html             # Command Center (primary UI)
-│   ├── js/command/              # Modular Command Center JS
-│   ├── js/war*.js               # Tactical map, combat, fog, audio, FX
-│   └── css/                     # CYBERCORE design system
+│   └── frontend/
+│       ├── unified.html             # Command Center (primary UI)
+│       ├── js/command/              # Modular Command Center JS
+│       ├── js/war*.js               # Tactical map, combat, fog, audio, FX
+│       └── css/                     # CYBERCORE design system
 ├── examples/
 │   ├── robot-template/          # Reference MQTT robot brain (Python)
 │   └── ros2-robot/              # ROS2 Humble robot (Nav2 + MQTT)
@@ -272,6 +272,8 @@ See [docs/USER-STORIES.md](docs/USER-STORIES.md) for what the complete experienc
 ---
 
 ## [GRAPHLINGS](https://graphlings.net) (COMING SOON)
+
+*[Graphlings](https://graphlings.net) — Created by Matthew Valancy, Copyright 2026 Valpatel Software LLC.*
 
 > *"Incoming game!"* — ReBoot
 

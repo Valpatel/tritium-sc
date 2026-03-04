@@ -13,7 +13,7 @@ Convention:
     - +X = East, +Y = North, +Z = Up
     - Heading 0 = North, clockwise in degrees
 
-The same math is mirrored in frontend/js/geo.js for client-side use.
+The same math is mirrored in src/frontend/js/geo.js for client-side use.
 """
 
 from __future__ import annotations
