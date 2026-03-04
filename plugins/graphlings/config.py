@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 class GraphlingsConfig:
     """Configuration for graphling agent deployment in tritium-sc."""
 
-    # Graphling home server (GB10-01 via Tailscale)
+    # Graphling home server (set via GRAPHLINGS_SERVER_URL env var or .env)
     server_url: str = "http://localhost:4774"
     server_timeout: float = 5.0
 

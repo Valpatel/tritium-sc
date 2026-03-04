@@ -1,5 +1,7 @@
 # Graphlings Plugin for TRITIUM-SC
 
+[Graphlings](https://graphlings.net) — Created by Matthew Valancy, Copyright 2026 Valpatel Software LLC.
+
 Crystal creature AI agents living as NPCs in the TRITIUM-SC simulation world.
 
 ## Quick Start
