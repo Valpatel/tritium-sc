@@ -319,6 +319,17 @@ tier22_combat_effects() {
     fi
 }
 
+tier_docs() {
+    header "Doc Screenshots: Generate README hero images"
+    if $VENV -m pytest "$SCRIPT_DIR/tests/visual/test_doc_screenshots.py" -v -s --tb=short 2>&1; then
+        pass "Doc screenshots generated"
+        info "Screenshots saved to docs/screenshots/"
+        info "Gallery: tests/.test-results/doc-screenshots/gallery.html"
+    else
+        fail "Doc screenshot generation"
+    fi
+}
+
 tier_dist() {
     header "Distributed Testing (local + ${REMOTE_HOST:-<unset>})"
     if [ -z "${REMOTE_HOST:-}" ]; then
@@ -433,7 +444,8 @@ main() {
         --overlap) tier20_ui_overlap ;;
         --panels) tier21_panel_coverage ;;
         --combat) tier22_combat_effects ;;
-        *) echo "Usage: $0 [all|fast|1-22|--dist|--visual|--gameplay|--battle|--integration|--quality|--smoke|--layout|--ux|--defects|--alignment|--layers|--ui-isolation|--defense|--user-stories|--overlap|--panels]"; exit 1 ;;
+        docs|--docs) tier_docs ;;
+        *) echo "Usage: $0 [all|fast|1-22|docs|--dist|--visual|--gameplay|--battle|--integration|--quality|--smoke|--layout|--ux|--defects|--alignment|--layers|--ui-isolation|--defense|--user-stories|--overlap|--panels|--docs]"; exit 1 ;;
     esac
     set -e
 
