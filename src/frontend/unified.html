@@ -25,24 +25,24 @@
     <!-- ================================================================== -->
     <header id="header-bar" class="cc-header" data-component="header">
         <div class="header-left cc-header__left">
-            <span class="header-logo" data-element="logo">TRITIUM-SC</span>
+            <span class="header-logo" data-element="logo" title="TRITIUM-SC Tactical Command Center">TRITIUM-SC</span>
             <span class="header-separator"></span>
-            <button id="mode-indicator" class="mode-badge" data-mode="sim" data-element="mode-indicator">
+            <button id="mode-indicator" class="mode-badge" data-mode="sim" data-element="mode-indicator" title="System mode — SIM = simulation, LIVE = real hardware">
                 <span class="mode-dot"></span>
                 <span class="mode-label">SIM</span>
             </button>
         </div>
 
         <div class="header-center cc-header__center">
-            <span id="header-clock" class="header-clock mono" data-element="clock">00:00:00 UTC</span>
+            <span id="header-clock" class="header-clock mono" data-element="clock" title="Current UTC time">00:00:00 UTC</span>
             <span class="header-separator"></span>
-            <span id="header-units" class="header-stat" data-element="unit-count">
+            <span id="header-units" class="header-stat" data-element="unit-count" title="Total active friendly + neutral units on the battlefield">
                 <span class="stat-dot status-green"></span>
                 <span class="stat-value">0</span>
                 <span class="stat-label">units</span>
             </span>
             <span class="header-separator"></span>
-            <span id="header-threats" class="header-stat" data-element="threat-count">
+            <span id="header-threats" class="header-stat" data-element="threat-count" title="Active hostile threats detected">
                 <span class="stat-dot status-amber"></span>
                 <span class="stat-value">0</span>
                 <span class="stat-label">threats</span>
@@ -50,17 +50,17 @@
         </div>
 
         <div class="header-right cc-header__right">
-            <div id="game-score-area" class="game-score" data-element="game-score" hidden>
-                <span class="score-label">WAVE</span>
+            <div id="game-score-area" class="game-score" data-element="game-score" hidden title="Battle scoreboard — visible during active games">
+                <span class="score-label" title="Current wave / total waves">WAVE</span>
                 <span id="game-wave" class="score-value">0/10</span>
                 <span class="score-sep"></span>
-                <span class="score-label">SCORE</span>
+                <span class="score-label" title="Points earned from eliminations and objectives">SCORE</span>
                 <span id="game-score" class="score-value">0</span>
                 <span class="score-sep"></span>
-                <span class="score-label">ELIMS</span>
+                <span class="score-label" title="Total hostile units eliminated">ELIMS</span>
                 <span id="game-eliminations" class="score-value">0</span>
             </div>
-            <span id="connection-status" class="connection-indicator" data-element="connection-status" data-state="disconnected">
+            <span id="connection-status" class="connection-indicator" data-element="connection-status" data-state="disconnected" title="WebSocket connection to server — ONLINE = real-time updates active">
                 <span class="conn-dot"></span>
                 <span class="conn-label mono">OFFLINE</span>
             </span>
@@ -81,13 +81,13 @@
 
             <!-- Map mode indicator (top-left of map) -->
             <div id="map-mode" class="map-mode-indicator" data-element="map-mode">
-                <button class="map-mode-btn active" data-map-mode="observe">
+                <button class="map-mode-btn active" data-map-mode="observe" title="Observe Mode (O) — Surveillance view, top-down, no 3D models">
                     <span class="mono">O</span>BSERVE
                 </button>
-                <button class="map-mode-btn" data-map-mode="tactical">
+                <button class="map-mode-btn" data-map-mode="tactical" title="Tactical Mode (T) — Combat view, tilted 3D, grid overlay, unit models">
                     <span class="mono">T</span>ACTICAL
                 </button>
-                <button class="map-mode-btn" data-map-mode="setup">
+                <button class="map-mode-btn" data-map-mode="setup" title="Setup Mode (S) — Deploy units, place waypoints, top-down grid view">
                     <span class="mono">S</span>ETUP
                 </button>
             </div>
@@ -115,7 +115,7 @@
             <div id="war-elimination-feed" class="war-elimination-feed"></div>
             <div id="war-score" class="war-score" style="display:none"></div>
             <div id="war-begin-btn" class="war-begin-btn" style="display:none">
-                <button class="game-btn game-btn-primary mono" onclick="if(typeof _onBeginWar==='function')_onBeginWar();else if(typeof warHudShowBeginWarButton==='function'){fetch('/api/game/begin',{method:'POST'}).catch(()=>{})}">[ BEGIN WAR ]</button>
+                <button class="game-btn game-btn-primary mono" title="Start a 10-wave Nerf battle simulation (keyboard: B)" onclick="if(typeof _onBeginWar==='function')_onBeginWar();else if(typeof warHudShowBeginWarButton==='function'){fetch('/api/game/begin',{method:'POST'}).catch(()=>{})}">[ BEGIN WAR ]</button>
             </div>
             <div id="war-game-over" class="war-game-over" style="display:none"></div>
             <div id="war-amy-toast" class="war-announcement" style="opacity:0"></div>
@@ -126,13 +126,13 @@
 
         <!-- Status Bar (bottom edge, 20px) -->
         <div id="status-bar" class="status-bar" data-component="status-bar">
-            <span id="status-fps" class="status-item mono" data-element="status-fps">-- FPS</span>
+            <span id="status-fps" class="status-item mono" data-element="status-fps" title="Simulation tick rate (frames per second)">-- FPS</span>
             <span class="status-sep"></span>
-            <span id="status-alive" class="status-item mono" data-element="status-alive">0 alive</span>
+            <span id="status-alive" class="status-item mono" data-element="status-alive" title="Friendly units still active">0 alive</span>
             <span class="status-sep"></span>
-            <span id="status-threats" class="status-item mono" data-element="status-threats">0 threats</span>
+            <span id="status-threats" class="status-item mono" data-element="status-threats" title="Hostile units currently on the map">0 threats</span>
             <span class="status-sep"></span>
-            <span id="status-ws" class="status-item mono" data-element="status-ws">WS: --</span>
+            <span id="status-ws" class="status-item mono" data-element="status-ws" title="WebSocket connection status and latency">WS: --</span>
             <span class="status-right">
                 <span class="status-item mono">TRITIUM-SC v0.1.0</span>
                 <span class="status-sep"></span>
@@ -155,7 +155,7 @@
         <div id="chat-panel" class="chat-panel" data-component="chat-panel">
             <div class="chat-header">
                 <span class="chat-title mono">AMY COMM</span>
-                <button id="chat-close" class="chat-close-btn" data-element="chat-close" aria-label="Close chat">
+                <button id="chat-close" class="chat-close-btn" data-element="chat-close" aria-label="Close chat" title="Close chat window">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                     </svg>
@@ -172,7 +172,7 @@
                        type="text" placeholder="Talk to Amy..."
                        autocomplete="off" spellcheck="false"
                        aria-label="Chat message input">
-                <button id="chat-send" class="chat-send-btn mono" data-element="chat-send">SEND</button>
+                <button id="chat-send" class="chat-send-btn mono" data-element="chat-send" title="Send message to Amy (Enter)">SEND</button>
             </div>
         </div>
     </div>
@@ -182,7 +182,7 @@
     <!-- ================================================================== -->
     <div id="modal-overlay" class="modal-overlay" data-component="modal" hidden>
         <div id="modal-content" class="modal-content" data-element="modal-content">
-            <button id="modal-close" class="modal-close-btn" data-element="modal-close" aria-label="Close modal">
+            <button id="modal-close" class="modal-close-btn" data-element="modal-close" aria-label="Close modal" title="Close this dialog (Escape)">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                     <path d="M5 5L15 15M15 5L5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                 </svg>
@@ -197,7 +197,7 @@
         <div class="help-panel corner-marks">
             <div class="help-header">
                 <span class="help-title">KEYBOARD SHORTCUTS</span>
-                <button class="help-close-btn" data-element="help-close" aria-label="Close help">
+                <button class="help-close-btn" data-element="help-close" aria-label="Close help" title="Close keyboard shortcuts (?)">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                     </svg>
@@ -245,6 +245,7 @@
                     <div class="help-row"><kbd>E</kbd><span>Toggle Sensors panel</span></div>
                     <div class="help-row"><kbd>P</kbd><span>Toggle Battle Stats panel</span></div>
                     <div class="help-row"><kbd>J</kbd><span>Toggle Unit Inspector panel</span></div>
+                    <div class="help-row"><kbd>L</kbd><span>Toggle Layers panel</span></div>
                 </div>
                 <div class="help-section">
                     <div class="help-section-title mono">LAYOUTS</div>
@@ -268,32 +269,39 @@
     <!-- ================================================================== -->
     <div id="game-over-overlay" class="game-over-overlay" data-component="game-over" hidden>
         <div class="game-over-panel corner-marks">
-            <div id="game-over-title" class="game-over-title" data-element="game-over-title">VICTORY</div>
-            <div class="game-over-stats">
-                <div class="go-stat">
-                    <span class="go-stat-label mono">FINAL SCORE</span>
-                    <span id="go-score" class="go-stat-value" data-element="go-score">0</span>
+            <!-- Scrollable content area -->
+            <div class="go-scroll-area">
+                <div id="game-over-title" class="game-over-title" data-element="game-over-title">VICTORY</div>
+                <div class="game-over-stats">
+                    <div class="go-stat">
+                        <span class="go-stat-label mono">FINAL SCORE</span>
+                        <span id="go-score" class="go-stat-value" data-element="go-score">0</span>
+                    </div>
+                    <div class="go-stat">
+                        <span class="go-stat-label mono">WAVES SURVIVED</span>
+                        <span id="go-waves" class="go-stat-value" data-element="go-waves">0</span>
+                    </div>
+                    <div class="go-stat">
+                        <span class="go-stat-label mono">TOTAL ELIMINATIONS</span>
+                        <span id="go-eliminations" class="go-stat-value" data-element="go-eliminations">0</span>
+                    </div>
                 </div>
-                <div class="go-stat">
-                    <span class="go-stat-label mono">WAVES SURVIVED</span>
-                    <span id="go-waves" class="go-stat-value" data-element="go-waves">0</span>
-                </div>
-                <div class="go-stat">
-                    <span class="go-stat-label mono">TOTAL ELIMINATIONS</span>
-                    <span id="go-eliminations" class="go-stat-value" data-element="go-eliminations">0</span>
-                </div>
+
+                <!-- MVP spotlight (populated by JS from /api/game/stats/mvp) -->
+                <div id="go-mvp-section" class="go-mvp-section" data-element="go-mvp-section"></div>
+
+                <!-- Combat stats grid (populated by JS from /api/game/stats/summary) -->
+                <div id="go-combat-section" class="go-combat-section" data-element="go-combat-section"></div>
+
+                <!-- Unit performance table (populated by JS from /api/game/stats) -->
+                <div id="go-units-section" class="go-units-section" data-element="go-units-section"></div>
             </div>
 
-            <!-- MVP spotlight (populated by JS from /api/game/stats/mvp) -->
-            <div id="go-mvp-section" class="go-mvp-section" data-element="go-mvp-section"></div>
-
-            <!-- Combat stats grid (populated by JS from /api/game/stats/summary) -->
-            <div id="go-combat-section" class="go-combat-section" data-element="go-combat-section"></div>
-
-            <!-- Unit performance table (populated by JS from /api/game/stats) -->
-            <div id="go-units-section" class="go-units-section" data-element="go-units-section"></div>
-
-            <button class="game-btn game-btn-primary mono" data-action="play-again">[ PLAY AGAIN ]</button>
+            <!-- Buttons always pinned at bottom -->
+            <div class="go-button-row">
+                <button class="game-btn game-btn-primary mono" data-action="play-again" title="Start another battle">[ PLAY AGAIN ]</button>
+                <button class="game-btn mono" data-action="exit-game" style="border-color:var(--text-dim,#555);color:var(--text-muted,#aaa)" title="Return to normal observation mode">[ EXIT ]</button>
+            </div>
         </div>
     </div>
 

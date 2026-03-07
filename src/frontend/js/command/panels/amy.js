@@ -37,19 +37,19 @@ export const AmyPanelDef = {
                 </div>
                 <div class="amy-p-info">
                     <div class="amy-p-name-row">
-                        <span class="amy-p-name">AMY</span>
-                        <span class="amy-p-state mono" data-bind="state">IDLE</span>
+                        <span class="amy-p-name" title="Amy — AI Commander, autonomous consciousness with 4 cognitive layers">AMY</span>
+                        <span class="amy-p-state mono" data-bind="state" title="Current cognitive state: IDLE, THINKING, OBSERVING, COMMANDING, or SPEAKING">IDLE</span>
                     </div>
-                    <div class="amy-p-mood mono" data-bind="mood">
+                    <div class="amy-p-mood mono" data-bind="mood" title="Amy's current emotional state — affects decision-making and communication tone">
                         <span class="panel-dot panel-dot-neutral"></span>
                         <span data-bind="mood-label">CALM</span>
                     </div>
                 </div>
             </div>
-            <div class="amy-p-thought" data-bind="thought">Awaiting initialization...</div>
+            <div class="amy-p-thought" data-bind="thought" title="Amy's latest inner thought — her stream of consciousness">Awaiting initialization...</div>
             <div class="amy-p-actions">
-                <button class="panel-action-btn panel-action-btn-primary" data-action="chat">CHAT</button>
-                <button class="panel-action-btn" data-action="attend">ATTEND</button>
+                <button class="panel-action-btn panel-action-btn-primary" data-action="chat" title="Open chat window to talk with Amy">CHAT</button>
+                <button class="panel-action-btn" data-action="attend" title="Ask Amy to focus attention on the current situation">ATTEND</button>
             </div>
         `;
         return el;

@@ -507,26 +507,31 @@
     <!-- ================================================================== -->
     <div id="game-over-overlay" class="game-over-overlay" data-component="game-over" hidden>
         <div class="game-over-panel corner-marks">
-            <div id="game-over-title" class="game-over-title" data-element="game-over-title">VICTORY</div>
-            <div class="game-over-stats">
-                <div class="go-stat">
-                    <span class="go-stat-label mono">FINAL SCORE</span>
-                    <span id="go-score" class="go-stat-value" data-element="go-score">0</span>
-                </div>
-                <div class="go-stat">
-                    <span class="go-stat-label mono">WAVES SURVIVED</span>
-                    <span id="go-waves" class="go-stat-value" data-element="go-waves">0</span>
-                </div>
-                <div class="go-stat">
-                    <span class="go-stat-label mono">TOTAL KILLS</span>
-                    <span id="go-kills" class="go-stat-value" data-element="go-kills">0</span>
-                </div>
-                <div class="go-stat">
-                    <span class="go-stat-label mono">BEST STREAK</span>
-                    <span id="go-streak" class="go-stat-value" data-element="go-streak">--</span>
+            <div class="go-scroll-area">
+                <div id="game-over-title" class="game-over-title" data-element="game-over-title">VICTORY</div>
+                <div class="game-over-stats">
+                    <div class="go-stat">
+                        <span class="go-stat-label mono">FINAL SCORE</span>
+                        <span id="go-score" class="go-stat-value" data-element="go-score">0</span>
+                    </div>
+                    <div class="go-stat">
+                        <span class="go-stat-label mono">WAVES SURVIVED</span>
+                        <span id="go-waves" class="go-stat-value" data-element="go-waves">0</span>
+                    </div>
+                    <div class="go-stat">
+                        <span class="go-stat-label mono">TOTAL KILLS</span>
+                        <span id="go-kills" class="go-stat-value" data-element="go-kills">0</span>
+                    </div>
+                    <div class="go-stat">
+                        <span class="go-stat-label mono">BEST STREAK</span>
+                        <span id="go-streak" class="go-stat-value" data-element="go-streak">--</span>
+                    </div>
                 </div>
             </div>
-            <button class="game-btn game-btn-primary mono" data-action="play-again">[ PLAY AGAIN ]</button>
+            <div class="go-button-row">
+                <button class="game-btn game-btn-primary mono" data-action="play-again">[ PLAY AGAIN ]</button>
+                <button class="game-btn mono" data-action="exit-game" style="border-color:var(--text-dim,#555);color:var(--text-muted,#aaa)">[ EXIT ]</button>
+            </div>
         </div>
     </div>
 

@@ -244,11 +244,42 @@ export function drawMinimapContent(opts) {
 
             ctx.fillStyle = color;
             ctx.globalAlpha = isNeutralized ? 0.3 : 1.0;
+            // Hostiles that recently took damage blink larger
+            const hp = unit.health || 0;
+            const maxHp = unit.maxHealth || 100;
+            const damaged = alliance === 'hostile' && !isNeutralized && hp < maxHp;
+            const baseR = alliance === 'hostile' ? 3 : 2.5;
+            const r = damaged && (Date.now() % 600 < 300) ? baseR + 1.5 : baseR;
             ctx.beginPath();
-            ctx.arc(mp.x, mp.y, 2.5, 0, Math.PI * 2);
+            ctx.arc(mp.x, mp.y, r, 0, Math.PI * 2);
             ctx.fill();
+            // Glow for damaged hostiles
+            if (damaged) {
+                ctx.fillStyle = color;
+                ctx.globalAlpha = 0.2;
+                ctx.beginPath();
+                ctx.arc(mp.x, mp.y, r + 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
         ctx.globalAlpha = 1.0;
+    }
+
+    // Selected unit weapon range circle on minimap
+    const selId = TritiumStore.get('map.selectedUnitId');
+    if (selId && units) {
+        const selUnit = units.get(selId);
+        if (selUnit && selUnit.position && selUnit.weaponRange) {
+            const sp = wToMM(selUnit.position.x, selUnit.position.y);
+            const rangeR = (selUnit.weaponRange / obRangeX) * mmW;
+            ctx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.arc(sp.x, sp.y, rangeR, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
     }
 
     // Camera viewport rectangle

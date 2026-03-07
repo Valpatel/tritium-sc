@@ -138,7 +138,7 @@ export const UnitsPanelDef = {
         const el = document.createElement('div');
         el.className = 'units-panel-inner';
         el.innerHTML = `
-            <select class="panel-filter" data-bind="filter">
+            <select class="panel-filter" data-bind="filter" title="Filter units by alliance or data source">
                 <option value="all">ALL</option>
                 <option value="friendly">FRIENDLY</option>
                 <option value="hostile">HOSTILE</option>
@@ -177,30 +177,40 @@ export const UnitsPanelDef = {
             const alliance = u.alliance || 'unknown';
             const color = ALLIANCE_COLORS[alliance] || 'var(--text-dim)';
             const icon = TYPE_ICONS[u.type] || '?';
-            const hp = (u.health !== undefined && u.maxHealth)
-                ? `${Math.round(u.health)}/${u.maxHealth}`
-                : '';
+            let hp = '';
+            let hpBar = '';
+            if (u.health !== undefined && u.maxHealth) {
+                const pct = Math.max(0, Math.min(100, (u.health / u.maxHealth) * 100));
+                const hpColor = pct > 60 ? 'var(--green)' : pct > 30 ? 'var(--amber)' : 'var(--magenta)';
+                hp = `${Math.round(u.health)}`;
+                hpBar = `<span style="display:inline-flex;align-items:center;gap:2px;flex-shrink:0">` +
+                    `<span style="width:28px;height:4px;background:rgba(255,255,255,0.08);border-radius:1px;overflow:hidden;display:inline-block">` +
+                    `<span style="width:${pct}%;height:100%;background:${hpColor};display:block;border-radius:1px"></span></span>` +
+                    `<span class="panel-stat-value" style="font-size:0.4rem;min-width:14px">${hp}</span></span>`;
+            }
             const fsm = u.fsmState || '';
-            const fsmBadge = fsm ? `<span class="unit-fsm-badge" style="color:${FSM_STATE_COLORS[fsm] || '#888'}">${fsm.toUpperCase()}</span>` : '';
+            const fsmBadge = fsm ? `<span class="unit-fsm-badge" style="color:${FSM_STATE_COLORS[fsm] || '#888'}" title="State: ${fsm}">${fsm.toUpperCase()}</span>` : '';
             const shortId = (u.identity && u.identity.short_id)
-                ? `<span style="font-family:var(--font-mono);font-size:0.4rem;color:var(--text-ghost);margin-right:3px">${_esc(u.identity.short_id)}</span>`
+                ? `<span style="font-family:var(--font-mono);font-size:0.4rem;color:var(--text-ghost);margin-right:3px" title="Short ID">${_esc(u.identity.short_id)}</span>`
                 : '';
             const srcInfo = SOURCE_BADGE[u.source] || SOURCE_BADGE.sim;
-            const srcBadge = `<span style="font-size:0.35rem;padding:0 3px;border:1px solid ${srcInfo.border};border-radius:2px;color:${srcInfo.color};margin-right:3px;flex-shrink:0">${srcInfo.label}</span>`;
+            const srcTip = u.source === 'real' ? 'Real hardware unit' : u.source === 'graphling' ? 'AI-generated agent' : 'Simulated unit';
+            const srcBadge = `<span style="font-size:0.35rem;padding:0 3px;border:1px solid ${srcInfo.border};border-radius:2px;color:${srcInfo.color};margin-right:3px;flex-shrink:0" title="${srcTip}">${srcInfo.label}</span>`;
             const statusBadge = u.weaponJammed
-                ? '<span style="font-size:0.35rem;padding:0 3px;border:1px solid var(--magenta);border-radius:2px;color:var(--magenta);margin-right:3px;flex-shrink:0">JAM</span>'
+                ? '<span style="font-size:0.35rem;padding:0 3px;border:1px solid var(--magenta);border-radius:2px;color:var(--magenta);margin-right:3px;flex-shrink:0" title="Weapon jammed — cannot fire">JAM</span>'
                 : u.ammoDepleted
-                ? '<span style="font-size:0.35rem;padding:0 3px;border:1px solid var(--magenta);border-radius:2px;color:var(--magenta);margin-right:3px;flex-shrink:0">EMPTY</span>'
+                ? '<span style="font-size:0.35rem;padding:0 3px;border:1px solid var(--magenta);border-radius:2px;color:var(--magenta);margin-right:3px;flex-shrink:0" title="Ammo depleted — weapon empty">EMPTY</span>'
                 : u.ammoLow
-                ? '<span style="font-size:0.35rem;padding:0 3px;border:1px solid var(--amber);border-radius:2px;color:var(--amber);margin-right:3px;flex-shrink:0">LOW</span>'
+                ? '<span style="font-size:0.35rem;padding:0 3px;border:1px solid var(--amber);border-radius:2px;color:var(--amber);margin-right:3px;flex-shrink:0" title="Ammo low — resupply needed">LOW</span>'
                 : '';
-            return `<span class="panel-icon-badge" style="color:${color};border-color:${color}">${icon}</span>` +
+            const typeTip = u.type ? `Type: ${u.type}` : 'Unit';
+            return `<span class="panel-icon-badge" style="color:${color};border-color:${color}" title="${typeTip} (${alliance})">${icon}</span>` +
                 shortId +
                 `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(u.name || u.id)}</span>` +
                 statusBadge +
                 srcBadge +
                 fsmBadge +
-                `<span class="panel-stat-value" style="font-size:0.5rem">${hp}</span>`;
+                hpBar;
         }
 
         function render() {
@@ -252,6 +262,7 @@ export const UnitsPanelDef = {
                     li.setAttribute('role', 'option');
                     li.innerHTML = content;
                     li._lastContent = content;
+                    li.title = `${u.name || u.id} — ${u.type || 'unit'} (${u.alliance || 'unknown'}). Click to select, double-click to fly to.`;
                     li.addEventListener('click', () => {
                         const id = li.dataset.unitId;
                         TritiumStore.set('map.selectedUnitId', id);
