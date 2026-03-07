@@ -138,15 +138,15 @@ const sandbox = {
 const ctx = vm.createContext(sandbox);
 
 // Load events.js
-const eventsCode = fs.readFileSync(__dirname + '/../../frontend/js/command/events.js', 'utf8');
+const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8');
 vm.runInContext(eventsCode.replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 
 // Load store.js
-const storeCode = fs.readFileSync(__dirname + '/../../frontend/js/command/store.js', 'utf8');
+const storeCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8');
 vm.runInContext(storeCode.replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 
 // Load audio.js panel
-const audioCode = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/audio.js', 'utf8');
+const audioCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/audio.js', 'utf8');
 const audioPlain = audioCode
     .replace(/^export\s+const\s+/gm, 'var ')
     .replace(/^export\s+/gm, '')

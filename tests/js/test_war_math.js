@@ -20,7 +20,7 @@ function assertClose(a, b, eps, msg) {
 }
 
 // Load war-fx.js into a sandboxed context
-const code = fs.readFileSync(__dirname + '/../../frontend/js/war-fx.js', 'utf8');
+const code = fs.readFileSync(__dirname + '/../../src/frontend/js/war-fx.js', 'utf8');
 let perfNow = 1000;
 const ctx = vm.createContext({
     Math, Date, console, Map, Array, Object, Number, Infinity,

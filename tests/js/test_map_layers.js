@@ -22,9 +22,9 @@ function assert(cond, msg) {
 }
 
 // Read the source files
-const mapSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/map-maplibre.js', 'utf8');
-const menuBarSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/menu-bar.js', 'utf8');
-const mainSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/main.js', 'utf8');
+const mapSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/map-maplibre.js', 'utf8');
+const menuBarSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/menu-bar.js', 'utf8');
+const mainSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/main.js', 'utf8');
 
 // ============================================================
 // 1. Verify all toggle functions are exported from map-maplibre.js
@@ -250,11 +250,13 @@ if (mapActionsMatch) {
 
 console.log('\n--- menu-bar.js menu items ---');
 
+// NOTE: FX toggles moved to Layers panel (Layer Browser).
+// MAP menu now has simplified quick toggles only.
 const menuLabels = [
-    'Toggle All',
-    'Tracers', 'Explosions', 'Particles', 'Hit Flashes', 'Floating Text',
-    'Kill Feed', 'Screen FX', 'Banners', 'Layer HUD',
-    'Health Bars', 'Selection FX',
+    'Layer Browser...', 'Toggle All Layers',
+    'Satellite', 'Buildings', 'Roads', 'Grid', 'Unit Markers',
+    'GIS Intelligence', 'Fog of War', 'Terrain',
+    'Center on Action', 'Reset Camera', 'Zoom In', 'Zoom Out',
 ];
 
 for (const label of menuLabels) {
@@ -355,7 +357,7 @@ console.log('\n--- Fog of war integration wiring ---');
 })();
 
 // CSS fog-hidden and radio-ghost styles exist
-const cssSrc = fs.readFileSync(__dirname + '/../../frontend/css/tritium.css', 'utf8');
+const cssSrc = fs.readFileSync(__dirname + '/../../src/frontend/css/tritium.css', 'utf8');
 (function testFogHiddenCSSExists() {
     assert(cssSrc.includes('.fog-hidden'), 'fog-hidden CSS class defined in tritium.css');
     assert(cssSrc.includes('opacity: 0.2'), 'fog-hidden has reduced opacity');

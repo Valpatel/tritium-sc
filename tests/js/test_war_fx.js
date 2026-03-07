@@ -24,8 +24,8 @@ function assertClose(a, b, eps, msg) {
 }
 
 // Load war-fog.js first (provides fogGetVisionProfile, fogGetSweepHeading)
-const fogCode = fs.readFileSync(__dirname + '/../../frontend/js/war-fog.js', 'utf8');
-const fxCode = fs.readFileSync(__dirname + '/../../frontend/js/war-fx.js', 'utf8');
+const fogCode = fs.readFileSync(__dirname + '/../../src/frontend/js/war-fog.js', 'utf8');
+const fxCode = fs.readFileSync(__dirname + '/../../src/frontend/js/war-fx.js', 'utf8');
 
 let perfNow = 1000;
 let dateNow = 5000;

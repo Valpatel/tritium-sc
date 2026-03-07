@@ -18,7 +18,7 @@ function assert(cond, msg) {
     else { console.log('PASS:', msg); passed++; }
 }
 
-const eventsCode = fs.readFileSync(__dirname + '/../../frontend/js/war-events.js', 'utf8');
+const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/war-events.js', 'utf8');
 
 // Mock warAudio that records all calls
 let audioCalls = [];

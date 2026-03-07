@@ -62,10 +62,10 @@ class MockWebSocket {
 // Load source files
 // ============================================================
 
-const storeCode = fs.readFileSync(__dirname + '/../../frontend/js/command/store.js', 'utf8');
-const eventsCode = fs.readFileSync(__dirname + '/../../frontend/js/command/events.js', 'utf8');
-const wsCode = fs.readFileSync(__dirname + '/../../frontend/js/command/websocket.js', 'utf8');
-const hudCode = fs.readFileSync(__dirname + '/../../frontend/js/war-hud.js', 'utf8');
+const storeCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8');
+const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8');
+const wsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
+const hudCode = fs.readFileSync(__dirname + '/../../src/frontend/js/war-hud.js', 'utf8');
 
 // Bridge object for capturing EventBus emissions
 let _bridge = {};

@@ -27,7 +27,7 @@ function assertEq(a, b, msg) {
     else { console.error(`FAIL: ${msg} (expected ${JSON.stringify(b)}, got ${JSON.stringify(a)})`); failed++; }
 }
 
-let hudCode = fs.readFileSync(__dirname + '/../../frontend/js/war-hud.js', 'utf8');
+let hudCode = fs.readFileSync(__dirname + '/../../src/frontend/js/war-hud.js', 'utf8');
 
 // Expose internal state for testing
 hudCode += `

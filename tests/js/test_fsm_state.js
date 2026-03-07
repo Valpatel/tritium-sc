@@ -34,7 +34,7 @@ const ALL_FSM_STATES = [
 // Load units.js to extract FSM_STATE_COLORS
 // ============================================================
 
-const unitsSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/units.js', 'utf8');
+const unitsSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/units.js', 'utf8');
 
 // Extract FSM_STATE_COLORS object from the source
 const fsmColorsMatch = unitsSrc.match(/const FSM_STATE_COLORS\s*=\s*\{([^}]+)\}/);
@@ -53,7 +53,7 @@ if (fsmColorsMatch) {
 // Load map.js to extract FSM_BADGE_COLORS
 // ============================================================
 
-const mapSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/map.js', 'utf8');
+const mapSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/map.js', 'utf8');
 const fsmBadgeMatch = mapSrc.match(/const FSM_BADGE_COLORS\s*=\s*\{([^}]+)\}/);
 assert(!!fsmBadgeMatch, 'FSM_BADGE_COLORS object found in map.js');
 
@@ -145,7 +145,7 @@ assert(mapSrc.includes("const badgeText = fsm || status"), 'map.js badge prefers
 
 console.log('\n--- Websocket fsm_state passthrough ---');
 
-const wsSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/websocket.js', 'utf8');
+const wsSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
 assert(wsSrc.includes('fsm_state = t.fsm_state'), 'websocket.js passes fsm_state from telemetry');
 
 // ============================================================
@@ -154,7 +154,7 @@ assert(wsSrc.includes('fsm_state = t.fsm_state'), 'websocket.js passes fsm_state
 
 console.log('\n--- CSS badge styling ---');
 
-const cssSrc = fs.readFileSync(__dirname + '/../../frontend/css/panels.css', 'utf8');
+const cssSrc = fs.readFileSync(__dirname + '/../../src/frontend/css/panels.css', 'utf8');
 assert(cssSrc.includes('.unit-fsm-badge'), 'panels.css has .unit-fsm-badge rule');
 assert(cssSrc.includes('font-size: 0.5rem'), 'FSM badge uses small font');
 

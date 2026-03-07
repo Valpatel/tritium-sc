@@ -139,21 +139,21 @@ const sandbox = {
 const ctx = vm.createContext(sandbox);
 
 // Load events.js (EventBus)
-const eventsCode = fs.readFileSync(__dirname + '/../../frontend/js/command/events.js', 'utf8');
+const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8');
 const eventsPlain = eventsCode
     .replace(/^export\s+/gm, '')
     .replace(/^import\s+.*$/gm, '');
 vm.runInContext(eventsPlain, ctx);
 
 // Load store.js (TritiumStore)
-const storeCode = fs.readFileSync(__dirname + '/../../frontend/js/command/store.js', 'utf8');
+const storeCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8');
 const storePlain = storeCode
     .replace(/^export\s+/gm, '')
     .replace(/^import\s+.*$/gm, '');
 vm.runInContext(storePlain, ctx);
 
 // Load game-hud.js panel
-const gameCode = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+const gameCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
 const gamePlain = gameCode
     .replace(/^export\s+const\s+/gm, 'var ')
     .replace(/^export\s+/gm, '')
@@ -550,7 +550,7 @@ console.log('\n--- Combat status event wiring ---');
 // npc:thought, npc:alliance_change — emitting toast:show for each.
 
 (function testGameHudSourceHasCombatStatusEvents() {
-    const source = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const source = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     const events = [
         'combat:ammo_low',
         'combat:ammo_depleted',
@@ -567,7 +567,7 @@ console.log('\n--- Combat status event wiring ---');
 })();
 
 (function testCombatStatusEventsEmitToast() {
-    const source = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const source = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     // Each combat status event handler should emit toast:show
     // Count EventBus.on calls that also contain EventBus.emit('toast:show'
     const blocks = source.split("EventBus.on('combat:ammo_low'");
@@ -579,7 +579,7 @@ console.log('\n--- Combat status event wiring ---');
 })();
 
 (function testAmmoLowToastContainsUnitName() {
-    const source = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const source = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     // The ammo_low handler should use d.unit_name
     const block = source.split("combat:ammo_low")[1] || '';
     assert(block.includes('unit_name'), 'combat:ammo_low handler uses unit_name');
@@ -587,21 +587,21 @@ console.log('\n--- Combat status event wiring ---');
 })();
 
 (function testAbilityActivatedToastFormat() {
-    const source = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const source = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     const block = source.split("ability:activated")[1] || '';
     assert(block.includes('ability_name'), 'ability:activated handler uses ability_name');
     assert(block.includes('ACTIVATED'), 'ability:activated handler shows ACTIVATED message');
 })();
 
 (function testNpcThoughtToastFormat() {
-    const source = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const source = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     const block = source.split("npc:thought")[1] || '';
     assert(block.includes('d.text'), 'npc:thought handler uses d.text (matches backend field name)');
     assert(block.includes('d.unit_id'), 'npc:thought handler uses d.unit_id (matches backend field name)');
 })();
 
 (function testAllianceChangeToastFormat() {
-    const source = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const source = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     const block = source.split("npc:alliance_change")[1] || '';
     assert(block.includes('new_alliance'), 'alliance_change handler uses new_alliance');
 })();
@@ -638,21 +638,21 @@ console.log('\n--- Combat status event wiring ---');
 
 // Test: game-hud.js contains mission-metrics section
 (() => {
-    const source = fs.readFileSync('frontend/js/command/panels/game-hud.js', 'utf8');
+    const source = fs.readFileSync('src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(source.includes('data-section="mission-metrics"'),
         'game-hud.js contains mission-metrics section element');
 })();
 
 // Test: game-hud.js reads modeType from store
 (() => {
-    const source = fs.readFileSync('frontend/js/command/panels/game-hud.js', 'utf8');
+    const source = fs.readFileSync('src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(source.includes("TritiumStore.get('game.modeType')"),
         'game-hud.js reads game.modeType from store');
 })();
 
 // Test: game-hud.js reads civil_unrest-specific store keys
 (() => {
-    const source = fs.readFileSync('frontend/js/command/panels/game-hud.js', 'utf8');
+    const source = fs.readFileSync('src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(source.includes("TritiumStore.get('game.deEscalationScore')"),
         'game-hud.js reads deEscalationScore');
     assert(source.includes("TritiumStore.get('game.civilianHarmCount')"),
@@ -663,7 +663,7 @@ console.log('\n--- Combat status event wiring ---');
 
 // Test: game-hud.js reads infrastructure health store keys
 (() => {
-    const source = fs.readFileSync('frontend/js/command/panels/game-hud.js', 'utf8');
+    const source = fs.readFileSync('src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(source.includes("TritiumStore.get('game.infrastructureHealth')"),
         'game-hud.js reads infrastructureHealth');
     assert(source.includes("TritiumStore.get('game.infrastructureMax')"),
@@ -672,21 +672,21 @@ console.log('\n--- Combat status event wiring ---');
 
 // Test: game-hud.js renders drone_swarm mode
 (() => {
-    const source = fs.readFileSync('frontend/js/command/panels/game-hud.js', 'utf8');
+    const source = fs.readFileSync('src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(source.includes("modeType === 'drone_swarm'"),
         'game-hud.js has drone_swarm mode rendering');
 })();
 
 // Test: game-hud.js renders civil_unrest mode
 (() => {
-    const source = fs.readFileSync('frontend/js/command/panels/game-hud.js', 'utf8');
+    const source = fs.readFileSync('src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(source.includes("modeType === 'civil_unrest'"),
         'game-hud.js has civil_unrest mode rendering');
 })();
 
 // Test: _renderMissionMetrics is called in refreshDashboard
 (() => {
-    const source = fs.readFileSync('frontend/js/command/panels/game-hud.js', 'utf8');
+    const source = fs.readFileSync('src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(source.includes('_renderMissionMetrics()'),
         'refreshDashboard calls _renderMissionMetrics');
 })();
@@ -716,7 +716,7 @@ console.log('\n--- Combat status event wiring ---');
 // ============================================================
 
 (function testGameHudHasDifficultyDisplay() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(
         src.includes('data-bind="difficulty"'),
         'Game HUD has a data-bind="difficulty" element for difficulty multiplier'
@@ -728,7 +728,7 @@ console.log('\n--- Combat status event wiring ---');
 })();
 
 (function testGameHudHasWaveNameDisplay() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(
         src.includes('data-bind="waveName"'),
         'Game HUD has a data-bind="waveName" element for wave name'
@@ -740,7 +740,7 @@ console.log('\n--- Combat status event wiring ---');
 })();
 
 (function testDifficultyDisplayColorCoding() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     // Difficulty display should color-code: green for easy, yellow for normal, red for hard
     const diffIdx = src.indexOf("game.difficultyMultiplier");
     assert(diffIdx >= 0, 'difficulty subscriber exists');
@@ -755,7 +755,7 @@ console.log('\n--- Combat status event wiring ---');
 console.log('\n--- Event handler wiring (static analysis) ---');
 
 (function testCombatEventSubscriptions() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
 
     // Combat events
     assert(src.includes("'combat:projectile'"), 'mount subscribes to combat:projectile');
@@ -899,20 +899,20 @@ console.log('\n--- Event handler behavior ---');
 console.log('\n--- Button handlers ---');
 
 (function testBeginButtonWiring() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(src.includes("'/api/game/begin'"), 'BEGIN button calls /api/game/begin');
     assert(src.includes("method: 'POST'"), 'BEGIN button uses POST method');
 })();
 
 (function testSpawnButtonWiring() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(src.includes("'/api/amy/simulation/spawn'"), 'SPAWN button calls /api/amy/simulation/spawn');
     assert(src.includes("'Hostile spawned'"), 'SPAWN success shows Hostile spawned toast');
     assert(src.includes("'Spawn failed: network error'"), 'SPAWN catch shows network error toast');
 })();
 
 (function testResetButtonWiring() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(src.includes("'/api/game/reset'"), 'RESET button calls /api/game/reset');
     assert(src.includes('warCombatReset'), 'RESET calls warCombatReset if available');
     assert(src.includes('tracker.reset()'), 'RESET resets combat tracker');
@@ -924,7 +924,7 @@ console.log('\n--- Button handlers ---');
 console.log('\n--- Store subscriptions ---');
 
 (function testStorePhaseSubscription() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(src.includes("'game.phase'"), 'subscribes to game.phase');
     assert(src.includes("'game.wave'"), 'subscribes to game.wave');
     assert(src.includes("'game.waveName'"), 'subscribes to game.waveName');
@@ -939,7 +939,7 @@ console.log('\n--- Store subscriptions ---');
 console.log('\n--- Dashboard refresh interval ---');
 
 (function testDashboardInterval() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(src.includes('setInterval(refreshDashboard, 2000)'), 'dashboard refreshes every 2000ms');
     assert(src.includes('clearInterval(dashboardInterval)'), 'dashboard interval cleaned up on unmount');
 })();
@@ -950,7 +950,7 @@ console.log('\n--- Dashboard refresh interval ---');
 console.log('\n--- Upgrade picker flow ---');
 
 (function testUpgradePickerExists() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(src.includes('function showUpgradePicker'), 'showUpgradePicker function exists');
     assert(src.includes('function hideUpgradePicker'), 'hideUpgradePicker function exists');
     assert(src.includes("'/api/game/upgrades'"), 'upgrade picker fetches from /api/game/upgrades');
@@ -965,7 +965,7 @@ console.log('\n--- Upgrade picker flow ---');
 console.log('\n--- Mission metrics ---');
 
 (function testMissionMetricsExist() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(src.includes('_renderMissionMetrics'), '_renderMissionMetrics function exists');
     assert(src.includes('civil_unrest'), 'mission metrics handle civil_unrest mode');
     assert(src.includes('drone_swarm'), 'mission metrics handle drone_swarm mode');
@@ -979,7 +979,7 @@ console.log('\n--- Mission metrics ---');
 console.log('\n--- Visibility logic ---');
 
 (function testVisibilityLogic() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(src.includes('function updateVisibility'), 'updateVisibility function exists');
     // BEGIN button visible in idle/setup
     assert(src.includes("'idle'") && src.includes("'setup'"), 'visibility checks idle and setup phases');
@@ -993,7 +993,7 @@ console.log('\n--- Visibility logic ---');
 console.log('\n--- Game state reset ---');
 
 (function testGameStateResetHandler() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     // On game:state active, wave 1 — tracker should reset
     const stateBlock = src.match(/game:state.*?tracker\.reset/s);
     assert(stateBlock !== null, 'game:state handler resets tracker on wave 1');
@@ -1006,7 +1006,7 @@ console.log('\n--- Game state reset ---');
 console.log('\n--- Wave start ---');
 
 (function testWaveStartHandler() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     const waveBlock = src.match(/game:wave_start.*?_waveStartTime/s);
     assert(waveBlock !== null, 'wave_start handler sets _waveStartTime');
     assert(src.includes('_waveHostileTotal'), 'wave_start captures hostile count');
@@ -1018,7 +1018,7 @@ console.log('\n--- Wave start ---');
 console.log('\n--- Countdown display ---');
 
 (function testCountdownElementExists() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(
         src.includes('data-bind="countdown"'),
         'Game HUD has a data-bind="countdown" element'
@@ -1026,7 +1026,7 @@ console.log('\n--- Countdown display ---');
 })();
 
 (function testCountdownStoreSubscription() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     assert(
         src.includes("game.countdown"),
         'Game HUD subscribes to game.countdown store key'
@@ -1034,7 +1034,7 @@ console.log('\n--- Countdown display ---');
 })();
 
 (function testCountdownShownDuringCountdownPhase() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
     // Countdown element should be shown when phase === 'countdown'
     assert(
         src.includes("'countdown'") && src.includes('countdownEl'),

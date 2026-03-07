@@ -31,7 +31,7 @@ function assertClose(a, b, eps, msg) {
 // Load mesh-layer.js into a sandboxed context
 // ---------------------------------------------------------------------------
 
-const code = fs.readFileSync(__dirname + '/../../frontend/js/command/mesh-layer.js', 'utf8');
+const code = fs.readFileSync(__dirname + '/../../src/frontend/js/command/mesh-layer.js', 'utf8');
 
 // Mock canvas context that records draw calls
 function createMockCtx() {

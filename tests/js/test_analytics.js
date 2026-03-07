@@ -166,7 +166,7 @@ const ctx = vm.createContext(sandbox);
 
 // Load analytics.js
 const analyticsCode = fs.readFileSync(
-    __dirname + '/../../frontend/js/analytics.js', 'utf8'
+    __dirname + '/../../src/frontend/js/analytics.js', 'utf8'
 );
 vm.runInContext(analyticsCode, ctx);
 

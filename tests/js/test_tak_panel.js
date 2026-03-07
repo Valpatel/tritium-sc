@@ -73,10 +73,10 @@ const sandbox = {
 
 const ctx = vm.createContext(sandbox);
 
-vm.runInContext(fs.readFileSync(__dirname + '/../../frontend/js/command/events.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
-vm.runInContext(fs.readFileSync(__dirname + '/../../frontend/js/command/store.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
+vm.runInContext(fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
+vm.runInContext(fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 
-const takCode = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/tak.js', 'utf8');
+const takCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/tak.js', 'utf8');
 vm.runInContext(takCode.replace(/^export\s+const\s+/gm, 'var ').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 
 const TakPanelDef = ctx.TakPanelDef;
@@ -224,7 +224,7 @@ console.log('\n--- unmount() ---');
 console.log('\n--- API contracts ---');
 
 (function testChatSendsToCallsign() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/tak.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/tak.js', 'utf8');
     assert(src.includes('to_callsign'), 'Chat sends to_callsign (matches backend ChatRequest model)');
     assert(!src.includes("channel: 'All'"), 'Chat does NOT send channel: All (wrong field name for backend)');
 })();
@@ -235,7 +235,7 @@ console.log('\n--- API contracts ---');
 })();
 
 (function testAlertRequestFields() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/tak.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/tak.js', 'utf8');
     const alertIdx = src.indexOf("'/api/tak/alert'");
     if (alertIdx < 0) { assert(false, 'Alert endpoint exists'); return; }
     const alertBlock = src.slice(alertIdx, alertIdx + 300);

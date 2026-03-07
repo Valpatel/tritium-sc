@@ -175,7 +175,7 @@ function buildSandbox() {
 }
 
 function loadInput(sandbox) {
-    const code = fs.readFileSync(__dirname + '/../../frontend/js/input.js', 'utf8');
+    const code = fs.readFileSync(__dirname + '/../../src/frontend/js/input.js', 'utf8');
     const plain = code
         .replace(/^export\s+/gm, '')
         .replace(/^import\s+.*$/gm, '');

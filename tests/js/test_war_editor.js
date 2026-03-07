@@ -19,7 +19,7 @@ function assert(cond, msg) {
     else { console.log('PASS:', msg); passed++; }
 }
 
-let editorCode = fs.readFileSync(__dirname + '/../../frontend/js/war-editor.js', 'utf8');
+let editorCode = fs.readFileSync(__dirname + '/../../src/frontend/js/war-editor.js', 'utf8');
 
 // Expose internal functions for testing
 editorCode += `

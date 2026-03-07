@@ -125,7 +125,7 @@ function createMockCtx() {
 // Load map.js source and strip imports/exports for sandboxing
 // ============================================================
 
-const mapSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/map.js', 'utf8');
+const mapSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/map.js', 'utf8');
 
 // Strip import statements and convert const/let to var so symbols
 // become sandbox context properties accessible from the test harness.
@@ -1399,7 +1399,7 @@ console.log('\n--- 2D/3D indicator toggle independence ---');
     // The rendering code should use `has3D && modelsVisible` (use3DPath),
     // NOT just `has3D` alone, so toggling 3D models off shows 2D icons
     const code = require('fs').readFileSync(
-        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'map-maplibre.js'), 'utf8'
+        require('path').join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'map-maplibre.js'), 'utf8'
     );
     assert(code.includes('use3DPath = has3D && modelsVisible'),
         'Rendering uses use3DPath = has3D && modelsVisible');
@@ -1407,7 +1407,7 @@ console.log('\n--- 2D/3D indicator toggle independence ---');
 
 (function test3DPathGuardedByUse3DPath() {
     const code = require('fs').readFileSync(
-        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'map-maplibre.js'), 'utf8'
+        require('path').join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'map-maplibre.js'), 'utf8'
     );
     assert(code.includes('if (use3DPath)'),
         '3D rendering path is guarded by use3DPath (not raw has3D)');
@@ -1417,7 +1417,7 @@ console.log('\n--- 2D/3D indicator toggle independence ---');
     // The old code had a locDot fallback when models were hidden but has3D was true
     // This is no longer needed since we fall through to the full 2D path
     const code = require('fs').readFileSync(
-        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'map-maplibre.js'), 'utf8'
+        require('path').join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'map-maplibre.js'), 'utf8'
     );
     assert(!code.includes("if (!modelsVisible) {\n            if (!locDot)"),
         'Old locDot fallback in 3D path has been removed');
@@ -1425,7 +1425,7 @@ console.log('\n--- 2D/3D indicator toggle independence ---');
 
 (function testControlledUnitRingExists() {
     const code = require('fs').readFileSync(
-        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'map-maplibre.js'), 'utf8'
+        require('path').join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'map-maplibre.js'), 'utf8'
     );
     assert(code.includes('unit-ctrl-ring'),
         'Map renderer has controlled-unit visual ring indicator');
@@ -1437,7 +1437,7 @@ console.log('\n--- 2D/3D indicator toggle independence ---');
 
 (function testDrawTargetsFiltersInvisibleHostiles() {
     const code = require('fs').readFileSync(
-        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'map.js'), 'utf8'
+        require('path').join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'map.js'), 'utf8'
     );
     assert(
         code.includes("!unit.visible") && code.includes("fogEnabled"),
@@ -1447,7 +1447,7 @@ console.log('\n--- 2D/3D indicator toggle independence ---');
 
 (function testDrawTargetsShowsRadioGhostForRadioDetected() {
     const code = require('fs').readFileSync(
-        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'map.js'), 'utf8'
+        require('path').join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'map.js'), 'utf8'
     );
     assert(
         code.includes("_drawRadioGhost(ctx, unit)"),
@@ -1457,7 +1457,7 @@ console.log('\n--- 2D/3D indicator toggle independence ---');
 
 (function testRadioGhostFunctionExists() {
     const code = require('fs').readFileSync(
-        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'map.js'), 'utf8'
+        require('path').join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'map.js'), 'utf8'
     );
     assert(
         code.includes("function _drawRadioGhost(ctx, unit)"),
@@ -1475,7 +1475,7 @@ console.log('\n--- 2D/3D indicator toggle independence ---');
 
 (function testDrawLabelsFiltersInvisibleHostiles() {
     const code = require('fs').readFileSync(
-        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'map.js'), 'utf8'
+        require('path').join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'map.js'), 'utf8'
     );
     // Labels should also skip invisible hostile units
     const labelSection = code.split('function _drawLabels')[1];
@@ -1487,7 +1487,7 @@ console.log('\n--- 2D/3D indicator toggle independence ---');
 
 (function testFogFilterOnlyAffectsHostiles() {
     const code = require('fs').readFileSync(
-        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'map.js'), 'utf8'
+        require('path').join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'map.js'), 'utf8'
     );
     // Should only filter hostile alliance, not friendly or neutral
     const drawTargetsSection = code.split('function _drawTargets')[1].split('function ')[0];
@@ -1499,7 +1499,7 @@ console.log('\n--- 2D/3D indicator toggle independence ---');
 
 (function testRadioGhostPulsingAnimation() {
     const code = require('fs').readFileSync(
-        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'map.js'), 'utf8'
+        require('path').join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'map.js'), 'utf8'
     );
     const ghostSection = code.split('function _drawRadioGhost')[1];
     assert(
@@ -1518,7 +1518,7 @@ console.log('\n--- 2D/3D indicator toggle independence ---');
 
 (function testFogUndefinedVisibleTreatedAsHidden() {
     const code = require('fs').readFileSync(
-        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'map.js'), 'utf8'
+        require('path').join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'map.js'), 'utf8'
     );
     const drawTargets = code.split('function _drawTargets')[1] || '';
     // Should use !unit.visible (loose), NOT unit.visible === false (strict)
@@ -1530,7 +1530,7 @@ console.log('\n--- 2D/3D indicator toggle independence ---');
 
 (function testFogLabelsUseLooseEquality() {
     const code = require('fs').readFileSync(
-        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'map.js'), 'utf8'
+        require('path').join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'map.js'), 'utf8'
     );
     const drawLabels = code.split('function _drawLabels')[1] || '';
     assert(
@@ -1549,7 +1549,7 @@ console.log('\n--- 2D/3D indicator toggle independence ---');
 
 (function testHitTestSkipsInvisibleHostiles() {
     const code = require('fs').readFileSync(
-        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'map.js'), 'utf8'
+        require('path').join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'map.js'), 'utf8'
     );
     const hitTest = code.split('function _hitTestUnit')[1] || '';
     assert(
@@ -1572,7 +1572,7 @@ console.log('\n--- Canvas dispatch endpoint ---');
     // Read map.js source and check that _doDispatch uses the modern
     // /api/amy/simulation/dispatch endpoint instead of the legacy
     // /api/amy/command endpoint.
-    var mapSrc = require('fs').readFileSync('frontend/js/command/map.js', 'utf8');
+    var mapSrc = require('fs').readFileSync('src/frontend/js/command/map.js', 'utf8');
     var fnStart = mapSrc.indexOf('function _doDispatch');
     assert(fnStart > 0, '_doDispatch function exists in map.js');
     var fnBlock = mapSrc.substring(fnStart, fnStart + 1200);
@@ -2615,7 +2615,7 @@ console.log('\n--- Coordinate transform DPR consistency ---');
 console.log('\n--- MapLibre cursor references ---');
 
 (function testMapLibreCursorUsesStateContainer() {
-    var mlSrc = require('fs').readFileSync('frontend/js/command/map-maplibre.js', 'utf8');
+    var mlSrc = require('fs').readFileSync('src/frontend/js/command/map-maplibre.js', 'utf8');
     // Every cursor change should reference _state.container, not _state.mapContainer
     assert(
         !mlSrc.includes('_state.mapContainer'),
@@ -2632,7 +2632,7 @@ console.log('\n--- MapLibre cursor references ---');
 
 (function testSignalRingUsesCorrectZoomPath() {
     const code = require('fs').readFileSync(
-        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'map.js'), 'utf8'
+        require('path').join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'map.js'), 'utf8'
     );
     const signalSection = code.split('function _drawUnitSignals')[1];
     assert(signalSection, '_drawUnitSignals function exists');
@@ -2657,7 +2657,7 @@ console.log('\n--- MapLibre cursor references ---');
 
 (function testDispatchErrorShowsDetail() {
     const code = require('fs').readFileSync(
-        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'map.js'), 'utf8'
+        require('path').join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'map.js'), 'utf8'
     );
     const dispatchSection = code.split('function _doDispatch')[1];
     assert(dispatchSection, '_doDispatch function exists');

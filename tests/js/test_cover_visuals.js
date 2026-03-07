@@ -25,8 +25,8 @@ function assert(cond, msg) {
 
 // ---- Read source files ----
 
-const mapSrc = fs.readFileSync(`${__dirname}/../../frontend/js/command/map.js`, 'utf-8');
-const wsSrc = fs.readFileSync(`${__dirname}/../../frontend/js/command/websocket.js`, 'utf-8');
+const mapSrc = fs.readFileSync(`${__dirname}/../../src/frontend/js/command/map.js`, 'utf-8');
+const wsSrc = fs.readFileSync(`${__dirname}/../../src/frontend/js/command/websocket.js`, 'utf-8');
 
 // ================================================================
 // Test: _drawCoverPoints function exists in map.js

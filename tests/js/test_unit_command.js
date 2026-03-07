@@ -120,17 +120,17 @@ const sandbox = {
 const ctx = vm.createContext(sandbox);
 
 // Load EventBus
-const eventsCode = fs.readFileSync(__dirname + '/../../frontend/js/command/events.js', 'utf8')
+const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8')
     .replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, '');
 vm.runInContext(eventsCode, ctx);
 
 // Load TritiumStore
-const storeCode = fs.readFileSync(__dirname + '/../../frontend/js/command/store.js', 'utf8')
+const storeCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8')
     .replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, '');
 vm.runInContext(storeCode, ctx);
 
 // Load units.js panel
-const unitsCode = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/units.js', 'utf8')
+const unitsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/units.js', 'utf8')
     .replace(/^export\s+const\s+/gm, 'var ').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, '');
 vm.runInContext(unitsCode, ctx);
 

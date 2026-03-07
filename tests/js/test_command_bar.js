@@ -208,14 +208,14 @@ const sandbox = {
 const ctx = vm.createContext(sandbox);
 
 // Load events.js (EventBus)
-const eventsCode = fs.readFileSync(__dirname + '/../../frontend/js/command/events.js', 'utf8');
+const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8');
 const eventsPlain = eventsCode
     .replace(/^export\s+/gm, '')
     .replace(/^import\s+.*$/gm, '');
 vm.runInContext(eventsPlain, ctx);
 
 // Load command-bar.js
-const commandBarCode = fs.readFileSync(__dirname + '/../../frontend/js/command/command-bar.js', 'utf8');
+const commandBarCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/command-bar.js', 'utf8');
 const commandBarPlain = commandBarCode
     .replace(/^export\s+function\s+/gm, 'function ')
     .replace(/^export\s+/gm, '')

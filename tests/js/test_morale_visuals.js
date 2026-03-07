@@ -111,7 +111,7 @@ function createFreshContext() {
 
 // ---- Read map.js source ----
 
-const mapSrc = fs.readFileSync(`${__dirname}/../../frontend/js/command/map.js`, 'utf-8');
+const mapSrc = fs.readFileSync(`${__dirname}/../../src/frontend/js/command/map.js`, 'utf-8');
 
 // ================================================================
 // Test: _drawMoraleIndicator function exists in map.js

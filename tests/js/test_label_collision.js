@@ -23,7 +23,7 @@ function assert(cond, msg) {
 // Read source and extract internal functions
 // --------------------------------------------------------------------------
 
-const srcPath = path.join(__dirname, '../../frontend/js/command/label-collision.js');
+const srcPath = path.join(__dirname, '../../src/frontend/js/command/label-collision.js');
 const src = fs.readFileSync(srcPath, 'utf8');
 
 // Convert ES module to CommonJS for vm execution

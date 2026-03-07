@@ -84,7 +84,7 @@ const ctx = vm.createContext({
 });
 
 // Load the game-hud.js file (it will register helpers on window)
-const hudCode = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+const hudCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
 // Strip ES module syntax for Node.js
 const hudClean = hudCode
     .replace(/import\s*\{[^}]*\}\s*from\s*['"][^'"]*['"];?/g, '')

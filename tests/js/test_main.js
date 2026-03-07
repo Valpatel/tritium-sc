@@ -26,7 +26,7 @@ function assertEqual(a, b, msg) {
 // Load main.js source as a string for static analysis
 // ============================================================
 
-const mainSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/main.js', 'utf8');
+const mainSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/main.js', 'utf8');
 const mainLines = mainSrc.split('\n');
 
 // ============================================================

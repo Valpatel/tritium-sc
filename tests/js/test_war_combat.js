@@ -21,7 +21,7 @@ function assertClose(a, b, eps, msg) {
     assert(Math.abs(a - b) < (eps || 0.01), msg + ` (got ${a}, expected ${b})`);
 }
 
-let combatCode = fs.readFileSync(__dirname + '/../../frontend/js/war-combat.js', 'utf8');
+let combatCode = fs.readFileSync(__dirname + '/../../src/frontend/js/war-combat.js', 'utf8');
 
 // Expose internal const arrays and PROJECTILE_STYLES for testing
 combatCode += `

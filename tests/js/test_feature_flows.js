@@ -61,7 +61,7 @@ const EXPECTED_PANELS = [
     'cameras', 'search', 'tak', 'videos', 'zones',
 ];
 
-const mainSrc = readSource('frontend/js/command/main.js');
+const mainSrc = readSource('src/frontend/js/command/main.js');
 for (const panelId of EXPECTED_PANELS) {
     // Each panel must have a PanelDef import
     const hasImport = /import\s+\{[^}]*PanelDef[^}]*\}\s+from\s+['"]\.\/panels\//.test(mainSrc);
@@ -144,7 +144,7 @@ for (const key of DOCUMENTED_KEYS) {
 console.log('\n=== Button-to-Endpoint Contract ===\n');
 
 // Game HUD endpoints
-const gameHudSrc = readSource('frontend/js/command/panels/game-hud.js');
+const gameHudSrc = readSource('src/frontend/js/command/panels/game-hud.js');
 assert(gameHudSrc.includes('/api/game/begin'), 'game-hud: calls POST /api/game/begin');
 assert(gameHudSrc.includes('/api/game/reset'), 'game-hud: calls POST /api/game/reset');
 assert(gameHudSrc.includes('/api/amy/simulation/spawn'), 'game-hud: calls POST /api/amy/simulation/spawn');
@@ -152,24 +152,24 @@ assert(gameHudSrc.includes('/api/game/upgrades'), 'game-hud: calls GET /api/game
 assert(gameHudSrc.includes('/api/game/upgrade'), 'game-hud: calls POST /api/game/upgrade');
 
 // Units panel endpoints
-const unitsSrc = readSource('frontend/js/command/panels/units.js');
+const unitsSrc = readSource('src/frontend/js/command/panels/units.js');
 assert(unitsSrc.includes('/api/amy/command'), 'units: calls POST /api/amy/command (dispatch)');
 // NPC control is handled in main.js via WASD, not in units.js directly
 assert(mainSrc.includes('/api/npc/'), 'main.js: calls /api/npc/ for WASD control');
 
 // Amy panel endpoints
-const amySrc = readSource('frontend/js/command/panels/amy.js');
+const amySrc = readSource('src/frontend/js/command/panels/amy.js');
 assert(amySrc.includes('/api/amy/status'), 'amy: calls GET /api/amy/status');
 assert(amySrc.includes('/api/amy/command'), 'amy: calls POST /api/amy/command');
 
 // Patrol panel endpoints
-const patrolSrc = readSource('frontend/js/command/panels/patrol.js');
+const patrolSrc = readSource('src/frontend/js/command/panels/patrol.js');
 assert(patrolSrc.includes('/api/amy/command'), 'patrol: calls POST /api/amy/command');
 assert(patrolSrc.includes('patrol_all'), 'patrol: sends patrol_all action');
 assert(patrolSrc.includes('stand_down'), 'patrol: sends stand_down action');
 
 // Replay panel endpoints
-const replaySrc = readSource('frontend/js/command/panels/replay.js');
+const replaySrc = readSource('src/frontend/js/command/panels/replay.js');
 assert(replaySrc.includes('/api/game/replay'), 'replay: calls /api/game/replay endpoints');
 const replayActions = ['play', 'pause', 'stop', 'seek', 'speed'];
 for (const action of replayActions) {
@@ -177,22 +177,22 @@ for (const action of replayActions) {
 }
 
 // Mission modal endpoints
-const missionSrc = readSource('frontend/js/command/mission-modal.js');
+const missionSrc = readSource('src/frontend/js/command/mission-modal.js');
 assert(missionSrc.includes('/api/game/generate'), 'mission: calls POST /api/game/generate');
 assert(missionSrc.includes('/api/game/mission/apply'), 'mission: calls POST /api/game/mission/apply');
 assert(missionSrc.includes('/api/game/models'), 'mission: calls GET /api/game/models');
 
 // Stats panel endpoints
-const statsSrc = readSource('frontend/js/command/panels/stats.js');
+const statsSrc = readSource('src/frontend/js/command/panels/stats.js');
 assert(statsSrc.includes('/api/game/stats'), 'stats: calls GET /api/game/stats');
 
 // Context menu endpoints
-const contextSrc = readSource('frontend/js/command/context-menu.js');
+const contextSrc = readSource('src/frontend/js/command/context-menu.js');
 assert(contextSrc.includes('/api/amy/command'), 'context-menu: calls POST /api/amy/command');
 assert(contextSrc.includes('dispatch'), 'context-menu: has dispatch action');
 
 // System panel endpoints
-const systemSrc = readSource('frontend/js/command/panels/system.js');
+const systemSrc = readSource('src/frontend/js/command/panels/system.js');
 assert(systemSrc.includes('/api/cameras'), 'system: calls GET /api/cameras');
 assert(systemSrc.includes('/api/discovery'), 'system: calls /api/discovery endpoints');
 assert(systemSrc.includes('/api/telemetry'), 'system: calls /api/telemetry endpoints');
@@ -201,11 +201,11 @@ assert(systemSrc.includes('fleet') || systemSrc.includes('/api/amy/fleet') || sy
     'system: calls fleet or AI-related endpoint');
 
 // Cameras panel endpoints
-const camerasSrc = readSource('frontend/js/command/panels/cameras.js');
+const camerasSrc = readSource('src/frontend/js/command/panels/cameras.js');
 assert(camerasSrc.includes('/api/synthetic/cameras'), 'cameras: calls /api/synthetic/cameras');
 
 // Scenarios panel endpoints
-const scenariosSrc = readSource('frontend/js/command/panels/scenarios.js');
+const scenariosSrc = readSource('src/frontend/js/command/panels/scenarios.js');
 assert(scenariosSrc.includes('/api/scenarios'), 'scenarios: calls GET /api/scenarios');
 
 // ============================================================
@@ -213,7 +213,7 @@ assert(scenariosSrc.includes('/api/scenarios'), 'scenarios: calls GET /api/scena
 // ============================================================
 console.log('\n=== Store Field Contract ===\n');
 
-const wsSrc = readSource('frontend/js/command/websocket.js');
+const wsSrc = readSource('src/frontend/js/command/websocket.js');
 
 // Core telemetry fields that the store must contain
 const TELEMETRY_FIELDS = [
@@ -274,7 +274,7 @@ for (const msgType of UNPREFIXED_TYPES) {
 // ============================================================
 console.log('\n=== Fog of War Contract ===\n');
 
-const visionSrc = readSource('frontend/js/command/vision-system.js');
+const visionSrc = readSource('src/frontend/js/command/vision-system.js');
 
 // Coordinate transforms must NOT be stubs
 assert(!visionSrc.includes('// This would use mapState.map.project'),
@@ -375,7 +375,7 @@ assert(tritiumCss.includes('.radio-ghost'),
 assert(tritiumCss.includes('radio-pulse') || tritiumCss.includes('radio-ring'),
     'CSS: has radio ghost animation keyframes');
 
-const mapSrc = readSource('frontend/js/command/map-maplibre.js');
+const mapSrc = readSource('src/frontend/js/command/map-maplibre.js');
 assert(mapSrc.includes('radio-ghost'), 'map: adds radio-ghost CSS class');
 assert(mapSrc.includes('radio_detected'), 'map: checks radio_detected for ghost styling');
 
@@ -384,7 +384,7 @@ assert(mapSrc.includes('radio_detected'), 'map: checks radio_detected for ghost 
 // ============================================================
 console.log('\n=== Menu Bar VIEW Menu ===\n');
 
-const menuSrc = readSource('frontend/js/command/menu-bar.js');
+const menuSrc = readSource('src/frontend/js/command/menu-bar.js');
 // VIEW menu dynamically generates items from panelManager.getRegisteredPanels()
 assert(menuSrc.includes('getRegisteredPanels'),
     'menu-bar: VIEW menu uses getRegisteredPanels() for dynamic panel listing');
@@ -487,7 +487,7 @@ assert(mainSrc.includes('/api/npc/'),
 // ============================================================
 console.log('\n=== Layout Manager ===\n');
 
-const layoutSrc = readSource('frontend/js/command/layout-manager.js');
+const layoutSrc = readSource('src/frontend/js/command/layout-manager.js');
 assert(layoutSrc.includes('saveLayout') || layoutSrc.includes('save'),
     'layout: has save functionality');
 assert(layoutSrc.includes('localStorage'),
@@ -507,7 +507,7 @@ for (const name of BUILT_IN_LAYOUTS) {
 // ============================================================
 console.log('\n=== Game Over Stats ===\n');
 
-const gameOverSrc = readSource('frontend/js/command/game-over-stats.js');
+const gameOverSrc = readSource('src/frontend/js/command/game-over-stats.js');
 assert(gameOverSrc.includes('/api/game/stats'),
     'game-over: fetches from /api/game/stats');
 
@@ -516,7 +516,7 @@ assert(gameOverSrc.includes('/api/game/stats'),
 // ============================================================
 console.log('\n=== Store Reactivity ===\n');
 
-const storeSrc = readSource('frontend/js/command/store.js');
+const storeSrc = readSource('src/frontend/js/command/store.js');
 assert(storeSrc.includes('updateUnit'), 'store: has updateUnit method');
 assert(storeSrc.includes('removeUnit'), 'store: has removeUnit method');
 assert(storeSrc.includes('_notify') || storeSrc.includes('flushNotify'),

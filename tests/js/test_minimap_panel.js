@@ -25,9 +25,9 @@ function assertEqual(a, b, msg) {
 // Load source files
 // ============================================================
 
-const minimapSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/minimap.js', 'utf8');
-const mainSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/main.js', 'utf8');
-const mapSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/map.js', 'utf8');
+const minimapSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/minimap.js', 'utf8');
+const mainSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/main.js', 'utf8');
+const mapSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/map.js', 'utf8');
 
 // ============================================================
 // 1. Panel definition structure
@@ -166,7 +166,7 @@ console.log('\n--- Map.js Integration ---');
 
 console.log('\n--- Panel Presets ---');
 
-const panelMgrSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/panel-manager.js', 'utf8');
+const panelMgrSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panel-manager.js', 'utf8');
 
 (function testCommanderPresetHasMinimap() {
     // Commander preset should include minimap

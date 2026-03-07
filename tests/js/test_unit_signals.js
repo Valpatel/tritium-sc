@@ -88,13 +88,13 @@ function createFreshContext() {
     sandbox.self = sandbox;
     const ctx = vm.createContext(sandbox);
 
-    const storeCode = fs.readFileSync('frontend/js/command/store.js', 'utf-8');
+    const storeCode = fs.readFileSync('src/frontend/js/command/store.js', 'utf-8');
     vm.runInContext(storeCode.replace(/^export\s+/gm, ''), ctx);
 
-    const eventsCode = fs.readFileSync('frontend/js/command/events.js', 'utf-8');
+    const eventsCode = fs.readFileSync('src/frontend/js/command/events.js', 'utf-8');
     vm.runInContext(eventsCode.replace(/^export\s+/gm, '').replace(/^import\s.*$/gm, ''), ctx);
 
-    const wsCode = fs.readFileSync('frontend/js/command/websocket.js', 'utf-8');
+    const wsCode = fs.readFileSync('src/frontend/js/command/websocket.js', 'utf-8');
     vm.runInContext(
         wsCode.replace(/^export\s+/gm, '').replace(/^import\s.*$/gm, ''),
         ctx
@@ -245,7 +245,7 @@ console.log('\n--- unit_signal handler ---');
 
 console.log('\n--- _drawUnitSignals in map.js ---');
 
-const mapSource = fs.readFileSync('frontend/js/command/map.js', 'utf8');
+const mapSource = fs.readFileSync('src/frontend/js/command/map.js', 'utf8');
 
 {
     assert(mapSource.includes('function _drawUnitSignals'),

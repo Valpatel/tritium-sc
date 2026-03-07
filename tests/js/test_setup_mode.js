@@ -242,7 +242,7 @@ console.log('\n--- Placement Toolbar ---');
 
 // Load game-hud.js helpers
 const gameHudCode = fs.readFileSync(
-    __dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8'
+    __dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8'
 );
 
 // Strip ES module imports/exports and expose GameHudPanelDef on window

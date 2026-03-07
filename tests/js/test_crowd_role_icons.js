@@ -37,7 +37,7 @@ function assertEq(a, b, msg) {
 // ============================================================
 
 const iconsSource = fs.readFileSync(
-    path.join(__dirname, '../../frontend/js/command/unit-icons.js'), 'utf8');
+    path.join(__dirname, '../../src/frontend/js/command/unit-icons.js'), 'utf8');
 
 // ============================================================
 // Test: drawUnit function supports crowdRole parameter
@@ -95,7 +95,7 @@ console.log('\n--- drawCrowdRoleIndicator function ---');
 console.log('\n--- map.js crowd role integration ---');
 
 const mapSource = fs.readFileSync(
-    path.join(__dirname, '../../frontend/js/command/map.js'), 'utf8');
+    path.join(__dirname, '../../src/frontend/js/command/map.js'), 'utf8');
 
 {
     assert(mapSource.includes('crowdRole'), 'map.js _drawUnit references crowdRole');

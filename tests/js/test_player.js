@@ -230,7 +230,7 @@ const sandbox = {
 const ctx = vm.createContext(sandbox);
 
 // Load player.js — wrap in IIFE that exposes internal state via window
-const code = fs.readFileSync(__dirname + '/../../frontend/js/player.js', 'utf8');
+const code = fs.readFileSync(__dirname + '/../../src/frontend/js/player.js', 'utf8');
 vm.runInContext(code, ctx);
 
 // Expose const-scoped internals to test harness via evaluation

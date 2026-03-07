@@ -138,21 +138,21 @@ const sandbox = {
 const ctx = vm.createContext(sandbox);
 
 // Load events.js (EventBus)
-const eventsCode = fs.readFileSync(__dirname + '/../../frontend/js/command/events.js', 'utf8');
+const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8');
 const eventsPlain = eventsCode
     .replace(/^export\s+/gm, '')
     .replace(/^import\s+.*$/gm, '');
 vm.runInContext(eventsPlain, ctx);
 
 // Load store.js (TritiumStore)
-const storeCode = fs.readFileSync(__dirname + '/../../frontend/js/command/store.js', 'utf8');
+const storeCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8');
 const storePlain = storeCode
     .replace(/^export\s+/gm, '')
     .replace(/^import\s+.*$/gm, '');
 vm.runInContext(storePlain, ctx);
 
 // Load alerts.js panel
-const alertsCode = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/alerts.js', 'utf8');
+const alertsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/alerts.js', 'utf8');
 const alertsPlain = alertsCode
     .replace(/^export\s+const\s+/gm, 'var ')
     .replace(/^export\s+/gm, '')

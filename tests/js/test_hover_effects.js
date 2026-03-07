@@ -61,7 +61,7 @@ function createMockCtx() {
 // Load unit-icons.js
 // ============================================================
 
-const src = fs.readFileSync('frontend/js/command/unit-icons.js', 'utf-8');
+const src = fs.readFileSync('src/frontend/js/command/unit-icons.js', 'utf-8');
 const cleaned = src
     .replace(/^export\s*\{[^}]*\};?\s*$/m, '')
     .replace(/export\s+(function|const|let|var|class)/g, '$1');

@@ -32,8 +32,8 @@ function assert(cond, msg) {
 }
 
 // Read source files
-const mapSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/map-maplibre.js', 'utf8');
-const wsSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/websocket.js', 'utf8');
+const mapSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/map-maplibre.js', 'utf8');
+const wsSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
 
 // ============================================================
 // 1. Weapon Range -- Source/Layer Constants
@@ -83,7 +83,8 @@ assert(mapSrc.includes('function _clearWeaponRange'), '_clearWeaponRange functio
     if (fnIdx === -1) return;
     const snippet = mapSrc.substring(fnIdx, fnIdx + 800);
     assert(snippet.includes('showWeaponRange'), '_updateWeaponRange checks showWeaponRange flag');
-    assert(snippet.includes('observe'), '_updateWeaponRange checks for observe mode');
+    // Weapon range now shows in all modes (including observe); mode-specific
+    // clearing is handled in setMapMode instead.
     assert(snippet.includes('weaponRange'), '_updateWeaponRange reads unit.weaponRange');
     assert(snippet.includes('_makeCircleGeoJSON'), '_updateWeaponRange uses _makeCircleGeoJSON');
 })();

@@ -18,7 +18,7 @@ function assert(cond, msg) {
     else { console.log('PASS:', msg); passed++; }
 }
 
-let hudCode = fs.readFileSync(__dirname + '/../../frontend/js/war-hud.js', 'utf8');
+let hudCode = fs.readFileSync(__dirname + '/../../src/frontend/js/war-hud.js', 'utf8');
 
 // Expose internal state for testing
 hudCode += `
@@ -927,7 +927,7 @@ console.log('\n--- warHudDrawHostileIntel ---');
 // ============================================================
 
 {
-    const code = fs.readFileSync(__dirname + '/../../frontend/js/war-hud.js', 'utf8');
+    const code = fs.readFileSync(__dirname + '/../../src/frontend/js/war-hud.js', 'utf8');
     // threat_level should be escaped before .toUpperCase()
     assert(code.includes('_hudEscapeHtml(briefingData.threat_level)'),
         'Wave banner escapes threat_level before injecting into HTML');
@@ -941,7 +941,7 @@ console.log('\n--- warHudDrawHostileIntel ---');
 // ============================================================
 
 {
-    const code = fs.readFileSync(__dirname + '/../../frontend/js/war-hud.js', 'utf8');
+    const code = fs.readFileSync(__dirname + '/../../src/frontend/js/war-hud.js', 'utf8');
     // warHudPlayAgain should clear both timers
     assert(code.includes('clearTimeout(_hudState.countdownTimer)'),
         'warHudPlayAgain clears countdownTimer');

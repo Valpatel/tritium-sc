@@ -25,7 +25,7 @@ function assertDeepEqual(a, b, msg) {
 }
 
 // Load events.js into a sandboxed context
-const code = fs.readFileSync(__dirname + '/../../frontend/js/command/events.js', 'utf8');
+const code = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8');
 const plain = code
     .replace(/^export\s+/gm, '')
     .replace(/^import\s+.*$/gm, '');

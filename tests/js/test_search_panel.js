@@ -65,10 +65,10 @@ const sandbox = {
 
 const ctx = vm.createContext(sandbox);
 
-vm.runInContext(fs.readFileSync(__dirname + '/../../frontend/js/command/events.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
-vm.runInContext(fs.readFileSync(__dirname + '/../../frontend/js/command/store.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
+vm.runInContext(fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
+vm.runInContext(fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 
-const searchCode = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/search.js', 'utf8');
+const searchCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/search.js', 'utf8');
 vm.runInContext(searchCode.replace(/^export\s+const\s+/gm, 'var ').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 
 const SearchPanelDef = ctx.SearchPanelDef;
@@ -191,7 +191,7 @@ console.log('\n--- unmount() ---');
 console.log('\n--- Merge request format ---');
 
 (function testMergeRequestUsesCorrectFieldNames() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/search.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/search.js', 'utf8');
     // Backend MergeRequest model expects {primary_id: str, duplicate_ids: list[str]}
     assert(src.includes('primary_id'), 'Merge request uses primary_id (matches backend MergeRequest model)');
     assert(src.includes('duplicate_ids'), 'Merge request uses duplicate_ids array (matches backend MergeRequest model)');
@@ -205,26 +205,26 @@ console.log('\n--- Merge request format ---');
 console.log('\n--- API contracts ---');
 
 (function testSightingsUsesPathParam() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/search.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/search.js', 'utf8');
     assert(src.includes('/api/search/sightings/${'), 'Sightings uses path param (not query param)');
     assert(!src.includes('/api/search/sightings?thumbnail_id='), 'Sightings does NOT use query param');
 })();
 
 (function testSimilarUsesPathParam() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/search.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/search.js', 'utf8');
     assert(src.includes('/api/search/similar/${'), 'Similar uses path param (not query param)');
     assert(!src.includes('/api/search/similar?thumbnail_id='), 'Similar does NOT use query param');
 })();
 
 (function testNoLabelGetRequest() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/search.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/search.js', 'utf8');
     assert(!src.includes("'/api/search/label?"), 'No GET request to /api/search/label (only POST exists)');
     assert(!src.includes('"/api/search/label?'), 'No GET request to /api/search/label (double-quote check)');
     assert(!src.includes('/api/search/label?thumbnail_id='), 'No label query param fetch');
 })();
 
 (function testFeedbackSendsFeedbackType() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/search.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/search.js', 'utf8');
     assert(src.includes('feedback_type'), 'Feedback sends feedback_type (matches backend FeedbackRequest model)');
     assert(!src.includes('correct: true'), 'Feedback does NOT send {correct: true} (wrong field for backend)');
     assert(!src.includes('correct: false'), 'Feedback does NOT send {correct: false} (wrong field for backend)');

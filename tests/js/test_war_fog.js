@@ -27,7 +27,7 @@ function assertEqual(a, b, msg) {
 }
 
 // Load war-fog.js into a sandboxed context
-const code = fs.readFileSync(__dirname + '/../../frontend/js/war-fog.js', 'utf8');
+const code = fs.readFileSync(__dirname + '/../../src/frontend/js/war-fog.js', 'utf8');
 let perfNow = 1000;
 const ctx = vm.createContext({
     Math, Date, console, Map, Array, Object, Number, Infinity, Boolean, JSON,

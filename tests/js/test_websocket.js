@@ -126,9 +126,9 @@ function clearAllTimers() {
 // Load store.js + events.js + websocket.js source
 // ============================================================
 
-const storeCode = fs.readFileSync(__dirname + '/../../frontend/js/command/store.js', 'utf8');
-const eventsCode = fs.readFileSync(__dirname + '/../../frontend/js/command/events.js', 'utf8');
-const wsCode = fs.readFileSync(__dirname + '/../../frontend/js/command/websocket.js', 'utf8');
+const storeCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8');
+const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8');
+const wsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
 
 // Shared bridge object for capturing EventBus emissions from inside the VM.
 // We place this on the context so both host and VM code can access it.
@@ -149,13 +149,10 @@ function createFreshContext() {
         clearTimeout: mockClearTimeout,
         WebSocket: MockWebSocket,
         _bridge,
-        window: {
-            location: {
-                protocol: 'http:',
-                host: 'localhost:8000',
-            },
-        },
     });
+    // Make window === ctx so that window.warHandleFoo resolves to ctx.warHandleFoo
+    ctx.window = ctx;
+    ctx.window.location = { protocol: 'http:', host: 'localhost:8000' };
 
     // Load store (strip export)
     const storeStripped = storeCode.replace(/^export\s+/gm, '');
@@ -2261,7 +2258,7 @@ console.log('\n--- NPC thought triggers store notification ---');
     // The amy_npc_thought handler should call _scheduleNotify('units')
     // so the detail panel updates when thought text changes
     const code = require('fs').readFileSync(
-        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'websocket.js'), 'utf8'
+        require('path').join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'websocket.js'), 'utf8'
     );
     // Find the amy_npc_thought case and verify _scheduleNotify is called
     const thoughtIdx = code.indexOf("case 'amy_npc_thought':");
@@ -2276,7 +2273,7 @@ console.log('\n--- NPC thought triggers store notification ---');
 
 (function testNpcThoughtClearCallsScheduleNotify() {
     const code = require('fs').readFileSync(
-        require('path').join(__dirname, '..', '..', 'frontend', 'js', 'command', 'websocket.js'), 'utf8'
+        require('path').join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'websocket.js'), 'utf8'
     );
     const clearIdx = code.indexOf("case 'amy_npc_thought_clear':");
     const nextCase = code.indexOf('case ', clearIdx + 30);
@@ -2607,7 +2604,7 @@ console.log('\n--- State Refresh on Connect ---');
 (function testRefreshStateMethodExists() {
     const ctx = createFreshContext();
     const wsCode2 = fs.readFileSync(
-        __dirname + '/../../frontend/js/command/websocket.js', 'utf8'
+        __dirname + '/../../src/frontend/js/command/websocket.js', 'utf8'
     );
     assert(
         wsCode2.includes('_refreshState()'),
@@ -2625,7 +2622,7 @@ console.log('\n--- State Refresh on Connect ---');
 
 (function testOnOpenCallsRefreshState() {
     const wsCode2 = fs.readFileSync(
-        __dirname + '/../../frontend/js/command/websocket.js', 'utf8'
+        __dirname + '/../../src/frontend/js/command/websocket.js', 'utf8'
     );
     // onopen handler must call _refreshState
     assert(
@@ -2649,7 +2646,7 @@ console.log('\n--- State Refresh on Connect ---');
 
 (function testRefreshStateSetsGamePhase() {
     const wsCode2 = fs.readFileSync(
-        __dirname + '/../../frontend/js/command/websocket.js', 'utf8'
+        __dirname + '/../../src/frontend/js/command/websocket.js', 'utf8'
     );
     assert(
         wsCode2.includes("game.state") && wsCode2.includes("game.phase"),
@@ -2663,7 +2660,7 @@ console.log('\n--- State Refresh on Connect ---');
 
 (function testRefreshStateUpdatesUnits() {
     const wsCode2 = fs.readFileSync(
-        __dirname + '/../../frontend/js/command/websocket.js', 'utf8'
+        __dirname + '/../../src/frontend/js/command/websocket.js', 'utf8'
     );
     // Must call _updateUnit for each target in the response
     assert(
@@ -2674,7 +2671,7 @@ console.log('\n--- State Refresh on Connect ---');
 
 (function testRefreshStateCatchesErrors() {
     const wsCode2 = fs.readFileSync(
-        __dirname + '/../../frontend/js/command/websocket.js', 'utf8'
+        __dirname + '/../../src/frontend/js/command/websocket.js', 'utf8'
     );
     // Must have try/catch for network failures
     assert(
@@ -2688,7 +2685,7 @@ console.log('\n--- State Refresh on Connect ---');
 // ============================================================
 
 (function testGameStateWiresDifficultyMultiplier() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/websocket.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
     assert(
         src.includes("game.difficultyMultiplier") && src.includes("d.difficulty_multiplier"),
         'game_state_change handler wires difficulty_multiplier to store'
@@ -2696,7 +2693,7 @@ console.log('\n--- State Refresh on Connect ---');
 })();
 
 (function testGameStateWiresWaveName() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/websocket.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
     assert(
         src.includes("game.waveName") && src.includes("d.wave_name"),
         'game_state_change handler wires wave_name to store'
@@ -2704,7 +2701,7 @@ console.log('\n--- State Refresh on Connect ---');
 })();
 
 (function testGameStateWiresCountdown() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/websocket.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
     assert(
         src.includes("game.countdown") && src.includes("d.countdown"),
         'game_state_change handler wires countdown to store'
@@ -2712,7 +2709,7 @@ console.log('\n--- State Refresh on Connect ---');
 })();
 
 (function testGameStateWiresWaveHostilesRemaining() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/websocket.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
     assert(
         src.includes("game.waveHostilesRemaining") && src.includes("d.wave_hostiles_remaining"),
         'game_state_change handler wires wave_hostiles_remaining to store'
@@ -2720,7 +2717,7 @@ console.log('\n--- State Refresh on Connect ---');
 })();
 
 (function testRefreshStateWiresDifficultyMultiplier() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/websocket.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
     // refreshState should also set difficulty_multiplier
     const refreshIdx = src.indexOf('async _refreshState');
     assert(refreshIdx >= 0, 'async _refreshState method exists');
@@ -2732,7 +2729,7 @@ console.log('\n--- State Refresh on Connect ---');
 })();
 
 (function testRefreshStateWiresEliminationsAndModeType() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/websocket.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
     const refreshIdx = src.indexOf('async _refreshState');
     assert(refreshIdx >= 0, 'async _refreshState method exists (eliminations check)');
     const refreshBlock = src.slice(refreshIdx, refreshIdx + 2000);
@@ -2747,7 +2744,7 @@ console.log('\n--- State Refresh on Connect ---');
 })();
 
 (function testRefreshStateHydratesModeSpecificFields() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/websocket.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
     const refreshIdx = src.indexOf('async _refreshState');
     assert(refreshIdx >= 0, 'async _refreshState exists (mode-specific check)');
     const refreshBlock = src.slice(refreshIdx, refreshIdx + 2500);
@@ -2766,25 +2763,25 @@ console.log('\n--- State Refresh on Connect ---');
 // ============================================================
 
 (function testTakConnectedHandler() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/websocket.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
     assert(src.includes("case 'tak_connected':"), 'Has tak_connected case');
     assert(src.includes("EventBus.emit('tak:connected'"), 'tak_connected emits tak:connected');
 })();
 
 (function testTakDisconnectedHandler() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/websocket.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
     assert(src.includes("case 'tak_disconnected':"), 'Has tak_disconnected case');
     assert(src.includes("EventBus.emit('tak:disconnected'"), 'tak_disconnected emits tak:disconnected');
 })();
 
 (function testTakClientUpdateHandler() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/websocket.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
     assert(src.includes("case 'tak_client_update':"), 'Has tak_client_update case');
     assert(src.includes("EventBus.emit('tak:client_update'"), 'tak_client_update emits tak:client_update');
 })();
 
 (function testTakGeochatHandler() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/websocket.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
     assert(src.includes("case 'tak_geochat':"), 'Has tak_geochat case');
     assert(src.includes("EventBus.emit('tak:geochat'"), 'tak_geochat emits tak:geochat');
 })();
@@ -2799,7 +2796,7 @@ console.log('\n--- State Refresh on Connect ---');
 // ============================================================
 
 (function testStoreHasDifficultyMultiplierDefault() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/store.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8');
     assert(
         src.includes('difficultyMultiplier: 1.0'),
         'Store game state has difficultyMultiplier default of 1.0'
@@ -2807,7 +2804,7 @@ console.log('\n--- State Refresh on Connect ---');
 })();
 
 (function testStoreHasWaveNameDefault() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/store.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8');
     assert(
         src.includes("waveName: ''"),
         "Store game state has waveName default of empty string"
@@ -3245,7 +3242,7 @@ console.log('\n--- Audio-relevant EventBus emissions ---');
 // ============================================================
 
 (function testWarEventsPatches_EliminationStreak_NotKillStreak() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/war-events.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/war-events.js', 'utf8');
     assert(
         src.includes("_patchWarHandler('warHandleEliminationStreak'"),
         'war-events.js patches warHandleEliminationStreak (canonical name used by websocket.js)'

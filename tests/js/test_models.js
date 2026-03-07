@@ -220,7 +220,7 @@ const mockDocument = {
 // Load models.js into VM context
 // ============================================================
 
-const srcPath = __dirname + '/../../frontend/js/models.js';
+const srcPath = __dirname + '/../../src/frontend/js/models.js';
 const source = fs.readFileSync(srcPath, 'utf8');
 
 const ctx = vm.createContext({

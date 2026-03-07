@@ -23,7 +23,7 @@ function assertClose(a, b, eps, msg) {
 }
 
 // Load geo.js into a sandboxed context
-const code = fs.readFileSync(__dirname + '/../../frontend/js/geo.js', 'utf8');
+const code = fs.readFileSync(__dirname + '/../../src/frontend/js/geo.js', 'utf8');
 const _window = {};
 const ctx = vm.createContext({
     Math, Date, console, Array, Object, Number, Infinity, parseFloat, parseInt, isNaN,

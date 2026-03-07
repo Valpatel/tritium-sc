@@ -988,6 +988,11 @@ class TestHostileCollisionEscape:
                 if abs(x) < 10 and abs(y) < 10:
                     return 5.0
                 return None
+            def path_crosses_building(self, waypoints):
+                for wp in waypoints:
+                    if self.point_in_building(wp[0], wp[1]):
+                        return True
+                return False
 
         engine._obstacles = MockObstacles()
 

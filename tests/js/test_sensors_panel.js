@@ -67,12 +67,12 @@ const sandbox = {
 const ctx = vm.createContext(sandbox);
 
 // Load EventBus
-vm.runInContext(fs.readFileSync(__dirname + '/../../frontend/js/command/events.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
+vm.runInContext(fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 // Load store
-vm.runInContext(fs.readFileSync(__dirname + '/../../frontend/js/command/store.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
+vm.runInContext(fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 
 // Load sensors panel
-const sensorCode = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/sensors.js', 'utf8');
+const sensorCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/sensors.js', 'utf8');
 vm.runInContext(sensorCode.replace(/^export\s+const\s+/gm, 'var ').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 
 const SensorNetPanelDef = ctx.SensorNetPanelDef;

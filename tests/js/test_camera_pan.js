@@ -15,7 +15,7 @@
 const fs = require('fs');
 const path = require('path');
 const mapLibreSource = fs.readFileSync(
-    path.join(__dirname, '../../frontend/js/command/map-maplibre.js'), 'utf8');
+    path.join(__dirname, '../../src/frontend/js/command/map-maplibre.js'), 'utf8');
 
 // Simple test runner
 let passed = 0, failed = 0;

@@ -31,9 +31,9 @@ function loadModule(relPath) {
         .replace(/^import\s+.*$/gm, '');
 }
 
-const eventsCode = loadModule('frontend/js/command/events.js');
-const storeCode = loadModule('frontend/js/command/store.js');
-const deviceModalCode = loadModule('frontend/js/command/device-modal.js');
+const eventsCode = loadModule('src/frontend/js/command/events.js');
+const storeCode = loadModule('src/frontend/js/command/store.js');
+const deviceModalCode = loadModule('src/frontend/js/command/device-modal.js');
 
 // Minimal DOM mock
 function createMockDocument() {

@@ -86,7 +86,7 @@ function createMockCtx() {
 // Load map.js in sandbox
 // ============================================================
 
-const mapSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/map.js', 'utf8');
+const mapSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/map.js', 'utf8');
 let strippedCode = mapSrc
     .replace(/^import\s+.*$/gm, '')
     .replace(/export\s+function\s+/g, 'function ')

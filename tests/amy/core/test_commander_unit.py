@@ -876,8 +876,10 @@ class TestProcessBridgeMessage:
         cmd = _make_cmd(game_active=True)
         cmd.target_tracker = MagicMock()
         _process_bridge_message(cmd, {
-            "type": "sim_telemetry",
-            "data": {"targets": []},
+            "type": "sim_telemetry_batch",
+            "data": [{"target_id": "t1", "name": "T", "alliance": "friendly",
+                       "health": 100.0, "max_health": 100.0, "status": "active",
+                       "is_combatant": True}],
         })
         cmd.target_tracker.update_from_simulation.assert_called_once()
 
@@ -885,14 +887,12 @@ class TestProcessBridgeMessage:
         from amy.commander import _process_bridge_message
         cmd = _make_cmd(game_active=True)
         _process_bridge_message(cmd, {
-            "type": "sim_telemetry",
-            "data": {
-                "targets": [{
-                    "target_id": "t1", "name": "T", "alliance": "friendly",
-                    "health": 20.0, "max_health": 200.0, "status": "active",
-                    "is_combatant": True,
-                }],
-            },
+            "type": "sim_telemetry_batch",
+            "data": [{
+                "target_id": "t1", "name": "T", "alliance": "friendly",
+                "health": 20.0, "max_health": 200.0, "status": "active",
+                "is_combatant": True,
+            }],
         })
         events = _drain_tactical(cmd.sensorium)
         health_events = [e for e in events if "health" in e.text.lower()]
@@ -902,7 +902,7 @@ class TestProcessBridgeMessage:
         from amy.commander import _process_bridge_message
         cmd = _make_cmd(game_active=True)
         _process_bridge_message(cmd, {
-            "type": "sim_telemetry",
+            "type": "sim_telemetry_batch",
             "data": {
                 "target_id": "t1", "name": "T", "alliance": "friendly",
                 "health": 20.0, "max_health": 200.0, "status": "active",

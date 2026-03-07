@@ -101,7 +101,7 @@ function createMockCtx() {
 // Load unit-icons.js into sandbox
 // ============================================================
 
-const code = fs.readFileSync(__dirname + '/../../frontend/js/command/unit-icons.js', 'utf8');
+const code = fs.readFileSync(__dirname + '/../../src/frontend/js/command/unit-icons.js', 'utf8');
 
 // The module uses export; wrap it so we can extract the exports
 const wrappedCode = `

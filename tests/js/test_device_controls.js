@@ -245,7 +245,7 @@ const sandbox = {
 const ctx = vm.createContext(sandbox);
 
 // Load device-modal.js (strip ES module syntax)
-const srcCode = fs.readFileSync(__dirname + '/../../frontend/js/command/device-modal.js', 'utf8');
+const srcCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/device-modal.js', 'utf8');
 const plainCode = srcCode
     .replace(/^export\s+\{[^}]*\};?\s*$/m, '')
     .replace(/^export\s+/gm, '')
@@ -1848,17 +1848,17 @@ console.log('\n--- Turret PAN/TILT sliders send aim commands ---');
 
 (function testTurretSliderBindListensToInput() {
     // Verify the turret bind code references 'data-axis' in slider event handler
-    const code = fs.readFileSync(__dirname + '/../../frontend/js/command/device-modal.js', 'utf8');
+    const code = fs.readFileSync(__dirname + '/../../src/frontend/js/command/device-modal.js', 'utf8');
     assert(code.includes('api.aim(device.id, pan, tilt)'), 'TurretControl.bind sends api.aim() on slider input');
 })();
 
 (function testTurretSliderHasDebounce() {
-    const code = fs.readFileSync(__dirname + '/../../frontend/js/command/device-modal.js', 'utf8');
+    const code = fs.readFileSync(__dirname + '/../../src/frontend/js/command/device-modal.js', 'utf8');
     assert(code.includes('_aimTimer') && code.includes('clearTimeout'), 'TurretControl slider uses debounce timer');
 })();
 
 (function testTurretSliderReadsAxisFromDOM() {
-    const code = fs.readFileSync(__dirname + '/../../frontend/js/command/device-modal.js', 'utf8');
+    const code = fs.readFileSync(__dirname + '/../../src/frontend/js/command/device-modal.js', 'utf8');
     assert(code.includes('[data-axis="pan"]') && code.includes('[data-axis="tilt"]'),
         'TurretControl slider reads pan/tilt axis from DOM');
 })();
@@ -1870,25 +1870,25 @@ console.log('\n--- Turret PAN/TILT sliders send aim commands ---');
 console.log('\n--- TAKE CONTROL sets store + emits event ---');
 
 (function testTakeControlSetsControlledUnitId() {
-    const code = fs.readFileSync(__dirname + '/../../frontend/js/command/device-modal.js', 'utf8');
+    const code = fs.readFileSync(__dirname + '/../../src/frontend/js/command/device-modal.js', 'utf8');
     assert(code.includes("TritiumStore.set('controlledUnitId'"),
         'TAKE CONTROL handler sets controlledUnitId in store');
 })();
 
 (function testTakeControlEmitsEvent() {
-    const code = fs.readFileSync(__dirname + '/../../frontend/js/command/device-modal.js', 'utf8');
+    const code = fs.readFileSync(__dirname + '/../../src/frontend/js/command/device-modal.js', 'utf8');
     assert(code.includes("EventBus.emit('unit:control-acquired'"),
         'TAKE CONTROL handler emits unit:control-acquired event');
 })();
 
 (function testReleaseControlClearsStore() {
-    const code = fs.readFileSync(__dirname + '/../../frontend/js/command/device-modal.js', 'utf8');
+    const code = fs.readFileSync(__dirname + '/../../src/frontend/js/command/device-modal.js', 'utf8');
     assert(code.includes("TritiumStore.set('controlledUnitId', null)"),
         'RELEASE handler clears controlledUnitId to null');
 })();
 
 (function testReleaseControlEmitsEvent() {
-    const code = fs.readFileSync(__dirname + '/../../frontend/js/command/device-modal.js', 'utf8');
+    const code = fs.readFileSync(__dirname + '/../../src/frontend/js/command/device-modal.js', 'utf8');
     assert(code.includes("EventBus.emit('unit:control-released'"),
         'RELEASE handler emits unit:control-released event');
 })();
@@ -1902,7 +1902,7 @@ console.log('\n--- Battery display ---');
 (function testBatteryStrNotDoubleMultiplied() {
     // websocket.js converts 0-1 to 0-100 before storing.
     // _batteryStr must NOT multiply by 100 again.
-    const code = fs.readFileSync(__dirname + '/../../frontend/js/command/device-modal.js', 'utf8');
+    const code = fs.readFileSync(__dirname + '/../../src/frontend/js/command/device-modal.js', 'utf8');
     // The function should use Math.round(bat) not Math.round(bat * 100)
     assert(!code.includes('Math.round(bat * 100)'),
         '_batteryStr does not double-multiply battery by 100');

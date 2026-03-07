@@ -150,7 +150,7 @@ const DeviceAPI = {};
 // Load unit-inspector.js
 // ============================================================
 
-const src = fs.readFileSync('frontend/js/command/panels/unit-inspector.js', 'utf-8');
+const src = fs.readFileSync('src/frontend/js/command/panels/unit-inspector.js', 'utf-8');
 const cleaned = src
     .replace(/^export\s*\{[^}]*\};?\s*$/m, '')
     .replace(/export\s+(const|let|var|function|class)/g, '$1')

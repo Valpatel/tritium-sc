@@ -42,7 +42,7 @@ function assertMatch(str, regex, msg) {
 // Load source as text for structural analysis
 // ============================================================
 
-const srcPath = __dirname + '/../../frontend/js/command/map3d.js';
+const srcPath = __dirname + '/../../src/frontend/js/command/map3d.js';
 const source = fs.readFileSync(srcPath, 'utf8');
 
 // ============================================================

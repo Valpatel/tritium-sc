@@ -27,13 +27,13 @@ function assertEqual(a, b, msg) {
 
 // Read map.js source for static analysis and extraction
 const mapSource = fs.readFileSync(
-    path.join(__dirname, '../../frontend/js/command/map.js'), 'utf8');
+    path.join(__dirname, '../../src/frontend/js/command/map.js'), 'utf8');
 
 // Read store + events for functional tests
 const storeSrc = fs.readFileSync(
-    path.join(__dirname, '../../frontend/js/command/store.js'), 'utf8');
+    path.join(__dirname, '../../src/frontend/js/command/store.js'), 'utf8');
 const eventsSrc = fs.readFileSync(
-    path.join(__dirname, '../../frontend/js/command/events.js'), 'utf8');
+    path.join(__dirname, '../../src/frontend/js/command/events.js'), 'utf8');
 
 
 // ============================================================

@@ -22,7 +22,7 @@ function assert(cond, msg) {
     return true;
 }
 
-const mapSrc = fs.readFileSync(`${__dirname}/../../frontend/js/command/map.js`, 'utf-8');
+const mapSrc = fs.readFileSync(`${__dirname}/../../src/frontend/js/command/map.js`, 'utf-8');
 
 // ================================================================
 // Test: _drawSquadLines function exists

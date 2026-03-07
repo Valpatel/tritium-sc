@@ -29,7 +29,7 @@ function assert(cond, msg) {
 // Extract _getMoraleState from map-maplibre.js source
 // ============================================================
 
-const mapSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/map-maplibre.js', 'utf8');
+const mapSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/map-maplibre.js', 'utf8');
 
 // Extract the function body
 const fnMatch = mapSrc.match(/function _getMoraleState\(morale\)\s*\{([\s\S]*?)\n\}/);
@@ -180,7 +180,7 @@ assert(mapSrc.includes('window._getMoraleState = _getMoraleState'), '_getMoraleS
 
 console.log('\n--- CSS keyframes in command.css ---');
 
-const cssSrc = fs.readFileSync(__dirname + '/../../frontend/css/command.css', 'utf8');
+const cssSrc = fs.readFileSync(__dirname + '/../../src/frontend/css/command.css', 'utf8');
 
 assert(cssSrc.includes('@keyframes morale-suppressed-pulse'), 'command.css has morale-suppressed-pulse keyframes');
 assert(cssSrc.includes('@keyframes morale-broken-pulse'), 'command.css has morale-broken-pulse keyframes');
@@ -266,7 +266,7 @@ assert(nanResult === null, 'NaN returns null because all comparisons are false')
 
 console.log('\n--- Websocket morale passthrough ---');
 
-const wsSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/websocket.js', 'utf8');
+const wsSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
 assert(wsSrc.includes('morale'), 'websocket.js references morale field');
 assert(wsSrc.includes('t.morale'), 'websocket.js reads t.morale from telemetry');
 

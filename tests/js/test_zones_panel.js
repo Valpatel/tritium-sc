@@ -65,10 +65,10 @@ const sandbox = {
 
 const ctx = vm.createContext(sandbox);
 
-vm.runInContext(fs.readFileSync(__dirname + '/../../frontend/js/command/events.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
-vm.runInContext(fs.readFileSync(__dirname + '/../../frontend/js/command/store.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
+vm.runInContext(fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
+vm.runInContext(fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 
-const zoneCode = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/zones.js', 'utf8');
+const zoneCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/zones.js', 'utf8');
 vm.runInContext(zoneCode.replace(/^export\s+const\s+/gm, 'var ').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 
 const ZonesPanelDef = ctx.ZonesPanelDef;
@@ -176,7 +176,7 @@ console.log('\n--- unmount() ---');
 console.log('\n--- Zone toggle HTTP method ---');
 
 (function testZoneToggleUsesPut() {
-    const src = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/zones.js', 'utf8');
+    const src = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/zones.js', 'utf8');
     // Backend route is @router.put("/{zone_id}") — frontend must use PUT
     assert(src.includes("method: 'PUT'"), 'Zone toggle uses PUT method (matches backend @router.put)');
     assert(!src.includes("method: 'PATCH'"), 'Zone toggle does NOT use PATCH (backend has no PATCH route)');

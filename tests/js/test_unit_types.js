@@ -29,7 +29,7 @@ function assert(cond, msg) {
 // Load all unit-types files into a single sandbox
 // ============================================================
 
-const BASE_DIR = path.join(__dirname, '..', '..', 'frontend', 'js', 'command', 'unit-types');
+const BASE_DIR = path.join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'unit-types');
 
 // Read files in dependency order
 const files = [

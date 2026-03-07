@@ -28,7 +28,7 @@ function assertClose(a, b, eps, msg) {
 
 // Read map.js source for static analysis and extraction
 const mapSource = fs.readFileSync(
-    path.join(__dirname, '../../frontend/js/command/map.js'), 'utf8');
+    path.join(__dirname, '../../src/frontend/js/command/map.js'), 'utf8');
 
 
 // ============================================================

@@ -25,7 +25,7 @@ function assertDeepEqual(a, b, msg) {
 }
 
 // Load store.js into a sandboxed context
-const code = fs.readFileSync(__dirname + '/../../frontend/js/command/store.js', 'utf8');
+const code = fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8');
 const plainCode = code
     .replace(/^export\s+/gm, '')
     .replace(/^import\s+.*$/gm, '');

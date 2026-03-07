@@ -24,8 +24,8 @@ function assertClose(a, b, eps, msg) {
 // Load war-audio.js into a sandboxed context
 // ============================================================
 
-const audioCode = fs.readFileSync(__dirname + '/../../frontend/js/war-audio.js', 'utf8');
-const eventsCode = fs.readFileSync(__dirname + '/../../frontend/js/war-events.js', 'utf8');
+const audioCode = fs.readFileSync(__dirname + '/../../src/frontend/js/war-audio.js', 'utf8');
+const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/war-events.js', 'utf8');
 
 // Mock Web Audio API
 class MockAudioContext {

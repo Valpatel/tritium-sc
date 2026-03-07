@@ -104,7 +104,7 @@ const mockDocument = {
 // exposed on window.GameHudHelpers and window.CombatStatsTracker.
 // The approach: read the file, strip the ESM import/export, provide mocks.
 
-const gameHudCode = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/game-hud.js', 'utf8');
+const gameHudCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/game-hud.js', 'utf8');
 
 // Strip ES module import statements and export keyword
 let processedCode = gameHudCode

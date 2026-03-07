@@ -26,14 +26,14 @@ console.log('\n=== Graphlings Observer Panel Tests ===\n');
 
 // Test 1: Panel definition file exists
 test('graphlings panel file exists', () => {
-    const p = path.join(__dirname, '../../frontend/js/command/panels/graphlings.js');
+    const p = path.join(__dirname, '../../src/frontend/js/command/panels/graphlings.js');
     assert.ok(fs.existsSync(p), 'panels/graphlings.js should exist');
 });
 
 // Test 2: Panel definition exports correctly
 test('panel definition has required fields', () => {
     const content = fs.readFileSync(
-        path.join(__dirname, '../../frontend/js/command/panels/graphlings.js'), 'utf8'
+        path.join(__dirname, '../../src/frontend/js/command/panels/graphlings.js'), 'utf8'
     );
     assert.ok(content.includes("id: 'graphlings'"), 'panel id should be graphlings');
     assert.ok(content.includes('title:'), 'panel should have a title');
@@ -45,7 +45,7 @@ test('panel definition has required fields', () => {
 // Test 3: Panel connects to SSE endpoint
 test('panel connects to graphlings thoughts SSE', () => {
     const content = fs.readFileSync(
-        path.join(__dirname, '../../frontend/js/command/panels/graphlings.js'), 'utf8'
+        path.join(__dirname, '../../src/frontend/js/command/panels/graphlings.js'), 'utf8'
     );
     assert.ok(
         content.includes('/api/graphlings/thoughts'),
@@ -56,7 +56,7 @@ test('panel connects to graphlings thoughts SSE', () => {
 // Test 4: Panel fetches agent status
 test('panel fetches graphlings status', () => {
     const content = fs.readFileSync(
-        path.join(__dirname, '../../frontend/js/command/panels/graphlings.js'), 'utf8'
+        path.join(__dirname, '../../src/frontend/js/command/panels/graphlings.js'), 'utf8'
     );
     assert.ok(
         content.includes('/api/graphlings/status') || content.includes('/api/graphlings/agents'),
@@ -67,7 +67,7 @@ test('panel fetches graphlings status', () => {
 // Test 5: Panel shows thought stream
 test('panel renders thought entries', () => {
     const content = fs.readFileSync(
-        path.join(__dirname, '../../frontend/js/command/panels/graphlings.js'), 'utf8'
+        path.join(__dirname, '../../src/frontend/js/command/panels/graphlings.js'), 'utf8'
     );
     assert.ok(
         content.includes('thought') && content.includes('soul_id'),
@@ -78,7 +78,7 @@ test('panel renders thought entries', () => {
 // Test 6: Panel is registered in main.js
 test('panel is registered in main.js', () => {
     const content = fs.readFileSync(
-        path.join(__dirname, '../../frontend/js/command/main.js'), 'utf8'
+        path.join(__dirname, '../../src/frontend/js/command/main.js'), 'utf8'
     );
     assert.ok(
         content.includes('GraphlingsPanelDef'),
@@ -89,7 +89,7 @@ test('panel is registered in main.js', () => {
 // Test 7: Panel cleans up SSE on unmount
 test('panel cleans up SSE on unmount', () => {
     const content = fs.readFileSync(
-        path.join(__dirname, '../../frontend/js/command/panels/graphlings.js'), 'utf8'
+        path.join(__dirname, '../../src/frontend/js/command/panels/graphlings.js'), 'utf8'
     );
     assert.ok(
         content.includes('unmount') && content.includes('close()'),
@@ -100,7 +100,7 @@ test('panel cleans up SSE on unmount', () => {
 // Test 7b: Cleanup uses standard _unsubs pattern
 test('cleanup uses panel._unsubs pattern', () => {
     const content = fs.readFileSync(
-        path.join(__dirname, '../../frontend/js/command/panels/graphlings.js'), 'utf8'
+        path.join(__dirname, '../../src/frontend/js/command/panels/graphlings.js'), 'utf8'
     );
     assert.ok(
         content.includes('panel._unsubs.push'),
@@ -115,7 +115,7 @@ test('cleanup uses panel._unsubs pattern', () => {
 // Test 7c: _unsubs cleanup closes EventSource and clears interval
 test('_unsubs cleanup closes EventSource and interval', () => {
     const content = fs.readFileSync(
-        path.join(__dirname, '../../frontend/js/command/panels/graphlings.js'), 'utf8'
+        path.join(__dirname, '../../src/frontend/js/command/panels/graphlings.js'), 'utf8'
     );
     // The cleanup function inside _unsubs.push should close eventSource and clearInterval
     const pushIdx = content.indexOf('panel._unsubs.push');
@@ -128,7 +128,7 @@ test('_unsubs cleanup closes EventSource and interval', () => {
 // Test 7d: cleanup includes clearInterval
 test('cleanup clears polling interval', () => {
     const content = fs.readFileSync(
-        path.join(__dirname, '../../frontend/js/command/panels/graphlings.js'), 'utf8'
+        path.join(__dirname, '../../src/frontend/js/command/panels/graphlings.js'), 'utf8'
     );
     assert.ok(
         content.includes('clearInterval(statusInterval)'),
@@ -139,7 +139,7 @@ test('cleanup clears polling interval', () => {
 // Test 8: Panel has emotion/mood indicators
 test('panel shows emotion indicators', () => {
     const content = fs.readFileSync(
-        path.join(__dirname, '../../frontend/js/command/panels/graphlings.js'), 'utf8'
+        path.join(__dirname, '../../src/frontend/js/command/panels/graphlings.js'), 'utf8'
     );
     assert.ok(
         content.includes('emotion'),

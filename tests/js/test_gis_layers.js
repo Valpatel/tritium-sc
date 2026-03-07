@@ -24,8 +24,8 @@ function assert(cond, msg) {
 }
 
 // Read sources
-const mapSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/map-maplibre.js', 'utf8');
-const menuBarSrc = fs.readFileSync(__dirname + '/../../frontend/js/command/menu-bar.js', 'utf8');
+const mapSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/map-maplibre.js', 'utf8');
+const menuBarSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/menu-bar.js', 'utf8');
 const geoSrc = fs.readFileSync(__dirname + '/../../src/app/routers/geo.py', 'utf8');
 
 // ============================================================

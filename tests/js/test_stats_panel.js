@@ -97,7 +97,7 @@ const mockDocument = {
 // Load stats.js
 // ============================================================
 
-const statsCode = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/stats.js', 'utf8');
+const statsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/stats.js', 'utf8');
 
 let processedCode = statsCode
     .replace(/^import\s+.*?from\s+['"].*?['"];?\s*$/gm, '')

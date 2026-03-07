@@ -23,7 +23,7 @@ function assert(cond, msg) {
 // For now, test the pure helper functions that we'll export from game-over-stats.js
 
 const helpersCode = fs.readFileSync(
-    __dirname + '/../../frontend/js/command/game-over-stats.js', 'utf8'
+    __dirname + '/../../src/frontend/js/command/game-over-stats.js', 'utf8'
 );
 
 // Mock DOM

@@ -61,7 +61,7 @@ const path = require('path');
 const vm = require('vm');
 
 // Try to load the real source file
-const srcPath = path.join(__dirname, '..', '..', 'frontend', 'js', 'command', 'vision-system.js');
+const srcPath = path.join(__dirname, '..', '..', 'src', 'frontend', 'js', 'command', 'vision-system.js');
 let isInCone, updateSweepAngle, GhostTracker, FrontendVisionSystem;
 let loaded = false;
 

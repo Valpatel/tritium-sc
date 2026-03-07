@@ -181,21 +181,21 @@ const sandbox = {
 const ctx = vm.createContext(sandbox);
 
 // Load events.js (EventBus)
-const eventsCode = fs.readFileSync(__dirname + '/../../frontend/js/command/events.js', 'utf8');
+const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8');
 const eventsPlain = eventsCode
     .replace(/^export\s+/gm, '')
     .replace(/^import\s+.*$/gm, '');
 vm.runInContext(eventsPlain, ctx);
 
 // Load store.js (TritiumStore)
-const storeCode = fs.readFileSync(__dirname + '/../../frontend/js/command/store.js', 'utf8');
+const storeCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8');
 const storePlain = storeCode
     .replace(/^export\s+/gm, '')
     .replace(/^import\s+.*$/gm, '');
 vm.runInContext(storePlain, ctx);
 
 // Load replay.js panel
-const replayCode = fs.readFileSync(__dirname + '/../../frontend/js/command/panels/replay.js', 'utf8');
+const replayCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/replay.js', 'utf8');
 const replayPlain = replayCode
     .replace(/^export\s+const\s+/gm, 'var ')
     .replace(/^export\s+/gm, '')
@@ -673,7 +673,7 @@ console.log('\n--- CSS class naming ---');
 
 (function testReplayFrameFogOfWarFields() {
     // Read replay.js source to check applyFrameToStore includes visibility fields
-    const replaySrc = fs.readFileSync('frontend/js/command/panels/replay.js', 'utf8');
+    const replaySrc = fs.readFileSync('src/frontend/js/command/panels/replay.js', 'utf8');
 
     const hasVisible = replaySrc.includes('visible: t.visible');
     assert(hasVisible, 'applyFrameToStore passes through visible field');
@@ -716,7 +716,7 @@ console.log('\n--- Backward seek elimination handling ---');
     // instead of removing them from the store entirely.
 
     // Read replay.js source to check for the fix
-    const src = fs.readFileSync('frontend/js/command/panels/replay.js', 'utf8');
+    const src = fs.readFileSync('src/frontend/js/command/panels/replay.js', 'utf8');
 
     // The old bug: `TritiumStore.removeUnit(id)` for units not in frame
     // The fix: should not blindly remove, should mark eliminated instead
