@@ -133,10 +133,10 @@ test_videos/
 sample_data/
 
 # ==================
-# AMY RUNTIME DATA
+# RUNTIME DATA
 # ==================
-# Personal camera captures, memory, and transcripts
-data/amy/
+# Personal camera captures, memory, transcripts, zones, backstories
+data/
 
 # ==================
 # TEST ARTIFACTS

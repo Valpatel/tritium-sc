@@ -1,0 +1,56 @@
+{
+  "scenario_id": "doc_combat-satellite",
+  "name": "Matrix: doc_combat-satellite",
+  "description": "4v20 loadout=small_arms bounds=100.0m",
+  "map_bounds": 100.0,
+  "max_hostiles": 200,
+  "waves": [
+    {
+      "name": "Wave 1 (small_arms)",
+      "groups": [
+        {
+          "asset_type": "person",
+          "count": 20,
+          "speed": 1.5,
+          "health": 80.0
+        }
+      ],
+      "speed_mult": 1.0,
+      "health_mult": 1.0
+    }
+  ],
+  "defenders": [
+    {
+      "asset_type": "turret",
+      "position": [
+        30.0,
+        0.0
+      ],
+      "name": "Defender-1"
+    },
+    {
+      "asset_type": "turret",
+      "position": [
+        0.0,
+        30.0
+      ],
+      "name": "Defender-2"
+    },
+    {
+      "asset_type": "turret",
+      "position": [
+        -30.0,
+        0.0
+      ],
+      "name": "Defender-3"
+    },
+    {
+      "asset_type": "turret",
+      "position": [
+        -0.0,
+        -30.0
+      ],
+      "name": "Defender-4"
+    }
+  ]
+}

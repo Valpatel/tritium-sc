@@ -1,0 +1,88 @@
+{
+  "scenario_id": "doc_combat-close",
+  "name": "Matrix: doc_combat-close",
+  "description": "8v8 loadout=small_arms bounds=100.0m",
+  "map_bounds": 100.0,
+  "max_hostiles": 200,
+  "waves": [
+    {
+      "name": "Wave 1 (small_arms)",
+      "groups": [
+        {
+          "asset_type": "person",
+          "count": 8,
+          "speed": 1.5,
+          "health": 80.0
+        }
+      ],
+      "speed_mult": 1.0,
+      "health_mult": 1.0
+    }
+  ],
+  "defenders": [
+    {
+      "asset_type": "heavy_turret",
+      "position": [
+        30.0,
+        0.0
+      ],
+      "name": "Defender-1"
+    },
+    {
+      "asset_type": "tank",
+      "position": [
+        0.0,
+        30.0
+      ],
+      "name": "Defender-2"
+    },
+    {
+      "asset_type": "rover",
+      "position": [
+        -30.0,
+        0.0
+      ],
+      "name": "Defender-3"
+    },
+    {
+      "asset_type": "drone",
+      "position": [
+        -0.0,
+        -30.0
+      ],
+      "name": "Defender-4"
+    },
+    {
+      "asset_type": "heavy_turret",
+      "position": [
+        42.4,
+        42.4
+      ],
+      "name": "Defender-5"
+    },
+    {
+      "asset_type": "tank",
+      "position": [
+        -42.4,
+        42.4
+      ],
+      "name": "Defender-6"
+    },
+    {
+      "asset_type": "rover",
+      "position": [
+        -42.4,
+        -42.4
+      ],
+      "name": "Defender-7"
+    },
+    {
+      "asset_type": "drone",
+      "position": [
+        42.4,
+        -42.4
+      ],
+      "name": "Defender-8"
+    }
+  ]
+}

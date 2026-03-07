@@ -1,0 +1,56 @@
+{
+  "scenario_id": "doc_game-combat",
+  "name": "Matrix: doc_game-combat",
+  "description": "4v10 loadout=small_arms bounds=100.0m",
+  "map_bounds": 100.0,
+  "max_hostiles": 200,
+  "waves": [
+    {
+      "name": "Wave 1 (small_arms)",
+      "groups": [
+        {
+          "asset_type": "person",
+          "count": 10,
+          "speed": 1.5,
+          "health": 80.0
+        }
+      ],
+      "speed_mult": 1.0,
+      "health_mult": 1.0
+    }
+  ],
+  "defenders": [
+    {
+      "asset_type": "turret",
+      "position": [
+        30.0,
+        0.0
+      ],
+      "name": "Defender-1"
+    },
+    {
+      "asset_type": "rover",
+      "position": [
+        0.0,
+        30.0
+      ],
+      "name": "Defender-2"
+    },
+    {
+      "asset_type": "tank",
+      "position": [
+        -30.0,
+        0.0
+      ],
+      "name": "Defender-3"
+    },
+    {
+      "asset_type": "apc",
+      "position": [
+        -0.0,
+        -30.0
+      ],
+      "name": "Defender-4"
+    }
+  ]
+}
