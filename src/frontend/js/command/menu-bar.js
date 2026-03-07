@@ -11,14 +11,6 @@
 
 import { EventBus } from './events.js';
 
-/**
- * Get the currently selected battle scenario name.
- * Deprecated: always returns null. All missions route through MissionModal.
- * @returns {null}
- */
-export function getSelectedScenario() {
-    return null;
-}
 
 // ---------------------------------------------------------------------------
 // Menu definitions (data-driven)
@@ -65,7 +57,12 @@ function _fileMenuItems(layoutManager) {
 }
 
 function _viewMenuItems(panelManager) {
-    const keyMap = { amy: '1', units: '2', alerts: '3', game: '4', mesh: '5', cameras: '6', search: '7', tak: '8', videos: '9', zones: '0' };
+    const keyMap = {
+        amy: '1', units: '2', alerts: '3', game: '4', mesh: '5',
+        cameras: '6', search: '7', tak: '8', videos: '9', zones: '0',
+        minimap: 'M', replay: 'R', sensors: 'E', 'battle-stats': 'P',
+        'unit-inspector': 'J', layers: 'L',
+    };
     const items = panelManager.getRegisteredPanels().map(p => ({
         label: p.title, shortcut: keyMap[p.id] || '', checkable: true,
         checked: () => panelManager.isOpen(p.id),
@@ -112,46 +109,25 @@ function _layoutMenuItems(layoutManager) {
 function _mapMenuItems(mapActions) {
     const s = () => mapActions.getMapState();
     return [
-        { label: 'Toggle All', action: () => mapActions.toggleAllLayers() },
+        // Layer browser opens the full panel with all 43 layers
+        { label: 'Layer Browser...', shortcut: 'L',
+          action: () => EventBus.emit('panel:request-open', { id: 'layers' }) },
+        { label: 'Toggle All Layers', action: () => mapActions.toggleAllLayers() },
         { separator: true },
-        // Base map layers
+        // Quick toggles for most-used layers
         { label: 'Satellite', shortcut: 'I', checkable: true, checked: () => s().showSatellite, action: () => mapActions.toggleSatellite() },
-        { label: 'Roads', shortcut: 'G', checkable: true, checked: () => s().showRoads, action: () => mapActions.toggleRoads() },
         { label: 'Buildings', shortcut: 'K', checkable: true, checked: () => s().showBuildings, action: () => mapActions.toggleBuildings() },
-        { label: 'Waterways', checkable: true, checked: () => s().showWaterways, action: () => mapActions.toggleWaterways() },
-        { label: 'Parks', checkable: true, checked: () => s().showParks, action: () => mapActions.toggleParks() },
+        { label: 'Roads', shortcut: 'G', checkable: true, checked: () => s().showRoads, action: () => mapActions.toggleRoads() },
         { label: 'Grid', checkable: true, checked: () => s().showGrid, action: () => mapActions.toggleGrid() },
-        { separator: true },
-        // Unit layers
         { label: 'Unit Markers', shortcut: 'U', checkable: true, checked: () => s().showUnits, action: () => mapActions.toggleUnits() },
-        { label: '3D Models', checkable: true, checked: () => s().showModels3d, action: () => mapActions.toggleModels() },
-        { label: 'Labels', checkable: true, checked: () => s().showLabels, action: () => mapActions.toggleLabels() },
-        { label: 'Mesh Network', checkable: true, checked: () => s().showMesh, action: () => mapActions.toggleMesh() },
-        { label: 'Thought Bubbles', checkable: true, checked: () => s().showThoughts, action: () => mapActions.toggleThoughts() },
+        { label: 'GIS Intelligence', checkable: true, checked: () => s().showGeoLayers, action: () => mapActions.toggleGeoLayers() },
         { separator: true },
-        // Combat FX layers
-        { label: 'Tracers', checkable: true, checked: () => s().showTracers, action: () => mapActions.toggleTracers() },
-        { label: 'Explosions', checkable: true, checked: () => s().showExplosions, action: () => mapActions.toggleExplosions() },
-        { label: 'Particles', checkable: true, checked: () => s().showParticles, action: () => mapActions.toggleParticles() },
-        { label: 'Hit Flashes', checkable: true, checked: () => s().showHitFlashes, action: () => mapActions.toggleHitFlashes() },
-        { label: 'Floating Text', checkable: true, checked: () => s().showFloatingText, action: () => mapActions.toggleFloatingText() },
-        { separator: true },
-        // Overlay layers
-        { label: 'Kill Feed', checkable: true, checked: () => s().showKillFeed, action: () => mapActions.toggleKillFeed() },
-        { label: 'Screen FX', checkable: true, checked: () => s().showScreenFx, action: () => mapActions.toggleScreenFx() },
-        { label: 'Banners', checkable: true, checked: () => s().showBanners, action: () => mapActions.toggleBanners() },
-        { label: 'Layer HUD', checkable: true, checked: () => s().showLayerHud, action: () => mapActions.toggleLayerHud() },
-        { separator: true },
-        // Unit decorations
-        { label: 'Health Bars', checkable: true, checked: () => s().showHealthBars, action: () => mapActions.toggleHealthBars() },
-        { label: 'Selection FX', checkable: true, checked: () => s().showSelectionFx, action: () => mapActions.toggleSelectionFx() },
-        { separator: true },
-        // Environment
-        { label: 'Fog', checkable: true, checked: () => s().showFog, action: () => mapActions.toggleFog() },
+        // View
+        { label: 'Fog of War', checkable: true, checked: () => s().showFog, action: () => mapActions.toggleFog() },
         { label: 'Terrain', shortcut: 'H', checkable: true, checked: () => s().showTerrain, action: () => mapActions.toggleTerrain() },
         { label: '3D Mode', checkable: true, checked: () => s().tiltMode === 'tilted', action: () => mapActions.toggleTilt() },
         { separator: true },
-        // Camera controls
+        // Camera
         { label: 'Center on Action', shortcut: 'F', action: () => mapActions.centerOnAction() },
         { label: 'Reset Camera', action: () => mapActions.resetCamera() },
         { label: 'Zoom In', shortcut: ']', action: () => mapActions.zoomIn() },
@@ -164,7 +140,7 @@ function _gameMenuItems(mapActions) {
         { label: 'New Mission', shortcut: 'B',
           action: () => { if (mapActions.beginWar) mapActions.beginWar(); } },
         { separator: true },
-        { label: 'Reset Game', shortcut: 'R',
+        { label: 'Reset Game',
           action: () => { if (mapActions.resetGame) mapActions.resetGame(); } },
     ];
 }
@@ -206,12 +182,12 @@ export function createMenuBar(container, panelManager, layoutManager, mapActions
     let hoverMode = false; // hover-switch enabled after first click
 
     const menus = [
-        { label: 'FILE',   getItems: () => _fileMenuItems(layoutManager) },
-        { label: 'VIEW',   getItems: () => _viewMenuItems(panelManager) },
-        { label: 'LAYOUT', getItems: () => _layoutMenuItems(layoutManager) },
-        { label: 'MAP',    getItems: () => _mapMenuItems(mapActions) },
-        { label: 'GAME',   getItems: () => _gameMenuItems(mapActions) },
-        { label: 'HELP',   getItems: () => _helpMenuItems() },
+        { label: 'FILE',   tip: 'Save and export workspace layouts', getItems: () => _fileMenuItems(layoutManager) },
+        { label: 'VIEW',   tip: 'Show or hide panels (Amy, Units, Alerts, etc.)', getItems: () => _viewMenuItems(panelManager) },
+        { label: 'LAYOUT', tip: 'Switch between saved workspace layouts', getItems: () => _layoutMenuItems(layoutManager) },
+        { label: 'MAP',    tip: 'Map layers, camera, and display settings', getItems: () => _mapMenuItems(mapActions) },
+        { label: 'GAME',   tip: 'Start battles and manage game state', getItems: () => _gameMenuItems(mapActions) },
+        { label: 'HELP',   tip: 'Keyboard shortcuts and about info', getItems: () => _helpMenuItems() },
     ];
 
     // Build menu triggers
@@ -223,6 +199,7 @@ export function createMenuBar(container, panelManager, layoutManager, mapActions
         const trigger = document.createElement('button');
         trigger.className = 'menu-trigger';
         trigger.textContent = menuDef.label;
+        if (menuDef.tip) trigger.title = menuDef.tip;
 
         const dropdown = document.createElement('div');
         dropdown.className = 'menu-dropdown';
@@ -424,6 +401,11 @@ function _shortLabel(title) {
 }
 
 function _panelKey(id) {
-    const map = { amy: '1', units: '2', alerts: '3', game: '4', mesh: '5', cameras: '6', search: '7', tak: '8', videos: '9', zones: '0' };
+    const map = {
+        amy: '1', units: '2', alerts: '3', game: '4', mesh: '5',
+        cameras: '6', search: '7', tak: '8', videos: '9', zones: '0',
+        minimap: 'M', replay: 'R', sensors: 'E', 'battle-stats': 'P',
+        'unit-inspector': 'J', layers: 'L',
+    };
     return map[id] || '';
 }

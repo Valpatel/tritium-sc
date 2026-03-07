@@ -10,7 +10,7 @@
 import { TritiumStore } from './store.js';
 import { EventBus } from './events.js';
 import { WebSocketManager } from './websocket.js';
-import { initMap, destroyMap, toggleSatellite, toggleRoads, toggleGrid, toggleBuildings, toggleFog, toggleTerrain, toggleUnits, toggleLabels, toggleModels, toggleWaterways, toggleParks, toggleMesh, toggleThoughts, toggleAllLayers, toggleTracers, toggleExplosions, toggleParticles, toggleHitFlashes, toggleFloatingText, toggleKillFeed, toggleScreenFx, toggleBanners, toggleLayerHud, toggleHealthBars, toggleSelectionFx, getMapState, centerOnAction, resetCamera, zoomIn, zoomOut, toggleTilt, setLayers, setMapMode, toggleSquadHulls, toggleAutoFollow } from './map-maplibre.js';
+import { initMap, destroyMap, toggleSatellite, toggleRoads, toggleGrid, toggleBuildings, toggleFog, toggleTerrain, toggleUnits, toggleLabels, toggleModels, toggleWaterways, toggleParks, toggleMesh, toggleThoughts, toggleAllLayers, toggleTracers, toggleExplosions, toggleParticles, toggleHitFlashes, toggleFloatingText, toggleKillFeed, toggleScreenFx, toggleBanners, toggleLayerHud, toggleHealthBars, toggleSelectionFx, getMapState, centerOnAction, resetCamera, zoomIn, zoomOut, toggleTilt, setLayers, setMapMode, toggleSquadHulls, toggleAutoFollow, toggleGeoLayers, togglePatrolRoutes, toggleWeaponRange, toggleHeatmap, toggleSwarmHull, toggleHazardZones, toggleHostileObjectives, toggleCrowdDensity, toggleCoverPoints, toggleUnitSignals, toggleHostileIntel } from './map-maplibre.js';
 import { PanelManager } from './panel-manager.js';
 import { LayoutManager } from './layout-manager.js';
 import { createMenuBar, focusSaveInput } from './menu-bar.js';
@@ -36,6 +36,7 @@ import { SearchPanelDef } from './panels/search.js';
 import { TakPanelDef } from './panels/tak.js';
 import { VideosPanelDef } from './panels/videos.js';
 import { ZonesPanelDef } from './panels/zones.js';
+import { LayersPanelDef } from './panels/layers.js';
 import { MissionModal, initMissionModal } from './mission-modal.js';
 
 // Make available on window for console debugging
@@ -122,7 +123,7 @@ function init() {
     TritiumStore.on('game.phase', (phase) => {
         // Show/hide game score in header
         const scoreArea = document.getElementById('game-score-area');
-        if (scoreArea) scoreArea.hidden = (phase === 'idle' || !phase);
+        if (scoreArea) scoreArea.hidden = (phase === 'idle' || phase === 'setup' || !phase);
 
         // Game over overlay
         if (phase === 'victory' || phase === 'defeat') {
@@ -131,14 +132,6 @@ function init() {
             // Dismiss game-over overlay on reset
             const goOverlay = document.getElementById('game-over-overlay');
             if (goOverlay) goOverlay.hidden = true;
-        }
-
-        // Auto-enable fog of war during battle, disable when idle
-        const mapState = getMapState();
-        if (phase === 'countdown' || phase === 'active') {
-            if (!mapState.showFog) toggleFog();
-        } else if (phase === 'idle' || phase === 'setup') {
-            if (mapState.showFog) toggleFog();
         }
 
         // Auto-enable fog of war during battle, disable when idle
@@ -157,7 +150,17 @@ function init() {
 
     TritiumStore.on('game.score', (score) => {
         const header = document.getElementById('game-score');
-        if (header) header.textContent = score;
+        if (header) {
+            header.textContent = score.toLocaleString();
+            // Brief glow pulse on score change
+            header.style.color = '#fcee0a';
+            header.style.textShadow = '0 0 8px #fcee0a';
+            clearTimeout(header._pulseTimer);
+            header._pulseTimer = setTimeout(() => {
+                header.style.color = '';
+                header.style.textShadow = '';
+            }, 400);
+        }
     });
 
     TritiumStore.on('game.eliminations', (elims) => {
@@ -362,7 +365,7 @@ function init() {
                 EventBus.on('game:state', (d) => {
                     if (d.state === 'active') {
                         audioMgr.startAmbient();
-                        audioMgr.play('hostile_detected');
+                        audioMgr.play('countdown_go');
                     } else if (d.state === 'idle' || d.state === 'victory' || d.state === 'defeat') {
                         audioMgr.stopAmbient();
                     }
@@ -445,6 +448,7 @@ function initPanelSystem(container) {
     panelManager.register(TakPanelDef);
     panelManager.register(VideosPanelDef);
     panelManager.register(ZonesPanelDef);
+    panelManager.register(LayersPanelDef);
 
     // panel:request-open — allows map click to open panels by id
     EventBus.on('panel:request-open', (data) => {
@@ -497,6 +501,17 @@ function initPanelSystem(container) {
             toggleSelectionFx: () => (_activeMapModule ? _activeMapModule.toggleSelectionFx() : toggleSelectionFx()),
             toggleSquadHulls: () => (_activeMapModule ? _activeMapModule.toggleSquadHulls() : toggleSquadHulls()),
             toggleAutoFollow: () => (_activeMapModule ? _activeMapModule.toggleAutoFollow() : toggleAutoFollow()),
+            toggleGeoLayers: () => (_activeMapModule ? _activeMapModule.toggleGeoLayers() : toggleGeoLayers()),
+            togglePatrolRoutes: () => (_activeMapModule ? _activeMapModule.togglePatrolRoutes() : togglePatrolRoutes()),
+            toggleWeaponRange: () => (_activeMapModule ? _activeMapModule.toggleWeaponRange() : toggleWeaponRange()),
+            toggleHeatmap: () => (_activeMapModule ? _activeMapModule.toggleHeatmap() : toggleHeatmap()),
+            toggleSwarmHull: () => (_activeMapModule ? _activeMapModule.toggleSwarmHull() : toggleSwarmHull()),
+            toggleHazardZones: () => (_activeMapModule ? _activeMapModule.toggleHazardZones() : toggleHazardZones()),
+            toggleHostileObjectives: () => (_activeMapModule ? _activeMapModule.toggleHostileObjectives() : toggleHostileObjectives()),
+            toggleCrowdDensity: () => (_activeMapModule ? _activeMapModule.toggleCrowdDensity() : toggleCrowdDensity()),
+            toggleCoverPoints: () => (_activeMapModule ? _activeMapModule.toggleCoverPoints() : toggleCoverPoints()),
+            toggleUnitSignals: () => (_activeMapModule ? _activeMapModule.toggleUnitSignals() : toggleUnitSignals()),
+            toggleHostileIntel: () => (_activeMapModule ? _activeMapModule.toggleHostileIntel() : toggleHostileIntel()),
             centerOnAction: () => (_activeMapModule ? _activeMapModule.centerOnAction() : centerOnAction()),
             resetCamera: () => (_activeMapModule ? _activeMapModule.resetCamera() : resetCamera()),
             zoomIn: () => (_activeMapModule ? _activeMapModule.zoomIn() : zoomIn()),
@@ -512,6 +527,12 @@ function initPanelSystem(container) {
         // Expose for automated testing
         window._mapActions = mapActions;
         menuBarEl = createMenuBar(barContainer, panelManager, layoutManager, mapActions);
+
+        // Bridge map actions to Layers panel
+        EventBus.on('layers:request-map-actions', () => {
+            EventBus.emit('layers:set-map-actions', mapActions);
+        });
+        EventBus.emit('layers:set-map-actions', mapActions);
     }
 
     console.log('%c[TRITIUM] Panel system initialized', 'color: #00f0ff;');
@@ -606,13 +627,24 @@ function showGameOver(phase) {
     }
 
     const scoreEl = document.getElementById('go-score');
-    if (scoreEl) scoreEl.textContent = TritiumStore.game.score || 0;
-
     const wavesEl = document.getElementById('go-waves');
-    if (wavesEl) wavesEl.textContent = `${TritiumStore.game.wave}/${TritiumStore.game.totalWaves}`;
-
     const elimsEl = document.getElementById('go-eliminations');
+
+    // Use store values first, then backfill from API if empty
+    if (scoreEl) scoreEl.textContent = TritiumStore.game.score || 0;
+    const totalW = TritiumStore.game.totalWaves || 10;
+    const displayWave = Math.min(TritiumStore.game.wave || 0, totalW);
+    if (wavesEl) wavesEl.textContent = `${displayWave}/${totalW}`;
     if (elimsEl) elimsEl.textContent = TritiumStore.game.eliminations || 0;
+
+    // Backfill from API if store values are empty (e.g., late-joining session)
+    if (!TritiumStore.game.score) {
+        fetch('/api/game/state').then(r => r.json()).then(gs => {
+            if (scoreEl && gs.score) scoreEl.textContent = gs.score;
+            if (wavesEl && gs.wave) wavesEl.textContent = `${gs.wave}/${gs.total_waves || 10}`;
+            if (elimsEl && gs.total_eliminations) elimsEl.textContent = gs.total_eliminations;
+        }).catch(() => {});
+    }
 
     // Clear previous stats sections
     const mvpSection = document.getElementById('go-mvp-section');
@@ -629,7 +661,13 @@ function showGameOver(phase) {
 
     overlay.querySelector('[data-action="play-again"]')?.addEventListener('click', () => {
         overlay.hidden = true;
-        resetGame();
+        try { resetGame(); } catch (_) {}
+        setTimeout(() => { try { beginWar(); } catch (_) {} }, 500);
+    }, { once: true });
+
+    overlay.querySelector('[data-action="exit-game"]')?.addEventListener('click', () => {
+        overlay.hidden = true;
+        try { resetGame(); } catch (_) {}
     }, { once: true });
 }
 
@@ -997,7 +1035,7 @@ async function resetGame() {
         // Clear all game-related state so stale data does not leak into the next game
         TritiumStore.resetGameState();
         // Clear projectiles, particles, and screen effects from previous game
-        if (typeof warCombatReset === 'function') warCombatReset();
+        if (typeof window.warCombatReset === 'function') window.warCombatReset();
     } catch (e) {
         showToast('Failed to reset game', 'alert');
     }
@@ -1298,6 +1336,10 @@ function initKeyboard() {
             case 'h':
             case 'H':
                 _mapActions ? _mapActions.toggleTerrain() : toggleTerrain();
+                break;
+            case 'l':
+            case 'L':
+                if (panelManager) panelManager.toggle('layers');
                 break;
             case 'Tab':
                 if (panelManager) {
