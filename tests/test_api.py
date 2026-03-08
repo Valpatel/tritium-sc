@@ -24,7 +24,7 @@ class TestHealth:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "operational"
-        assert data["system"] == "TRITIUM"
+        assert data["system"] == "TRITIUM-SC"
 
     def test_status(self, client):
         """Test status endpoint."""
@@ -46,16 +46,24 @@ class TestCameras:
 
     def test_create_camera(self, client):
         """Test creating a camera."""
+        import random
+
+        channel = random.randint(9000, 9999)
         camera_data = {
-            "channel": 1,
-            "name": "Test Camera 1",
+            "channel": channel,
+            "name": f"Test Camera {channel}",
             "rtsp_url": "rtsp://192.168.1.100/stream",
         }
         response = client.post("/api/cameras", json=camera_data)
-        assert response.status_code == 200
+        assert response.status_code in (200, 201), response.text
         data = response.json()
-        assert data["channel"] == 1
-        assert data["name"] == "Test Camera 1"
+        assert data["channel"] == channel
+        assert data["name"] == f"Test Camera {channel}"
+
+        # Cleanup: delete the created camera
+        cam_id = data.get("id")
+        if cam_id:
+            client.delete(f"/api/cameras/{cam_id}")
 
 
 class TestVideos:

@@ -78,27 +78,30 @@ def _make_engine(map_bounds: float = 200.0) -> tuple[SimulationEngine, SimpleEve
 
 
 class TestCombatSpawnRadius:
-    """Hostile combat spawns should be at 70-95% of map bounds."""
+    """Hostile combat spawns should be at 40-65% of map bounds.
 
-    def test_combat_spawn_within_70_95_percent(self):
-        """Every combat spawn should have distance 70-95% of map_bounds."""
+    (Previously 70-95%, reduced for faster engagement.)
+    """
+
+    def test_combat_spawn_within_40_65_percent(self):
+        """Every combat spawn should have distance 40-65% of map_bounds."""
         engine, bus = _make_engine(map_bounds=200.0)
         for _ in range(200):
             x, y = engine._random_edge_position(combat=True)
             dist = math.hypot(x, y)
             frac = dist / 200.0
-            assert 0.68 <= frac <= 0.97, (
+            assert 0.38 <= frac <= 0.67, (
                 f"Combat spawn at ({x:.1f}, {y:.1f}) is at {frac:.2%} of "
-                f"bounds, expected 70-95%"
+                f"bounds, expected 40-65%"
             )
 
     def test_combat_spawn_never_at_center(self):
-        """No combat spawn should be within 50% of center."""
+        """No combat spawn should be within 20% of center."""
         engine, bus = _make_engine(map_bounds=200.0)
         for _ in range(200):
             x, y = engine._random_edge_position(combat=True)
             dist = math.hypot(x, y)
-            assert dist > 100.0, (
+            assert dist > 40.0, (
                 f"Combat spawn at ({x:.1f}, {y:.1f}) is too close to center "
                 f"(dist={dist:.1f})"
             )
@@ -367,7 +370,7 @@ class TestSpreadDefenders:
 
 
 class TestSpawnHostileSpread:
-    """spawn_hostile() should use the wider 70-95% radius during combat."""
+    """spawn_hostile() should use the 40-65% radius during combat."""
 
     def test_spawned_hostile_position_far_from_center(self):
         engine, bus = _make_engine(map_bounds=200.0)
@@ -379,10 +382,10 @@ class TestSpawnHostileSpread:
             dist = math.hypot(*h.position)
             dists.append(dist)
         avg_dist = sum(dists) / len(dists)
-        # Average should be around 165m (82.5% of 200)
-        assert avg_dist > 120.0, (
+        # Average should be around 105m (52.5% of 200)
+        assert avg_dist > 70.0, (
             f"Average hostile spawn distance {avg_dist:.1f}m is too close "
-            f"to center (expected >120m for 200m bounds)"
+            f"to center (expected >70m for 200m bounds)"
         )
 
     def test_spawned_hostiles_cover_all_quadrants(self):

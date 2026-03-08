@@ -272,7 +272,10 @@ class TestSpawnDistanceE2E:
     """Hostiles should spawn across the full city, not clustered at center."""
 
     def test_combat_spawn_average_distance_far(self):
-        """Average spawn distance should be >120m on a 200m map."""
+        """Average spawn distance should be >70m on a 200m map.
+
+        Combat spawns use 40-65% of bounds for faster engagement.
+        """
         engine = _make_engine(map_bounds=200.0)
         _add_friendly_turret(engine)
         engine.game_mode.state = "active"
@@ -282,7 +285,7 @@ class TestSpawnDistanceE2E:
             h = engine.spawn_hostile()
             dists.append(math.hypot(*h.position))
         avg = sum(dists) / len(dists)
-        assert avg > 120.0, f"Average spawn distance {avg:.1f}m too close"
+        assert avg > 70.0, f"Average spawn distance {avg:.1f}m too close"
 
     def test_objectives_spread_across_map(self):
         """Hostile waypoint objectives should reach ±50% of bounds."""

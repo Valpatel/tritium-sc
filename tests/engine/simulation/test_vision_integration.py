@@ -151,18 +151,23 @@ class TestCombatLOSCheck:
     """Combat.fire() should check LOS when terrain_map is provided."""
 
     def test_fire_blocked_by_building(self):
-        """Projectile is not created when building blocks LOS."""
+        """Projectile is not created when building blocks LOS.
+
+        Uses 'person' source type (not mortar-capable) so direct-fire
+        LOS check applies.  Turrets are mortar-capable and would arc
+        over buildings at this range.
+        """
         terrain = TerrainMap(200.0)
         terrain.set_cell(0, 15, "building")
 
-        turret = _make_target("t1", "friendly", "turret", (0, 0), heading=0,
-                              weapon_range=50, weapon_cooldown=0.0, last_fired=0.0)
+        shooter = _make_target("t1", "friendly", "person", (0, 0), heading=0,
+                               weapon_range=50, weapon_cooldown=0.0, last_fired=0.0)
         enemy = _make_target("h1", "hostile", "person", (0, 30))
 
         from engine.comms.event_bus import EventBus
         eb = EventBus()
         combat = CombatSystem(eb)
-        result = combat.fire(turret, enemy, terrain_map=terrain)
+        result = combat.fire(shooter, enemy, terrain_map=terrain)
         assert result is None, "Shot should be blocked by building"
 
     def test_clear_los_fire_succeeds(self):
