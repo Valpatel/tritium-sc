@@ -598,3 +598,162 @@ class TestDeviceTracking:
         bridge.stop()
         assert bridge.connected is False
         assert bridge._running is False
+
+    def test_config_sync_returns_copy(self):
+        bridge, _ = _make_bridge()
+        bridge._config_sync = {"config_version": "v2"}
+        cs = bridge.config_sync
+        cs["extra"] = True
+        assert "extra" not in bridge.config_sync
+
+    def test_config_sync_initially_empty(self):
+        bridge, _ = _make_bridge()
+        assert bridge.config_sync == {}
+
+
+# ── Fleet config polling ────────────────────────────────────────────────
+
+@pytest.mark.unit
+class TestPollFleetConfig:
+
+    def test_poll_fleet_config_emits_event(self):
+        bridge, bus = _make_bridge()
+        drain = _collect_events(bus)
+        request_mod = MagicMock()
+        error_mod = MagicMock()
+        config_data = {
+            "config_version": "v3",
+            "nodes_synced": 4,
+            "nodes_total": 5,
+            "nodes_pending": ["node-5"],
+        }
+        request_mod.urlopen.return_value = _mock_urlopen(json.dumps(config_data).encode())
+        bridge._poll_fleet_config(request_mod, error_mod)
+
+        assert bridge.config_sync["config_version"] == "v3"
+        assert bridge.config_sync["nodes_synced"] == 4
+        assert bridge.config_sync["nodes_pending"] == ["node-5"]
+
+        events = drain()
+        cs_events = [e for e in events if e["type"] == "fleet.config_sync"]
+        assert len(cs_events) == 1
+        assert cs_events[0]["data"]["config_version"] == "v3"
+        assert cs_events[0]["data"]["nodes_synced"] == 4
+        assert cs_events[0]["data"]["nodes_total"] == 5
+        assert cs_events[0]["data"]["nodes_pending"] == ["node-5"]
+
+    def test_poll_fleet_config_url_error_silent(self):
+        """URLError should be silently ignored (endpoint may not exist)."""
+        bridge, _ = _make_bridge()
+        request_mod = MagicMock()
+        error_mod = MagicMock()
+        import urllib.error
+        error_mod.URLError = urllib.error.URLError
+        request_mod.urlopen.side_effect = urllib.error.URLError("not found")
+        bridge._poll_fleet_config(request_mod, error_mod)
+        assert bridge.config_sync == {}
+
+    def test_poll_fleet_config_non_dict_response(self):
+        """Non-dict response should result in empty config_sync."""
+        bridge, bus = _make_bridge()
+        drain = _collect_events(bus)
+        request_mod = MagicMock()
+        error_mod = MagicMock()
+        # Response is a list instead of dict
+        request_mod.urlopen.return_value = _mock_urlopen(json.dumps([1, 2, 3]).encode())
+        bridge._poll_fleet_config(request_mod, error_mod)
+        assert bridge.config_sync == {}
+        events = drain()
+        # Should still emit event with defaults since data is not a dict
+        cs_events = [e for e in events if e["type"] == "fleet.config_sync"]
+        assert len(cs_events) == 1
+        assert cs_events[0]["data"]["config_version"] == "unknown"
+
+    def test_poll_fleet_config_missing_fields_use_defaults(self):
+        """Missing fields in the response should use defaults."""
+        bridge, bus = _make_bridge()
+        drain = _collect_events(bus)
+        request_mod = MagicMock()
+        error_mod = MagicMock()
+        # Minimal response with only config_version
+        request_mod.urlopen.return_value = _mock_urlopen(json.dumps({"config_version": "v1"}).encode())
+        bridge._poll_fleet_config(request_mod, error_mod)
+
+        events = drain()
+        cs_events = [e for e in events if e["type"] == "fleet.config_sync"]
+        assert len(cs_events) == 1
+        d = cs_events[0]["data"]
+        assert d["config_version"] == "v1"
+        assert d["nodes_synced"] == 0
+        assert d["nodes_total"] == 0
+        assert d["nodes_pending"] == []
+
+    def test_stats_includes_config_sync(self):
+        bridge, _ = _make_bridge()
+        bridge._config_sync = {"config_version": "v5", "nodes_synced": 3}
+        s = bridge.stats
+        assert "config_sync" in s
+        assert s["config_sync"]["config_version"] == "v5"
+
+    def test_stats_config_sync_empty_when_not_polled(self):
+        bridge, _ = _make_bridge()
+        s = bridge.stats
+        assert s["config_sync"] == {}
+
+
+# ── Node diagnostics edge cases ──────────────────────────────────────────
+
+@pytest.mark.unit
+class TestPollNodeDiagnosticsEdgeCases:
+
+    def test_poll_node_diagnostics_default_port(self):
+        """Devices without explicit port should default to 80."""
+        bridge, bus = _make_bridge()
+        bridge._devices["node-np"] = {"ip": "10.0.0.7"}
+        drain = _collect_events(bus)
+        request_mod = MagicMock()
+        error_mod = MagicMock()
+        diag_data = {"health": {"cpu_temp_c": 38.0}, "anomalies": []}
+        request_mod.urlopen.return_value = _mock_urlopen(json.dumps(diag_data).encode())
+        bridge._poll_node_diagnostics(request_mod, error_mod)
+
+        # Verify the URL used port 80
+        call_args = request_mod.Request.call_args
+        assert ":80/api/diag" in call_args[0][0]
+
+        events = drain()
+        diag = [e for e in events if e["type"] == "fleet.node_diag"]
+        assert len(diag) == 1
+
+    def test_poll_node_diagnostics_custom_port(self):
+        """Devices with explicit port should use that port."""
+        bridge, bus = _make_bridge()
+        bridge._devices["node-cp"] = {"ip": "10.0.0.8", "port": 8080}
+        drain = _collect_events(bus)
+        request_mod = MagicMock()
+        error_mod = MagicMock()
+        diag_data = {"health": {}, "anomalies": []}
+        request_mod.urlopen.return_value = _mock_urlopen(json.dumps(diag_data).encode())
+        bridge._poll_node_diagnostics(request_mod, error_mod)
+
+        call_args = request_mod.Request.call_args
+        assert ":8080/api/diag" in call_args[0][0]
+
+    def test_poll_multiple_nodes(self):
+        """Should poll all tracked devices with IPs."""
+        bridge, bus = _make_bridge()
+        bridge._devices["n1"] = {"ip": "10.0.0.1"}
+        bridge._devices["n2"] = {"ip": "10.0.0.2"}
+        bridge._devices["n3"] = {}  # No IP, should be skipped
+        drain = _collect_events(bus)
+        request_mod = MagicMock()
+        error_mod = MagicMock()
+        diag_data = {"health": {}, "anomalies": []}
+        request_mod.urlopen.return_value = _mock_urlopen(json.dumps(diag_data).encode())
+        bridge._poll_node_diagnostics(request_mod, error_mod)
+
+        events = drain()
+        diag = [e for e in events if e["type"] == "fleet.node_diag"]
+        assert len(diag) == 2
+        device_ids = {e["data"]["device_id"] for e in diag}
+        assert device_ids == {"n1", "n2"}

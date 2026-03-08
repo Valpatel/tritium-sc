@@ -94,6 +94,36 @@ async def fleet_presence(request: Request):
     return {"devices": [], "count": 0, "source": "unavailable"}
 
 
+@router.get("/config")
+async def fleet_config(request: Request):
+    """GET /api/fleet/config — fleet configuration sync status.
+
+    Proxies to the fleet server /api/fleet/config endpoint.  Falls back to
+    cached config_sync data from FleetBridge when the fleet server is
+    unreachable.
+    """
+    base = _get_fleet_url(request)
+    data = _proxy_get(f"{base}/api/fleet/config")
+
+    if data is not None:
+        return {**data, "source": "live"}
+
+    # Fallback: cached config sync from bridge
+    bridge = getattr(request.app.state, "fleet_bridge", None)
+    if bridge is not None:
+        cached = bridge.config_sync
+        if cached:
+            return {**cached, "source": "cached"}
+
+    return {
+        "config_version": "unknown",
+        "nodes_synced": 0,
+        "nodes_total": 0,
+        "nodes_pending": [],
+        "source": "unavailable",
+    }
+
+
 @router.get("/node/{device_id}")
 async def fleet_node_detail(request: Request, device_id: str):
     """GET /api/fleet/node/{device_id} — detail for a specific edge node.

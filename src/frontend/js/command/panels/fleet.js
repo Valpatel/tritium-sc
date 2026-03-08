@@ -87,6 +87,21 @@ export const FleetPanelDef = {
                 <li class="panel-empty">Waiting for fleet data...</li>
             </ul>
             <div class="fleet-node-detail" data-bind="node-detail" style="display:none"></div>
+            <div class="fleet-config-bar" data-bind="config-bar" style="display:none">
+                <div class="panel-section-label">CONFIG SYNC</div>
+                <div class="panel-stat-row">
+                    <span class="panel-stat-label">VERSION</span>
+                    <span class="panel-stat-value mono" data-bind="config-version">--</span>
+                </div>
+                <div class="panel-stat-row">
+                    <span class="panel-stat-label">SYNCED</span>
+                    <span class="panel-stat-value mono" data-bind="config-synced">--</span>
+                </div>
+                <div class="panel-stat-row">
+                    <span class="panel-stat-label">PENDING</span>
+                    <span class="panel-stat-value mono" data-bind="config-pending">--</span>
+                </div>
+            </div>
             <div class="fleet-status-bar" data-bind="status">
                 <span class="panel-dot panel-dot-neutral" data-bind="status-dot"></span>
                 <span class="mono" data-bind="status-label">POLLING</span>
@@ -102,6 +117,10 @@ export const FleetPanelDef = {
         const statusDot = bodyEl.querySelector('[data-bind="status-dot"]');
         const statusLabelEl = bodyEl.querySelector('[data-bind="status-label"]');
         const refreshBtn = bodyEl.querySelector('[data-action="refresh"]');
+        const configBar = bodyEl.querySelector('[data-bind="config-bar"]');
+        const configVersionEl = bodyEl.querySelector('[data-bind="config-version"]');
+        const configSyncedEl = bodyEl.querySelector('[data-bind="config-synced"]');
+        const configPendingEl = bodyEl.querySelector('[data-bind="config-pending"]');
 
         // node tracking: device_id -> merged node data
         let nodes = {};
@@ -368,6 +387,36 @@ export const FleetPanelDef = {
             if (selectedNodeId === id) showNodeDetail(id);
         }
 
+        // --- Config sync handler ---
+        function onConfigSync(data) {
+            if (!data) return;
+            if (configBar) configBar.style.display = '';
+            if (configVersionEl) configVersionEl.textContent = data.config_version || '--';
+            const synced = data.nodes_synced ?? 0;
+            const total = data.nodes_total ?? 0;
+            if (configSyncedEl) {
+                configSyncedEl.textContent = `${synced}/${total}`;
+                configSyncedEl.style.color = synced === total && total > 0
+                    ? 'var(--green)' : 'var(--yellow, #fcee0a)';
+            }
+            const pending = data.nodes_pending || [];
+            if (configPendingEl) {
+                configPendingEl.textContent = pending.length > 0
+                    ? pending.join(', ') : 'none';
+                configPendingEl.style.color = pending.length > 0
+                    ? 'var(--magenta)' : 'inherit';
+            }
+        }
+
+        async function fetchConfigSync() {
+            try {
+                const res = await fetch('/api/fleet/config');
+                if (!res.ok) return;
+                const data = await res.json();
+                onConfigSync(data);
+            } catch (_) {}
+        }
+
         // --- EventBus subscriptions ---
         panel._unsubs.push(
             EventBus.on('fleet:heartbeat', onHeartbeat),
@@ -384,6 +433,7 @@ export const FleetPanelDef = {
                 bridgeConnected = false;
                 updateStatusBar();
             }),
+            EventBus.on('fleet:config_sync', onConfigSync),
         );
 
         // Refresh button
@@ -397,6 +447,7 @@ export const FleetPanelDef = {
 
         // Initial fetch
         fetchNodes();
+        fetchConfigSync();
         updateStatusBar();
     },
 

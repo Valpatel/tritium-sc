@@ -81,6 +81,8 @@ class FleetBridge:
         self._devices: dict[str, dict] = {}
         # BLE presence cache from REST polling
         self._ble_presence: list[dict] = []
+        # Config sync cache from REST polling
+        self._config_sync: dict = {}
 
     @property
     def connected(self) -> bool:
@@ -100,6 +102,7 @@ class FleetBridge:
             "last_error": self._last_error,
             "devices_tracked": len(self._devices),
             "device_ids": list(self._devices.keys()),
+            "config_sync": dict(self._config_sync) if self._config_sync else {},
         }
 
     @property
@@ -111,6 +114,11 @@ class FleetBridge:
     def ble_presence(self) -> list[dict]:
         """Return latest BLE presence data from REST polling."""
         return list(self._ble_presence)
+
+    @property
+    def config_sync(self) -> dict:
+        """Return latest fleet config sync status from REST polling."""
+        return dict(self._config_sync)
 
     def start(self) -> None:
         """Connect to fleet server WebSocket in a background thread."""
@@ -322,6 +330,7 @@ class FleetBridge:
                 self._poll_devices(urllib.request, urllib.error)
                 self._poll_ble_presence(urllib.request, urllib.error)
                 self._poll_node_diagnostics(urllib.request, urllib.error)
+                self._poll_fleet_config(urllib.request, urllib.error)
             except Exception as e:
                 logger.debug(f"Fleet REST poll error: {e}")
             time.sleep(self._poll_interval)
@@ -399,3 +408,33 @@ class FleetBridge:
                         })
             except (error_mod.URLError, Exception):
                 pass  # Node may be offline or diag not enabled
+
+    def _poll_fleet_config(self, request_mod, error_mod) -> None:
+        """GET /api/fleet/config and emit fleet.config_sync.
+
+        Fetches the fleet-wide configuration sync status so the command center
+        can show which nodes are running the expected firmware version and
+        settings.  The response is expected to contain at minimum:
+            - config_version: current fleet config revision
+            - nodes_synced: count of nodes matching the current config
+            - nodes_total: total managed nodes
+            - nodes_pending: list of device_ids still pending sync
+        """
+        url = f"{self._rest_url}/api/fleet/config"
+        try:
+            req = request_mod.Request(url, method="GET")
+            req.add_header("Accept", "application/json")
+            with request_mod.urlopen(req, timeout=5) as resp:
+                raw = json.loads(resp.read().decode())
+                data = raw if isinstance(raw, dict) else {}
+                self._config_sync = data
+                self._event_bus.publish("fleet.config_sync", {
+                    "config_version": data.get("config_version", "unknown"),
+                    "nodes_synced": data.get("nodes_synced", 0),
+                    "nodes_total": data.get("nodes_total", 0),
+                    "nodes_pending": data.get("nodes_pending", []),
+                })
+        except error_mod.URLError:
+            pass  # Config endpoint may not exist on all fleet servers
+        except Exception as e:
+            logger.debug(f"Fleet REST /api/fleet/config error: {e}")
