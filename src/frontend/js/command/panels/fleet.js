@@ -87,6 +87,25 @@ export const FleetPanelDef = {
                 <li class="panel-empty">Waiting for fleet data...</li>
             </ul>
             <div class="fleet-node-detail" data-bind="node-detail" style="display:none"></div>
+            <div class="fleet-health-bar" data-bind="health-bar" style="display:none">
+                <div class="panel-section-label">FLEET HEALTH</div>
+                <div class="panel-stat-row">
+                    <span class="panel-stat-label">SCORE</span>
+                    <span class="panel-stat-value mono" data-bind="health-score">--</span>
+                </div>
+                <div class="panel-stat-row">
+                    <span class="panel-stat-label">NODES</span>
+                    <span class="panel-stat-value mono" data-bind="health-nodes">--</span>
+                </div>
+                <div class="panel-stat-row">
+                    <span class="panel-stat-label">ALERTS</span>
+                    <span class="panel-stat-value mono" data-bind="health-alerts">--</span>
+                </div>
+                <div class="panel-stat-row">
+                    <span class="panel-stat-label">CONFIG</span>
+                    <span class="panel-stat-value mono" data-bind="health-config">--</span>
+                </div>
+            </div>
             <div class="fleet-config-bar" data-bind="config-bar" style="display:none">
                 <div class="panel-section-label">CONFIG SYNC</div>
                 <div class="panel-stat-row">
@@ -101,6 +120,10 @@ export const FleetPanelDef = {
                     <span class="panel-stat-label">PENDING</span>
                     <span class="panel-stat-value mono" data-bind="config-pending">--</span>
                 </div>
+            </div>
+            <div class="fleet-anomaly-bar" data-bind="anomaly-bar" style="display:none">
+                <div class="panel-section-label" style="color:var(--magenta)">FLEET ANOMALIES</div>
+                <div data-bind="anomaly-list"></div>
             </div>
             <div class="fleet-status-bar" data-bind="status">
                 <span class="panel-dot panel-dot-neutral" data-bind="status-dot"></span>
@@ -117,10 +140,17 @@ export const FleetPanelDef = {
         const statusDot = bodyEl.querySelector('[data-bind="status-dot"]');
         const statusLabelEl = bodyEl.querySelector('[data-bind="status-label"]');
         const refreshBtn = bodyEl.querySelector('[data-action="refresh"]');
+        const healthBar = bodyEl.querySelector('[data-bind="health-bar"]');
+        const healthScoreEl = bodyEl.querySelector('[data-bind="health-score"]');
+        const healthNodesEl = bodyEl.querySelector('[data-bind="health-nodes"]');
+        const healthAlertsEl = bodyEl.querySelector('[data-bind="health-alerts"]');
+        const healthConfigEl = bodyEl.querySelector('[data-bind="health-config"]');
         const configBar = bodyEl.querySelector('[data-bind="config-bar"]');
         const configVersionEl = bodyEl.querySelector('[data-bind="config-version"]');
         const configSyncedEl = bodyEl.querySelector('[data-bind="config-synced"]');
         const configPendingEl = bodyEl.querySelector('[data-bind="config-pending"]');
+        const anomalyBar = bodyEl.querySelector('[data-bind="anomaly-bar"]');
+        const anomalyListEl = bodyEl.querySelector('[data-bind="anomaly-list"]');
 
         // node tracking: device_id -> merged node data
         let nodes = {};
@@ -408,12 +438,89 @@ export const FleetPanelDef = {
             }
         }
 
+        // --- Dashboard handler ---
+        function onDashboard(data) {
+            if (!data) return;
+            if (healthBar) healthBar.style.display = '';
+            const score = data.health_score ?? 0;
+            if (healthScoreEl) {
+                const pct = Math.round(score * 100);
+                healthScoreEl.textContent = `${pct}%`;
+                healthScoreEl.style.color = pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--yellow, #fcee0a)' : 'var(--magenta)';
+            }
+            if (healthNodesEl) {
+                healthNodesEl.textContent = `${data.online_count ?? 0}/${data.total_nodes ?? 0} online`;
+            }
+            const critAlerts = data.critical_alerts ?? 0;
+            if (healthAlertsEl) {
+                healthAlertsEl.textContent = critAlerts > 0
+                    ? `${critAlerts} critical / ${data.alert_count ?? 0} total`
+                    : `${data.alert_count ?? 0} total`;
+                healthAlertsEl.style.color = critAlerts > 0 ? 'var(--magenta)' : 'inherit';
+            }
+            const syncRatio = data.sync_ratio ?? 1;
+            if (healthConfigEl) {
+                const syncPct = Math.round(syncRatio * 100);
+                healthConfigEl.textContent = `${syncPct}% synced (${data.drifted_count ?? 0} drifted)`;
+                healthConfigEl.style.color = syncPct === 100 ? 'var(--green)' : 'var(--yellow, #fcee0a)';
+            }
+        }
+
+        // --- Fleet anomalies handler ---
+        function onFleetAnomalies(data) {
+            if (!data) return;
+            const anomalies = data.anomalies || [];
+            if (anomalies.length === 0) {
+                if (anomalyBar) anomalyBar.style.display = 'none';
+                return;
+            }
+            if (anomalyBar) anomalyBar.style.display = '';
+            if (anomalyListEl) {
+                anomalyListEl.innerHTML = anomalies.map(a => {
+                    const affected = (a.affected_nodes || []).join(', ') || '--';
+                    const sev = a.severity !== undefined ? Math.round(a.severity * 100) + '%' : '';
+                    return `<div class="panel-stat-row" style="color:var(--magenta)">
+                        <span class="panel-stat-label">${_esc(a.type || 'UNKNOWN')}</span>
+                        <span class="panel-stat-value mono">${_esc(affected)} ${sev}</span>
+                    </div>`;
+                }).join('');
+            }
+        }
+
+        // --- Health report handler ---
+        function onHealthReport(data) {
+            if (!data) return;
+            // Update node counts in health bar if dashboard hasn't populated it
+            if (healthBar && !healthScoreEl?.textContent?.includes('%')) {
+                healthBar.style.display = '';
+            }
+        }
+
         async function fetchConfigSync() {
             try {
                 const res = await fetch('/api/fleet/config');
                 if (!res.ok) return;
                 const data = await res.json();
                 onConfigSync(data);
+            } catch (_) {}
+        }
+
+        async function fetchDashboard() {
+            try {
+                const res = await fetch('/api/fleet/dashboard');
+                if (!res.ok) return;
+                const data = await res.json();
+                onDashboard({
+                    health_score: data.health?.score ?? 0,
+                    total_nodes: data.health?.total_nodes ?? 0,
+                    online_count: data.health?.online_count ?? 0,
+                    synced_count: data.config?.synced_count ?? 0,
+                    drifted_count: data.config?.drifted_count ?? 0,
+                    sync_ratio: data.config?.sync_ratio ?? 1,
+                    alert_count: data.alerts?.recent_count ?? 0,
+                    critical_alerts: data.alerts?.critical ?? 0,
+                    server_uptime_s: data.server_uptime_s ?? 0,
+                });
             } catch (_) {}
         }
 
@@ -434,6 +541,9 @@ export const FleetPanelDef = {
                 updateStatusBar();
             }),
             EventBus.on('fleet:config_sync', onConfigSync),
+            EventBus.on('fleet:dashboard', onDashboard),
+            EventBus.on('fleet:health_report', onHealthReport),
+            EventBus.on('fleet:anomalies', onFleetAnomalies),
         );
 
         // Refresh button
@@ -448,6 +558,7 @@ export const FleetPanelDef = {
         // Initial fetch
         fetchNodes();
         fetchConfigSync();
+        fetchDashboard();
         updateStatusBar();
     },
 

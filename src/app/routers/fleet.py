@@ -124,6 +124,67 @@ async def fleet_config(request: Request):
     }
 
 
+@router.get("/dashboard")
+async def fleet_dashboard(request: Request):
+    """GET /api/fleet/dashboard — combined health + config + alerts summary.
+
+    Proxies to the fleet server /api/fleet/dashboard endpoint.  Falls back
+    to cached dashboard data from FleetBridge when unreachable.
+    """
+    base = _get_fleet_url(request)
+    data = _proxy_get(f"{base}/api/fleet/dashboard")
+
+    if data is not None:
+        return {**data, "source": "live"}
+
+    # Fallback: cached dashboard from bridge
+    bridge = getattr(request.app.state, "fleet_bridge", None)
+    if bridge is not None:
+        cached = bridge.dashboard
+        if cached:
+            return {**cached, "source": "cached"}
+
+    return {
+        "health": {"score": 0, "total_nodes": 0, "online_count": 0, "ble_total": 0},
+        "config": {"synced_count": 0, "drifted_count": 0, "critical_drift_count": 0, "sync_ratio": 1.0},
+        "alerts": {"recent_count": 0, "critical": 0, "warning": 0, "recent": []},
+        "server_uptime_s": 0,
+        "source": "unavailable",
+    }
+
+
+@router.get("/health-report")
+async def fleet_health_report(request: Request):
+    """GET /api/fleet/health-report — per-node health classification and anomalies.
+
+    Proxies to the fleet server /api/fleet/health-report endpoint.  Falls back
+    to cached health report from FleetBridge when unreachable.
+    """
+    base = _get_fleet_url(request)
+    data = _proxy_get(f"{base}/api/fleet/health-report")
+
+    if data is not None:
+        return {**data, "source": "live"}
+
+    # Fallback: cached health report from bridge
+    bridge = getattr(request.app.state, "fleet_bridge", None)
+    if bridge is not None:
+        cached = bridge.health_report
+        if cached:
+            return {**cached, "source": "cached"}
+
+    return {
+        "total_nodes": 0,
+        "healthy": 0,
+        "warning": 0,
+        "critical": 0,
+        "anomaly_count": 0,
+        "anomalies": [],
+        "nodes": [],
+        "source": "unavailable",
+    }
+
+
 @router.get("/node/{device_id}")
 async def fleet_node_detail(request: Request, device_id: str):
     """GET /api/fleet/node/{device_id} — detail for a specific edge node.
