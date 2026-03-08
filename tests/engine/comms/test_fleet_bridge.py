@@ -610,6 +610,28 @@ class TestDeviceTracking:
         bridge, _ = _make_bridge()
         assert bridge.config_sync == {}
 
+    def test_dashboard_returns_copy(self):
+        bridge, _ = _make_bridge()
+        bridge._dashboard = {"health": {"score": 0.9}}
+        d = bridge.dashboard
+        d["extra"] = True
+        assert "extra" not in bridge.dashboard
+
+    def test_dashboard_initially_empty(self):
+        bridge, _ = _make_bridge()
+        assert bridge.dashboard == {}
+
+    def test_health_report_returns_copy(self):
+        bridge, _ = _make_bridge()
+        bridge._health_report = {"total_nodes": 3}
+        hr = bridge.health_report
+        hr["extra"] = True
+        assert "extra" not in bridge.health_report
+
+    def test_health_report_initially_empty(self):
+        bridge, _ = _make_bridge()
+        assert bridge.health_report == {}
+
 
 # ── Fleet config polling ────────────────────────────────────────────────
 
@@ -757,3 +779,171 @@ class TestPollNodeDiagnosticsEdgeCases:
         assert len(diag) == 2
         device_ids = {e["data"]["device_id"] for e in diag}
         assert device_ids == {"n1", "n2"}
+
+
+# ── Fleet dashboard polling ─────────────────────────────────────────────
+
+@pytest.mark.unit
+class TestPollFleetDashboard:
+
+    def test_poll_fleet_dashboard_emits_event(self):
+        bridge, bus = _make_bridge()
+        drain = _collect_events(bus)
+        request_mod = MagicMock()
+        error_mod = MagicMock()
+        dashboard_data = {
+            "health": {"score": 0.85, "total_nodes": 5, "online_count": 4, "ble_total": 12},
+            "config": {"synced_count": 4, "drifted_count": 1, "sync_ratio": 0.8, "critical_drift_count": 0},
+            "alerts": {"recent_count": 2, "critical": 1, "warning": 1, "recent": []},
+            "server_uptime_s": 3600,
+        }
+        request_mod.urlopen.return_value = _mock_urlopen(json.dumps(dashboard_data).encode())
+        bridge._poll_fleet_dashboard(request_mod, error_mod)
+
+        assert bridge.dashboard["health"]["score"] == 0.85
+        assert bridge.dashboard["server_uptime_s"] == 3600
+
+        events = drain()
+        dash = [e for e in events if e["type"] == "fleet.dashboard"]
+        assert len(dash) == 1
+        d = dash[0]["data"]
+        assert d["health_score"] == 0.85
+        assert d["total_nodes"] == 5
+        assert d["online_count"] == 4
+        assert d["synced_count"] == 4
+        assert d["drifted_count"] == 1
+        assert d["sync_ratio"] == 0.8
+        assert d["alert_count"] == 2
+        assert d["critical_alerts"] == 1
+        assert d["server_uptime_s"] == 3600
+
+    def test_poll_fleet_dashboard_url_error_silent(self):
+        bridge, _ = _make_bridge()
+        request_mod = MagicMock()
+        error_mod = MagicMock()
+        import urllib.error
+        error_mod.URLError = urllib.error.URLError
+        request_mod.urlopen.side_effect = urllib.error.URLError("not found")
+        bridge._poll_fleet_dashboard(request_mod, error_mod)
+        assert bridge.dashboard == {}
+
+    def test_poll_fleet_dashboard_non_dict_response(self):
+        bridge, bus = _make_bridge()
+        drain = _collect_events(bus)
+        request_mod = MagicMock()
+        error_mod = MagicMock()
+        request_mod.urlopen.return_value = _mock_urlopen(json.dumps("string").encode())
+        bridge._poll_fleet_dashboard(request_mod, error_mod)
+        assert bridge.dashboard == {}
+        events = drain()
+        dash = [e for e in events if e["type"] == "fleet.dashboard"]
+        assert len(dash) == 1
+        assert dash[0]["data"]["health_score"] == 0
+
+    def test_poll_fleet_dashboard_missing_sections(self):
+        bridge, bus = _make_bridge()
+        drain = _collect_events(bus)
+        request_mod = MagicMock()
+        error_mod = MagicMock()
+        request_mod.urlopen.return_value = _mock_urlopen(json.dumps({}).encode())
+        bridge._poll_fleet_dashboard(request_mod, error_mod)
+        events = drain()
+        dash = [e for e in events if e["type"] == "fleet.dashboard"]
+        assert len(dash) == 1
+        d = dash[0]["data"]
+        assert d["health_score"] == 0
+        assert d["total_nodes"] == 0
+        assert d["sync_ratio"] == 1.0
+
+    def test_stats_includes_dashboard(self):
+        bridge, _ = _make_bridge()
+        bridge._dashboard = {"health": {"score": 0.95}}
+        s = bridge.stats
+        assert "dashboard" in s
+        assert s["dashboard"]["health"]["score"] == 0.95
+
+
+# ── Fleet health report polling ─────────────────────────────────────────
+
+@pytest.mark.unit
+class TestPollFleetHealthReport:
+
+    def test_poll_fleet_health_report_emits_event(self):
+        bridge, bus = _make_bridge()
+        drain = _collect_events(bus)
+        request_mod = MagicMock()
+        error_mod = MagicMock()
+        report_data = {
+            "total_nodes": 3,
+            "healthy": 2,
+            "warning": 1,
+            "critical": 0,
+            "anomaly_count": 0,
+            "anomalies": [],
+            "nodes": [],
+        }
+        request_mod.urlopen.return_value = _mock_urlopen(json.dumps(report_data).encode())
+        bridge._poll_fleet_health_report(request_mod, error_mod)
+
+        assert bridge.health_report["total_nodes"] == 3
+        assert bridge.health_report["healthy"] == 2
+
+        events = drain()
+        hr = [e for e in events if e["type"] == "fleet.health_report"]
+        assert len(hr) == 1
+        d = hr[0]["data"]
+        assert d["total_nodes"] == 3
+        assert d["healthy"] == 2
+        assert d["warning"] == 1
+        assert d["critical"] == 0
+        assert d["anomaly_count"] == 0
+
+        # No anomalies event when list is empty
+        anomaly_events = [e for e in events if e["type"] == "fleet.anomalies"]
+        assert len(anomaly_events) == 0
+
+    def test_poll_fleet_health_report_with_anomalies(self):
+        bridge, bus = _make_bridge()
+        drain = _collect_events(bus)
+        request_mod = MagicMock()
+        error_mod = MagicMock()
+        report_data = {
+            "total_nodes": 5,
+            "healthy": 2,
+            "warning": 2,
+            "critical": 1,
+            "anomaly_count": 2,
+            "anomalies": [
+                {"type": "wifi_degradation", "affected_nodes": ["n1", "n2"], "severity": 0.7},
+                {"type": "power_instability", "affected_nodes": ["n3"], "severity": 0.9},
+            ],
+        }
+        request_mod.urlopen.return_value = _mock_urlopen(json.dumps(report_data).encode())
+        bridge._poll_fleet_health_report(request_mod, error_mod)
+
+        events = drain()
+        hr = [e for e in events if e["type"] == "fleet.health_report"]
+        assert len(hr) == 1
+        assert hr[0]["data"]["anomaly_count"] == 2
+
+        anomaly_events = [e for e in events if e["type"] == "fleet.anomalies"]
+        assert len(anomaly_events) == 1
+        assert anomaly_events[0]["data"]["count"] == 2
+        assert anomaly_events[0]["data"]["anomalies"][0]["type"] == "wifi_degradation"
+
+    def test_poll_fleet_health_report_url_error_silent(self):
+        bridge, _ = _make_bridge()
+        request_mod = MagicMock()
+        error_mod = MagicMock()
+        import urllib.error
+        error_mod.URLError = urllib.error.URLError
+        request_mod.urlopen.side_effect = urllib.error.URLError("not found")
+        bridge._poll_fleet_health_report(request_mod, error_mod)
+        assert bridge.health_report == {}
+
+    def test_stats_includes_health_report(self):
+        bridge, _ = _make_bridge()
+        bridge._health_report = {"total_nodes": 7, "healthy": 6}
+        s = bridge.stats
+        assert "health_report" in s
+        assert s["health_report"]["total_nodes"] == 7

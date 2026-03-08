@@ -83,6 +83,10 @@ class FleetBridge:
         self._ble_presence: list[dict] = []
         # Config sync cache from REST polling
         self._config_sync: dict = {}
+        # Dashboard cache from REST polling
+        self._dashboard: dict = {}
+        # Fleet health report cache
+        self._health_report: dict = {}
 
     @property
     def connected(self) -> bool:
@@ -103,6 +107,8 @@ class FleetBridge:
             "devices_tracked": len(self._devices),
             "device_ids": list(self._devices.keys()),
             "config_sync": dict(self._config_sync) if self._config_sync else {},
+            "dashboard": dict(self._dashboard) if self._dashboard else {},
+            "health_report": dict(self._health_report) if self._health_report else {},
         }
 
     @property
@@ -119,6 +125,16 @@ class FleetBridge:
     def config_sync(self) -> dict:
         """Return latest fleet config sync status from REST polling."""
         return dict(self._config_sync)
+
+    @property
+    def dashboard(self) -> dict:
+        """Return latest fleet dashboard summary from REST polling."""
+        return dict(self._dashboard)
+
+    @property
+    def health_report(self) -> dict:
+        """Return latest fleet health report from REST polling."""
+        return dict(self._health_report)
 
     def start(self) -> None:
         """Connect to fleet server WebSocket in a background thread."""
@@ -331,6 +347,8 @@ class FleetBridge:
                 self._poll_ble_presence(urllib.request, urllib.error)
                 self._poll_node_diagnostics(urllib.request, urllib.error)
                 self._poll_fleet_config(urllib.request, urllib.error)
+                self._poll_fleet_dashboard(urllib.request, urllib.error)
+                self._poll_fleet_health_report(urllib.request, urllib.error)
             except Exception as e:
                 logger.debug(f"Fleet REST poll error: {e}")
             time.sleep(self._poll_interval)
@@ -438,3 +456,70 @@ class FleetBridge:
             pass  # Config endpoint may not exist on all fleet servers
         except Exception as e:
             logger.debug(f"Fleet REST /api/fleet/config error: {e}")
+
+    def _poll_fleet_dashboard(self, request_mod, error_mod) -> None:
+        """GET /api/fleet/dashboard and emit fleet.dashboard.
+
+        Fetches the combined dashboard summary (health + config + alerts)
+        in a single call, reducing roundtrips for the command center UI.
+        """
+        url = f"{self._rest_url}/api/fleet/dashboard"
+        try:
+            req = request_mod.Request(url, method="GET")
+            req.add_header("Accept", "application/json")
+            with request_mod.urlopen(req, timeout=5) as resp:
+                raw = json.loads(resp.read().decode())
+                data = raw if isinstance(raw, dict) else {}
+                self._dashboard = data
+                health = data.get("health", {})
+                config = data.get("config", {})
+                alerts = data.get("alerts", {})
+                self._event_bus.publish("fleet.dashboard", {
+                    "health_score": health.get("score", 0),
+                    "total_nodes": health.get("total_nodes", 0),
+                    "online_count": health.get("online_count", 0),
+                    "synced_count": config.get("synced_count", 0),
+                    "drifted_count": config.get("drifted_count", 0),
+                    "sync_ratio": config.get("sync_ratio", 1.0),
+                    "alert_count": alerts.get("recent_count", 0),
+                    "critical_alerts": alerts.get("critical", 0),
+                    "server_uptime_s": data.get("server_uptime_s", 0),
+                })
+        except error_mod.URLError:
+            pass  # Dashboard endpoint may not exist on all fleet servers
+        except Exception as e:
+            logger.debug(f"Fleet REST /api/fleet/dashboard error: {e}")
+
+    def _poll_fleet_health_report(self, request_mod, error_mod) -> None:
+        """GET /api/fleet/health-report and emit fleet.health_report.
+
+        Fetches per-node health classification and fleet-wide anomaly
+        detection from tritium-lib.  Emits separate events for anomalies
+        to enable command center alerting.
+        """
+        url = f"{self._rest_url}/api/fleet/health-report"
+        try:
+            req = request_mod.Request(url, method="GET")
+            req.add_header("Accept", "application/json")
+            with request_mod.urlopen(req, timeout=5) as resp:
+                raw = json.loads(resp.read().decode())
+                data = raw if isinstance(raw, dict) else {}
+                self._health_report = data
+                self._event_bus.publish("fleet.health_report", {
+                    "total_nodes": data.get("total_nodes", 0),
+                    "healthy": data.get("healthy", 0),
+                    "warning": data.get("warning", 0),
+                    "critical": data.get("critical", 0),
+                    "anomaly_count": data.get("anomaly_count", 0),
+                })
+                # Emit individual anomaly events for alerting
+                anomalies = data.get("anomalies", [])
+                if anomalies:
+                    self._event_bus.publish("fleet.anomalies", {
+                        "anomalies": anomalies,
+                        "count": len(anomalies),
+                    })
+        except error_mod.URLError:
+            pass  # Health report endpoint may not exist on all fleet servers
+        except Exception as e:
+            logger.debug(f"Fleet REST /api/fleet/health-report error: {e}")
