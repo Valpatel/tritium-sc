@@ -1070,6 +1070,16 @@ export class WebSocketManager {
                 break;
             }
 
+            // -- Edge tracker BLE updates --------------------------------
+            case 'amy_edge:ble_update':
+                EventBus.emit('edge:ble_update', msg.data || msg);
+                break;
+
+            // -- Edge tracker WiFi updates --------------------------------
+            case 'amy_edge:wifi_update':
+                EventBus.emit('edge:wifi_update', msg.data || msg);
+                break;
+
             default:
                 // Forward unknown events for extensibility
                 EventBus.emit(`ws:${type}`, msg.data || msg);

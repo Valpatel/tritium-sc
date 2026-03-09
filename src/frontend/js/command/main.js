@@ -38,6 +38,7 @@ import { VideosPanelDef } from './panels/videos.js';
 import { ZonesPanelDef } from './panels/zones.js';
 import { LayersPanelDef } from './panels/layers.js';
 import { FleetPanelDef } from './panels/fleet.js';
+import { EdgeTrackerPanelDef } from './panels/edge-tracker.js';
 import { MissionModal, initMissionModal } from './mission-modal.js';
 
 // Make available on window for console debugging
@@ -451,6 +452,7 @@ function initPanelSystem(container) {
     panelManager.register(ZonesPanelDef);
     panelManager.register(LayersPanelDef);
     panelManager.register(FleetPanelDef);
+    panelManager.register(EdgeTrackerPanelDef);
 
     // panel:request-open — allows map click to open panels by id
     EventBus.on('panel:request-open', (data) => {

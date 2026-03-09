@@ -529,6 +529,9 @@ def start_headless_event_bridge(event_bus, loop: asyncio.AbstractEventLoop,
                     # Amy mode/formation events
                     "formation_created",
                     "mode_change",
+                    # Edge tracker BLE and WiFi updates
+                    "edge:ble_update",
+                    "edge:wifi_update",
                 ):
                     asyncio.run_coroutine_threadsafe(
                         broadcast_amy_event(event_type, data), loop

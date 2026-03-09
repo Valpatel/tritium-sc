@@ -3022,3 +3022,68 @@
     color: var(--cyan, #00f0ff);
     opacity: 0.7;
 }
+
+/* ========================================
+   Edge Tracker Tabs
+   ======================================== */
+
+.edge-tracker-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border, rgba(255,255,255,0.08));
+    margin-bottom: 4px;
+    flex-shrink: 0;
+}
+
+.edge-tracker-tab {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-ghost, rgba(255,255,255,0.25));
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 4px 12px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    flex: 1;
+    text-align: center;
+}
+
+.edge-tracker-tab:hover {
+    color: var(--text-secondary, rgba(255,255,255,0.6));
+}
+
+.edge-tracker-tab.active {
+    color: var(--cyan, #00f0ff);
+    border-bottom-color: var(--cyan, #00f0ff);
+}
+
+.edge-tracker-tab-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.edge-tracker-wifi-track-btn {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-ghost, rgba(255,255,255,0.25));
+    background: none;
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border-radius: var(--radius-sm, 2px);
+    padding: 1px 6px;
+    cursor: pointer;
+    margin-left: auto;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.edge-tracker-wifi-track-btn:hover {
+    color: var(--cyan, #00f0ff);
+    border-color: var(--cyan, #00f0ff);
+}
