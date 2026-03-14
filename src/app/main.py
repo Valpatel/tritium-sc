@@ -49,6 +49,8 @@ from app.routers.enrichment import router as enrichment_router
 from app.routers.dossiers import router as dossiers_router
 from app.routers.investigations import router as investigations_router
 from app.routers.ontology import router as ontology_router
+from app.routers.patrols import router as patrols_router
+from app.routers.timeline import router as timeline_router
 
 
 # ---------------------------------------------------------------------------
@@ -797,6 +799,8 @@ app.include_router(enrichment_router)
 app.include_router(dossiers_router)
 app.include_router(investigations_router)
 app.include_router(ontology_router)
+app.include_router(patrols_router)
+app.include_router(timeline_router)
 
 # Static files
 frontend_path = Path(__file__).parent.parent / "frontend"

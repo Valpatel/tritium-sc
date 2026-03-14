@@ -16,6 +16,10 @@ correlation strategies evaluate the pair independently:
 Each strategy produces a score (0-1). A weighted sum determines final
 correlation confidence. When correlated, targets are merged and a
 TargetDossier is created/updated in DossierStore for persistent identity.
+
+Optionally writes entity nodes and relationship edges into a KuzuDB graph
+store (TritiumGraph) for graph traversal queries. If kuzu is not installed
+or no graph_store is provided, graph writes are silently skipped.
 """
 
 from __future__ import annotations
@@ -38,6 +42,25 @@ from .dossier import DossierStore, TargetDossier
 from .target_tracker import TargetTracker, TrackedTarget
 
 logger = logging.getLogger("correlator")
+
+# Map tracker asset_type values to graph node table names.
+# Anything not listed falls back to "Device".
+_ASSET_TYPE_TO_NODE: dict[str, str] = {
+    "person": "Person",
+    "vehicle": "Vehicle",
+    "car": "Vehicle",
+    "motorcycle": "Vehicle",
+    "bicycle": "Vehicle",
+    "ble_device": "Device",
+    "rover": "Device",
+    "drone": "Device",
+    "turret": "Device",
+}
+
+
+def _node_type_for(asset_type: str) -> str:
+    """Return the graph node table name for a tracker asset_type."""
+    return _ASSET_TYPE_TO_NODE.get(asset_type, "Device")
 
 
 @dataclass
@@ -81,6 +104,7 @@ class TargetCorrelator:
         dossier_store: DossierStore | None = None,
         strategies: list[CorrelationStrategy] | None = None,
         weights: dict[str, float] | None = None,
+        graph_store: object | None = None,
     ) -> None:
         """
         Args:
@@ -93,6 +117,9 @@ class TargetCorrelator:
                 automatically if not provided.
             strategies: Custom strategy list. If None, defaults are created.
             weights: Strategy name -> weight mapping. Defaults to DEFAULT_WEIGHTS.
+            graph_store: Optional TritiumGraph instance for writing entity nodes
+                and relationship edges. If None or kuzu not installed, graph
+                writes are silently skipped.
         """
         self.tracker = tracker
         self.radius = radius
@@ -101,6 +128,7 @@ class TargetCorrelator:
         self.confidence_threshold = confidence_threshold
         self.dossier_store = dossier_store or DossierStore()
         self.weights = weights or dict(DEFAULT_WEIGHTS)
+        self.graph_store = graph_store
 
         # Build strategies
         if strategies is not None:
@@ -180,6 +208,9 @@ class TargetCorrelator:
                         "secondary_type": secondary.asset_type,
                     },
                 )
+
+                # Write entity nodes and relationship edges to graph store
+                self._write_graph(primary, secondary, weighted_confidence)
 
                 record = CorrelationRecord(
                     primary_id=primary.target_id,
@@ -280,6 +311,114 @@ class TargetCorrelator:
         if secondary.position_confidence > primary.position_confidence:
             primary.position = secondary.position
             primary.position_source = secondary.position_source
+
+    def _write_graph(
+        self,
+        primary: TrackedTarget,
+        secondary: TrackedTarget,
+        confidence: float,
+    ) -> None:
+        """Write entity nodes and relationship edges into the graph store.
+
+        Creates/updates entity nodes for both targets, then writes edges:
+          - CORRELATED_WITH between the two entities (always)
+          - CARRIES from device to person (BLE + camera person)
+          - DETECTED_WITH between two BLE devices seen together
+
+        Silently skips if graph_store is None or if any graph operation fails.
+        """
+        if self.graph_store is None:
+            return
+
+        try:
+            graph = self.graph_store
+            now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+            # Determine node types
+            primary_node = _node_type_for(primary.asset_type)
+            secondary_node = _node_type_for(secondary.asset_type)
+
+            # Create/update entity nodes
+            graph.create_entity(
+                entity_type=primary_node,
+                id=primary.target_id,
+                name=primary.name,
+                properties={
+                    "source": primary.source,
+                    "asset_type": primary.asset_type,
+                },
+                confidence=primary.position_confidence,
+            )
+            graph.create_entity(
+                entity_type=secondary_node,
+                id=secondary.target_id,
+                name=secondary.name,
+                properties={
+                    "source": secondary.source,
+                    "asset_type": secondary.asset_type,
+                },
+                confidence=secondary.position_confidence,
+            )
+
+            # Always write CORRELATED_WITH
+            graph.add_relationship(
+                from_id=primary.target_id,
+                to_id=secondary.target_id,
+                rel_type="CORRELATED_WITH",
+                properties={
+                    "timestamp": now_iso,
+                    "confidence": confidence,
+                    "source": f"{primary.source}+{secondary.source}",
+                    "count": 1,
+                },
+            )
+
+            # BLE device correlated with camera person -> CARRIES (device->person)
+            source_pair = frozenset((primary.source, secondary.source))
+            type_pair = frozenset((primary.asset_type, secondary.asset_type))
+
+            if source_pair == frozenset(("ble", "yolo")) and "person" in type_pair:
+                # Identify which is device and which is person
+                if primary.asset_type == "person":
+                    device, person = secondary, primary
+                else:
+                    device, person = primary, secondary
+                graph.add_relationship(
+                    from_id=device.target_id,
+                    to_id=person.target_id,
+                    rel_type="CARRIES",
+                    properties={
+                        "timestamp": now_iso,
+                        "confidence": confidence,
+                        "source": "correlator",
+                        "count": 1,
+                    },
+                )
+
+            # Two BLE devices correlated -> DETECTED_WITH
+            if primary.source == "ble" and secondary.source == "ble":
+                graph.add_relationship(
+                    from_id=primary.target_id,
+                    to_id=secondary.target_id,
+                    rel_type="DETECTED_WITH",
+                    properties={
+                        "timestamp": now_iso,
+                        "confidence": confidence,
+                        "source": "correlator",
+                        "count": 1,
+                    },
+                )
+
+            logger.debug(
+                "Graph: wrote %s(%s) -[CORRELATED_WITH]-> %s(%s)",
+                primary_node,
+                primary.target_id,
+                secondary_node,
+                secondary.target_id,
+            )
+
+        except Exception as exc:
+            logger.warning("Graph write failed (non-fatal): %s", exc)
 
     def _loop(self) -> None:
         """Background correlation loop."""
