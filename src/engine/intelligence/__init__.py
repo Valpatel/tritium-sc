@@ -6,5 +6,8 @@
 Provides:
 - TrainingStore: SQLite-backed ML training data collection
 - CorrelationLearner: Trains logistic regression from operator feedback
+- BLEClassificationLearner: Random forest on BLE advertisement features
 - LearnedStrategy: Adapter for TargetCorrelator integration
+- BaseLearner: ABC for all learners (re-exported from tritium-lib)
+- register_model_in_registry: Helper to save models for federation sharing
 """
