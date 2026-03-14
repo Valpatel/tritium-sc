@@ -14,10 +14,34 @@ import time
 import uuid
 from typing import Any, Optional
 
+import html
+import re
+
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 router = APIRouter(prefix="/api/annotations", tags=["annotations"])
+
+# ---------------------------------------------------------------------------
+# Limits
+# ---------------------------------------------------------------------------
+_MAX_TEXT_LEN = 2000
+_MAX_LABEL_LEN = 200
+_MAX_LAYER_LEN = 100
+_MAX_COLOR_LEN = 20
+_MAX_POINTS = 5000
+_MAX_ANNOTATIONS = 10000
+_VALID_TYPES = {"text", "arrow", "circle", "freehand", "rectangle", "polygon"}
+
+# Strip HTML/script tags — defence-in-depth against XSS
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _sanitize(value: str, max_len: int) -> str:
+    """Strip HTML tags and enforce length limit."""
+    value = _HTML_TAG_RE.sub("", value)
+    value = html.escape(value)
+    return value[:max_len]
 
 
 # ---------------------------------------------------------------------------
@@ -27,50 +51,83 @@ router = APIRouter(prefix="/api/annotations", tags=["annotations"])
 class AnnotationCreate(BaseModel):
     """Create a new map annotation."""
     type: str = Field(..., description="text | arrow | circle | freehand | rectangle | polygon")
-    lat: float = Field(..., description="Latitude of annotation anchor")
-    lng: float = Field(..., description="Longitude of annotation anchor")
+    lat: float = Field(..., ge=-90, le=90, description="Latitude of annotation anchor")
+    lng: float = Field(..., ge=-180, le=180, description="Longitude of annotation anchor")
     # Text content (for text annotations)
-    text: str = ""
+    text: str = Field(default="", max_length=_MAX_TEXT_LEN)
     # Geometry (type-specific)
-    end_lat: Optional[float] = None  # arrow end point
-    end_lng: Optional[float] = None
-    radius_m: Optional[float] = None  # circle radius in meters
+    end_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    end_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    radius_m: Optional[float] = Field(default=None, ge=0, le=100_000)
     points: Optional[list[list[float]]] = None  # freehand/polygon: [[lat,lng], ...]
-    width: Optional[float] = None  # rectangle width in meters
-    height: Optional[float] = None  # rectangle height in meters
+    width: Optional[float] = Field(default=None, ge=0, le=100_000)
+    height: Optional[float] = Field(default=None, ge=0, le=100_000)
     # Style
-    color: str = "#00f0ff"
-    stroke_width: float = 2.0
-    font_size: float = 14.0
-    opacity: float = 0.8
+    color: str = Field(default="#00f0ff", max_length=_MAX_COLOR_LEN)
+    stroke_width: float = Field(default=2.0, ge=0.1, le=50)
+    font_size: float = Field(default=14.0, ge=1, le=200)
+    opacity: float = Field(default=0.8, ge=0, le=1)
     fill: bool = False
-    fill_opacity: float = 0.2
+    fill_opacity: float = Field(default=0.2, ge=0, le=1)
     # Metadata
-    label: str = ""
-    layer: str = "default"
+    label: str = Field(default="", max_length=_MAX_LABEL_LEN)
+    layer: str = Field(default="default", max_length=_MAX_LAYER_LEN)
     locked: bool = False
+
+    @field_validator("type")
+    @classmethod
+    def validate_type(cls, v: str) -> str:
+        if v not in _VALID_TYPES:
+            raise ValueError(f"type must be one of {_VALID_TYPES}")
+        return v
+
+    @field_validator("points")
+    @classmethod
+    def validate_points(cls, v):
+        if v is not None and len(v) > _MAX_POINTS:
+            raise ValueError(f"points list exceeds maximum of {_MAX_POINTS}")
+        return v
+
+    @field_validator("text", "label", "layer", "color")
+    @classmethod
+    def sanitize_strings(cls, v: str) -> str:
+        return _sanitize(v, _MAX_TEXT_LEN)
 
 
 class AnnotationUpdate(BaseModel):
     """Partial update for an annotation."""
-    lat: Optional[float] = None
-    lng: Optional[float] = None
-    text: Optional[str] = None
-    end_lat: Optional[float] = None
-    end_lng: Optional[float] = None
-    radius_m: Optional[float] = None
+    lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    text: Optional[str] = Field(default=None, max_length=_MAX_TEXT_LEN)
+    end_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    end_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    radius_m: Optional[float] = Field(default=None, ge=0, le=100_000)
     points: Optional[list[list[float]]] = None
-    width: Optional[float] = None
-    height: Optional[float] = None
-    color: Optional[str] = None
-    stroke_width: Optional[float] = None
-    font_size: Optional[float] = None
-    opacity: Optional[float] = None
+    width: Optional[float] = Field(default=None, ge=0, le=100_000)
+    height: Optional[float] = Field(default=None, ge=0, le=100_000)
+    color: Optional[str] = Field(default=None, max_length=_MAX_COLOR_LEN)
+    stroke_width: Optional[float] = Field(default=None, ge=0.1, le=50)
+    font_size: Optional[float] = Field(default=None, ge=1, le=200)
+    opacity: Optional[float] = Field(default=None, ge=0, le=1)
     fill: Optional[bool] = None
-    fill_opacity: Optional[float] = None
-    label: Optional[str] = None
-    layer: Optional[str] = None
+    fill_opacity: Optional[float] = Field(default=None, ge=0, le=1)
+    label: Optional[str] = Field(default=None, max_length=_MAX_LABEL_LEN)
+    layer: Optional[str] = Field(default=None, max_length=_MAX_LAYER_LEN)
     locked: Optional[bool] = None
+
+    @field_validator("text", "label", "layer", "color")
+    @classmethod
+    def sanitize_strings(cls, v):
+        if v is not None:
+            return _sanitize(v, _MAX_TEXT_LEN)
+        return v
+
+    @field_validator("points")
+    @classmethod
+    def validate_points(cls, v):
+        if v is not None and len(v) > _MAX_POINTS:
+            raise ValueError(f"points list exceeds maximum of {_MAX_POINTS}")
+        return v
 
 
 # ---------------------------------------------------------------------------
@@ -99,6 +156,11 @@ async def list_annotations(layer: Optional[str] = None):
 @router.post("")
 async def create_annotation(body: AnnotationCreate):
     """Create a new map annotation."""
+    if len(_annotations) >= _MAX_ANNOTATIONS:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Annotation limit reached ({_MAX_ANNOTATIONS})",
+        )
     now = time.time()
     ann_id = f"ann_{uuid.uuid4().hex[:8]}"
     annotation = {

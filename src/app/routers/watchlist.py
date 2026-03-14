@@ -15,10 +15,32 @@ import time
 import uuid
 from typing import Any, Optional
 
+import html
+import re
+
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
+
+# ---------------------------------------------------------------------------
+# Limits
+# ---------------------------------------------------------------------------
+_MAX_TARGET_ID_LEN = 200
+_MAX_LABEL_LEN = 200
+_MAX_NOTES_LEN = 5000
+_MAX_TAG_LEN = 100
+_MAX_TAGS = 50
+_MAX_WATCH_ENTRIES = 5000
+
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _sanitize(value: str, max_len: int) -> str:
+    """Strip HTML tags and enforce length limit."""
+    value = _HTML_TAG_RE.sub("", value)
+    value = html.escape(value)
+    return value[:max_len]
 
 
 # ---------------------------------------------------------------------------
@@ -27,9 +49,9 @@ router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
 
 class WatchEntryCreate(BaseModel):
     """Add a target to the watch list."""
-    target_id: str = Field(..., description="Target ID to watch")
-    label: str = ""
-    notes: str = ""
+    target_id: str = Field(..., max_length=_MAX_TARGET_ID_LEN, description="Target ID to watch")
+    label: str = Field(default="", max_length=_MAX_LABEL_LEN)
+    notes: str = Field(default="", max_length=_MAX_NOTES_LEN)
     priority: int = Field(default=3, ge=1, le=5, description="1=highest, 5=lowest")
     alert_on_move: bool = True
     alert_on_state_change: bool = True
@@ -37,17 +59,45 @@ class WatchEntryCreate(BaseModel):
     alert_on_zone_exit: bool = False
     tags: list[str] = Field(default_factory=list)
 
+    @field_validator("target_id", "label", "notes")
+    @classmethod
+    def sanitize_strings(cls, v: str) -> str:
+        return _sanitize(v, _MAX_NOTES_LEN)
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, v: list[str]) -> list[str]:
+        if len(v) > _MAX_TAGS:
+            raise ValueError(f"Too many tags (max {_MAX_TAGS})")
+        return [_sanitize(t, _MAX_TAG_LEN) for t in v]
+
 
 class WatchEntryUpdate(BaseModel):
     """Update a watch entry."""
-    label: Optional[str] = None
-    notes: Optional[str] = None
+    label: Optional[str] = Field(default=None, max_length=_MAX_LABEL_LEN)
+    notes: Optional[str] = Field(default=None, max_length=_MAX_NOTES_LEN)
     priority: Optional[int] = Field(default=None, ge=1, le=5)
     alert_on_move: Optional[bool] = None
     alert_on_state_change: Optional[bool] = None
     alert_on_zone_enter: Optional[bool] = None
     alert_on_zone_exit: Optional[bool] = None
     tags: Optional[list[str]] = None
+
+    @field_validator("label", "notes")
+    @classmethod
+    def sanitize_strings(cls, v):
+        if v is not None:
+            return _sanitize(v, _MAX_NOTES_LEN)
+        return v
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, v):
+        if v is not None:
+            if len(v) > _MAX_TAGS:
+                raise ValueError(f"Too many tags (max {_MAX_TAGS})")
+            return [_sanitize(t, _MAX_TAG_LEN) for t in v]
+        return v
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +201,11 @@ async def list_watch_entries():
 @router.post("")
 async def add_watch_entry(body: WatchEntryCreate):
     """Add a target to the watch list."""
+    if len(_watch_entries) >= _MAX_WATCH_ENTRIES:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Watch list limit reached ({_MAX_WATCH_ENTRIES})",
+        )
     # Check for duplicate
     for existing in _watch_entries.values():
         if existing["target_id"] == body.target_id:

@@ -14,6 +14,39 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 42: Security Hardening + WebSocket Improvements
+
+### Annotation Security (Unit Tested, 18 tests)
+- XSS prevention: HTML tags stripped via regex, remaining chars HTML-escaped
+- Type enum validation: only `text|arrow|circle|freehand|rectangle|polygon` accepted
+- Lat/lng range enforcement: -90..90, -180..180
+- Numeric range constraints on stroke_width, font_size, opacity, radius, dimensions
+- Points list limit: max 5,000 points per freehand/polygon annotation
+- Collection DoS protection: max 10,000 annotations
+
+### Watchlist Security (Unit Tested, 9 tests)
+- XSS prevention on target_id, label, notes, tags
+- Tag count limit: max 50 tags per entry
+- Text length limits: 200 char target_id/label, 5,000 char notes
+- Collection DoS protection: max 5,000 watch entries
+
+### WebSocket Authentication (Unit Tested, 6 tests)
+- Optional token auth via `WS_AUTH_TOKEN` environment variable
+- Token passed as query parameter: `/ws/live?token=SECRET`
+- Unauthenticated connections rejected with close code 4003
+- Open mode (no token set) allows all connections for development/LAN
+
+### WebSocket Heartbeat
+- Server sends `{"type":"ping"}` every 30 seconds to all clients
+- Clients respond with `{"type":"pong"}` (auto-handled in frontend)
+- Stale connections (3 missed pongs = 90s silence) forcibly closed
+- Singleton guard prevents duplicate heartbeat loops
+- Prevents zombie WebSocket connections from accumulating
+
+### Test Baseline
+- Fast suite: 17,824 passed, 41 known failures (test_menu_bar.js off-by-one)
+- New security tests: 27 tests covering XSS, limits, auth, heartbeat
+
 ## 2026-03-14 — Wave 41: Annotations, Watch List, Plugin Messaging, Compass Rose
 
 ### Map Annotations System (Unit Tested, 7 tests)

@@ -295,6 +295,11 @@ export class WebSocketManager {
         const type = msg.type || msg.event;
 
         switch (type) {
+            case 'ping':
+                // Server-initiated heartbeat — respond with pong
+                this.send({ type: 'pong' });
+                return;
+
             case 'amy_thought':
                 TritiumStore.set('amy.lastThought', msg.text || msg.data?.text || '');
                 EventBus.emit('amy:thought', msg.data || msg);

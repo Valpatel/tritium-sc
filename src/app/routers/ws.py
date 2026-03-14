@@ -1,41 +1,77 @@
 # Created by Matthew Valancy
 # Copyright 2026 Valpatel Software LLC
 # Licensed under AGPL-3.0 — see LICENSE for details.
-"""WebSocket endpoints for real-time updates."""
+"""WebSocket endpoints for real-time updates.
+
+Security model
+--------------
+WebSocket connections support optional token-based authentication via the
+``token`` query parameter (``/ws/live?token=<secret>``).  When the
+environment variable ``WS_AUTH_TOKEN`` is set, connections without a valid
+token are rejected with 4003.  When the variable is unset, all connections
+are accepted (open mode, suitable for development / LAN deployment).
+
+Heartbeat
+---------
+The server sends a ``{"type":"ping"}`` frame every 30 seconds.  Clients
+must respond with ``{"type":"pong"}``.  Connections that miss 3 consecutive
+pings are considered stale and are forcibly closed.  This prevents zombie
+WebSocket connections from accumulating.
+"""
 
 import asyncio
 import json
+import os
 import queue
 import threading
 import time as _time
 from datetime import datetime
-from typing import Set
+from typing import Dict, Set
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from loguru import logger
+from starlette.websockets import WebSocketState
 
 router = APIRouter(prefix="/ws", tags=["websocket"])
 
+# Optional auth token — set WS_AUTH_TOKEN to enable
+_WS_AUTH_TOKEN: str | None = os.environ.get("WS_AUTH_TOKEN")
+
+# Heartbeat constants
+_PING_INTERVAL_S = 30.0
+_MAX_MISSED_PONGS = 3
+
 
 class ConnectionManager:
-    """Manages WebSocket connections for real-time updates."""
+    """Manages WebSocket connections for real-time updates.
+
+    Tracks last-pong timestamps to detect stale connections.
+    """
 
     def __init__(self):
         self.active_connections: Set[WebSocket] = set()
+        self._last_pong: Dict[WebSocket, float] = {}
         self._lock = asyncio.Lock()
 
     async def connect(self, websocket: WebSocket):
         """Accept and register a new WebSocket connection."""
         await websocket.accept()
+        now = _time.time()
         async with self._lock:
             self.active_connections.add(websocket)
+            self._last_pong[websocket] = now
         logger.info(f"WebSocket connected. Total connections: {len(self.active_connections)}")
 
     async def disconnect(self, websocket: WebSocket):
         """Remove a WebSocket connection."""
         async with self._lock:
             self.active_connections.discard(websocket)
+            self._last_pong.pop(websocket, None)
         logger.info(f"WebSocket disconnected. Total connections: {len(self.active_connections)}")
+
+    def record_pong(self, websocket: WebSocket):
+        """Record that a pong was received from a client."""
+        self._last_pong[websocket] = _time.time()
 
     async def broadcast(self, message: dict):
         """Broadcast a message to all connected clients."""
@@ -78,8 +114,19 @@ _target_tracker = None
 
 
 @router.websocket("/live")
-async def websocket_live(websocket: WebSocket):
-    """WebSocket endpoint for live updates (events, alerts, status)."""
+async def websocket_live(websocket: WebSocket, token: str | None = Query(default=None)):
+    """WebSocket endpoint for live updates (events, alerts, status).
+
+    Authentication: when WS_AUTH_TOKEN is set, connections must provide
+    a matching ``token`` query parameter.  Unauthenticated connections
+    are rejected with close code 4003.
+    """
+    # --- Auth check ---
+    if _WS_AUTH_TOKEN is not None:
+        if token != _WS_AUTH_TOKEN:
+            await websocket.close(code=4003, reason="Forbidden — invalid or missing token")
+            return
+
     await manager.connect(websocket)
 
     # Send initial connection confirmation
@@ -129,10 +176,14 @@ async def handle_client_message(websocket: WebSocket, message: dict):
     msg_type = message.get("type")
 
     if msg_type == "ping":
+        manager.record_pong(websocket)
         await manager.send_to(
             websocket,
             {"type": "pong", "timestamp": datetime.now(tz=None).isoformat()},
         )
+    elif msg_type == "pong":
+        # Client responding to our server-initiated ping
+        manager.record_pong(websocket)
     elif msg_type == "subscribe":
         # Subscribe to specific channels/events
         channels = message.get("channels", [])
@@ -491,6 +542,9 @@ def start_amy_event_bridge(amy_commander, loop: asyncio.AbstractEventLoop):
     # Broadcast BLE/mesh targets from the tracker every 2s
     _start_tracker_broadcast(tracker, loop)
 
+    # Start server-side WebSocket ping heartbeat
+    _start_ws_ping_heartbeat(loop)
+
 
 def start_headless_event_bridge(event_bus, loop: asyncio.AbstractEventLoop,
                                 simulation_engine=None, target_tracker=None):
@@ -655,6 +709,9 @@ def start_headless_event_bridge(event_bus, loop: asyncio.AbstractEventLoop,
     # Broadcast BLE/mesh targets for headless mode too
     _start_tracker_broadcast(target_tracker, loop)
 
+    # Start server-side WebSocket ping heartbeat
+    _start_ws_ping_heartbeat(loop)
+
 
 def _start_game_state_heartbeat(
     sim_engine, loop: asyncio.AbstractEventLoop, interval: float = 2.0
@@ -746,3 +803,62 @@ def _start_tracker_broadcast(
         target=_broadcast, daemon=True, name="tracker-broadcast"
     )
     thread.start()
+
+
+# Track whether the ping heartbeat has already been started (singleton)
+_ping_heartbeat_started = False
+
+
+def _start_ws_ping_heartbeat(loop: asyncio.AbstractEventLoop) -> None:
+    """Send a ping frame to every connected client every 30s.
+
+    Clients must respond with ``{"type":"pong"}``.  Connections that miss
+    3 consecutive pings (90s of silence) are considered stale and are
+    forcibly closed.  This prevents zombie WebSocket connections from
+    accumulating memory and CPU.
+    """
+    global _ping_heartbeat_started
+    if _ping_heartbeat_started:
+        return
+    _ping_heartbeat_started = True
+
+    async def _ping_loop():
+        while True:
+            await asyncio.sleep(_PING_INTERVAL_S)
+            if not manager.active_connections:
+                continue
+
+            now = _time.time()
+            stale_threshold = now - (_PING_INTERVAL_S * _MAX_MISSED_PONGS)
+
+            # Identify stale connections
+            stale: set = set()
+            async with manager._lock:
+                for ws in list(manager.active_connections):
+                    last = manager._last_pong.get(ws, 0)
+                    if last < stale_threshold:
+                        stale.add(ws)
+
+            # Close stale connections
+            for ws in stale:
+                try:
+                    logger.warning("Closing stale WebSocket (no pong received)")
+                    await ws.close(code=4001, reason="Ping timeout")
+                except Exception:
+                    pass
+                await manager.disconnect(ws)
+
+            # Send ping to all remaining connections
+            ping_msg = json.dumps({
+                "type": "ping",
+                "timestamp": datetime.now(tz=None).isoformat(),
+            })
+            async with manager._lock:
+                for ws in list(manager.active_connections):
+                    try:
+                        if ws.client_state == WebSocketState.CONNECTED:
+                            await ws.send_text(ping_msg)
+                    except Exception:
+                        pass
+
+    asyncio.run_coroutine_threadsafe(_ping_loop(), loop)
