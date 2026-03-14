@@ -41,6 +41,7 @@ from app.routers.plugins import router as plugins_router
 from app.routers.devices import router as devices_router
 from app.routers.tak import router as tak_router
 from app.routers.fleet import router as fleet_router
+from app.routers.demo import router as demo_router
 
 
 # ---------------------------------------------------------------------------
@@ -435,7 +436,13 @@ def _shutdown_subsystems(amy_instance, sim_engine, mqtt_bridge, app: FastAPI) ->
         logger.info("Stopping mesh web source...")
         mesh_web.stop()
 
-    # 2.4. Fleet bridge
+    # 2.4. Demo mode
+    demo_ctrl = getattr(getattr(app, "state", None), "demo_controller", None)
+    if demo_ctrl is not None and demo_ctrl.active:
+        logger.info("Stopping demo mode...")
+        demo_ctrl.stop()
+
+    # 2.4b. Fleet bridge
     fleet_br = getattr(getattr(app, "state", None), "fleet_bridge", None)
     if fleet_br is not None:
         logger.info("Stopping fleet bridge...")
@@ -655,6 +662,20 @@ async def lifespan(app: FastAPI):
                 except Exception as e:
                     logger.warning(f"Formation actions registration failed: {e}")
 
+    # Demo mode auto-start (TRITIUM_DEMO=true)
+    if settings.tritium_demo and amy_instance is not None:
+        try:
+            from engine.synthetic.demo_mode import DemoController
+            demo = DemoController(
+                event_bus=amy_instance.event_bus,
+                target_tracker=amy_instance.target_tracker,
+            )
+            demo.start()
+            app.state.demo_controller = demo
+            logger.info("Demo mode auto-started (TRITIUM_DEMO=true)")
+        except Exception as e:
+            logger.warning(f"Demo mode auto-start failed: {e}")
+
     # Plugin system — discover, configure, and start all plugins
     plugin_manager = _start_plugins(app, amy_instance, sim_engine)
     if plugin_manager is not None:
@@ -719,6 +740,7 @@ app.include_router(plugins_router)
 app.include_router(devices_router)
 app.include_router(tak_router)
 app.include_router(fleet_router)
+app.include_router(demo_router)
 
 # Static files
 frontend_path = Path(__file__).parent.parent / "frontend"

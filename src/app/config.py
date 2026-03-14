@@ -95,6 +95,9 @@ class Settings(BaseSettings):
     npc_max_vehicles: int = 150      # Peak vehicle count (scaled by time-of-day)
     npc_max_pedestrians: int = 200   # Peak pedestrian count (scaled by time-of-day)
 
+    # Demo mode — synthetic data generators for full pipeline testing
+    tritium_demo: bool = False
+
     # Amy AI Commander
     amy_enabled: bool = True
     amy_camera_device: str | None = None    # auto-detect BCC950
