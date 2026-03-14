@@ -80,6 +80,9 @@ from app.routers.map_share import router as map_share_router
 from app.routers.classification_override import router as classification_override_router
 from app.routers.feedback import router as feedback_router
 from app.routers.intelligence import router as intelligence_router
+from app.routers.layouts import router as layouts_router
+from app.routers.playback import router as playback_router
+from app.routers.system_inventory import router as system_inventory_router
 
 
 # ---------------------------------------------------------------------------
@@ -983,6 +986,9 @@ app.include_router(map_share_router)
 app.include_router(classification_override_router)
 app.include_router(feedback_router)
 app.include_router(intelligence_router)
+app.include_router(layouts_router)
+app.include_router(playback_router)
+app.include_router(system_inventory_router)
 
 # Static files
 frontend_path = Path(__file__).parent.parent / "frontend"

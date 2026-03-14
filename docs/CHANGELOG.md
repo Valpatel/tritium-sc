@@ -14,6 +14,35 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 55: Skepticism + System Inventory + RL E2E
+
+### Server Verification (Human Verified)
+- Server starts in ~14s, imports 463 routes (was 448 before missing router fix)
+- POST /api/demo/start returns 200, generators running (BLE, Meshtastic, Camera)
+- GET /api/targets returns 10 targets after 3s of demo (6 BLE + 4 YOLO, 4 hostiles)
+- Full pipeline verified: synthetic data -> tracker -> API -> correct target data
+
+### System Inventory Endpoint (Unit Tested)
+- New `GET /api/system/inventory` — complete system awareness in one call
+- Returns: panel count (64), router count (66), route count (463), model count (9 SA), test file count (649), fleet status, intelligence/ML model status, tracker state, simulation state
+- Single endpoint for operator dashboard system health overview
+
+### RL Pipeline E2E Test (Unit Tested, 10 tests)
+- New `tests/engine/intelligence/test_rl_pipeline_e2e.py` — full lifecycle test
+- Tests: empty store, insufficient data, full train+predict, model persistence, learned strategy integration, static fallback, retrain with more data, training store stats, feedback logging, outcome updates
+- Verifies model learns correct pattern: close cross-sensor pairs score higher than far same-sensor pairs
+
+### Missing Router Registration Fix (Code Verified)
+- Added `layouts_router`, `playback_router`, `system_inventory_router` to main.py
+- Previously layouts.py and playback.py existed as router files but were never included
+
+### Skepticism Audit (Human Verified)
+- Panels: 64 files, 60 registered as PanelDefs, 4 are utility modules (operator-activity, operator-cursors, training-dashboard, map-screenshot) — correct, not mismatches
+- Routers: 66 files, all now registered (was missing layouts + playback)
+- tritium-lib: 1537 passed, 29 skipped, 0 failures
+
+---
+
 ## 2026-03-14 — Wave 53: RL Correlation Learner, Intelligence API, Anomaly Description
 
 ### CorrelationLearner (Unit Tested, 12 tests)
