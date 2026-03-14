@@ -3549,3 +3549,127 @@ button:disabled:hover {
 .wl-alert-detail { color: #8888aa; flex: 1; }
 .wl-empty { color: #555; font-size: 11px; text-align: center; padding: 12px; }
 .wl-hint { font-size: 10px; color: #444; }
+
+/* ========================================
+   Print-friendly view
+   ======================================== */
+@media print {
+    /* Reset dark backgrounds to white for printing */
+    body,
+    .app-container,
+    .main-content,
+    .command-center,
+    .panel-container,
+    .panel,
+    .panel-body,
+    .modal-content,
+    .stat-box,
+    .neon-box {
+        background: #fff !important;
+        color: #000 !important;
+        border-color: #333 !important;
+        box-shadow: none !important;
+    }
+
+    /* High-contrast text */
+    * {
+        color: #000 !important;
+        text-shadow: none !important;
+    }
+
+    /* Cyan/magenta/green accent colors become high-contrast for print */
+    .text-cyan, [style*="color: #00f0ff"], [style*="color: var(--cyan)"] {
+        color: #005577 !important;
+    }
+    .text-magenta, [style*="color: #ff2a6d"], [style*="color: var(--magenta)"] {
+        color: #990033 !important;
+    }
+    .text-green, [style*="color: #05ffa1"], [style*="color: var(--green)"] {
+        color: #006633 !important;
+    }
+    .text-yellow, [style*="color: #fcee0a"], [style*="color: var(--yellow)"] {
+        color: #886600 !important;
+    }
+    .text-muted {
+        color: #666 !important;
+    }
+
+    /* Remove unnecessary UI elements */
+    .header,
+    .command-bar,
+    .menu-bar,
+    .footer,
+    .status-bar,
+    #multi-select-bar,
+    .modal-overlay,
+    .tooltip,
+    .notification-toast,
+    .context-menu,
+    button,
+    .btn,
+    input,
+    select,
+    textarea {
+        display: none !important;
+    }
+
+    /* Keep map canvas visible and sized for print */
+    #tactical-canvas,
+    canvas {
+        max-width: 100% !important;
+        height: auto !important;
+        page-break-inside: avoid;
+    }
+
+    /* Active panel content prints */
+    .panel.active,
+    .panel-body {
+        display: block !important;
+        overflow: visible !important;
+        max-height: none !important;
+        page-break-inside: avoid;
+    }
+
+    /* Table styling for print */
+    table {
+        border-collapse: collapse !important;
+        width: 100% !important;
+    }
+    th, td {
+        border: 1px solid #333 !important;
+        padding: 4px 8px !important;
+    }
+    th {
+        background: #eee !important;
+        font-weight: bold !important;
+    }
+
+    /* Remove animations and transitions */
+    * {
+        animation: none !important;
+        transition: none !important;
+    }
+
+    /* Full width layout */
+    .main-content {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Page margins and header */
+    @page {
+        margin: 1cm;
+        size: landscape;
+    }
+
+    /* Print header */
+    body::before {
+        content: "TRITIUM-SC Tactical Report";
+        display: block;
+        font-size: 18pt;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 12pt;
+        border-bottom: 2px solid #000;
+        padding-bottom: 6pt;
+    }
+}

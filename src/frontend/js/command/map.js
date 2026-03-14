@@ -185,6 +185,10 @@ const _state = {
     // Screen shake tracking
     _shakeActive: false,
 
+    // Multi-select (Shift+click)
+    selectedUnitIds: new Set(),  // Set of selected unit IDs for multi-select
+    multiSelectActive: false,    // true when shift is held
+
     // Context menu
     contextMenu: null,
     contextMenuWorld: null,
@@ -2197,6 +2201,7 @@ function _drawUnit(ctx, id, unit) {
     const status = (unit.status || 'active').toLowerCase();
     const isNeutralized = status === 'neutralized' || status === 'eliminated' || status === 'destroyed';
     const isSelected = TritiumStore.get('map.selectedUnitId') === id;
+    const isMultiSelected = _state.selectedUnitIds.has(id);
     const isHovered = _state.hoveredUnit === id;
 
     // Smooth heading interpolation
@@ -2215,6 +2220,7 @@ function _drawUnit(ctx, id, unit) {
     let scale = Math.min(_state.cam.zoom, 3) / 4.0;
     scale = Math.max(0.2, Math.min(0.8, scale));
     if (isSelected) scale *= 1.3;
+    else if (isMultiSelected) scale *= 1.2;
     else if (isHovered) scale *= 1.15;
 
     // Map type name to unit-icons type
@@ -2594,6 +2600,22 @@ function _drawSelectionIndicator(ctx) {
     ctx.beginPath();
     ctx.arc(sp.x, sp.y, radius + 8 + pulse * 3, 0, Math.PI * 2);
     ctx.stroke();
+
+    // Draw multi-select rings for other selected units
+    for (const uid of _state.selectedUnitIds) {
+        if (uid === selectedId) continue;
+        const u = TritiumStore.units.get(uid);
+        if (!u || !u.position) continue;
+        const usp = worldToScreen(u.position.x, u.position.y);
+        const ur = 10 * Math.min(_state.cam.zoom, 3);
+        ctx.strokeStyle = '#fcee0a';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(usp.x, usp.y, ur + 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
 }
 
 // ============================================================
@@ -3103,12 +3125,41 @@ function _onMouseDown(e) {
         // Hit test units
         const hitId = _hitTestUnit(sx, sy);
         if (hitId) {
-            TritiumStore.set('map.selectedUnitId', hitId);
-            EventBus.emit('unit:selected', { id: hitId });
-            EventBus.emit('panel:request-open', { id: 'unit-inspector' });
+            if (e.shiftKey) {
+                // Multi-select: toggle unit in selection set
+                if (_state.selectedUnitIds.has(hitId)) {
+                    _state.selectedUnitIds.delete(hitId);
+                } else {
+                    _state.selectedUnitIds.add(hitId);
+                }
+                // Also set primary selected to the clicked unit
+                TritiumStore.set('map.selectedUnitId', hitId);
+                EventBus.emit('unit:selected', { id: hitId });
+                EventBus.emit('multiselect:changed', {
+                    ids: Array.from(_state.selectedUnitIds),
+                    count: _state.selectedUnitIds.size,
+                });
+                if (_state.selectedUnitIds.size > 1) {
+                    _showMultiSelectBar();
+                } else {
+                    _hideMultiSelectBar();
+                }
+            } else {
+                // Single select: clear multi-select
+                _state.selectedUnitIds.clear();
+                _state.selectedUnitIds.add(hitId);
+                TritiumStore.set('map.selectedUnitId', hitId);
+                EventBus.emit('unit:selected', { id: hitId });
+                EventBus.emit('panel:request-open', { id: 'unit-inspector' });
+                _hideMultiSelectBar();
+            }
         } else {
+            // Click on empty space: clear all
+            _state.selectedUnitIds.clear();
             TritiumStore.set('map.selectedUnitId', null);
             EventBus.emit('unit:deselected', {});
+            EventBus.emit('multiselect:changed', { ids: [], count: 0 });
+            _hideMultiSelectBar();
         }
     }
 }
@@ -4333,3 +4384,95 @@ function _fetchZones() {
             // Zones not available -- non-fatal
         });
 }
+
+// ============================================================
+// Multi-select action bar
+// ============================================================
+
+function _showMultiSelectBar() {
+    let bar = document.getElementById('multi-select-bar');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'multi-select-bar';
+        bar.style.cssText = `
+            position: fixed;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 10, 15, 0.95);
+            border: 1px solid #fcee0a;
+            border-radius: 8px;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 500;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.75rem;
+            box-shadow: 0 0 20px rgba(252, 238, 10, 0.3);
+        `;
+        document.body.appendChild(bar);
+    }
+
+    const count = _state.selectedUnitIds.size;
+    bar.innerHTML = `
+        <span style="color: #fcee0a; font-weight: bold;">${count} SELECTED</span>
+        <button onclick="window._multiSelectAction('dossier')" style="background: #00f0ff; color: #0a0a0f; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 0.7rem; font-weight: bold;">GROUP DOSSIER</button>
+        <button onclick="window._multiSelectAction('export')" style="background: #05ffa1; color: #0a0a0f; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 0.7rem; font-weight: bold;">EXPORT</button>
+        <button onclick="window._multiSelectAction('compare')" style="background: #ff8800; color: #0a0a0f; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 0.7rem; font-weight: bold;">COMPARE</button>
+        <button onclick="window._multiSelectAction('alliance')" style="background: #ff2a6d; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 0.7rem; font-weight: bold;">SET ALLIANCE</button>
+        <button onclick="window._multiSelectAction('clear')" style="background: transparent; color: #888; border: 1px solid #444; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 0.7rem;">CLEAR</button>
+    `;
+    bar.style.display = 'flex';
+}
+
+function _hideMultiSelectBar() {
+    const bar = document.getElementById('multi-select-bar');
+    if (bar) bar.style.display = 'none';
+}
+
+// Global handler for multi-select actions
+window._multiSelectAction = function(action) {
+    const ids = Array.from(_state.selectedUnitIds);
+    if (ids.length === 0) return;
+
+    switch (action) {
+        case 'dossier':
+            EventBus.emit('multiselect:group-dossier', { ids });
+            EventBus.emit('panel:request-open', { id: 'dossiers' });
+            break;
+        case 'export':
+            // Download selected targets as JSON
+            fetch('/api/targets')
+                .then(r => r.json())
+                .then(data => {
+                    const targets = (data.targets || []).filter(t => ids.includes(t.target_id));
+                    const blob = new Blob([JSON.stringify(targets, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `selected_targets_${ids.length}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                });
+            break;
+        case 'compare':
+            EventBus.emit('multiselect:compare', { ids });
+            EventBus.emit('panel:request-open', { id: 'target-compare' });
+            break;
+        case 'alliance': {
+            const alliance = prompt('Set alliance for selected targets:\nfriendly / hostile / neutral / unknown');
+            if (alliance && ['friendly', 'hostile', 'neutral', 'unknown'].includes(alliance.toLowerCase())) {
+                EventBus.emit('multiselect:set-alliance', { ids, alliance: alliance.toLowerCase() });
+            }
+            break;
+        }
+        case 'clear':
+            _state.selectedUnitIds.clear();
+            TritiumStore.set('map.selectedUnitId', null);
+            EventBus.emit('unit:deselected', {});
+            EventBus.emit('multiselect:changed', { ids: [], count: 0 });
+            _hideMultiSelectBar();
+            break;
+    }
+};

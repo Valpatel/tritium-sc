@@ -349,6 +349,123 @@ async def export_targets(
         )
 
 
+@router.get("/targets/{target_id}/history/export")
+async def export_target_history(
+    request: Request,
+    target_id: str,
+    format: str = Query("csv", description="Export format: csv, json, or geojson"),
+    max_points: int = Query(10000, ge=1, le=100000, description="Max history points"),
+):
+    """Export full position history of a specific target for external analysis.
+
+    Supported formats:
+    - ``csv`` — Comma-separated with header (timestamp, lat, lng, x, y, heading, speed)
+    - ``json`` — Array of position records
+    - ``geojson`` — GeoJSON LineString geometry with point timestamps
+    """
+    from fastapi.responses import Response
+
+    tracker = _get_tracker(request)
+    if tracker is None:
+        return {"error": "No tracker available"}
+
+    target = tracker.get_target(target_id)
+    if target is None:
+        return {"error": "Target not found"}
+
+    trail = tracker.history.get_trail_dicts(target_id, max_points=max_points)
+
+    # Also include current target metadata
+    target_dict = target.to_dict()
+
+    fmt = format.lower().strip()
+    safe_id = target_id.replace("/", "_").replace("\\", "_")
+
+    if fmt == "csv":
+        import csv
+        import io
+
+        buf = io.StringIO()
+        fieldnames = ["timestamp", "lat", "lng", "x", "y", "heading", "speed", "confidence"]
+        writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        for pt in trail:
+            writer.writerow({
+                "timestamp": pt.get("time", pt.get("timestamp", "")),
+                "lat": pt.get("lat", ""),
+                "lng": pt.get("lng", ""),
+                "x": pt.get("x", ""),
+                "y": pt.get("y", ""),
+                "heading": pt.get("heading", ""),
+                "speed": pt.get("speed", ""),
+                "confidence": pt.get("confidence", ""),
+            })
+
+        return Response(
+            content=buf.getvalue(),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename={safe_id}_history.csv",
+            },
+        )
+
+    elif fmt == "geojson":
+        import json
+
+        coordinates = []
+        timestamps = []
+        for pt in trail:
+            lat = pt.get("lat", 0.0) or 0.0
+            lng = pt.get("lng", 0.0) or 0.0
+            if lat == 0.0 and lng == 0.0:
+                lng = pt.get("x", 0.0)
+                lat = pt.get("y", 0.0)
+            coordinates.append([lng, lat])
+            timestamps.append(pt.get("time", pt.get("timestamp", "")))
+
+        geojson = {
+            "type": "Feature",
+            "geometry": {
+                "type": "LineString",
+                "coordinates": coordinates,
+            },
+            "properties": {
+                "target_id": target_id,
+                "name": target_dict.get("name", ""),
+                "alliance": target_dict.get("alliance", ""),
+                "type": target_dict.get("asset_type", target_dict.get("type", "")),
+                "point_count": len(trail),
+                "timestamps": timestamps,
+            },
+        }
+
+        return Response(
+            content=json.dumps(geojson, default=str),
+            media_type="application/geo+json",
+            headers={
+                "Content-Disposition": f"attachment; filename={safe_id}_history.geojson",
+            },
+        )
+
+    else:
+        import json
+
+        export = {
+            "target_id": target_id,
+            "target": target_dict,
+            "point_count": len(trail),
+            "trail": trail,
+        }
+
+        return Response(
+            content=json.dumps(export, default=str),
+            media_type="application/json",
+            headers={
+                "Content-Disposition": f"attachment; filename={safe_id}_history.json",
+            },
+        )
+
+
 @router.post("/sighting")
 async def report_sighting(request: Request):
     """Accept a sighting report from camera or robot."""

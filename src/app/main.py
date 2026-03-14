@@ -71,6 +71,7 @@ from app.routers.missions import router as missions_router
 from app.routers.api_docs import router as api_docs_router
 from app.routers.annotations import router as annotations_router
 from app.routers.watchlist import router as watchlist_router
+from app.routers.sitrep import router as sitrep_router
 
 
 # ---------------------------------------------------------------------------
@@ -917,6 +918,7 @@ app.include_router(missions_router)
 app.include_router(api_docs_router)
 app.include_router(annotations_router)
 app.include_router(watchlist_router)
+app.include_router(sitrep_router)
 
 # Static files
 frontend_path = Path(__file__).parent.parent / "frontend"
