@@ -233,12 +233,29 @@ class TemporalPlayback:
     def get_playback_status(self) -> dict:
         """Return current playback state."""
         with self._lock:
-            return {
-                "active": self._playback_active,
-                "time": self._playback_time,
-                "speed": self._playback_speed,
-                "range": self.get_time_range(),
-            }
+            active = self._playback_active
+            pb_time = self._playback_time
+            speed = self._playback_speed
+            if not self._snapshots:
+                time_range = {
+                    "start": 0.0,
+                    "end": 0.0,
+                    "duration_s": 0.0,
+                    "snapshot_count": 0,
+                }
+            else:
+                time_range = {
+                    "start": self._timestamps[0],
+                    "end": self._timestamps[-1],
+                    "duration_s": self._timestamps[-1] - self._timestamps[0],
+                    "snapshot_count": len(self._snapshots),
+                }
+        return {
+            "active": active,
+            "time": pb_time,
+            "speed": speed,
+            "range": time_range,
+        }
 
     # ------------------------------------------------------------------
     # Target trajectory extraction
