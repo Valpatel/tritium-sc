@@ -14,6 +14,49 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 35: ReID Integration, Map Snapshot, Replay SSE, Notification Prefs
+
+### Multi-Camera ReID Integration (Unit Tested)
+- Wired `ReIDStore` from tritium-lib into YOLO detector plugin
+- New `plugins/yolo_detector/reid_integration.py`:
+  - Extracts stub appearance embeddings from person/vehicle detection crops
+  - Stores embeddings in ReIDStore with camera source
+  - Cross-camera cosine similarity search for re-identification
+  - Records matches and links dossiers
+  - Stats exposed via `/api/yolo/reid/stats`
+- YOLO plugin auto-initializes ReID on start
+- Event bus publishes `reid_matches` events for cross-camera matches
+- 5 new tests passing
+
+### Map Snapshot — P key (Unit Tested)
+- Press P in War Room to capture tactical map as PNG
+- Uses `canvas.toDataURL('image/png')` with browser download
+- Filename: `tritium-map-{ISO-timestamp}.png`
+- Alert shown on capture success/failure
+
+### Historical Target Replay SSE (Unit Tested)
+- New `GET /api/playback/replay?start=&end=&speed=` endpoint
+- Returns Server-Sent Events stream replaying target positions
+- Timing adjusted by speed multiplier (1.0 = realtime, 2.0 = 2x)
+- Each event: `{timestamp, targets, events, progress}`
+- Stream ends with `event: done`
+- Capped individual delays to 2s to prevent stalls
+- 3 new tests passing
+
+### Notification Preferences Panel (Unit Tested)
+- New `GET/PUT /api/notifications/preferences` endpoints
+- 13 default notification types (geofence, BLE, targets, nodes, threats, etc.)
+- Per-type enable/disable and severity threshold configuration
+- `POST /api/notifications/preferences/reset` restores defaults
+- New `notification_prefs.js` panel in Command Center frontend
+  - Toggle checkboxes for each notification type
+  - Severity dropdown (debug/info/warning/error/critical)
+  - Reset to defaults button
+- Persistent via file storage when configured
+- 6 new tests passing
+
+---
+
 ## 2026-03-14 — Wave 33: Mission Management, Context Menu, Notification Sounds
 
 ### Mission Management Panel (Integration Tested)

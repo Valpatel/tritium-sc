@@ -24,6 +24,7 @@ import numpy as np
 from engine.plugins.base import PluginContext, PluginInterface
 
 from .detector import YOLODetector, FrameResult
+from .reid_integration import ReIDIntegration
 
 log = logging.getLogger("yolo-detector")
 
@@ -61,6 +62,9 @@ class YOLODetectorPlugin(PluginInterface):
 
         # Last result for API access
         self._last_result: Optional[FrameResult] = None
+
+        # ReID integration (created on start if ReIDStore available)
+        self._reid: Optional[ReIDIntegration] = None
 
     # -- PluginInterface identity ------------------------------------------
 
@@ -116,6 +120,16 @@ class YOLODetectorPlugin(PluginInterface):
         )
 
         self._running = True
+
+        # Initialize ReID integration if ReIDStore is available
+        try:
+            from tritium_lib.store import ReIDStore
+            reid_store = ReIDStore(":memory:")
+            self._reid = ReIDIntegration(reid_store)
+            self._logger.info("ReID integration enabled (in-memory store)")
+        except Exception as exc:
+            self._logger.debug("ReID integration not available: %s", exc)
+            self._reid = None
 
         # Subscribe to event bus for camera frame events
         if self._event_bus is not None:
@@ -176,7 +190,7 @@ class YOLODetectorPlugin(PluginInterface):
             raise RuntimeError("YOLO Detector plugin is not started")
         result = self._detector.detect(frame)
         self._last_result = result
-        self._publish_detections(result)
+        self._publish_detections(result, frame=frame)
         return result
 
     def submit_frame(self, frame: np.ndarray) -> None:
@@ -197,7 +211,10 @@ class YOLODetectorPlugin(PluginInterface):
         """Detection statistics."""
         if self._detector is None:
             return {"status": "not_started"}
-        return self._detector.stats.to_dict()
+        s = self._detector.stats.to_dict()
+        if self._reid is not None:
+            s["reid"] = self._reid.stats
+        return s
 
     @property
     def confidence_threshold(self) -> float:
@@ -245,19 +262,36 @@ class YOLODetectorPlugin(PluginInterface):
                 continue
 
             try:
+                source_camera = "default"
                 result = self._detector.detect(frame)
                 self._last_result = result
-                self._publish_detections(result)
+                self._publish_detections(result, frame=frame, source_camera=source_camera)
                 last_inference = time.monotonic()
             except Exception as exc:
                 self._logger.error("Detection error: %s", exc)
 
     # -- Internal ----------------------------------------------------------
 
-    def _publish_detections(self, result: FrameResult) -> None:
-        """Publish detection results to EventBus and TargetTracker."""
+    def _publish_detections(self, result: FrameResult, frame: Optional[np.ndarray] = None, source_camera: str = "default") -> None:
+        """Publish detection results to EventBus, TargetTracker, and ReID."""
         if not result.detections:
             return
+
+        # Run ReID on person/vehicle detections
+        if self._reid is not None and frame is not None:
+            try:
+                det_dicts = [d.to_dict() for d in result.detections]
+                reid_matches = self._reid.process_frame_detections(
+                    frame, det_dicts, source_camera,
+                )
+                if reid_matches and self._event_bus is not None:
+                    self._event_bus.publish("reid_matches", {
+                        "matches": reid_matches,
+                        "camera": source_camera,
+                        "timestamp": result.timestamp,
+                    })
+            except Exception as exc:
+                self._logger.debug("ReID processing error: %s", exc)
 
         # Publish to EventBus
         if self._event_bus is not None:

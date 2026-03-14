@@ -1752,6 +1752,11 @@ function warKeyHandler(e) {
                 warAddAlert('Minimap: ' + (fogState.minimapEnabled ? 'ON' : 'OFF'), 'info');
             }
             break;
+        case 'p':
+        case 'P':
+            // Capture tactical map as PNG screenshot
+            captureMapSnapshot();
+            break;
         case '1': case '2': case '3': case '4': case '5':
         case '6': case '7': case '8': case '9':
             // Control groups: Ctrl+digit saves, digit recalls
@@ -2787,6 +2792,32 @@ function _stopPipFeed() {
 }
 
 // ============================================================
+// Map snapshot (P key)
+// ============================================================
+
+function captureMapSnapshot() {
+    const canvas = warState.canvas;
+    if (!canvas) {
+        if (typeof warAddAlert === 'function') warAddAlert('No canvas to capture', 'warning');
+        return;
+    }
+    try {
+        const dataUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        link.download = `tritium-map-${ts}.png`;
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        warAddAlert('Map snapshot saved', 'info');
+    } catch (err) {
+        console.error('[WAR] Map snapshot failed:', err);
+        warAddAlert('Snapshot failed: ' + err.message, 'warning');
+    }
+}
+
+// ============================================================
 // Expose globally
 // ============================================================
 
@@ -2822,6 +2853,7 @@ window.updateUnitInfo = updateUnitInfo;
 // Address bar + mode selector
 window.warLoadAddress = warLoadAddress;
 window.warSetSimMode = warSetSimMode;
+window.captureMapSnapshot = captureMapSnapshot;
 window.warHandleModeChange = warHandleModeChange;
 // Audio + PIP controls
 window.warToggleMute = warToggleMute;

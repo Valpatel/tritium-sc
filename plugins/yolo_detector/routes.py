@@ -78,4 +78,11 @@ def create_router(plugin: YOLODetectorPlugin) -> APIRouter:
             return {"detections": [], "message": "No detections yet"}
         return result.to_dict()
 
+    @router.get("/reid/stats")
+    async def get_reid_stats():
+        """Get ReID cross-camera matching statistics."""
+        if plugin._reid is None:
+            return {"enabled": False, "message": "ReID integration not available"}
+        return {"enabled": True, **plugin._reid.stats}
+
     return router

@@ -16,11 +16,14 @@ Endpoints:
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import time
 from typing import Optional
 
 from fastapi import APIRouter, Query, Request
+from fastapi.responses import StreamingResponse
 
 logger = logging.getLogger(__name__)
 
@@ -169,3 +172,89 @@ async def get_trajectory(
         "trajectory": trajectory,
         "count": len(trajectory),
     }
+
+
+@router.get("/replay")
+async def replay_targets(
+    request: Request,
+    start: float = Query(..., description="Start timestamp (unix)"),
+    end: float = Query(..., description="End timestamp (unix)"),
+    speed: float = Query(1.0, description="Playback speed multiplier (1.0 = realtime)"),
+    max_count: int = Query(500, description="Max snapshots to replay"),
+):
+    """Replay historical target positions as a Server-Sent Events stream.
+
+    The stream emits one SSE event per snapshot, with timing adjusted by the
+    speed multiplier.  At speed=2.0, events are delivered at 2x real time.
+    The frontend subscribes and animates targets through their historical
+    positions on the tactical map.
+
+    Each SSE event data is a JSON object:
+        {
+            "timestamp": <float>,
+            "targets": [...],
+            "events": [...],
+            "progress": <float 0.0-1.0>
+        }
+
+    The stream ends with a "done" event.
+    """
+    playback = _get_playback(request)
+
+    speed = max(0.1, min(100.0, speed))
+
+    async def event_stream():
+        if playback is None:
+            yield f"data: {json.dumps({'error': 'Temporal playback not initialized'})}\n\n"
+            yield "event: done\ndata: {}\n\n"
+            return
+
+        snapshots = playback.get_snapshots_between(start, end, max_count=max_count)
+        if not snapshots:
+            yield f"data: {json.dumps({'error': 'No snapshots in range', 'start': start, 'end': end})}\n\n"
+            yield "event: done\ndata: {}\n\n"
+            return
+
+        total = len(snapshots)
+        prev_ts = None
+
+        for i, snap in enumerate(snapshots):
+            # Check if client disconnected
+            if await request.is_disconnected():
+                break
+
+            snap_ts = snap.get("timestamp", 0)
+
+            # Compute delay between snapshots based on speed
+            if prev_ts is not None and speed > 0:
+                real_delta = snap_ts - prev_ts
+                if real_delta > 0:
+                    wait = real_delta / speed
+                    # Cap individual wait to 2 seconds to prevent stalls
+                    wait = min(wait, 2.0)
+                    if wait > 0.01:
+                        await asyncio.sleep(wait)
+
+            prev_ts = snap_ts
+
+            payload = {
+                "timestamp": snap_ts,
+                "targets": snap.get("targets", []),
+                "events": snap.get("events", []),
+                "progress": round((i + 1) / total, 4),
+                "index": i,
+                "total": total,
+            }
+            yield f"data: {json.dumps(payload)}\n\n"
+
+        yield "event: done\ndata: {}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
