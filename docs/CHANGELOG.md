@@ -14,6 +14,33 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 62: Security Audit + Self-Test + Self-Preservation
+
+### Security Audit (Unit Tested — 42 tests)
+- Audited 5 newest plugin routers: acoustic, watchlist, geofence, heatmap, notifications
+- Input validation tests: malformed JSON, oversized payloads, missing required fields
+- Voice command injection tests: shell injection ("start demo && rm -rf /"), SQL injection, XSS
+- Amy chat security: XSS payloads, SQL injection in chat messages
+- Search endpoint security: path traversal in thumbnails, SQL injection in text search
+- Photo endpoint path traversal protection verified
+- All tests passing — no vulnerabilities found in tested surfaces
+
+### Self-Test Endpoint (Unit Tested — 7 tests)
+- New `/api/system/self-test` endpoint — runs quick health checks on 12 subsystems
+- Checks: EventBus, TargetTracker, TargetCorrelator, PluginManager, SimulationEngine,
+  MQTTBridge, DemoController, HeatmapEngine, GeofenceEngine, NotificationManager,
+  CoreImports, AmyCommander
+- Returns pass/fail per subsystem with elapsed_ms timing
+- Overall status: pass/degraded/fail based on failure count
+
+### Self-Preservation (Verified)
+- gb10-02 cron job set: auto-pull dev branch every 6 hours
+- Meshtastic radio discovered on gb10-02: T-LoRa Pager, firmware 2.7.19, /dev/ttyACM0
+  - 250 nodes in mesh, user added to dialout group
+  - Node ID: !ba33ff38, hwModel: T_LORA_PAGER
+
+---
+
 ## 2026-03-14 — Wave 59: Screenshot Sharing + Correlation Lines + Plugin Deps
 
 ### Screenshot Sharing (Code Reviewed)
