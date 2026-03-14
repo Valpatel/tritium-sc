@@ -14,6 +14,21 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 73: Spatial Intelligence + Indoor Mapping
+
+| Change | Verification |
+|--------|-------------|
+| Floor plan plugin — upload SVG/PNG, geo-reference to map, manage rooms/zones | Unit Tested (18 tests) |
+| Indoor target localizer — BLE trilateration + WiFi fingerprint -> room assignment | Unit Tested (10 tests) |
+| Building occupancy panel — per-room person/device counts with capacity alerts | Code Complete |
+| Floor plan management panel — upload, activate, view rooms, delete | Code Complete |
+| WiFi fingerprint collection + storage + matching API | Unit Tested |
+| Plugin loader for auto-discovery (floorplan_loader.py) | Code Complete |
+| API: POST/GET/PUT/DELETE /api/floorplans, rooms, positions, occupancy, fingerprints | Unit Tested |
+| EventBus integration — trilateration + BLE presence -> auto-localization | Code Complete |
+
+---
+
 ## 2026-03-14 — Wave 71: Edge-to-Cloud Intelligence Pipeline
 
 | Change | Verification |
