@@ -1,7 +1,7 @@
 # Created by Matthew Valancy
 # Copyright 2026 Valpatel Software LLC
 # Licensed under AGPL-3.0 — see LICENSE for details.
-"""Tests for TargetCorrelator — sensor fusion engine."""
+"""Tests for TargetCorrelator — multi-strategy identity resolution engine."""
 
 import time
 
@@ -13,6 +13,7 @@ from src.engine.tactical.correlator import (
     start_correlator,
     stop_correlator,
 )
+from src.engine.tactical.dossier import DossierStore, TargetDossier
 from src.engine.tactical.target_tracker import TargetTracker, TrackedTarget
 
 
@@ -214,12 +215,13 @@ class TestEdgeCases:
 
     @pytest.mark.unit
     def test_at_exact_radius_boundary(self):
-        """Targets at exactly the radius distance should still correlate."""
+        """Targets at exactly the radius distance should still correlate with low threshold."""
         ble = _ble_target(pos=(0.0, 0.0))
         yolo = _yolo_target(pos=(5.0, 0.0))  # exactly 5 units away
         tracker = _make_tracker_with(ble, yolo)
 
-        correlator = TargetCorrelator(tracker, radius=5.0)
+        # At the boundary, spatial score is low but signal pattern helps
+        correlator = TargetCorrelator(tracker, radius=5.0, confidence_threshold=0.15)
         records = correlator.correlate()
 
         assert len(records) == 1
@@ -290,3 +292,124 @@ class TestLifecycle:
         thread2 = correlator._thread
         assert thread1 is thread2
         correlator.stop()
+
+
+class TestMultiStrategy:
+    """Tests for the multi-strategy scoring system."""
+
+    @pytest.mark.unit
+    def test_strategy_scores_in_record(self):
+        """Correlation records should contain strategy scores."""
+        ble = _ble_target(pos=(5.0, 5.0))
+        yolo = _yolo_target(pos=(5.5, 5.5))
+        tracker = _make_tracker_with(ble, yolo)
+
+        correlator = TargetCorrelator(tracker, radius=5.0)
+        records = correlator.correlate()
+
+        assert len(records) == 1
+        rec = records[0]
+        assert len(rec.strategy_scores) > 0
+        strategy_names = [s.strategy_name for s in rec.strategy_scores]
+        assert "spatial" in strategy_names
+
+    @pytest.mark.unit
+    def test_dossier_created_on_correlation(self):
+        """A dossier should be created when targets are correlated."""
+        ble = _ble_target(pos=(5.0, 5.0))
+        yolo = _yolo_target(pos=(5.5, 5.5))
+        tracker = _make_tracker_with(ble, yolo)
+
+        dossier_store = DossierStore()
+        correlator = TargetCorrelator(
+            tracker, radius=5.0, dossier_store=dossier_store
+        )
+        records = correlator.correlate()
+
+        assert len(records) == 1
+        assert records[0].dossier_uuid != ""
+        assert dossier_store.count == 1
+
+        dossier = dossier_store.find_by_signal(ble.target_id)
+        assert dossier is not None
+        assert dossier.has_signal(yolo.target_id)
+
+    @pytest.mark.unit
+    def test_dossier_reused_on_re_correlation(self):
+        """Repeated correlations update existing dossier, not create new."""
+        dossier_store = DossierStore()
+
+        # First pass
+        ble = _ble_target(pos=(5.0, 5.0))
+        yolo = _yolo_target(pos=(5.5, 5.5))
+        tracker = _make_tracker_with(ble, yolo)
+        correlator = TargetCorrelator(
+            tracker, radius=5.0, dossier_store=dossier_store
+        )
+        records1 = correlator.correlate()
+        uuid1 = records1[0].dossier_uuid
+
+        # Second pass with same IDs
+        ble2 = _ble_target(pos=(6.0, 6.0))
+        yolo2 = _yolo_target(pos=(6.2, 6.2))
+        tracker2 = _make_tracker_with(ble2, yolo2)
+        correlator2 = TargetCorrelator(
+            tracker2, radius=5.0, dossier_store=dossier_store
+        )
+        records2 = correlator2.correlate()
+
+        assert len(records2) == 1
+        assert records2[0].dossier_uuid == uuid1
+        assert dossier_store.count == 1
+
+        dossier = dossier_store.find_by_uuid(uuid1)
+        assert dossier is not None
+        assert dossier.correlation_count == 2
+
+    @pytest.mark.unit
+    def test_confidence_threshold(self):
+        """Pairs below confidence threshold are not correlated."""
+        ble = _ble_target(pos=(0.0, 0.0))
+        yolo = _yolo_target(pos=(4.99, 0.0))  # near the edge
+        tracker = _make_tracker_with(ble, yolo)
+
+        # Very high threshold — nothing should pass
+        correlator = TargetCorrelator(
+            tracker, radius=5.0, confidence_threshold=0.99
+        )
+        records = correlator.correlate()
+        assert len(records) == 0
+
+    @pytest.mark.unit
+    def test_custom_weights(self):
+        """Custom weights change correlation scoring."""
+        ble = _ble_target(pos=(5.0, 5.0))
+        yolo = _yolo_target(pos=(5.5, 5.5))
+        tracker = _make_tracker_with(ble, yolo)
+
+        # Weight spatial at 100%, everything else 0
+        weights = {
+            "spatial": 1.0,
+            "temporal": 0.0,
+            "signal_pattern": 0.0,
+            "dossier": 0.0,
+        }
+        correlator = TargetCorrelator(tracker, radius=5.0, weights=weights)
+        records = correlator.correlate()
+
+        assert len(records) == 1
+        # The confidence should be purely spatial
+        rec = records[0]
+        spatial_score = next(
+            s for s in rec.strategy_scores if s.strategy_name == "spatial"
+        )
+        # With 100% spatial weight, confidence should equal spatial score
+        assert abs(rec.confidence - spatial_score.score) < 0.01
+
+    @pytest.mark.unit
+    def test_correlator_has_default_dossier_store(self):
+        """Correlator creates its own DossierStore if none provided."""
+        tracker = TargetTracker()
+        correlator = TargetCorrelator(tracker)
+        assert correlator.dossier_store is not None
+        assert isinstance(correlator.dossier_store, DossierStore)

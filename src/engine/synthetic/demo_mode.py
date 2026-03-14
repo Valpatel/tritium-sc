@@ -5,7 +5,8 @@
 
 Activates synthetic BLE, Meshtastic, and camera generators that publish
 events through the real EventBus, proving end-to-end data flow without
-any hardware.
+any hardware.  Includes a FusionScenario that generates correlated
+multi-sensor targets to demonstrate Tritium's core fusion capability.
 
 Usage::
 
@@ -29,9 +30,11 @@ from engine.synthetic.data_generators import (
     CameraDetectionGenerator,
     MeshtasticNodeGenerator,
 )
+from engine.synthetic.fusion_scenario import FusionScenario
 
 if TYPE_CHECKING:
     from engine.comms.event_bus import EventBus
+    from engine.tactical.geofence import GeofenceEngine
     from engine.tactical.target_tracker import TargetTracker
 
 logger = logging.getLogger("synthetic.demo_mode")
@@ -50,18 +53,22 @@ class DemoController:
 
     Creates BLE, Meshtastic, and camera generators and wires them
     to the EventBus so data flows through the real pipeline.
+    Also runs a FusionScenario that produces correlated multi-sensor
+    targets for correlator fusion demonstration.
     """
 
     def __init__(
         self,
         event_bus: EventBus,
         target_tracker: TargetTracker | None = None,
+        geofence_engine: GeofenceEngine | None = None,
         ble_device_count: int = 5,
         mesh_node_count: int = 3,
         camera_count: int = 2,
     ) -> None:
         self._event_bus = event_bus
         self._target_tracker = target_tracker
+        self._geofence_engine = geofence_engine
         self._ble_device_count = ble_device_count
         self._mesh_node_count = mesh_node_count
         self._camera_count = camera_count
@@ -72,6 +79,7 @@ class DemoController:
         self._ble_gen: BLEScanGenerator | None = None
         self._mesh_gen: MeshtasticNodeGenerator | None = None
         self._camera_gens: list[CameraDetectionGenerator] = []
+        self._fusion: FusionScenario | None = None
 
     @property
     def active(self) -> bool:
@@ -112,15 +120,26 @@ class DemoController:
             cam.start(self._event_bus)
             self._camera_gens.append(cam)
 
+        # Fusion scenario — correlated multi-sensor targets
+        self._fusion = FusionScenario(
+            event_bus=self._event_bus,
+            target_tracker=self._target_tracker,
+            geofence_engine=self._geofence_engine,
+            interval=2.0,
+        )
+        self._fusion.start()
+
         self._active = True
         self._event_bus.publish("demo:started", {
             "ble_devices": self._ble_device_count,
             "mesh_nodes": self._mesh_node_count,
             "cameras": self._camera_count,
+            "fusion_scenario": True,
         })
         logger.info(
             f"Demo mode active: {self._ble_device_count} BLE devices, "
-            f"{self._mesh_node_count} mesh nodes, {self._camera_count} cameras"
+            f"{self._mesh_node_count} mesh nodes, {self._camera_count} cameras, "
+            f"fusion scenario running"
         )
 
     def stop(self) -> None:
@@ -143,9 +162,25 @@ class DemoController:
             cam.stop()
         self._camera_gens = []
 
+        if self._fusion is not None:
+            self._fusion.stop()
+            self._fusion = None
+
         self._active = False
         self._event_bus.publish("demo:stopped", {})
         logger.info("Demo mode stopped")
+
+    def get_scenario_info(self) -> dict:
+        """Return fusion scenario description and live dossier state."""
+        if self._fusion is not None:
+            return self._fusion.get_scenario_info()
+        # Return static description even when not running
+        from engine.synthetic.fusion_scenario import SCENARIO_DESCRIPTION
+        info = dict(SCENARIO_DESCRIPTION)
+        info["running"] = False
+        info["tick_count"] = 0
+        info["dossiers"] = []
+        return info
 
     def status(self) -> dict:
         """Return current demo mode status."""
@@ -173,12 +208,22 @@ class DemoController:
 
         for i, cam in enumerate(self._camera_gens):
             generators.append({
-                "name": f"CameraDetectionGenerator",
+                "name": "CameraDetectionGenerator",
                 "camera_id": f"demo-cam-{i + 1:02d}",
                 "running": cam.running,
                 "config": {
                     "max_objects": 4,
                     "interval": 1.0,
+                },
+            })
+
+        if self._fusion is not None:
+            generators.append({
+                "name": "FusionScenario",
+                "running": self._fusion.running,
+                "config": {
+                    "actors": 3,
+                    "interval": 2.0,
                 },
             })
 

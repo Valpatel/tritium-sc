@@ -4,9 +4,10 @@
 """Demo mode API router — start/stop/status for synthetic data pipeline.
 
 Endpoints:
-  POST /api/demo/start  — activate demo mode
-  POST /api/demo/stop   — deactivate demo mode
-  GET  /api/demo/status  — current state and generator stats
+  POST /api/demo/start     — activate demo mode
+  POST /api/demo/stop      — deactivate demo mode
+  GET  /api/demo/status    — current state and generator stats
+  GET  /api/demo/scenario  — fusion scenario description + live dossiers
 """
 
 from __future__ import annotations
@@ -86,3 +87,22 @@ async def demo_status(request: Request):
             "generator_count": 0,
         }
     return controller.status()
+
+
+@router.get("/scenario")
+async def demo_scenario(request: Request):
+    """GET /api/demo/scenario — fusion scenario description + live dossiers.
+
+    Returns the scenario description (actors, capabilities, geofence zone)
+    along with the current dossier state if the demo is running.
+    """
+    controller = getattr(request.app.state, "demo_controller", None)
+    if controller is None:
+        # Return static description even without a controller
+        from engine.synthetic.fusion_scenario import SCENARIO_DESCRIPTION
+        info = dict(SCENARIO_DESCRIPTION)
+        info["running"] = False
+        info["tick_count"] = 0
+        info["dossiers"] = []
+        return info
+    return controller.get_scenario_info()
