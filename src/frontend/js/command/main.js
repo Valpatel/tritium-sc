@@ -45,6 +45,7 @@ import { FleetDashboardPanelDef } from './panels/fleet-dashboard.js';
 import { GeofencePanelDef } from './panels/geofence.js';
 import { TargetSearchPanelDef } from './panels/target-search.js';
 import { DossiersPanelDef } from './panels/dossiers.js';
+import { GraphExplorerPanelDef } from './panels/graph-explorer.js';
 import { MissionModal, initMissionModal } from './mission-modal.js';
 
 // Make available on window for console debugging
@@ -465,6 +466,7 @@ function initPanelSystem(container) {
     panelManager.register(GeofencePanelDef);
     panelManager.register(TargetSearchPanelDef);
     panelManager.register(DossiersPanelDef);
+    panelManager.register(GraphExplorerPanelDef);
 
     // panel:request-open — allows map click to open panels by id
     EventBus.on('panel:request-open', (data) => {
