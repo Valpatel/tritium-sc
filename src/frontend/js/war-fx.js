@@ -139,36 +139,65 @@ function _updateTrailColor(tid, alliance) {
 // ============================================================
 
 function warFxDrawVisionCones(ctx, worldToScreen, targets, zoom) {
+    // Color map per sensor type
+    var CONE_COLORS = {
+        turret:  { inner: 'rgba(5, 255, 161, 0.15)',  outer: 'rgba(5, 255, 161, 0.0)' },
+        camera:  { inner: 'rgba(5, 255, 161, 0.12)',  outer: 'rgba(5, 255, 161, 0.0)' },
+        sensor:  { inner: 'rgba(0, 160, 255, 0.12)',  outer: 'rgba(0, 160, 255, 0.0)' },
+        ble:     { inner: 'rgba(0, 240, 255, 0.08)',  outer: 'rgba(0, 240, 255, 0.0)' },
+        mesh:    { inner: 'rgba(252, 238, 10, 0.08)', outer: 'rgba(252, 238, 10, 0.0)' },
+    };
+    // Default range per sensor type (game units)
+    var DEFAULT_RANGE = { turret: 15, camera: 12, sensor: 10, ble: 5, mesh: 18 };
+
     for (var tid in targets) {
         if (!targets.hasOwnProperty(tid)) continue;
         var t = targets[tid];
         var type = (t.asset_type || '').toLowerCase();
-        if (!type.includes('turret') && !type.includes('camera') && !type.includes('sensor')) continue;
+        var sensorType = null;
+        if (type.includes('turret')) sensorType = 'turret';
+        else if (type.includes('camera')) sensorType = 'camera';
+        else if (type.includes('sensor')) sensorType = 'sensor';
+        else if (type === 'ble_device' || type === 'ble') sensorType = 'ble';
+        else if (type === 'mesh_radio' || type === 'meshtastic') sensorType = 'mesh';
+        if (!sensorType) continue;
         if ((t.alliance || '').toLowerCase() !== 'friendly') continue;
 
         var pos = { x: t.x !== undefined ? t.x : (t.position ? t.position.x : 0),
                     y: t.y !== undefined ? t.y : (t.position ? t.position.y : 0) };
         var sp = worldToScreen(pos.x, pos.y);
         var heading = t.heading || 0;
-        // *12 converts game units to approximate screen pixels at base zoom
-        var range = (t.weapon_range || t.fov_range || 15) * zoom * 12;
-        var fov = (t.fov_angle || 60) * Math.PI / 180;
+        var rangeVal = t.weapon_range || t.fov_range || DEFAULT_RANGE[sensorType] || 15;
+        var range = rangeVal * zoom * 12;
+        var fov = (t.fov_angle || (sensorType === 'ble' || sensorType === 'mesh' ? 360 : 60)) * Math.PI / 180;
         var rad = (90 - heading) * Math.PI / 180;
+        var colors = CONE_COLORS[sensorType] || CONE_COLORS.sensor;
 
         ctx.save();
         ctx.translate(sp.x, sp.y);
-        ctx.rotate(-rad);
 
-        var gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, range);
-        gradient.addColorStop(0, 'rgba(5, 255, 161, 0.15)');
-        gradient.addColorStop(1, 'rgba(5, 255, 161, 0.0)');
-
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.arc(0, 0, range, -fov / 2, fov / 2);
-        ctx.closePath();
-        ctx.fill();
+        if (fov >= Math.PI * 1.99) {
+            // Omnidirectional: draw circle
+            var circGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, range);
+            circGrad.addColorStop(0, colors.inner);
+            circGrad.addColorStop(1, colors.outer);
+            ctx.fillStyle = circGrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, range, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            // Directional cone
+            ctx.rotate(-rad);
+            var gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, range);
+            gradient.addColorStop(0, colors.inner);
+            gradient.addColorStop(1, colors.outer);
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.arc(0, 0, range, -fov / 2, fov / 2);
+            ctx.closePath();
+            ctx.fill();
+        }
         ctx.restore();
     }
 }

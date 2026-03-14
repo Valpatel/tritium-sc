@@ -588,6 +588,15 @@ function _draw() {
     if (typeof warFxUpdateTrails === 'function') warFxUpdateTrails(targetsObj, _state.dt);
     if (typeof warFxDrawTrails === 'function') warFxDrawTrails(ctx, worldToScreen);
 
+    // Layer 7.8: RF motion indicators (pulsing circles at motion locations)
+    _drawRfMotion(ctx);
+
+    // Layer 7.9: Geofence drawing overlay (vertices + lines while drawing)
+    _drawGeofenceOverlay(ctx);
+
+    // Layer 7.95: Patrol waypoint drawing overlay
+    _drawPatrolOverlay(ctx);
+
     // Layer 8: Selection indicator
     _drawSelectionIndicator(ctx);
 
@@ -944,6 +953,176 @@ function _drawZones(ctx) {
             ctx.fillText(name.toUpperCase(), sp.x, sp.y + sr + 14);
         }
     }
+}
+
+// ============================================================
+// Layer 7.8: RF Motion Indicators
+// ============================================================
+
+function _drawRfMotion(ctx) {
+    const pairs = _state.rfMotionPairs;
+    if (!pairs || pairs.length === 0) return;
+
+    const now = Date.now();
+
+    for (const p of pairs) {
+        const pos = p.midpoint || p.estimated_position;
+        if (!pos) continue;
+        const px = pos.x !== undefined ? pos.x : 0;
+        const py = pos.y !== undefined ? pos.y : 0;
+        const sp = worldToScreen(px, py);
+        const confidence = p.confidence || 0.5;
+
+        // Pulsing ring animation
+        const pulse = 0.5 + 0.5 * Math.sin(now / 300);
+        const baseRadius = 8 + confidence * 12;
+        const radius = (baseRadius + pulse * 6) * Math.min(_state.cam.zoom, 3);
+
+        // Outer pulse ring
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 42, 109, ${0.3 + pulse * 0.3})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Inner fill
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, radius * 0.5, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 42, 109, ${0.15 + confidence * 0.2})`;
+        ctx.fill();
+
+        // Direction arrow
+        const dir = p.direction_hint || 'unknown';
+        if (dir !== 'unknown') {
+            ctx.fillStyle = 'rgba(255, 42, 109, 0.8)';
+            ctx.font = `bold ${Math.max(10, 12 * Math.min(_state.cam.zoom, 2))}px ${FONT_FAMILY}`;
+            ctx.textAlign = 'center';
+            const arrow = dir === 'approaching' ? '>' : dir === 'departing' ? '<' : 'X';
+            ctx.fillText(arrow, sp.x, sp.y + 4);
+        }
+
+        // Label
+        if (_state.cam.zoom > 0.3) {
+            ctx.fillStyle = 'rgba(255, 42, 109, 0.7)';
+            ctx.font = `${Math.max(7, 9 * Math.min(_state.cam.zoom, 2))}px ${FONT_FAMILY}`;
+            ctx.textAlign = 'center';
+            ctx.fillText('RF MOTION', sp.x, sp.y + radius + 10);
+        }
+    }
+}
+
+// ============================================================
+// Layer 7.9: Geofence Drawing Overlay
+// ============================================================
+
+function _drawGeofenceOverlay(ctx) {
+    if (!_state.geofenceDrawing || _state.geofenceVertices.length === 0) return;
+
+    const verts = _state.geofenceVertices;
+
+    // Draw lines connecting vertices
+    ctx.beginPath();
+    for (let i = 0; i < verts.length; i++) {
+        const sp = worldToScreen(verts[i][0], verts[i][1]);
+        if (i === 0) ctx.moveTo(sp.x, sp.y);
+        else ctx.lineTo(sp.x, sp.y);
+    }
+    // Close polygon preview (dashed line back to first)
+    if (verts.length >= 3) {
+        const first = worldToScreen(verts[0][0], verts[0][1]);
+        ctx.lineTo(first.x, first.y);
+    }
+    ctx.strokeStyle = '#00f0ff';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Fill preview
+    if (verts.length >= 3) {
+        ctx.beginPath();
+        for (let i = 0; i < verts.length; i++) {
+            const sp = worldToScreen(verts[i][0], verts[i][1]);
+            if (i === 0) ctx.moveTo(sp.x, sp.y);
+            else ctx.lineTo(sp.x, sp.y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(0, 240, 255, 0.1)';
+        ctx.fill();
+    }
+
+    // Draw vertex dots
+    for (let i = 0; i < verts.length; i++) {
+        const sp = worldToScreen(verts[i][0], verts[i][1]);
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = i === 0 ? '#05ffa1' : '#00f0ff';
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+
+    // HUD instruction text
+    ctx.fillStyle = 'rgba(0, 240, 255, 0.8)';
+    ctx.font = `12px ${FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    const cssW = _state.canvas.width / _state.dpr;
+    ctx.fillText(`DRAWING ZONE: ${verts.length} vertices — Enter to finish, Escape to cancel`, cssW / 2, 30);
+}
+
+// ============================================================
+// Layer 7.95: Patrol Waypoint Drawing Overlay
+// ============================================================
+
+function _drawPatrolOverlay(ctx) {
+    if (!_state.patrolDrawing || _state.patrolWaypoints.length === 0) return;
+
+    const wps = _state.patrolWaypoints;
+
+    // Draw lines connecting waypoints
+    ctx.beginPath();
+    for (let i = 0; i < wps.length; i++) {
+        const sp = worldToScreen(wps[i].x, wps[i].y);
+        if (i === 0) ctx.moveTo(sp.x, sp.y);
+        else ctx.lineTo(sp.x, sp.y);
+    }
+    ctx.strokeStyle = '#05ffa1';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw waypoint markers
+    for (let i = 0; i < wps.length; i++) {
+        const sp = worldToScreen(wps[i].x, wps[i].y);
+
+        // Diamond marker
+        ctx.beginPath();
+        ctx.moveTo(sp.x, sp.y - 6);
+        ctx.lineTo(sp.x + 6, sp.y);
+        ctx.lineTo(sp.x, sp.y + 6);
+        ctx.lineTo(sp.x - 6, sp.y);
+        ctx.closePath();
+        ctx.fillStyle = '#05ffa1';
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Waypoint number
+        ctx.fillStyle = '#0a0a0f';
+        ctx.font = `bold 8px ${FONT_FAMILY}`;
+        ctx.textAlign = 'center';
+        ctx.fillText(String(i + 1), sp.x, sp.y + 3);
+    }
+
+    // HUD instruction text
+    ctx.fillStyle = 'rgba(5, 255, 161, 0.8)';
+    ctx.font = `12px ${FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    const cssW = _state.canvas.width / _state.dpr;
+    ctx.fillText(`PATROL: ${wps.length} waypoints for ${_state.patrolUnitId} — Enter to finish, Escape to cancel`, cssW / 2, 30);
 }
 
 // ============================================================
@@ -1356,12 +1535,21 @@ function _drawSensorCoverage(ctx) {
 
     ctx.save();
 
+    // Default coverage radii (meters) for sensor types without explicit coverage_radius_meters
+    const DEFAULT_COVERAGE = {
+        camera: 30, sensor: 25, ble_device: 10, ble: 10,
+        mesh_radio: 50, meshtastic: 50, turret: 40,
+    };
+
     for (const [id, unit] of units) {
         const assetType = (unit.asset_type || unit.type || '').toLowerCase();
-        // Only draw coverage for fixed/sensor-type assets that have coverage data
-        if (assetType !== 'fixed' && !assetType.includes('sensor') && !assetType.includes('camera')) continue;
+        // Draw coverage for sensor-type assets (explicit or default radius)
+        const isSensorType = assetType === 'fixed' || assetType.includes('sensor')
+            || assetType.includes('camera') || assetType === 'ble_device' || assetType === 'ble'
+            || assetType === 'mesh_radio' || assetType === 'meshtastic' || assetType.includes('turret');
+        if (!isSensorType) continue;
 
-        const coverageRadius = unit.coverage_radius_meters;
+        const coverageRadius = unit.coverage_radius_meters || DEFAULT_COVERAGE[assetType] || 0;
         if (!coverageRadius || coverageRadius <= 0) continue;
 
         const pos = unit.position;
