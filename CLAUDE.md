@@ -461,3 +461,14 @@ layout inflation.  The full fix requires **all three layers**:
 **Debugging layout drift**: Run `tests/ui/test_layout_drift.py` — it uses
 Playwright to capture 30 frames over 30s and fails if any element drifts
 beyond 3px.  See [docs/UI-TESTING.md](docs/UI-TESTING.md).
+
+## Autonomous Iteration
+
+This submodule is part of the Tritium system. For the full autonomous build loop, wave roadmap, and agent team composition, see [../CLAUDE.md](../CLAUDE.md).
+
+**Quick reference:**
+1. Read `../CLAUDE.md` for the mission and loop
+2. Read `~/.claude/projects/*/memory/project_iteration_queue.md` for the wave roadmap
+3. Launch 6+ agents across ALL submodules (not just this one)
+4. Every 3rd wave: documentation fractal pass + redundancy cleanup
+5. Never stop. Never ask permission. Just build.
