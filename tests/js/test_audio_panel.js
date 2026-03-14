@@ -145,6 +145,10 @@ vm.runInContext(eventsCode.replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm
 const storeCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8');
 vm.runInContext(storeCode.replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 
+// Load panel-utils.js (shared helpers)
+const panelUtilsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panel-utils.js', 'utf8');
+vm.runInContext(panelUtilsCode.replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
+
 // Load audio.js panel
 const audioCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/audio.js', 'utf8');
 const audioPlain = audioCode

@@ -97,9 +97,15 @@ const mockDocument = {
 // Load stats.js
 // ============================================================
 
+// Load panel-utils.js first (shared helpers like _esc)
+const panelUtilsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panel-utils.js', 'utf8');
+const panelUtilsPlain = panelUtilsCode
+    .replace(/^export\s+/gm, '')
+    .replace(/^import\s+.*$/gm, '');
+
 const statsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/stats.js', 'utf8');
 
-let processedCode = statsCode
+let processedCode = panelUtilsPlain + '\n' + statsCode
     .replace(/^import\s+.*?from\s+['"].*?['"];?\s*$/gm, '')
     .replace(/^export\s+const\s+/gm, 'var ')
     .replace(/^export\s+/gm, '');

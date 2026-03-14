@@ -7,13 +7,7 @@
 // Controls: layer selector, time window slider, opacity slider, auto-refresh.
 
 import { EventBus } from '../events.js';
-
-function _esc(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = String(text);
-    return div.innerHTML;
-}
+import { _esc } from '../panel-utils.js';
 
 // Time window presets (minutes)
 const TIME_WINDOWS = [

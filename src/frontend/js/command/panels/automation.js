@@ -6,13 +6,7 @@
 // Supports triggers, conditions (9 operators), and actions (6 types).
 
 import { EventBus } from '../events.js';
-
-function _esc(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = String(text);
-    return div.innerHTML;
-}
+import { _esc } from '../panel-utils.js';
 
 const TRIGGER_EXAMPLES = [
     'ble:new_device', 'ble:suspicious_device', 'ble:*',

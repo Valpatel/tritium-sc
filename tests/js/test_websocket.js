@@ -243,7 +243,7 @@ console.log('\n--- Connection Establishment ---');
     fireNextTimer();
     // Open the new socket
     createdSockets[1]._simulateOpen();
-    assertEqual(ws._reconnectDelay, 2000, 'onopen resets reconnect delay to 2000');
+    assertEqual(ws._reconnectDelay, 1000, 'onopen resets reconnect delay to 1000');
 })();
 
 (function testConnectedPropertyReflectsState() {
@@ -297,7 +297,7 @@ console.log('\n--- Auto-Reconnect with Exponential Backoff ---');
     ws.connect();
     createdSockets[0]._simulateClose();
     const delay = getNextTimerDelay();
-    assertEqual(delay, 2000, 'First reconnect delay is 2000ms');
+    assertEqual(delay, 1000, 'First reconnect delay is 1000ms');
 })();
 
 (function testReconnectDelayGrowsExponentially() {
@@ -308,21 +308,21 @@ console.log('\n--- Auto-Reconnect with Exponential Backoff ---');
     ws.connect();
     createdSockets[0]._simulateClose();
     const delay1 = getNextTimerDelay();
-    assertEqual(delay1, 2000, 'First reconnect delay is 2000ms');
+    assertEqual(delay1, 1000, 'First reconnect delay is 1000ms');
 
     // Fire timer to trigger reconnect attempt
     fireNextTimer();
-    // After fire, delay should have grown: 2000 * 1.5 = 3000
+    // After fire, delay should have grown: 1000 * 2 = 2000
     // Now the second socket closes
     createdSockets[1]._simulateClose();
     const delay2 = getNextTimerDelay();
-    assertEqual(delay2, 3000, 'Second reconnect delay is 3000ms (2000 * 1.5)');
+    assertEqual(delay2, 2000, 'Second reconnect delay is 2000ms (1000 * 2)');
 
     // Third close
     fireNextTimer();
     createdSockets[2]._simulateClose();
     const delay3 = getNextTimerDelay();
-    assertEqual(delay3, 4500, 'Third reconnect delay is 4500ms (3000 * 1.5)');
+    assertEqual(delay3, 4000, 'Third reconnect delay is 4000ms (2000 * 2)');
 })();
 
 (function testReconnectDelayCapsAtMax() {
@@ -331,13 +331,13 @@ console.log('\n--- Auto-Reconnect with Exponential Backoff ---');
     ws.connect();
 
     // Force delay very high
-    ws._reconnectDelay = 25000;
+    ws._reconnectDelay = 12000;
     createdSockets[0]._simulateClose();
     fireNextTimer();
-    // After firing, delay = min(25000 * 1.5, 30000) = 30000
+    // After firing, delay = min(12000 * 2, 16000) = 16000
     createdSockets[1]._simulateClose();
     const delay = getNextTimerDelay();
-    assert(delay <= 30000, 'Reconnect delay capped at 30000ms (got ' + delay + ')');
+    assert(delay <= 16000, 'Reconnect delay capped at 16000ms (got ' + delay + ')');
 })();
 
 (function testReconnectActuallyCreatesNewSocket() {
@@ -356,13 +356,13 @@ console.log('\n--- Auto-Reconnect with Exponential Backoff ---');
     ws.connect();
 
     // Grow the delay
-    ws._reconnectDelay = 15000;
+    ws._reconnectDelay = 8000;
     createdSockets[0]._simulateClose();
     fireNextTimer();
 
     // Simulate successful connection on the new socket
     createdSockets[1]._simulateOpen();
-    assertEqual(ws._reconnectDelay, 2000, 'Successful reconnect resets delay to 2000');
+    assertEqual(ws._reconnectDelay, 1000, 'Successful reconnect resets delay to 1000');
 })();
 
 // ============================================================
@@ -1369,8 +1369,8 @@ console.log('\n--- Edge Cases ---');
     const ws = vm.runInContext('new WebSocketManager()', ctx);
     assertEqual(ws._ws, null, 'Initial _ws is null');
     assertEqual(ws._reconnectTimer, null, 'Initial _reconnectTimer is null');
-    assertEqual(ws._reconnectDelay, 2000, 'Initial _reconnectDelay is 2000');
-    assertEqual(ws._maxDelay, 30000, 'Initial _maxDelay is 30000');
+    assertEqual(ws._reconnectDelay, 1000, 'Initial _reconnectDelay is 1000');
+    assertEqual(ws._maxDelay, 16000, 'Initial _maxDelay is 16000');
 })();
 
 (function testWarHudGlobalCallbacksSafelyAbsent() {

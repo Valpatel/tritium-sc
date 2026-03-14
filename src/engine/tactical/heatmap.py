@@ -184,6 +184,101 @@ class HeatmapEngine:
             "event_count": len(events),
         }
 
+    def get_timeline(
+        self,
+        start: float,
+        end: float,
+        buckets: int = 48,
+        resolution: int = 30,
+        layer: str = "all",
+    ) -> dict:
+        """Build time-bucketed heatmap frames for timeline playback.
+
+        Args:
+            start:      Start timestamp (unix seconds).
+            end:        End timestamp (unix seconds).
+            buckets:    Number of time buckets to divide the range into.
+            resolution: Grid resolution (NxN) for each frame.
+            layer:      ``"all"`` or one of VALID_LAYERS.
+
+        Returns:
+            Dict with keys:
+                ``frames``     — list of heatmap dicts (one per bucket).
+                ``global_max`` — peak intensity across all frames.
+        """
+        if buckets < 1:
+            buckets = 1
+        bucket_size = (end - start) / buckets
+        all_events = self._collect_events(layer, start)
+
+        # Filter to only events within [start, end]
+        all_events = [e for e in all_events if e.timestamp <= end]
+
+        frames = []
+        global_max = 0.0
+
+        for i in range(buckets):
+            bucket_start = start + i * bucket_size
+            bucket_end = bucket_start + bucket_size
+            bucket_events = [
+                e for e in all_events
+                if bucket_start <= e.timestamp < bucket_end
+            ]
+
+            if not bucket_events:
+                frames.append({
+                    "timestamp": bucket_start,
+                    "grid": [[0.0] * resolution for _ in range(resolution)],
+                    "resolution": resolution,
+                    "max_value": 0.0,
+                    "event_count": 0,
+                })
+                continue
+
+            # Determine spatial bounds from ALL events (consistent across frames)
+            xs = [e.x for e in all_events] if all_events else [0]
+            ys = [e.y for e in all_events] if all_events else [0]
+            min_x, max_x = min(xs), max(xs)
+            min_y, max_y = min(ys), max(ys)
+            if max_x - min_x < 1.0:
+                min_x -= 0.5
+                max_x += 0.5
+            if max_y - min_y < 1.0:
+                min_y -= 0.5
+                max_y += 0.5
+
+            grid: list[list[float]] = [
+                [0.0] * resolution for _ in range(resolution)
+            ]
+            range_x = max_x - min_x
+            range_y = max_y - min_y
+
+            for evt in bucket_events:
+                col = int((evt.x - min_x) / range_x * (resolution - 1))
+                row = int((evt.y - min_y) / range_y * (resolution - 1))
+                col = max(0, min(resolution - 1, col))
+                row = max(0, min(resolution - 1, row))
+                grid[row][col] += evt.weight
+
+            max_value = max(
+                (grid[r][c] for r in range(resolution) for c in range(resolution)),
+                default=0.0,
+            )
+            global_max = max(global_max, max_value)
+
+            frames.append({
+                "timestamp": bucket_start,
+                "grid": grid,
+                "resolution": resolution,
+                "max_value": max_value,
+                "event_count": len(bucket_events),
+            })
+
+        return {
+            "frames": frames,
+            "global_max": global_max,
+        }
+
     # ------------------------------------------------------------------
     # Maintenance
     # ------------------------------------------------------------------

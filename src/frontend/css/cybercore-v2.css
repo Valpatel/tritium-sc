@@ -693,6 +693,38 @@
     background: rgba(8, 145, 178, 0.4);
 }
 
+/* Notification bell button in header */
+.notif-bell-btn {
+    position: relative;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 6px;
+    line-height: 1;
+    font-size: 1rem;
+    filter: grayscale(1) brightness(1.5);
+    transition: filter var(--transition-fast, 0.15s);
+}
+.notif-bell-btn:hover {
+    filter: grayscale(0) brightness(1.2);
+}
+.notif-bell-count {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    min-width: 16px;
+    height: 16px;
+    line-height: 16px;
+    text-align: center;
+    font-size: 0.55rem;
+    font-weight: bold;
+    color: #fff;
+    background: #ff2a6d;
+    border-radius: 8px;
+    padding: 0 3px;
+    pointer-events: none;
+}
+
 /* Theme toggle button */
 .theme-toggle-btn {
     background: none;

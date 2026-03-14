@@ -49,6 +49,7 @@ import { GraphExplorerPanelDef } from './panels/graph-explorer.js';
 import { TimelinePanelDef } from './panels/timeline.js';
 import { NotificationsPanelDef } from './panels/notifications.js';
 import { HeatmapPanelDef } from './panels/heatmap.js';
+import { HeatmapTimelinePanelDef } from './panels/heatmap-timeline.js';
 import { TestingPanelDef } from './panels/testing.js';
 import { DeviceManagerPanelDef } from './panels/device-manager.js';
 import { AutomationPanelDef } from './panels/automation.js';
@@ -538,6 +539,7 @@ function initPanelSystem(container) {
     panelManager.register(TimelinePanelDef);
     panelManager.register(NotificationsPanelDef);
     panelManager.register(HeatmapPanelDef);
+    panelManager.register(HeatmapTimelinePanelDef);
     panelManager.register(TestingPanelDef);
     panelManager.register(DeviceManagerPanelDef);
     panelManager.register(AutomationPanelDef);
@@ -558,6 +560,39 @@ function initPanelSystem(container) {
             panelManager.open(data.id);
         }
     });
+
+    // Notification bell in header — click opens notifications panel
+    const notifBellBtn = document.getElementById('notif-bell-btn');
+    const notifBellCount = document.getElementById('notif-bell-count');
+    let _notifUnreadCount = 0;
+
+    function _updateBellBadge(count) {
+        _notifUnreadCount = count;
+        if (notifBellCount) {
+            notifBellCount.textContent = String(count);
+            notifBellCount.hidden = count <= 0;
+        }
+    }
+
+    if (notifBellBtn) {
+        notifBellBtn.addEventListener('click', () => {
+            if (panelManager) panelManager.toggle('notifications');
+        });
+    }
+
+    // Track unread notification count
+    EventBus.on('notification:new', () => {
+        _updateBellBadge(_notifUnreadCount + 1);
+    });
+    // When notifications panel marks all read
+    EventBus.on('notifications:all-read', () => {
+        _updateBellBadge(0);
+    });
+    // Fetch initial count
+    fetch('/api/notifications?limit=100').then(r => r.ok ? r.json() : []).then(notifications => {
+        const unread = (notifications || []).filter(n => !n.read).length;
+        _updateBellBadge(unread);
+    }).catch(() => {});
 
     // Try loading saved layout; if none, open defaults
     if (!panelManager.loadLayout()) {

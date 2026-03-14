@@ -154,6 +154,7 @@ const mockStore = {
     units: mockUnits,
     amy: { state: 'idle', mood: 'calm' },
     _listeners: new Map(),
+    isTargetPinned: function(id) { return false; },
     on: function(path, fn) { return function() {}; },
     set: function(path, value) {
         var parts = path.split('.');

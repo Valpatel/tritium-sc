@@ -78,6 +78,11 @@
                 <span class="score-label" title="Total hostile units eliminated">ELIMS</span>
                 <span id="game-eliminations" class="score-value">0</span>
             </div>
+            <button id="notif-bell-btn" class="notif-bell-btn" title="Notifications — click to open notifications panel" data-element="notif-bell">
+                <span class="notif-bell-icon">&#x1F514;</span>
+                <span id="notif-bell-count" class="notif-bell-count" data-element="notif-count" hidden>0</span>
+            </button>
+            <span class="score-sep"></span>
             <button id="theme-toggle" class="theme-toggle-btn" title="Toggle dark/light theme for outdoor visibility" onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'light' ? '' : 'light'; localStorage.setItem('tritium-theme', document.documentElement.dataset.theme); this.textContent = document.documentElement.dataset.theme === 'light' ? 'DARK' : 'LIGHT';">LIGHT</button>
             <span class="score-sep"></span>
             <span id="connection-status" class="connection-indicator" data-element="connection-status" data-state="disconnected" title="WebSocket connection to server — ONLINE = real-time updates active">
