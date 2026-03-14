@@ -51,6 +51,7 @@ from app.routers.investigations import router as investigations_router
 from app.routers.ontology import router as ontology_router
 from app.routers.patrols import router as patrols_router
 from app.routers.timeline import router as timeline_router
+from app.routers.notifications import router as notifications_router
 
 
 # ---------------------------------------------------------------------------
@@ -716,6 +717,36 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"DossierManager failed to start: {e}")
 
+    # Notification manager — collects alerts from all plugins via EventBus
+    try:
+        from engine.comms.notifications import NotificationManager
+        from app.routers.notifications import set_manager as set_notification_manager
+        from app.routers.ws import manager as _ws_manager
+        import asyncio as _notif_asyncio
+
+        _notif_bus = amy_instance.event_bus if amy_instance else None
+        _notif_loop = _notif_asyncio.get_event_loop()
+
+        def _ws_notif_broadcast(msg: dict) -> None:
+            """Thread-safe broadcast of notification events to WebSocket clients."""
+            try:
+                _notif_asyncio.run_coroutine_threadsafe(
+                    _ws_manager.broadcast(msg), _notif_loop
+                )
+            except Exception:
+                pass
+
+        notification_manager = NotificationManager(
+            event_bus=_notif_bus,
+            ws_broadcast=_ws_notif_broadcast,
+        )
+        set_notification_manager(notification_manager)
+        app.state.notification_manager = notification_manager
+        logger.info("NotificationManager started")
+    except Exception as e:
+        logger.warning(f"NotificationManager failed to start: {e}")
+        notification_manager = None
+
     # Plugin system — discover, configure, and start all plugins
     plugin_manager = _start_plugins(app, amy_instance, sim_engine)
     if plugin_manager is not None:
@@ -739,6 +770,11 @@ async def lifespan(app: FastAPI):
     if _dossier_mgr is not None:
         logger.info("Stopping DossierManager...")
         _dossier_mgr.stop()
+
+    # Stop notification manager
+    _notif_mgr = getattr(app.state, "notification_manager", None)
+    if _notif_mgr is not None:
+        _notif_mgr.stop()
 
     # Stop enrichment pipeline listener
     _enrich_pipe = getattr(app.state, "enrichment_pipeline", None)
@@ -801,6 +837,7 @@ app.include_router(investigations_router)
 app.include_router(ontology_router)
 app.include_router(patrols_router)
 app.include_router(timeline_router)
+app.include_router(notifications_router)
 
 # Static files
 frontend_path = Path(__file__).parent.parent / "frontend"

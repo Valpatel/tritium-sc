@@ -1080,6 +1080,11 @@ export class WebSocketManager {
                 EventBus.emit('edge:wifi_update', msg.data || msg);
                 break;
 
+            // -- Notifications ------------------------------------
+            case 'notification:new':
+                EventBus.emit('notification:new', msg.data || msg);
+                break;
+
             default:
                 // Forward unknown events for extensibility
                 EventBus.emit(`ws:${type}`, msg.data || msg);
