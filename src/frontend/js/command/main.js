@@ -71,6 +71,9 @@ import { MqttInspectorPanelDef } from './panels/mqtt-inspector.js';
 import { AnnotationsPanelDef } from './panels/annotations.js';
 import { NotificationPrefsPanelDef } from './panels/notification_prefs.js';
 import { WatchlistPanelDef } from './panels/watchlist.js';
+import { MapSharePanelDef, checkShareHash } from './panels/map-share.js';
+import { KeyboardMacrosPanelDef } from './panels/keyboard-macros.js';
+import { GridOverlayPanelDef, toggleGridOverlay } from './panels/grid-overlay.js';
 import { initScreenshotHotkey } from './panels/map-screenshot.js';
 import { MissionModal, initMissionModal } from './mission-modal.js';
 import { initTargetCounter } from './target-counter.js';
@@ -260,6 +263,9 @@ function init() {
 
     // Initialize tactical map
     initMap();
+
+    // Check URL for shared map view
+    checkShareHash();
 
     // Target filter overlay (on tactical map)
     const tacticalArea = document.getElementById('tactical-area');
@@ -570,6 +576,9 @@ function initPanelSystem(container) {
     panelManager.register(AnnotationsPanelDef);
     panelManager.register(NotificationPrefsPanelDef);
     panelManager.register(WatchlistPanelDef);
+    panelManager.register(MapSharePanelDef);
+    panelManager.register(KeyboardMacrosPanelDef);
+    panelManager.register(GridOverlayPanelDef);
 
     // Enhanced map screenshot hotkey (Ctrl+Shift+P)
     initScreenshotHotkey();
@@ -1356,6 +1365,20 @@ function initKeyboard() {
         if (e.ctrlKey && e.shiftKey && (e.key === 'S' || e.key === 's')) {
             e.preventDefault();
             if (menuBarEl) focusSaveInput(menuBarEl);
+            return;
+        }
+
+        // Ctrl+G: toggle military grid overlay
+        if (e.ctrlKey && !e.shiftKey && (e.key === 'G' || e.key === 'g')) {
+            e.preventDefault();
+            toggleGridOverlay();
+            return;
+        }
+
+        // Ctrl+Shift+M: toggle macro recording
+        if (e.ctrlKey && e.shiftKey && (e.key === 'M' || e.key === 'm')) {
+            e.preventDefault();
+            if (panelManager) panelManager.toggle('keyboard-macros');
             return;
         }
 

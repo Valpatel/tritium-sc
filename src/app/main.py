@@ -76,6 +76,8 @@ from app.routers.metrics import router as metrics_router
 from app.routers.sessions import router as sessions_router
 from app.routers.operator_activity import router as operator_activity_router
 from app.routers.briefing import router as briefing_router
+from app.routers.map_share import router as map_share_router
+from app.routers.classification_override import router as classification_override_router
 
 
 # ---------------------------------------------------------------------------
@@ -927,6 +929,8 @@ app.include_router(metrics_router)
 app.include_router(sessions_router)
 app.include_router(operator_activity_router)
 app.include_router(briefing_router)
+app.include_router(map_share_router)
+app.include_router(classification_override_router)
 
 # Static files
 frontend_path = Path(__file__).parent.parent / "frontend"

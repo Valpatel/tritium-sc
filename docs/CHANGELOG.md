@@ -14,6 +14,42 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 51: Map Sharing, Macros, Grid Overlay, Classification Override
+
+### Map Sharing (Unit Tested, 4 tests)
+- New `routers/map_share.py` — share current map view with other operators
+- `POST /api/map-share/create` — encode view state into a share link (24h expiry)
+- `GET /api/map-share/{share_id}` — retrieve shared view by ID
+- `POST /api/map-share/broadcast` — push view to all connected operators via WebSocket
+- `GET /api/map-share` — list active shared views
+- Frontend `panels/map-share.js` — copy share link, broadcast with message
+- Auto-applies shared views from URL hash on page load (#share=xxx)
+- WebSocket `map_view_shared` event type for real-time view sync
+
+### Keyboard Macro System (Code Review Verified)
+- New `panels/keyboard-macros.js` — record and replay action sequences
+- Record panel toggles, layer toggles, mode changes as macro steps
+- Macros persist in localStorage across sessions
+- Playback with timing delays between steps
+- Max 20 macros, 50 steps each
+- Panel UI: name/trigger input, record button, saved macro list with play/delete
+
+### Map Grid Overlay (Code Review Verified)
+- New `panels/grid-overlay.js` — military-style coordinate grid on tactical map
+- Lat/lng grid with auto-scaling density based on zoom level
+- Grid lines with coordinate labels at intersections
+- Configurable opacity, color (5 presets), grid type
+- Toggle via Ctrl+G keyboard shortcut
+- Dynamically updates on map pan/zoom
+
+### Target Classification Override (Unit Tested, 2 tests)
+- New `routers/classification_override.py` — manual target reclassification
+- `POST /api/targets/{id}/classify` — override alliance and/or device type
+- `GET /api/targets/{id}/classification` — get current classification
+- Validates alliance (friendly/hostile/neutral/unknown) and device type
+- Updates live TargetTracker, persists to DossierStore, logs to audit trail
+- Broadcasts `target_classification_changed` via WebSocket
+
 ## 2026-03-14 — Wave 50: Multi-User & Operational Readiness
 
 ### Session Management (Unit Tested, 10 tests)
