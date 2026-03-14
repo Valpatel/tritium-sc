@@ -270,9 +270,10 @@ class TestConnectionCallbacks:
         mock_client.subscribe.assert_called_once()
         # Check subscriptions list
         subs = mock_client.subscribe.call_args[0][0]
-        assert len(subs) == 8
+        assert len(subs) == 10
         topics = {s[0]: s[1] for s in subs}
         assert "tritium/home/cameras/+/detections" in topics
+        assert "tritium/home/cameras/+/frame" in topics
         assert "tritium/home/cameras/+/status" in topics
         assert "tritium/home/robots/+/telemetry" in topics
         assert "tritium/home/robots/+/thoughts" in topics
@@ -746,7 +747,10 @@ class TestSiteId:
 
         subs = mock_client.subscribe.call_args[0][0]
         topics = [s[0] for s in subs]
-        assert all("tritium/hq/" in t for t in topics)
+        # Site-scoped topics use the configured site_id; edge sighting uses wildcard
+        site_topics = [t for t in topics if t != "tritium/+/sighting"]
+        assert all("tritium/hq/" in t for t in site_topics)
+        assert "tritium/+/sighting" in topics
 
     def test_publish_uses_site_id(self, event_bus, tracker):
         b = MQTTBridge(event_bus=event_bus, target_tracker=tracker, site_id="hq")
@@ -1707,3 +1711,133 @@ class TestRobotThoughtSensorium:
 
         _, _, importance = sensorium.pushed[0]
         assert importance == 0.7
+
+
+# ===========================================================================
+# Edge Device Sightings (tritium/{device_id}/sighting)
+# ===========================================================================
+
+
+@pytest.mark.unit
+class TestEdgeSightingBLE:
+    """Verify BLE sightings from edge devices route to EventBus."""
+
+    def test_ble_sighting_publishes_fleet_ble_presence(self, bridge, event_bus):
+        """BLE sighting MQTT message should emit fleet.ble_presence on EventBus."""
+        payload = {
+            "type": "ble",
+            "devices": [
+                {"mac": "AA:BB:CC:DD:EE:01", "name": "Phone", "rssi": -55},
+                {"mac": "AA:BB:CC:DD:EE:02", "name": "", "rssi": -80},
+            ],
+            "summary": "2 devices",
+        }
+        msg = _make_msg("tritium/edge-001/sighting", payload)
+        bridge._on_message(None, None, msg)
+
+        ble_events = [
+            (et, d) for et, d in event_bus.published
+            if et == "fleet.ble_presence"
+        ]
+        assert len(ble_events) == 1
+        data = ble_events[0][1]
+        assert data["node_id"] == "edge-001"
+        assert len(data["devices"]) == 2
+        assert data["devices"][0]["mac"] == "AA:BB:CC:DD:EE:01"
+
+    def test_ble_sighting_tracks_device_liveness(self, bridge):
+        """Edge sighting should update device_last_seen for liveness tracking."""
+        payload = {"type": "ble", "devices": []}
+        msg = _make_msg("tritium/edge-002/sighting", payload)
+        bridge._on_message(None, None, msg)
+
+        assert "edge-002" in bridge._device_last_seen
+
+    def test_ble_sighting_empty_devices(self, bridge, event_bus):
+        """BLE sighting with empty devices list should still emit event."""
+        payload = {"type": "ble", "devices": [], "summary": "0 devices"}
+        msg = _make_msg("tritium/edge-003/sighting", payload)
+        bridge._on_message(None, None, msg)
+
+        ble_events = [
+            (et, d) for et, d in event_bus.published
+            if et == "fleet.ble_presence"
+        ]
+        assert len(ble_events) == 1
+        assert ble_events[0][1]["devices"] == []
+
+
+@pytest.mark.unit
+class TestEdgeSightingWiFi:
+    """Verify WiFi sightings from edge devices route to EventBus."""
+
+    def test_wifi_sighting_publishes_fleet_wifi_presence(self, bridge, event_bus):
+        """WiFi sighting MQTT message should emit fleet.wifi_presence on EventBus."""
+        payload = {
+            "type": "wifi",
+            "networks": [
+                {"ssid": "HomeNet", "bssid": "11:22:33:44:55:66",
+                 "rssi": -40, "channel": 6},
+            ],
+            "count": 1,
+        }
+        msg = _make_msg("tritium/edge-001/sighting", payload)
+        bridge._on_message(None, None, msg)
+
+        wifi_events = [
+            (et, d) for et, d in event_bus.published
+            if et == "fleet.wifi_presence"
+        ]
+        assert len(wifi_events) == 1
+        data = wifi_events[0][1]
+        assert data["node_id"] == "edge-001"
+        assert len(data["networks"]) == 1
+        assert data["networks"][0]["ssid"] == "HomeNet"
+
+
+@pytest.mark.unit
+class TestEdgeSightingUnknownType:
+    """Verify unknown sighting types are forwarded as fleet.sighting."""
+
+    def test_unknown_type_publishes_fleet_sighting(self, bridge, event_bus):
+        """Sighting with unknown type should emit fleet.sighting."""
+        payload = {"type": "rfid", "tags": ["A001", "A002"]}
+        msg = _make_msg("tritium/edge-001/sighting", payload)
+        bridge._on_message(None, None, msg)
+
+        sighting_events = [
+            (et, d) for et, d in event_bus.published
+            if et == "fleet.sighting"
+        ]
+        assert len(sighting_events) == 1
+        data = sighting_events[0][1]
+        assert data["node_id"] == "edge-001"
+        assert data["type"] == "rfid"
+
+    def test_missing_type_publishes_fleet_sighting(self, bridge, event_bus):
+        """Sighting with no type field should emit fleet.sighting."""
+        payload = {"data": "raw stuff"}
+        msg = _make_msg("tritium/edge-001/sighting", payload)
+        bridge._on_message(None, None, msg)
+
+        sighting_events = [
+            (et, d) for et, d in event_bus.published
+            if et == "fleet.sighting"
+        ]
+        assert len(sighting_events) == 1
+
+
+@pytest.mark.unit
+class TestEdgeSightingSubscription:
+    """Verify that _on_connect subscribes to edge sighting topics."""
+
+    def test_on_connect_subscribes_to_sighting_topic(self, bridge):
+        """_on_connect should include tritium/+/sighting in subscriptions."""
+        mock_client = MagicMock()
+        bridge._on_connect(mock_client, None, {}, 0)
+
+        # Gather all subscribed topics
+        call_args = mock_client.subscribe.call_args
+        subscriptions = call_args[0][0]  # first positional arg is list of tuples
+        topics = [t for t, qos in subscriptions]
+        assert "tritium/+/sighting" in topics
