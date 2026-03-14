@@ -467,6 +467,87 @@ def _select_properties(obj: dict, properties: list[str] | None) -> dict:
 # Type endpoints
 # ---------------------------------------------------------------------------
 
+@router.get("/schema")
+async def get_schema():
+    """Return the full Tritium ontology as a JSON schema document.
+
+    External tools (ATAK plugins, federation peers, AI agents) can
+    consume this endpoint to understand all entity types, relationships,
+    actions, and their properties without reading source code.
+    """
+    # Build entity type schemas
+    entity_schemas = {}
+    for name, schema in ENTITY_TYPES.items():
+        entity_schemas[name] = {
+            "apiName": schema["apiName"],
+            "displayName": schema["displayName"],
+            "description": schema["description"],
+            "primaryKey": schema["primaryKey"],
+            "properties": schema["properties"],
+            "links": schema.get("links", {}),
+        }
+
+    # Build action type schemas
+    action_schemas = {}
+    for name, action in ACTION_TYPES.items():
+        action_schemas[name] = {
+            "apiName": action["apiName"],
+            "displayName": action["displayName"],
+            "description": action["description"],
+            "parameters": action["parameters"],
+        }
+
+    # Event types from tritium-lib if available
+    event_types = []
+    try:
+        from tritium_lib.models.event_schema import list_event_types
+        event_types = list_event_types()
+    except ImportError:
+        pass
+
+    # Ontology from tritium-lib if available
+    lib_ontology = None
+    try:
+        from tritium_lib.ontology.schema import TRITIUM_ONTOLOGY
+        lib_ontology = {
+            "version": TRITIUM_ONTOLOGY.version,
+            "entity_type_count": len(TRITIUM_ONTOLOGY.entity_types),
+            "relationship_type_count": len(TRITIUM_ONTOLOGY.relationship_types),
+            "interface_count": len(TRITIUM_ONTOLOGY.interfaces),
+            "entity_types": {
+                k: v.model_dump() for k, v in TRITIUM_ONTOLOGY.entity_types.items()
+            },
+            "relationship_types": {
+                k: v.model_dump() for k, v in TRITIUM_ONTOLOGY.relationship_types.items()
+            },
+            "interfaces": {
+                k: v.model_dump() for k, v in TRITIUM_ONTOLOGY.interfaces.items()
+            },
+        }
+    except (ImportError, Exception):
+        pass
+
+    return {
+        "schema_version": "1.0.0",
+        "system": "tritium",
+        "description": "Tritium unified operating picture ontology — all entity types, relationships, actions, and event schemas",
+        "entity_types": entity_schemas,
+        "action_types": action_schemas,
+        "event_types": event_types,
+        "lib_ontology": lib_ontology,
+        "endpoints": {
+            "list_types": "GET /api/v1/ontology/types",
+            "get_type": "GET /api/v1/ontology/types/{type}",
+            "get_type_links": "GET /api/v1/ontology/types/{type}/links",
+            "list_objects": "GET /api/v1/ontology/objects/{type}",
+            "get_object": "GET /api/v1/ontology/objects/{type}/{pk}",
+            "search_objects": "POST /api/v1/ontology/objects/{type}/search",
+            "traverse_links": "GET /api/v1/ontology/objects/{type}/{pk}/links/{linkType}",
+            "apply_action": "POST /api/v1/ontology/actions/{actionType}/apply",
+        },
+    }
+
+
 @router.get("/types")
 async def list_types():
     """List all entity types with their schemas."""
