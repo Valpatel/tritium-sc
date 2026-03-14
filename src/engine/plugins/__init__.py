@@ -10,10 +10,27 @@ and multi-source discovery.
 
 from engine.plugins.base import PluginInterface, PluginContext
 from engine.plugins.manager import PluginManager, PluginDependencyError
+from engine.plugins.data_provider import (
+    DataProviderPlugin,
+    DataItem,
+    EnrichmentResult,
+    Subscription,
+    Bounds,
+    TimeRange,
+)
+from engine.plugins.layer_registry import LayerRegistry, RegisteredLayer
 
 __all__ = [
     "PluginInterface",
     "PluginContext",
     "PluginManager",
     "PluginDependencyError",
+    "DataProviderPlugin",
+    "DataItem",
+    "EnrichmentResult",
+    "Subscription",
+    "Bounds",
+    "TimeRange",
+    "LayerRegistry",
+    "RegisteredLayer",
 ]
