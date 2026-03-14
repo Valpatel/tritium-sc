@@ -14,6 +14,30 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 27: Security Hardening & Performance
+
+### Security
+| Change | Verification |
+|--------|-------------|
+| Audit logging middleware: logs every API request (method, path, status, duration_ms, client IP) to AuditStore | Unit Tested |
+| `/api/audit` and `/api/audit/stats` endpoints for compliance review | Unit Tested |
+| API security audit: verified parameterized queries across dossiers, target_search, geofence, automation endpoints | Code Review |
+| MQTT topic ACL: confirmed existing docs cover ACL config, edge firmware does NOT validate command sources (known limitation) | Code Review |
+
+### Performance
+| Change | Verification |
+|--------|-------------|
+| TargetTracker.summary() O(n*m) proximity fix: capped to 200 per side with early exit (2575ms -> <200ms at 10k targets) | Unit Tested |
+| TargetTracker performance benchmarks: get_all, get_hostiles, update_throughput, summary all under limits at 10k targets | Unit Tested |
+
+### Fixes
+| Change | Verification |
+|--------|-------------|
+| BookmarksPanelDef: added PanelDef export and registered in main.js (42/42 panels registered) | Unit Tested |
+| Server startup verified: import OK, /api/health returns degraded (expected without MQTT broker) | Integration Tested |
+
+---
+
 ## 2026-03-14 — Wave 26: WS Compression, Clustering, Bookmarks, Ontology
 
 ### New Features
