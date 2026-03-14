@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 # Thresholds
 LOITER_RADIUS = 5.0        # meters — if target stays within this radius
-LOITER_MIN_DURATION = 60.0  # seconds — minimum time to classify as loitering
+LOITER_MIN_DURATION = 300.0  # seconds (5 min) — minimum time to classify as loitering
 SPEED_THRESHOLD = 0.3       # m/s — below this is considered stationary
 DEVIATION_SIGMA = 2.0       # standard deviations from mean path
 
