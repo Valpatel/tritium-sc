@@ -51,6 +51,8 @@ import { NotificationsPanelDef } from './panels/notifications.js';
 import { HeatmapPanelDef } from './panels/heatmap.js';
 import { TestingPanelDef } from './panels/testing.js';
 import { DeviceManagerPanelDef } from './panels/device-manager.js';
+import { AutomationPanelDef } from './panels/automation.js';
+import { RfMotionPanelDef } from './panels/rf-motion.js';
 import { MissionModal, initMissionModal } from './mission-modal.js';
 
 // Make available on window for console debugging
@@ -477,6 +479,8 @@ function initPanelSystem(container) {
     panelManager.register(HeatmapPanelDef);
     panelManager.register(TestingPanelDef);
     panelManager.register(DeviceManagerPanelDef);
+    panelManager.register(AutomationPanelDef);
+    panelManager.register(RfMotionPanelDef);
 
     // panel:request-open — allows map click to open panels by id
     EventBus.on('panel:request-open', (data) => {
@@ -1224,6 +1228,14 @@ function initKeyboard() {
                 layoutManager.apply(layoutMap[e.key]);
                 return;
             }
+        }
+
+        // Drawing mode keys (geofence polygon / patrol waypoints)
+        if (e.key === 'Enter') {
+            EventBus.emit('map:drawFinish', {});
+        }
+        if (e.key === 'Escape') {
+            EventBus.emit('map:drawCancel', {});
         }
 
         switch (e.key) {

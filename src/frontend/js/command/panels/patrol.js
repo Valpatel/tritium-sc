@@ -109,6 +109,9 @@ export const PatrolPanelDef = {
                             <span class="mono">${_esc(u.name)}</span>
                             <span class="mono" style="color:var(--text-ghost);font-size:0.45rem">${_esc(u.type)}</span>
                         </div>
+                        <div class="patrol-entry-info">
+                            <button class="patrol-btn-clear" data-action="draw-route" data-unit-id="${_esc(u.id)}" title="Draw patrol route on map">DRAW ROUTE</button>
+                        </div>
                     </div>`;
                 }
             }
@@ -123,6 +126,16 @@ export const PatrolPanelDef = {
                         TritiumStore.set('map.selectedUnitId', uid);
                         EventBus.emit('unit:selected', { id: uid });
                         EventBus.emit('map:centerOnUnit', { id: uid });
+                    }
+                });
+            });
+
+            listEl.querySelectorAll('[data-action="draw-route"]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const uid = btn.dataset.unitId;
+                    if (uid) {
+                        EventBus.emit('patrol:drawRoute', { unitId: uid });
                     }
                 });
             });

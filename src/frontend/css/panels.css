@@ -3602,3 +3602,101 @@
     padding: 2px 4px;
     border-top: 1px solid var(--border, rgba(255,255,255,0.1));
 }
+
+/* ============================================================
+   Automation Panel
+   ============================================================ */
+
+.automation-panel-inner {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 2px;
+}
+
+.auto-toolbar {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    flex-shrink: 0;
+}
+
+.auto-rule-list {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.auto-editor {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.auto-form-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 3px 0;
+}
+
+.auto-form-row label {
+    color: var(--text-dim, #8892b0);
+    font-size: 0.45rem;
+    min-width: 60px;
+    flex-shrink: 0;
+}
+
+.auto-input {
+    background: var(--surface-1, #0e0e14);
+    border: 1px solid var(--border, rgba(255,255,255,0.1));
+    color: var(--text-main, #e6e6e6);
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 0.45rem;
+    padding: 2px 4px;
+    border-radius: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.auto-input:focus {
+    border-color: var(--cyan, #00f0ff);
+    outline: none;
+}
+
+.auto-input select {
+    background: var(--surface-1, #0e0e14);
+    color: var(--text-main, #e6e6e6);
+}
+
+.auto-condition-row,
+.auto-action-row {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin: 2px 0;
+}
+
+/* ============================================================
+   RF Motion Panel
+   ============================================================ */
+
+.rf-motion-panel-inner {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 2px;
+}
+
+.rfm-toolbar {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    flex-shrink: 0;
+}
+
+.rfm-list {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
