@@ -458,6 +458,7 @@ function initPanelSystem(container) {
     panelManager.register(FleetPanelDef);
     panelManager.register(EdgeTrackerPanelDef);
     panelManager.register(AssetsPanelDef);
+    panelManager.register(FleetDashboardPanelDef);
 
     // panel:request-open — allows map click to open panels by id
     EventBus.on('panel:request-open', (data) => {
