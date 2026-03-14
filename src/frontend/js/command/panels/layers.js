@@ -83,6 +83,12 @@ const LAYER_CATEGORIES = [
         dynamic: true, // Flag to load from catalog
     },
     {
+        name: 'GIS DATA SOURCES',
+        description: 'Managed GIS layer providers — tile servers and vector feature sources',
+        layers: [],
+        gisPlugin: true, // Flag to load from /api/gis/layers
+    },
+    {
         name: 'INTERFACE',
         description: 'Map interface elements',
         layers: [
@@ -136,6 +142,7 @@ export const LayersPanelDef = {
         const searchEl = bodyEl.querySelector('[data-bind="search"]');
         let mapActions = null;
         let gisCatalog = []; // populated from /api/geo/layers/catalog
+        let gisPluginLayers = []; // populated from /api/gis/layers
 
         // Get map actions via event (set by main.js)
         EventBus.on('layers:set-map-actions', (actions) => { mapActions = actions; render(); });
@@ -148,8 +155,17 @@ export const LayersPanelDef = {
             .then(catalog => { gisCatalog = catalog; render(); })
             .catch(() => {});
 
+        // Fetch GIS plugin layers from /api/gis/layers
+        fetch('/api/gis/layers')
+            .then(r => r.ok ? r.json() : { layers: [] })
+            .then(data => { gisPluginLayers = data.layers || []; render(); })
+            .catch(() => {});
+
         // Track individual GIS layer visibility (off = hidden by user)
         const gisLayerOff = new Set();
+        // Track GIS plugin layer visibility and opacity
+        const gisPluginEnabled = new Set();
+        const gisPluginOpacity = {}; // layer_id -> 0.0-1.0
 
         function getState(key) {
             if (!mapActions || !mapActions.getMapState) return false;
@@ -157,11 +173,35 @@ export const LayersPanelDef = {
             if (key && key.startsWith('_gis_')) {
                 return !gisLayerOff.has(key);
             }
+            // GIS plugin data source layers
+            if (key && key.startsWith('_gis_src_')) {
+                return gisPluginEnabled.has(key);
+            }
             const s = mapActions.getMapState();
             return !!s[key];
         }
 
         function toggleLayer(layerDef) {
+            // GIS plugin data source layer toggle
+            if (layerDef.gisPlugin) {
+                const key = layerDef.key;
+                if (gisPluginEnabled.has(key)) {
+                    gisPluginEnabled.delete(key);
+                } else {
+                    gisPluginEnabled.add(key);
+                    if (gisPluginOpacity[layerDef.gisLayerId] === undefined) {
+                        gisPluginOpacity[layerDef.gisLayerId] = 1.0;
+                    }
+                }
+                EventBus.emit('gis:layer-toggle', {
+                    layerId: layerDef.gisLayerId,
+                    enabled: gisPluginEnabled.has(key),
+                    opacity: gisPluginOpacity[layerDef.gisLayerId] ?? 1.0,
+                    type: layerDef.gisLayerType,
+                });
+                render();
+                return;
+            }
             if (!mapActions) return;
             // Individual GIS layer toggle — directly manipulate MapLibre layer visibility
             if (layerDef.gisChild && layerDef.gisMapLayerId) {
@@ -215,6 +255,23 @@ export const LayersPanelDef = {
                             source: info.source || 'OpenStreetMap',
                             key: `_gis_${gis.id}`, // individual GIS toggle key
                             gisChild: true,
+                        });
+                    }
+                }
+
+                // Inject GIS plugin data source layers
+                if (cat.gisPlugin && gisPluginLayers.length > 0) {
+                    for (const gpl of gisPluginLayers) {
+                        layers.push({
+                            id: `gis_src_${gpl.id}`,
+                            label: gpl.name,
+                            description: gpl.description || `${gpl.name} (${gpl.type})`,
+                            color: gpl.type === 'tile' ? null : '#00f0ff',
+                            source: gpl.attribution || 'GIS Plugin',
+                            key: `_gis_src_${gpl.id}`,
+                            gisPlugin: true,
+                            gisLayerId: gpl.id,
+                            gisLayerType: gpl.type,
                         });
                     }
                 }
@@ -275,6 +332,21 @@ export const LayersPanelDef = {
                         }
                         html += `</div>`;
                     }
+
+                    // Opacity slider for GIS plugin layers when enabled
+                    if (layer.gisPlugin && on) {
+                        const opVal = gisPluginOpacity[layer.gisLayerId] ?? 1.0;
+                        const pct = Math.round(opVal * 100);
+                        html += `<div class="layer-opacity-row" data-gis-opacity="${_esc(layer.gisLayerId)}">`;
+                        html += `<span class="layer-opacity-label">OPACITY</span>`;
+                        html += `<input type="range" class="layer-opacity-slider" min="0" max="100" value="${pct}" data-gis-layer="${_esc(layer.gisLayerId)}" />`;
+                        html += `<span class="layer-opacity-value">${pct}%</span>`;
+                        html += `</div>`;
+                        // Attribution line
+                        if (layer.source) {
+                            html += `<div class="layer-attribution">${_esc(layer.source)}</div>`;
+                        }
+                    }
                 }
 
                 html += `</div></div>`;
@@ -302,6 +374,18 @@ export const LayersPanelDef = {
                         });
                     }
                 }
+                if (cat.gisPlugin && gisPluginLayers.length > 0) {
+                    for (const gpl of gisPluginLayers) {
+                        allRenderedLayers.push({
+                            id: `gis_src_${gpl.id}`,
+                            label: gpl.name,
+                            key: `_gis_src_${gpl.id}`,
+                            gisPlugin: true,
+                            gisLayerId: gpl.id,
+                            gisLayerType: gpl.type,
+                        });
+                    }
+                }
             }
 
             // Bind toggle clicks
@@ -310,6 +394,18 @@ export const LayersPanelDef = {
                     const key = cb.dataset.key;
                     const layer = allRenderedLayers.find(l => l.key === key);
                     if (layer) toggleLayer(layer);
+                });
+            }
+
+            // Bind opacity sliders for GIS plugin layers
+            for (const slider of treeEl.querySelectorAll('.layer-opacity-slider')) {
+                slider.addEventListener('input', () => {
+                    const layerId = slider.dataset.gisLayer;
+                    const val = parseInt(slider.value, 10) / 100;
+                    gisPluginOpacity[layerId] = val;
+                    const valLabel = slider.parentElement.querySelector('.layer-opacity-value');
+                    if (valLabel) valLabel.textContent = `${slider.value}%`;
+                    EventBus.emit('gis:layer-opacity', { layerId, opacity: val });
                 });
             }
 
