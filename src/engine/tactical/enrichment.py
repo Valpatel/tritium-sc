@@ -131,15 +131,8 @@ async def _oui_lookup(target_id: str, identifiers: dict) -> EnrichmentResult | N
     mac_clean = mac.upper().replace("-", ":").replace(".", ":")
     prefix = mac_clean[:8]  # "AA:BB:CC"
 
-    # Try tritium-lib store first
+    # Look up manufacturer from built-in OUI table
     manufacturer = None
-    try:
-        from tritium_lib.store.ble import oui_lookup  # type: ignore
-        manufacturer = oui_lookup(mac_clean)
-    except (ImportError, Exception):
-        pass
-
-    # Fallback to built-in table
     if not manufacturer:
         manufacturer = _OUI_FALLBACK.get(prefix)
 
