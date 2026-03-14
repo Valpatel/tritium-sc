@@ -198,6 +198,11 @@ class BackupManager:
         with zipfile.ZipFile(zip_path, "r") as zf:
             names = set(zf.namelist())
 
+            # Defense in depth: validate no path traversal in ZIP entries
+            for name in names:
+                if name.startswith("/") or ".." in name.split("/"):
+                    raise ValueError(f"Unsafe path in backup archive: {name}")
+
             # Validate manifest
             if "manifest.json" not in names:
                 raise ValueError("Invalid backup: missing manifest.json")

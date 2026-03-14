@@ -829,13 +829,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware
+# CORS middleware — restrict origins in production via CORS_ALLOWED_ORIGINS env var
+_cors_origins = (
+    [o.strip() for o in settings.cors_allowed_origins.split(",") if o.strip()]
+    if settings.cors_allowed_origins
+    else ["*"]
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-API-Key", "X-Requested-With"],
+    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining"],
 )
 
 # Rate limiting middleware (only active when rate_limit_enabled=True)
@@ -845,6 +851,10 @@ app.add_middleware(
     max_requests=settings.rate_limit_requests,
     window_seconds=settings.rate_limit_window_seconds,
 )
+
+# Content-Security-Policy middleware — prevent XSS
+from app.security_headers import SecurityHeadersMiddleware
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Audit logging middleware — logs every API request for compliance
 from app.audit_middleware import AuditLoggingMiddleware

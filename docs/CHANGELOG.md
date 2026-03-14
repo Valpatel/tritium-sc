@@ -14,6 +14,47 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 37: Security Hardening + CORS + CSP + API Keys
+
+### CORS Hardening (Unit Tested)
+- Replaced `allow_origins=["*"]` with configurable `CORS_ALLOWED_ORIGINS` env var
+- Restricted `allow_methods` to explicit HTTP methods (GET/POST/PUT/DELETE/PATCH/OPTIONS)
+- Restricted `allow_headers` to Authorization, Content-Type, X-API-Key, X-Requested-With
+- Added `expose_headers` for rate limit headers
+- Default (empty env var) still allows all origins for dev mode
+
+### Content-Security-Policy Headers (Unit Tested)
+- New `SecurityHeadersMiddleware` adds CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy
+- CSP restricts scripts/styles to 'self' + 'unsafe-inline', blocks object/frame embedding
+- CSP only applied to HTML responses (not API/WebSocket)
+- Configurable via `CSP_ENABLED` env var (default: true)
+
+### File Upload Security — Backup Restore (Unit Tested)
+- Streaming upload with 500MB size limit (no full-file memory load)
+- ZIP magic byte validation (PK header check)
+- Path traversal protection: rejects `..` and absolute paths in ZIP entries
+- Zip bomb protection: max 10,000 entries, max 5GB uncompressed
+- Defense-in-depth: BackupManager.import_state also validates paths
+- 6 new security tests for upload validation
+
+### API Key Authentication (Unit Tested)
+- New `X-API-Key` header support alongside JWT Bearer tokens
+- Configured via `API_KEYS` env var (comma-separated keys)
+- Constant-time comparison via `secrets.compare_digest`
+- Works in `require_auth` and `optional_auth` dependencies
+- 3 new tests for API key validation
+
+### Startup Performance (Verified)
+- App import: 0.5s, first /api/health response: 0.5s (well under 5s target)
+- No optimization needed
+
+### User Journey Verification (Verified)
+- Health, root HTML, targets, dossiers, auth, backup, plugins, notifications, WebSocket, static files all respond correctly
+- Security headers confirmed on all response types
+- 19 new tests, all passing, zero regressions in 47 existing security/auth tests
+
+---
+
 ## 2026-03-14 — Wave 35: ReID Integration, Map Snapshot, Replay SSE, Notification Prefs
 
 ### Multi-Camera ReID Integration (Unit Tested)

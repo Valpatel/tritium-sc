@@ -148,6 +148,15 @@ class Settings(BaseSettings):
     tls_cert_file: str = ""                # Path to TLS certificate
     tls_key_file: str = ""                 # Path to TLS private key
 
+    # CORS
+    cors_allowed_origins: str = ""         # Comma-separated allowed origins (empty = allow all in dev)
+
+    # Content-Security-Policy
+    csp_enabled: bool = True               # Enable CSP headers
+
+    # API key authentication (stateless alternative to JWT)
+    api_keys: str = ""                     # Comma-separated API keys for X-API-Key header auth
+
     # Rate limiting
     rate_limit_enabled: bool = False       # Enable rate limiting
     rate_limit_requests: int = 100         # Max requests per window

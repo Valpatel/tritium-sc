@@ -113,35 +113,114 @@ async def list_backups():
     }
 
 
+MAX_BACKUP_SIZE = 500 * 1024 * 1024  # 500 MB
+MAX_ZIP_ENTRIES = 10_000  # Prevent zip bomb with excessive file count
+
+
+def _validate_zip_safety(zip_path: Path) -> None:
+    """Validate ZIP contents for path traversal and zip bomb attacks.
+
+    Raises HTTPException on any safety violation.
+    """
+    import zipfile as zf
+
+    try:
+        with zf.ZipFile(zip_path, "r") as archive:
+            entries = archive.namelist()
+
+            # Check entry count (zip bomb protection)
+            if len(entries) > MAX_ZIP_ENTRIES:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"ZIP contains too many entries ({len(entries)} > {MAX_ZIP_ENTRIES})",
+                )
+
+            # Check for path traversal in every entry
+            for entry in entries:
+                # Normalize and check for traversal
+                if entry.startswith("/") or ".." in entry.split("/"):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"ZIP contains unsafe path: {entry}",
+                    )
+                # Check for absolute paths on Windows too
+                if ":" in entry.split("/")[0]:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"ZIP contains absolute path: {entry}",
+                    )
+
+            # Check total uncompressed size (zip bomb protection)
+            total_uncompressed = sum(info.file_size for info in archive.infolist())
+            if total_uncompressed > MAX_BACKUP_SIZE * 10:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"ZIP uncompressed size too large ({total_uncompressed} bytes)",
+                )
+    except zf.BadZipFile:
+        raise HTTPException(status_code=400, detail="Invalid ZIP file")
+
+
 @router.post("/restore")
 async def restore_backup(file: UploadFile = File(...)):
     """Upload a backup archive and restore system state.
 
     WARNING: This overwrites current databases and state.
     The server should be restarted after restore.
+
+    Security:
+    - Max file size: 500 MB
+    - File type validation: must be .zip with valid ZIP magic bytes
+    - Path traversal protection: no .. or absolute paths in ZIP entries
+    - Zip bomb protection: max 10,000 entries, max 5 GB uncompressed
+    - Files stored in system temp directory (not user-accessible)
     """
     if not file.filename or not file.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="File must be a ZIP archive")
 
-    content = await file.read()
-    if len(content) > 500 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="Backup file too large (max 500MB)")
-
-    # Write to a temp file and restore
-    with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
-        tmp.write(content)
-        tmp_path = Path(tmp.name)
-
+    # Stream upload to temp file with size limit enforcement
+    tmp_path = None
     try:
+        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+            total_read = 0
+            chunk_size = 64 * 1024  # 64 KB chunks
+            while True:
+                chunk = await file.read(chunk_size)
+                if not chunk:
+                    break
+                total_read += len(chunk)
+                if total_read > MAX_BACKUP_SIZE:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"Backup file too large (max {MAX_BACKUP_SIZE // (1024*1024)} MB)",
+                    )
+                tmp.write(chunk)
+
+        if total_read == 0:
+            raise HTTPException(status_code=400, detail="Empty file uploaded")
+
+        # Validate ZIP magic bytes (PK header)
+        with open(tmp_path, "rb") as f:
+            magic = f.read(4)
+        if magic[:2] != b"PK":
+            raise HTTPException(status_code=400, detail="File is not a valid ZIP archive")
+
+        # Validate ZIP safety (path traversal, zip bombs)
+        _validate_zip_safety(tmp_path)
+
         mgr = _shared_manager()
         report = mgr.import_state(tmp_path)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Restore failed: {e}")
         raise HTTPException(status_code=500, detail=f"Restore failed: {e}")
     finally:
-        tmp_path.unlink(missing_ok=True)
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
 
     return {
         "status": "restored",

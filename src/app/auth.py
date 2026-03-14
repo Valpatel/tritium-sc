@@ -115,21 +115,58 @@ def decode_token(token: str) -> dict:
         )
 
 
+def _validate_api_key(api_key: str) -> Optional[dict]:
+    """Validate an API key against configured keys.
+
+    Returns user dict if valid, None otherwise.
+    API keys are configured via API_KEYS env var (comma-separated).
+    """
+    if not settings.api_keys:
+        return None
+
+    configured_keys = [k.strip() for k in settings.api_keys.split(",") if k.strip()]
+    if not configured_keys:
+        return None
+
+    # Constant-time comparison to prevent timing attacks
+    for key in configured_keys:
+        if secrets.compare_digest(api_key, key):
+            return {"sub": "api_key_user", "role": "admin", "auth_method": "api_key"}
+
+    return None
+
+
 async def require_auth(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_security),
 ) -> dict:
-    """Dependency that requires valid JWT authentication.
+    """Dependency that requires valid authentication.
+
+    Supports two authentication methods:
+    1. JWT Bearer token (Authorization: Bearer <token>)
+    2. API key (X-API-Key: <key>)
 
     When auth_enabled=False, returns a default admin user.
-    When auth_enabled=True, validates the Bearer token.
     """
     if not settings.auth_enabled:
         return {"sub": "admin", "role": "admin"}
 
+    # Try API key first (stateless, for scripts/integrations)
+    api_key = request.headers.get("X-API-Key")
+    if api_key:
+        user = _validate_api_key(api_key)
+        if user:
+            return user
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+        )
+
+    # Fall back to JWT Bearer token
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required",
+            detail="Authentication required (use Bearer token or X-API-Key header)",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -137,16 +174,25 @@ async def require_auth(
 
 
 async def optional_auth(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_security),
 ) -> Optional[dict]:
     """Dependency that optionally authenticates.
 
-    Returns user dict if valid token provided, None otherwise.
+    Returns user dict if valid token/API key provided, None otherwise.
     Never raises — useful for endpoints that work with or without auth.
     """
     if not settings.auth_enabled:
         return {"sub": "admin", "role": "admin"}
 
+    # Try API key
+    api_key = request.headers.get("X-API-Key")
+    if api_key:
+        user = _validate_api_key(api_key)
+        if user:
+            return user
+
+    # Try JWT
     if not credentials:
         return None
 

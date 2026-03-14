@@ -186,16 +186,30 @@ class TestCORSMiddleware:
         assert "DELETE" in allow_methods or "*" in allow_methods
 
     def test_cors_allow_headers(self, client):
+        """CORS allows configured headers (Authorization, Content-Type, X-API-Key)."""
         resp = client.options(
             "/health",
             headers={
                 "Origin": "http://example.com",
                 "Access-Control-Request-Method": "GET",
-                "Access-Control-Request-Headers": "X-Custom-Header",
+                "Access-Control-Request-Headers": "Authorization",
             },
         )
         allow_headers = resp.headers.get("access-control-allow-headers", "")
-        assert "x-custom-header" in allow_headers.lower() or "*" in allow_headers
+        assert "authorization" in allow_headers.lower() or "*" in allow_headers
+
+    def test_cors_allows_api_key_header(self, client):
+        """CORS allows X-API-Key header for stateless auth."""
+        resp = client.options(
+            "/health",
+            headers={
+                "Origin": "http://example.com",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-API-Key",
+            },
+        )
+        allow_headers = resp.headers.get("access-control-allow-headers", "")
+        assert "x-api-key" in allow_headers.lower() or "*" in allow_headers
 
     def test_cors_allow_credentials(self, client):
         resp = client.options(
