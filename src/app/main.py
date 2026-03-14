@@ -60,6 +60,8 @@ from app.routers.backup import router as backup_router
 from app.routers.health import router as health_router
 from app.routers.acoustic import router as acoustic_router
 from app.routers.recordings import router as recordings_router
+from app.routers.lpr import router as lpr_router
+from app.routers.transponders import router as transponders_router
 
 
 # ---------------------------------------------------------------------------
@@ -881,6 +883,8 @@ app.include_router(backup_router)
 app.include_router(health_router)
 app.include_router(acoustic_router)
 app.include_router(recordings_router)
+app.include_router(lpr_router)
+app.include_router(transponders_router)
 
 # Static files
 frontend_path = Path(__file__).parent.parent / "frontend"
