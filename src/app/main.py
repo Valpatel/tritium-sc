@@ -65,6 +65,7 @@ from app.routers.transponders import router as transponders_router
 from app.routers.terrain import router as terrain_router
 from app.routers.behavior import router as behavior_router
 from app.routers.bookmarks import router as bookmarks_router
+from app.routers.audit import router as audit_router
 
 
 # ---------------------------------------------------------------------------
@@ -842,6 +843,10 @@ app.add_middleware(
     window_seconds=settings.rate_limit_window_seconds,
 )
 
+# Audit logging middleware — logs every API request for compliance
+from app.audit_middleware import AuditLoggingMiddleware
+app.add_middleware(AuditLoggingMiddleware)
+
 # Include routers
 app.include_router(cameras_router)
 app.include_router(videos_router)
@@ -891,6 +896,7 @@ app.include_router(transponders_router)
 app.include_router(terrain_router)
 app.include_router(behavior_router)
 app.include_router(bookmarks_router)
+app.include_router(audit_router)
 
 # Static files
 frontend_path = Path(__file__).parent.parent / "frontend"

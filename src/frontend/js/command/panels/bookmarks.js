@@ -136,3 +136,24 @@ export function destroyBookmarksPanel() {
     _container = null;
     _bookmarks = [];
 }
+
+/**
+ * PanelDef for the panel manager registration system.
+ */
+export const BookmarksPanelDef = {
+    id: 'bookmarks',
+    title: 'MAP BOOKMARKS',
+    defaultPosition: { x: 100, y: 340 },
+    defaultSize: { w: 320, h: 300 },
+
+    create(_panel) {
+        const el = document.createElement('div');
+        el.className = 'bookmarks-panel-inner';
+        initBookmarksPanel(el);
+        return el;
+    },
+
+    destroy() {
+        destroyBookmarksPanel();
+    },
+};

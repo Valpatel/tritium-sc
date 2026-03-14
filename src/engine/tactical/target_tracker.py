@@ -362,14 +362,24 @@ class TargetTracker:
 
         result = f"BATTLESPACE: {', '.join(parts)} target(s) tracked"
 
-        # Urgency alerts: hostiles near friendlies
+        # Urgency alerts: hostiles near friendlies (capped to avoid O(n*m) blowup)
         import math
         alerts = []
-        for h in hostiles:
-            for f in friendlies:
-                dist = math.hypot(h.position[0] - f.position[0], h.position[1] - f.position[1])
-                if dist < 5.0:
+        _max_proximity_checks = 200  # cap each side to keep summary fast
+        _h_sample = hostiles[:_max_proximity_checks]
+        _f_sample = friendlies[:_max_proximity_checks]
+        for h in _h_sample:
+            for f in _f_sample:
+                dx = h.position[0] - f.position[0]
+                dy = h.position[1] - f.position[1]
+                dist_sq = dx * dx + dy * dy
+                if dist_sq < 25.0:  # 5.0^2
+                    dist = math.sqrt(dist_sq)
                     alerts.append(f"ALERT: {h.name} within {dist:.1f} units of {f.name}")
+                    if len(alerts) >= 3:
+                        break
+            if len(alerts) >= 3:
+                break
         if alerts:
             result += "\n" + "\n".join(alerts[:3])
 

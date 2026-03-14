@@ -55,6 +55,7 @@ import { AutomationPanelDef } from './panels/automation.js';
 import { RfMotionPanelDef } from './panels/rf-motion.js';
 import { SystemHealthPanelDef } from './panels/system-health.js';
 import { QuickStartPanelDef } from './panels/quick-start.js';
+import { BookmarksPanelDef } from './panels/bookmarks.js';
 import { MissionModal, initMissionModal } from './mission-modal.js';
 
 // Make available on window for console debugging
@@ -485,6 +486,7 @@ function initPanelSystem(container) {
     panelManager.register(RfMotionPanelDef);
     panelManager.register(SystemHealthPanelDef);
     panelManager.register(QuickStartPanelDef);
+    panelManager.register(BookmarksPanelDef);
 
     // panel:request-open — allows map click to open panels by id
     EventBus.on('panel:request-open', (data) => {
