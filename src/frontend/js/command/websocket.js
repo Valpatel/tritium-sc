@@ -1143,6 +1143,24 @@ export class WebSocketManager {
                 EventBus.emit('notification:new', msg.data || msg);
                 break;
 
+            // -- Operator cursor sharing ----------------------------
+            case 'cursor_position': {
+                // Another operator's cursor position on the map
+                const cursor = msg;
+                TritiumStore.setOperatorCursor(cursor.session_id, {
+                    session_id: cursor.session_id,
+                    username: cursor.username,
+                    display_name: cursor.display_name,
+                    role: cursor.role,
+                    color: cursor.color,
+                    lat: cursor.lat,
+                    lng: cursor.lng,
+                    timestamp: cursor.timestamp,
+                });
+                EventBus.emit('operator:cursor', cursor);
+                break;
+            }
+
             default:
                 // Forward unknown events for extensibility
                 EventBus.emit(`ws:${type}`, msg.data || msg);

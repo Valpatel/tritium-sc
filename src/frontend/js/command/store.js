@@ -357,4 +357,48 @@ export const TritiumStore = {
             try { fn(path, value); } catch (e) { console.error('[Store] wildcard error:', e); }
         });
     },
+
+    // -- Operator cursor sharing ----------------------------------------
+
+    /** @type {Map<string, Object>} session_id -> cursor data */
+    _operatorCursors: new Map(),
+    /** Cursor stale timeout: 15 seconds */
+    _cursorStaleMs: 15000,
+
+    /**
+     * Update an operator's cursor position.
+     * @param {string} sessionId
+     * @param {Object} cursor - {session_id, username, display_name, role, color, lat, lng, timestamp}
+     */
+    setOperatorCursor(sessionId, cursor) {
+        cursor._receivedAt = Date.now();
+        this._operatorCursors.set(sessionId, cursor);
+        this._notify('operatorCursors', this._operatorCursors);
+    },
+
+    /**
+     * Remove an operator's cursor (e.g., on disconnect).
+     * @param {string} sessionId
+     */
+    removeOperatorCursor(sessionId) {
+        this._operatorCursors.delete(sessionId);
+        this._notify('operatorCursors', this._operatorCursors);
+    },
+
+    /**
+     * Get all active (non-stale) operator cursors.
+     * @returns {Array<Object>} cursor data entries
+     */
+    getOperatorCursors() {
+        const now = Date.now();
+        const result = [];
+        for (const [sid, cursor] of this._operatorCursors) {
+            if (now - (cursor._receivedAt || 0) < this._cursorStaleMs) {
+                result.push(cursor);
+            } else {
+                this._operatorCursors.delete(sid);
+            }
+        }
+        return result;
+    },
 };

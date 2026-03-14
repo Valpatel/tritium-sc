@@ -73,6 +73,9 @@ from app.routers.annotations import router as annotations_router
 from app.routers.watchlist import router as watchlist_router
 from app.routers.sitrep import router as sitrep_router
 from app.routers.metrics import router as metrics_router
+from app.routers.sessions import router as sessions_router
+from app.routers.operator_activity import router as operator_activity_router
+from app.routers.briefing import router as briefing_router
 
 
 # ---------------------------------------------------------------------------
@@ -921,6 +924,9 @@ app.include_router(annotations_router)
 app.include_router(watchlist_router)
 app.include_router(sitrep_router)
 app.include_router(metrics_router)
+app.include_router(sessions_router)
+app.include_router(operator_activity_router)
+app.include_router(briefing_router)
 
 # Static files
 frontend_path = Path(__file__).parent.parent / "frontend"

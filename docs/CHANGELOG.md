@@ -14,6 +14,43 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 50: Multi-User & Operational Readiness
+
+### Session Management (Unit Tested, 10 tests)
+- New `routers/sessions.py` — multi-operator session management
+- `POST /api/sessions` — create session with username, role, color
+- `GET /api/sessions` — list active sessions with auto-prune (30min timeout)
+- `DELETE /api/sessions/{id}` — end session (logout)
+- `PUT /api/sessions/{id}/layout` — per-session panel layout and notification preferences
+- `PUT /api/sessions/{id}/cursor` — update cursor position for real-time sharing
+- `GET /api/sessions/cursors` — all active cursor positions for map overlay
+- `GET /api/sessions/roles/list` — available roles with permissions and colors
+- Default role colors: admin=yellow, commander=magenta, analyst=cyan, operator=green, observer=muted
+- Uses tritium-lib User/UserSession/Permission models
+
+### Operator Activity Log (Unit Tested)
+- New `routers/operator_activity.py` — real-time who-is-doing-what feed
+- `GET /api/operator-activity` — recent operator actions with username, role, action, detail
+- `GET /api/operator-activity/stats` — per-operator action counts and last-seen
+- `GET /api/operator-activity/feed` — SSE stream for real-time activity updates
+- Queries AuditStore filtered to operator_action entries
+- Frontend `panels/operator-activity.js` — polls and renders activity feed
+
+### Real-Time Cursor Sharing (Unit Tested)
+- WebSocket `cursor_update` message type — operators send cursor lat/lng
+- Server broadcasts `cursor_position` to all other connected clients
+- Frontend `panels/operator-cursors.js` — renders colored dots with username labels on map canvas
+- `TritiumStore.setOperatorCursor/getOperatorCursors` — stale cursor pruning (15s)
+- Throttled sending at 200ms intervals to avoid flooding
+
+### Operational Briefing Generator (Unit Tested, 6 tests)
+- New `routers/briefing.py` — combines SITREP + investigations + fleet + operators
+- `GET /api/briefing` — JSON briefing with classification, threat level, sections
+- `GET /api/briefing/text` — human-readable plain text (8 sections)
+- `GET /api/briefing/html` — printable HTML with cyberpunk styling + print CSS
+- Sections: threat assessment, fleet status, active missions, investigations, geofence, operators, recent activity, Amy assessment
+- Briefing ID format: BRIEF-YYYYMMDD-HHMMSS
+
 ## 2026-03-14 — Wave 48: Comm Links, Target Prediction, Amy TTS, Reports
 
 ### Communication Link Map Layer (Unit Tested)

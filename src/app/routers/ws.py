@@ -195,6 +195,9 @@ async def handle_client_message(websocket: WebSocket, message: dict):
         # Frontend reports its current viewport center and zoom.
         # Forward to the simulation engine's LOD system to adjust fidelity.
         _handle_viewport_update(message)
+    elif msg_type == "cursor_update":
+        # Operator cursor position on the map — broadcast to all other clients
+        await _handle_cursor_update(websocket, message)
     else:
         await manager.send_to(
             websocket,
@@ -248,6 +251,65 @@ def _handle_viewport_update(message: dict) -> None:
         radius=float(radius) if radius is not None else None,
         zoom=float(zoom) if zoom is not None else None,
     )
+
+
+async def _handle_cursor_update(websocket: WebSocket, message: dict) -> None:
+    """Handle cursor position updates from operators.
+
+    Expected format:
+        {
+            "type": "cursor_update",
+            "session_id": "...",
+            "username": "...",
+            "display_name": "...",
+            "role": "commander",
+            "color": "#ff2a6d",
+            "lat": 40.7128,
+            "lng": -74.0060
+        }
+
+    Broadcasts the cursor position to all other connected clients so they
+    can render colored dots on the map with the operator's username.
+    """
+    session_id = message.get("session_id", "")
+    lat = message.get("lat")
+    lng = message.get("lng")
+
+    # Update the session store if available
+    if session_id:
+        try:
+            from app.routers.sessions import get_session_store
+            sessions = get_session_store()
+            session = sessions.get(session_id)
+            if session:
+                session.cursor_lat = lat
+                session.cursor_lng = lng
+                session.touch()
+        except Exception:
+            pass
+
+    # Broadcast cursor to all other clients
+    cursor_msg = {
+        "type": "cursor_position",
+        "session_id": session_id,
+        "username": message.get("username", ""),
+        "display_name": message.get("display_name", ""),
+        "role": message.get("role", "observer"),
+        "color": message.get("color", "#00f0ff"),
+        "lat": lat,
+        "lng": lng,
+        "timestamp": datetime.now(tz=None).isoformat(),
+    }
+
+    # Send to all clients except the sender
+    message_str = json.dumps(cursor_msg)
+    async with manager._lock:
+        for conn in manager.active_connections:
+            if conn is not websocket:
+                try:
+                    await conn.send_text(message_str)
+                except Exception:
+                    pass
 
 
 # Utility functions for broadcasting from other parts of the app
