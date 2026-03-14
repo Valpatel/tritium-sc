@@ -180,27 +180,43 @@ class SyntheticSource(CameraSourceBase):
 
 
 class MQTTSource(CameraSourceBase):
-    """Receives JPEG frames from an MQTT topic.
+    """Receives JPEG frames and detection events from MQTT cameras.
 
     Subscribes to the configured URI as an MQTT topic
-    (e.g. ``tritium/{device_id}/camera``) and decodes incoming
-    JPEG payloads into BGR frames.
+    (e.g. ``tritium/{site}/cameras/{cam_id}/frame``) and decodes incoming
+    JPEG payloads into BGR frames.  When wired to an MQTTBridge, also
+    receives detection events and forwards them to the TargetTracker.
     """
 
     def __init__(self, config: CameraSourceConfig) -> None:
         super().__init__(config)
         self._topic = config.uri or f"tritium/+/camera"
         self._event_bus: Any = None
+        self._mqtt_bridge: Any = None
+        self._target_tracker: Any = None
+        # Camera ID extracted from config for MQTT topic matching
+        self._cam_id: str = config.extra.get("cam_id", config.source_id)
+        # Detection stats
+        self._detection_count: int = 0
 
     def set_event_bus(self, event_bus: Any) -> None:
         """Inject the EventBus for receiving MQTT-bridged frames."""
         self._event_bus = event_bus
 
+    def set_mqtt_bridge(self, mqtt_bridge: Any) -> None:
+        """Wire this source to an MQTTBridge to receive camera frames."""
+        self._mqtt_bridge = mqtt_bridge
+        mqtt_bridge.register_camera_callback(self._cam_id, self.on_frame)
+
+    def set_target_tracker(self, tracker: Any) -> None:
+        """Set the TargetTracker for detection -> target creation."""
+        self._target_tracker = tracker
+
     def start(self) -> None:
         if self._running:
             return
         self._running = True
-        log.info("MQTTSource started, listening for frames on topic: %s", self._topic)
+        log.info("MQTTSource started, cam_id=%s topic=%s", self._cam_id, self._topic)
 
     def stop(self) -> None:
         self._running = False
@@ -219,9 +235,31 @@ class MQTTSource(CameraSourceBase):
         except Exception as exc:
             log.error("MQTTSource decode error: %s", exc)
 
+    def on_detection(self, detection: dict) -> None:
+        """Process a YOLO detection and create/update a TrackedTarget.
+
+        Args:
+            detection: Dict with keys: label, confidence, center_x, center_y.
+        """
+        self._detection_count += 1
+        if self._target_tracker is not None:
+            self._target_tracker.update_from_detection({
+                "class_name": detection.get("label", "unknown"),
+                "confidence": detection.get("confidence", 0.5),
+                "center_x": detection.get("center_x", 0.5),
+                "center_y": detection.get("center_y", 0.5),
+                "source_camera": self._cam_id,
+            })
+
     def get_frame(self) -> np.ndarray | None:
         with self._lock:
             return self._last_frame
+
+    def to_dict(self) -> dict:
+        d = super().to_dict()
+        d["cam_id"] = self._cam_id
+        d["detection_count"] = self._detection_count
+        return d
 
 
 class RTSPSource(CameraSourceBase):

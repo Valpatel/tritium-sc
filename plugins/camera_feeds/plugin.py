@@ -44,6 +44,8 @@ class CameraFeedsPlugin(PluginInterface):
         self._logger: logging.Logger = log
         self._sources: dict[str, CameraSourceBase] = {}
         self._running = False
+        self._mqtt_bridge: Any = None
+        self._target_tracker: Any = None
 
     # -- PluginInterface identity ------------------------------------------
 
@@ -97,6 +99,16 @@ class CameraFeedsPlugin(PluginInterface):
     def healthy(self) -> bool:
         return self._running
 
+    # -- MQTT integration --------------------------------------------------
+
+    def set_mqtt_bridge(self, mqtt_bridge: Any) -> None:
+        """Set MQTTBridge reference for wiring MQTT camera sources."""
+        self._mqtt_bridge = mqtt_bridge
+
+    def set_target_tracker(self, target_tracker: Any) -> None:
+        """Set TargetTracker for detection -> target creation."""
+        self._target_tracker = target_tracker
+
     # -- Source management -------------------------------------------------
 
     def register_source(self, config: CameraSourceConfig) -> CameraSourceBase:
@@ -123,9 +135,14 @@ class CameraFeedsPlugin(PluginInterface):
 
         source = source_cls(config)
 
-        # Wire up MQTT sources with the event bus
-        if isinstance(source, MQTTSource) and self._event_bus:
-            source.set_event_bus(self._event_bus)
+        # Wire up MQTT sources with the event bus, bridge, and tracker
+        if isinstance(source, MQTTSource):
+            if self._event_bus:
+                source.set_event_bus(self._event_bus)
+            if self._mqtt_bridge:
+                source.set_mqtt_bridge(self._mqtt_bridge)
+            if self._target_tracker:
+                source.set_target_tracker(self._target_tracker)
 
         self._sources[config.source_id] = source
 
