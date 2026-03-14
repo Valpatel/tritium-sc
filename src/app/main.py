@@ -44,6 +44,8 @@ from app.routers.fleet import router as fleet_router
 from app.routers.demo import router as demo_router
 from app.routers.geofence import router as geofence_router
 from app.routers.target_search import router as target_search_router
+from app.routers.layers import router as layers_router
+from app.routers.enrichment import router as enrichment_router
 
 
 # ---------------------------------------------------------------------------
@@ -678,6 +680,17 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Demo mode auto-start failed: {e}")
 
+    # Enrichment pipeline — auto-query intelligence providers on new targets
+    try:
+        from engine.tactical.enrichment import EnrichmentPipeline
+        _enrich_bus = amy_instance.event_bus if amy_instance else None
+        enrichment_pipeline = EnrichmentPipeline(event_bus=_enrich_bus)
+        app.state.enrichment_pipeline = enrichment_pipeline
+        logger.info("Enrichment pipeline started with %d providers",
+                     len(enrichment_pipeline.get_provider_names()))
+    except Exception as e:
+        logger.warning(f"Enrichment pipeline failed to start: {e}")
+
     # Plugin system — discover, configure, and start all plugins
     plugin_manager = _start_plugins(app, amy_instance, sim_engine)
     if plugin_manager is not None:
@@ -695,6 +708,11 @@ async def lifespan(app: FastAPI):
     if plugin_manager is not None:
         logger.info("Stopping plugins...")
         plugin_manager.stop_all()
+
+    # Stop enrichment pipeline listener
+    _enrich_pipe = getattr(app.state, "enrichment_pipeline", None)
+    if _enrich_pipe is not None:
+        _enrich_pipe.stop()
 
     _shutdown_subsystems(amy_instance, sim_engine, mqtt_bridge, app)
     logger.info("TRITIUM-SC shutting down...")
@@ -745,6 +763,8 @@ app.include_router(tak_router)
 app.include_router(fleet_router)
 app.include_router(demo_router)
 app.include_router(geofence_router)
+app.include_router(layers_router)
+app.include_router(enrichment_router)
 
 # Static files
 frontend_path = Path(__file__).parent.parent / "frontend"
