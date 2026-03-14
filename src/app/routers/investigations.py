@@ -233,6 +233,83 @@ async def filter_by_time(
     return {"inv_id": inv_id, "filtered_entities": filtered, "count": len(filtered)}
 
 
+@router.get("/{inv_id}/graph")
+async def get_investigation_graph(inv_id: str):
+    """Return the investigation entities and relationships as a graph for link chart rendering.
+
+    Returns nodes (entities) and edges (relationships) suitable for
+    force-directed graph visualization.
+    """
+    engine = _get_engine()
+    if engine is None:
+        raise HTTPException(status_code=503, detail="Investigation engine unavailable")
+
+    inv = engine.get(inv_id)
+    if inv is None:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+
+    nodes = []
+    edges = []
+    seen_ids = set()
+
+    # Build nodes from all entity IDs
+    for eid in inv.all_entity_ids():
+        if eid in seen_ids:
+            continue
+        seen_ids.add(eid)
+
+        node_data = {
+            "id": eid,
+            "label": eid,
+            "entity_type": "unknown",
+            "is_seed": eid in inv.seed_entities,
+        }
+
+        # Enrich with dossier data if available
+        if engine._dossier_store is not None:
+            dossier = engine._dossier_store.get_dossier(eid)
+            if dossier:
+                node_data["label"] = dossier.get("name", eid)
+                node_data["entity_type"] = dossier.get("entity_type", "unknown")
+                node_data["threat_level"] = dossier.get("threat_level", "none")
+                node_data["confidence"] = dossier.get("confidence", 0.0)
+
+                # Extract relationships to build edges
+                relationships = dossier.get("relationships", [])
+                for rel in relationships:
+                    target_id = rel.get("target_id") or rel.get("entity_id")
+                    if target_id and target_id in seen_ids or target_id in inv.all_entity_ids():
+                        edges.append({
+                            "source_id": eid,
+                            "target_id": target_id,
+                            "type": rel.get("type", rel.get("relationship", "")),
+                            "confidence": rel.get("confidence", 0.5),
+                        })
+
+        nodes.append(node_data)
+
+    # Connect seed entities to discovered entities if no edges found
+    if not edges and len(inv.seed_entities) > 0:
+        discovered = [eid for eid in inv.all_entity_ids() if eid not in inv.seed_entities]
+        for seed_id in inv.seed_entities:
+            for disc_id in discovered:
+                edges.append({
+                    "source_id": seed_id,
+                    "target_id": disc_id,
+                    "type": "discovered_from",
+                    "confidence": 0.3,
+                })
+
+    return {
+        "inv_id": inv_id,
+        "title": inv.title,
+        "nodes": nodes,
+        "edges": edges,
+        "node_count": len(nodes),
+        "edge_count": len(edges),
+    }
+
+
 @router.post("/{inv_id}/filter/type")
 async def filter_by_type(
     inv_id: str,

@@ -3876,3 +3876,230 @@
 .qs-dismiss-label input[type="checkbox"] {
     accent-color: var(--cyan, #00f0ff);
 }
+
+/* ============================================================
+ * Target Detail Modal (double-click on map unit)
+ * ============================================================ */
+
+.tdm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    animation: tdm-fade-in 0.15s ease-out;
+}
+
+@keyframes tdm-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.tdm-content {
+    background: #0a0a0f;
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 4px;
+    max-width: 680px;
+    width: 90vw;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 0 30px rgba(0, 240, 255, 0.15);
+}
+
+.tdm-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: rgba(26, 26, 46, 0.6);
+    border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+}
+
+.tdm-header-info {
+    flex: 1;
+}
+
+.tdm-name {
+    font-size: 1rem;
+    font-weight: bold;
+    color: #00f0ff;
+    margin-bottom: 4px;
+}
+
+.tdm-subtitle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.7rem;
+}
+
+.tdm-badge {
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-size: 0.6rem;
+    font-weight: bold;
+    color: #0a0a0f;
+}
+
+.tdm-type, .tdm-source {
+    color: #888;
+}
+
+.tdm-close {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    line-height: 1;
+}
+
+.tdm-close:hover { color: #ff2a6d; }
+
+.tdm-body {
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+}
+
+.tdm-col-left {
+    flex: 1;
+    min-width: 0;
+}
+
+.tdm-col-right {
+    width: 220px;
+    flex-shrink: 0;
+}
+
+.tdm-section-title {
+    font-size: 0.55rem;
+    color: #667;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+    padding-bottom: 3px;
+}
+
+.tdm-id-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+    font-size: 0.65rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.tdm-id-key {
+    color: #667;
+    font-size: 0.55rem;
+}
+
+.tdm-id-val {
+    color: #ccc;
+    text-align: right;
+    word-break: break-all;
+}
+
+.tdm-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.tdm-stat {
+    background: rgba(26, 26, 46, 0.4);
+    border: 1px solid rgba(0, 240, 255, 0.1);
+    border-radius: 3px;
+    padding: 6px;
+    text-align: center;
+}
+
+.tdm-stat-label {
+    font-size: 0.5rem;
+    color: #556;
+    margin-bottom: 2px;
+}
+
+.tdm-stat-value {
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: #00f0ff;
+}
+
+.tdm-trail-container {
+    margin-bottom: 12px;
+}
+
+.tdm-trail-empty {
+    color: #445;
+    font-size: 0.6rem;
+    text-align: center;
+    padding: 20px 0;
+}
+
+.tdm-dossier-link {
+    display: inline-block;
+    margin-top: 8px;
+    color: #00f0ff;
+    font-size: 0.6rem;
+    text-decoration: none;
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    padding: 4px 10px;
+    border-radius: 2px;
+}
+
+.tdm-dossier-link:hover {
+    background: rgba(0, 240, 255, 0.1);
+}
+
+.tdm-enrich-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    font-size: 0.6rem;
+}
+
+.tdm-enrich-src { color: #667; }
+.tdm-enrich-val { color: #aaa; }
+
+.tdm-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.tdm-action-btn {
+    flex: 1;
+    background: rgba(0, 240, 255, 0.1);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    color: #00f0ff;
+    padding: 6px;
+    font-size: 0.6rem;
+    font-family: 'Share Tech Mono', monospace;
+    cursor: pointer;
+    border-radius: 2px;
+}
+
+.tdm-action-btn:hover {
+    background: rgba(0, 240, 255, 0.2);
+}
+
+.tdm-action-track {
+    border-color: rgba(252, 238, 10, 0.4);
+    color: #fcee0a;
+    background: rgba(252, 238, 10, 0.1);
+}
+
+.tdm-action-track:hover {
+    background: rgba(252, 238, 10, 0.2);
+}
+
+@media (max-width: 600px) {
+    .tdm-body { flex-direction: column; }
+    .tdm-col-right { width: 100%; }
+}

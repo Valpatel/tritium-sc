@@ -237,6 +237,118 @@ async def get_target_clusters(
     }
 
 
+@router.get("/targets/export")
+async def export_targets(
+    request: Request,
+    format: str = Query("json", description="Export format: json, csv, or geojson"),
+):
+    """Export all current targets in standard formats for external analysis.
+
+    Supported formats:
+    - ``json`` — Array of target dicts
+    - ``csv`` — Comma-separated values with header row
+    - ``geojson`` — GeoJSON FeatureCollection with Point geometries
+    """
+    from fastapi.responses import Response
+
+    tracker = _get_tracker(request)
+    all_targets: list[dict] = []
+
+    if tracker is not None:
+        all_targets = [t.to_dict() for t in tracker.get_all()]
+    else:
+        engine = _get_sim_engine(request)
+        if engine is not None:
+            all_targets = [t.to_dict() for t in engine.get_targets()]
+
+    fmt = format.lower().strip()
+
+    if fmt == "csv":
+        import csv
+        import io
+
+        if not all_targets:
+            return Response(
+                content="target_id,name,type,alliance,lat,lng,source,confidence\n",
+                media_type="text/csv",
+                headers={"Content-Disposition": "attachment; filename=targets.csv"},
+            )
+
+        # Collect all keys
+        all_keys = set()
+        for t in all_targets:
+            all_keys.update(t.keys())
+        # Priority columns first, then alphabetical remainder
+        priority = ["target_id", "name", "type", "asset_type", "alliance", "lat", "lng",
+                     "source", "confidence", "rssi", "heading", "speed", "health"]
+        ordered_keys = [k for k in priority if k in all_keys]
+        ordered_keys += sorted(k for k in all_keys if k not in priority)
+
+        buf = io.StringIO()
+        writer = csv.DictWriter(buf, fieldnames=ordered_keys, extrasaction="ignore")
+        writer.writeheader()
+        for t in all_targets:
+            # Flatten nested position
+            row = dict(t)
+            if "position" in row and isinstance(row["position"], dict):
+                pos = row.pop("position")
+                row.setdefault("pos_x", pos.get("x"))
+                row.setdefault("pos_y", pos.get("y"))
+            writer.writerow(row)
+
+        return Response(
+            content=buf.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=targets.csv"},
+        )
+
+    elif fmt == "geojson":
+        import json
+
+        features = []
+        for t in all_targets:
+            lat = t.get("lat", 0.0) or 0.0
+            lng = t.get("lng", 0.0) or 0.0
+            # Fall back to position x/y if no lat/lng
+            if lat == 0.0 and lng == 0.0:
+                pos = t.get("position", {})
+                if isinstance(pos, dict):
+                    lng = pos.get("x", 0.0)
+                    lat = pos.get("y", 0.0)
+
+            props = {k: v for k, v in t.items()
+                     if k not in ("lat", "lng", "position") and not isinstance(v, (dict, list))}
+
+            features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [lng, lat],
+                },
+                "properties": props,
+            })
+
+        geojson = {
+            "type": "FeatureCollection",
+            "features": features,
+        }
+
+        return Response(
+            content=json.dumps(geojson, default=str),
+            media_type="application/geo+json",
+            headers={"Content-Disposition": "attachment; filename=targets.geojson"},
+        )
+
+    else:
+        # Default: JSON array
+        import json
+        return Response(
+            content=json.dumps(all_targets, default=str),
+            media_type="application/json",
+            headers={"Content-Disposition": "attachment; filename=targets.json"},
+        )
+
+
 @router.post("/sighting")
 async def report_sighting(request: Request):
     """Accept a sighting report from camera or robot."""

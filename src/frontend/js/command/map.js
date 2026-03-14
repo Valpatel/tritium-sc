@@ -1539,10 +1539,77 @@ function _drawSensorCoverage(ctx) {
     const DEFAULT_COVERAGE = {
         camera: 30, sensor: 25, ble_device: 10, ble: 10,
         mesh_radio: 50, meshtastic: 50, turret: 40,
+        edge_node: 30, // BLE default
     };
+
+    // Edge node dual-ring config: BLE ~30m (cyan) + WiFi ~50m (blue)
+    const EDGE_BLE_RADIUS = 30;
+    const EDGE_WIFI_RADIUS = 50;
+    const EDGE_BLE_COLORS = { fill: 'rgba(0, 240, 255, 0.06)', stroke: 'rgba(0, 240, 255, 0.35)' };
+    const EDGE_WIFI_COLORS = { fill: 'rgba(0, 80, 220, 0.05)', stroke: 'rgba(0, 120, 255, 0.3)' };
 
     for (const [id, unit] of units) {
         const assetType = (unit.asset_type || unit.type || '').toLowerCase();
+
+        // Check if this is an edge node (fleet device with position)
+        const isEdgeNode = assetType === 'edge_node' || assetType === 'edge'
+            || (unit.device_id && (assetType === 'fixed' || assetType === 'sensor'));
+        const capabilities = unit.capabilities || [];
+        const hasBle = capabilities.includes('ble') || capabilities.includes('ble_scan');
+        const hasWifi = capabilities.includes('wifi') || capabilities.includes('wifi_scan');
+
+        // Draw dual BLE/WiFi coverage rings for edge nodes
+        if (isEdgeNode || (hasBle && hasWifi)) {
+            const pos = unit.position;
+            if (pos && pos.x !== undefined && pos.y !== undefined) {
+                const sp = worldToScreen(pos.x, pos.y);
+
+                // WiFi outer ring (larger, blue)
+                const wifiRadius = (unit.wifi_range_meters || EDGE_WIFI_RADIUS) * _state.cam.zoom;
+                const wifiGrad = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, wifiRadius);
+                wifiGrad.addColorStop(0, 'rgba(0, 80, 220, 0.12)');
+                wifiGrad.addColorStop(0.6, EDGE_WIFI_COLORS.fill);
+                wifiGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.beginPath();
+                ctx.arc(sp.x, sp.y, wifiRadius, 0, Math.PI * 2);
+                ctx.fillStyle = wifiGrad;
+                ctx.fill();
+                ctx.strokeStyle = EDGE_WIFI_COLORS.stroke;
+                ctx.lineWidth = 1;
+                ctx.setLineDash([6, 4]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // WiFi label
+                ctx.font = '8px "Share Tech Mono", monospace';
+                ctx.fillStyle = 'rgba(0, 120, 255, 0.5)';
+                ctx.textAlign = 'center';
+                ctx.fillText('WiFi', sp.x, sp.y - wifiRadius - 3);
+
+                // BLE inner ring (smaller, cyan)
+                const bleRadius = (unit.ble_range_meters || EDGE_BLE_RADIUS) * _state.cam.zoom;
+                const bleGrad = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, bleRadius);
+                bleGrad.addColorStop(0, 'rgba(0, 240, 255, 0.15)');
+                bleGrad.addColorStop(0.6, EDGE_BLE_COLORS.fill);
+                bleGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.beginPath();
+                ctx.arc(sp.x, sp.y, bleRadius, 0, Math.PI * 2);
+                ctx.fillStyle = bleGrad;
+                ctx.fill();
+                ctx.strokeStyle = EDGE_BLE_COLORS.stroke;
+                ctx.lineWidth = 1;
+                ctx.setLineDash([3, 3]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // BLE label
+                ctx.fillStyle = 'rgba(0, 240, 255, 0.5)';
+                ctx.fillText('BLE', sp.x, sp.y - bleRadius - 3);
+
+                continue;  // Skip normal coverage rendering for this unit
+            }
+        }
+
         // Draw coverage for sensor-type assets (explicit or default radius)
         const isSensorType = assetType === 'fixed' || assetType.includes('sensor')
             || assetType.includes('camera') || assetType === 'ble_device' || assetType === 'ble'
@@ -3107,16 +3174,197 @@ function _onDblClick(e) {
     if (hitId) {
         TritiumStore.set('map.selectedUnitId', hitId);
         EventBus.emit('unit:selected', { id: hitId });
-        EventBus.emit('panel:request-open', { id: 'unit-inspector' });
         const unit = TritiumStore.units.get(hitId);
         if (unit) {
             if (unit.position) {
                 _state.cam.targetX = unit.position.x;
                 _state.cam.targetY = unit.position.y;
             }
-            DeviceModalManager.open(hitId, _resolveModalType(unit), unit);
+            // Open the rich target detail modal
+            _openTargetDetailModal(hitId, unit);
         }
     }
+}
+
+/**
+ * Open a rich target detail modal with identifiers, signal timeline,
+ * enrichments, dossier link, position trail, and RSSI/confidence.
+ */
+async function _openTargetDetailModal(targetId, unit) {
+    // Remove any existing modal
+    const existing = document.getElementById('target-detail-modal');
+    if (existing) existing.remove();
+
+    const alliance = (unit.alliance || 'unknown').toLowerCase();
+    const allianceColor = ALLIANCE_COLORS[alliance] || '#fcee0a';
+    const type = unit.asset_type || unit.type || 'unknown';
+    const source = unit.source || 'unknown';
+    const rssi = unit.rssi ?? unit.signal_strength ?? '--';
+    const confidence = unit.confidence != null ? Math.round(unit.confidence * 100) + '%' : '--';
+    const lat = unit.lat != null ? unit.lat.toFixed(6) : (unit.position?.x?.toFixed(1) || '--');
+    const lng = unit.lng != null ? unit.lng.toFixed(6) : (unit.position?.y?.toFixed(1) || '--');
+    const speed = unit.speed != null ? unit.speed.toFixed(1) + ' m/s' : '--';
+    const heading = unit.heading != null ? Math.round(unit.heading) + 'deg' : '--';
+    const health = unit.health != null ? Math.round(unit.health) + '%' : '--';
+    const fsm = unit.fsm_state || unit.state || '--';
+    const name = unit.name || unit.label || targetId;
+    const manufacturer = unit.manufacturer || unit.oui || '';
+    const deviceClass = unit.device_class || unit.classification || '';
+
+    // Build identifiers section
+    const identifiers = [];
+    identifiers.push(`<div class="tdm-id-row"><span class="tdm-id-key">TARGET ID</span><span class="tdm-id-val mono">${_escMap(targetId)}</span></div>`);
+    if (unit.mac) identifiers.push(`<div class="tdm-id-row"><span class="tdm-id-key">MAC</span><span class="tdm-id-val mono">${_escMap(unit.mac)}</span></div>`);
+    if (unit.device_id) identifiers.push(`<div class="tdm-id-row"><span class="tdm-id-key">DEVICE ID</span><span class="tdm-id-val mono">${_escMap(unit.device_id)}</span></div>`);
+    if (manufacturer) identifiers.push(`<div class="tdm-id-row"><span class="tdm-id-key">MFR</span><span class="tdm-id-val">${_escMap(manufacturer)}</span></div>`);
+    if (deviceClass) identifiers.push(`<div class="tdm-id-row"><span class="tdm-id-key">CLASS</span><span class="tdm-id-val">${_escMap(deviceClass)}</span></div>`);
+    if (unit.ssid) identifiers.push(`<div class="tdm-id-row"><span class="tdm-id-key">SSID</span><span class="tdm-id-val">${_escMap(unit.ssid)}</span></div>`);
+    if (unit.bssid) identifiers.push(`<div class="tdm-id-row"><span class="tdm-id-key">BSSID</span><span class="tdm-id-val mono">${_escMap(unit.bssid)}</span></div>`);
+
+    // Fetch trail data for mini-map
+    let trailHtml = '<div class="tdm-trail-empty">No trail data</div>';
+    try {
+        const trailRes = await fetch(`/api/targets/${encodeURIComponent(targetId)}/trail?max_points=50`);
+        if (trailRes.ok) {
+            const trailData = await trailRes.json();
+            if (trailData.trail && trailData.trail.length > 1) {
+                trailHtml = _renderTrailMiniMap(trailData.trail, 200, 120);
+            }
+        }
+    } catch (_) { /* skip */ }
+
+    // Fetch dossier for enrichments
+    let enrichHtml = '';
+    let dossierLink = '';
+    try {
+        const dosRes = await fetch(`/api/dossiers/${encodeURIComponent(targetId)}`);
+        if (dosRes.ok) {
+            const dossier = await dosRes.json();
+            dossierLink = `<a href="#" class="tdm-dossier-link" onclick="event.preventDefault(); window.EventBus && window.EventBus.emit('panel:request-open', {id: 'dossiers'})">VIEW FULL DOSSIER</a>`;
+            const enrichments = dossier.enrichments || [];
+            if (enrichments.length > 0) {
+                enrichHtml = '<div class="tdm-section-title">ENRICHMENTS</div>';
+                for (const e of enrichments.slice(0, 5)) {
+                    enrichHtml += `<div class="tdm-enrich-row"><span class="tdm-enrich-src">${_escMap(e.source || '')}</span><span class="tdm-enrich-val">${_escMap(e.value || e.data || '')}</span></div>`;
+                }
+            }
+        }
+    } catch (_) { /* skip */ }
+
+    const modal = document.createElement('div');
+    modal.id = 'target-detail-modal';
+    modal.className = 'tdm-overlay';
+    modal.innerHTML = `
+        <div class="tdm-content">
+            <div class="tdm-header" style="border-left: 3px solid ${allianceColor}">
+                <div class="tdm-header-info">
+                    <div class="tdm-name mono">${_escMap(name)}</div>
+                    <div class="tdm-subtitle">
+                        <span class="tdm-badge" style="background:${allianceColor}">${alliance.toUpperCase()}</span>
+                        <span class="tdm-type">${_escMap(type.toUpperCase())}</span>
+                        <span class="tdm-source">${_escMap(source)}</span>
+                    </div>
+                </div>
+                <button class="tdm-close" onclick="document.getElementById('target-detail-modal')?.remove()">&times;</button>
+            </div>
+            <div class="tdm-body">
+                <div class="tdm-col tdm-col-left">
+                    <div class="tdm-section-title">IDENTIFIERS</div>
+                    ${identifiers.join('')}
+
+                    <div class="tdm-section-title" style="margin-top:12px">SIGNAL</div>
+                    <div class="tdm-stats-grid">
+                        <div class="tdm-stat"><div class="tdm-stat-label">RSSI</div><div class="tdm-stat-value">${rssi}</div></div>
+                        <div class="tdm-stat"><div class="tdm-stat-label">CONF</div><div class="tdm-stat-value">${confidence}</div></div>
+                        <div class="tdm-stat"><div class="tdm-stat-label">SPEED</div><div class="tdm-stat-value">${speed}</div></div>
+                        <div class="tdm-stat"><div class="tdm-stat-label">HDG</div><div class="tdm-stat-value">${heading}</div></div>
+                    </div>
+
+                    <div class="tdm-section-title" style="margin-top:12px">STATUS</div>
+                    <div class="tdm-stats-grid">
+                        <div class="tdm-stat"><div class="tdm-stat-label">HEALTH</div><div class="tdm-stat-value">${health}</div></div>
+                        <div class="tdm-stat"><div class="tdm-stat-label">STATE</div><div class="tdm-stat-value">${_escMap(String(fsm))}</div></div>
+                        <div class="tdm-stat"><div class="tdm-stat-label">POS</div><div class="tdm-stat-value mono" style="font-size:0.55rem">${lat}, ${lng}</div></div>
+                    </div>
+
+                    ${enrichHtml}
+                    ${dossierLink}
+                </div>
+                <div class="tdm-col tdm-col-right">
+                    <div class="tdm-section-title">POSITION TRAIL</div>
+                    <div class="tdm-trail-container">${trailHtml}</div>
+
+                    <div class="tdm-actions">
+                        <button class="tdm-action-btn" onclick="window.EventBus && window.EventBus.emit('panel:request-open', {id: 'graph-explorer'}); document.getElementById('target-detail-modal')?.remove()">GRAPH</button>
+                        <button class="tdm-action-btn" onclick="window.EventBus && window.EventBus.emit('panel:request-open', {id: 'unit-inspector'}); document.getElementById('target-detail-modal')?.remove()">INSPECT</button>
+                        <button class="tdm-action-btn tdm-action-track">TRACK</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Close on overlay click
+    modal.addEventListener('click', (ev) => {
+        if (ev.target === modal) modal.remove();
+    });
+
+    // Close on Escape
+    const escHandler = (ev) => {
+        if (ev.key === 'Escape') { modal.remove(); document.removeEventListener('keydown', escHandler); }
+    };
+    document.addEventListener('keydown', escHandler);
+
+    document.body.appendChild(modal);
+}
+
+/**
+ * Render a trail as an inline SVG mini-map.
+ */
+function _renderTrailMiniMap(trail, width, height) {
+    if (!trail || trail.length < 2) return '<div class="tdm-trail-empty">Insufficient trail data</div>';
+
+    // Get bounds
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const pt of trail) {
+        const x = pt.x ?? pt.lng ?? 0;
+        const y = pt.y ?? pt.lat ?? 0;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+    }
+
+    const rangeX = maxX - minX || 1;
+    const rangeY = maxY - minY || 1;
+    const pad = 10;
+    const iw = width - pad * 2;
+    const ih = height - pad * 2;
+
+    // Build polyline points
+    const points = trail.map(pt => {
+        const x = pt.x ?? pt.lng ?? 0;
+        const y = pt.y ?? pt.lat ?? 0;
+        const sx = pad + ((x - minX) / rangeX) * iw;
+        const sy = pad + ih - ((y - minY) / rangeY) * ih;
+        return `${sx.toFixed(1)},${sy.toFixed(1)}`;
+    }).join(' ');
+
+    // Last point marker
+    const lastPt = trail[trail.length - 1];
+    const lx = pad + (((lastPt.x ?? lastPt.lng ?? 0) - minX) / rangeX) * iw;
+    const ly = pad + ih - (((lastPt.y ?? lastPt.lat ?? 0) - minY) / rangeY) * ih;
+
+    return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="background:#060609;border:1px solid rgba(0,240,255,0.2);border-radius:4px">
+        <polyline points="${points}" fill="none" stroke="#00f0ff" stroke-width="1.5" stroke-opacity="0.7"/>
+        <circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="4" fill="#00f0ff" stroke="#fff" stroke-width="1"/>
+        <text x="${width-4}" y="${height-4}" text-anchor="end" fill="#666" font-size="8" font-family="monospace">${trail.length} pts</text>
+    </svg>`;
+}
+
+function _escMap(text) {
+    if (!text) return '';
+    return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function _onContextMenu(e) {
