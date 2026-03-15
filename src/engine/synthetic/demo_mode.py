@@ -62,7 +62,8 @@ class DemoController:
     targets for correlator fusion demonstration.
     """
 
-    # Demo camera positions — placed around the same neighborhood as other generators
+    # Demo camera positions — placed around the demo neighborhood (San Francisco)
+    # Demo mode updates the geo reference to center the map here.
     _DEMO_CAMERA_POSITIONS = [
         {"id": "demo-cam-01", "name": "North Gate", "lat": 37.7755, "lng": -122.4185,
          "heading": 180, "scene_type": "street_cam"},
@@ -121,6 +122,15 @@ class DemoController:
 
         logger.info("Starting demo mode...")
         self._started_at = time.monotonic()
+
+        # Update geo reference to demo neighborhood so the map centers on
+        # the demo data.  All demo generators use San Francisco coordinates.
+        try:
+            from engine.tactical.geo import init_reference
+            init_reference(37.7749, -122.4194, 10.0)
+            logger.info("Geo reference updated to demo neighborhood (37.7749, -122.4194)")
+        except Exception as e:
+            logger.debug("Could not update geo reference for demo: %s", e)
 
         # BLE scanner
         self._ble_gen = BLEScanGenerator(

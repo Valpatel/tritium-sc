@@ -664,7 +664,7 @@ body.v2 {
     background: linear-gradient(135deg, var(--surface-2) 0%, var(--surface-1) 100%);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    pointer-events: auto;
+    pointer-events: none;
     animation: v2-fadeInRight 0.3s ease forwards;
     position: relative;
     overflow: hidden;
@@ -1674,7 +1674,7 @@ body.v2 {
 }
 
 .toast {
-    pointer-events: all;
+    pointer-events: none;
     background: linear-gradient(135deg, var(--surface-2) 0%, var(--surface-1) 100%);
     border: 1px solid var(--border);
     border-left: 3px solid var(--text-dim);
