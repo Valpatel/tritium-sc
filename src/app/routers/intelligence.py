@@ -16,9 +16,11 @@ from __future__ import annotations
 import time
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from loguru import logger
+
+from app.auth import optional_auth, require_auth
 
 router = APIRouter(prefix="/api/intelligence", tags=["intelligence"])
 
@@ -65,7 +67,7 @@ class AnomalyDescribeResponse(BaseModel):
 
 
 @router.post("/retrain", response_model=RetrainResponse)
-async def retrain_model(request: Request) -> RetrainResponse:
+async def retrain_model(request: Request, user: dict = Depends(require_auth)) -> RetrainResponse:
     """Trigger retraining of the correlation model from accumulated training data.
 
     Loads all confirmed correlation decisions from the TrainingStore,
@@ -123,7 +125,7 @@ async def model_status(request: Request) -> ModelStatusResponse:
 
 
 @router.post("/anomaly/describe", response_model=AnomalyDescribeResponse)
-async def describe_anomaly(req: AnomalyDescribeRequest) -> AnomalyDescribeResponse:
+async def describe_anomaly(req: AnomalyDescribeRequest, user: dict = Depends(optional_auth)) -> AnomalyDescribeResponse:
     """Use a local Ollama LLM to describe an anomaly in natural language.
 
     When the anomaly detector flags unusual RF activity, this endpoint
@@ -162,11 +164,30 @@ async def describe_anomaly(req: AnomalyDescribeRequest) -> AnomalyDescribeRespon
         )
 
 
+def _sanitize_context_value(value: Any) -> str:
+    """Sanitize a context value to prevent prompt injection."""
+    s = str(value)
+    # Truncate long values and strip control characters
+    s = s[:200]
+    s = "".join(c for c in s if c.isprintable() or c in (" ", "\t"))
+    return s
+
+
 def _build_anomaly_prompt(anomaly_type: str, context: dict[str, Any]) -> str:
     """Build a prompt for the LLM to describe an anomaly."""
+    # Sanitize anomaly type — only allow known types or truncate to safe chars
+    _KNOWN_TYPES = {
+        "rf_drop", "rf_spike", "device_loss", "jamming_suspected",
+        "mass_departure", "new_device_flood", "rssi_anomaly",
+    }
+    if anomaly_type in _KNOWN_TYPES:
+        safe_type = anomaly_type
+    else:
+        safe_type = "".join(c for c in str(anomaly_type)[:30] if c.isalnum() or c in ("_", "-"))
     ctx_lines = []
     for k, v in context.items():
-        ctx_lines.append(f"  {k}: {v}")
+        safe_k = "".join(c for c in str(k)[:30] if c.isalnum() or c in ("_", "-"))
+        ctx_lines.append(f"  {safe_k}: {_sanitize_context_value(v)}")
     ctx_str = "\n".join(ctx_lines) if ctx_lines else "  (no additional context)"
 
     return f"""You are a cybersecurity analyst monitoring an RF sensor network.
@@ -174,7 +195,7 @@ An anomaly has been detected. Describe what is happening in 1-2 sentences,
 using plain language that a security operator would understand. Include
 possible explanations and severity.
 
-Anomaly type: {anomaly_type}
+Anomaly type: {safe_type}
 Context:
 {ctx_str}
 
@@ -351,7 +372,7 @@ class EdgeMetricsResponse(BaseModel):
 
 
 @router.post("/features/ingest", response_model=FeatureIngestResponse)
-async def ingest_features(req: FeatureIngestRequest) -> FeatureIngestResponse:
+async def ingest_features(req: FeatureIngestRequest, user: dict = Depends(optional_auth)) -> FeatureIngestResponse:
     """Ingest feature vectors from an edge node.
 
     Edge nodes publish feature vectors as part of BLE sightings.
@@ -391,7 +412,7 @@ async def get_device_features(mac: str) -> FeaturesResponse:
 
 
 @router.get("/features", response_model=list[FeaturesResponse])
-async def list_all_features(limit: int = 100) -> list[FeaturesResponse]:
+async def list_all_features(limit: int = Query(100, ge=1, le=1000)) -> list[FeaturesResponse]:
     """List accumulated features for all tracked devices.
 
     Returns features ordered by most recently seen, limited to `limit` entries.
@@ -407,7 +428,7 @@ async def list_all_features(limit: int = 100) -> list[FeaturesResponse]:
 
 
 @router.post("/feedback/classify", response_model=FeedbackResponse)
-async def classify_and_feedback(req: FeedbackRequest) -> FeedbackResponse:
+async def classify_and_feedback(req: FeedbackRequest, user: dict = Depends(optional_auth)) -> FeedbackResponse:
     """Classify a device and send feedback to the originating edge node.
 
     Triggers ML classification on accumulated features and publishes

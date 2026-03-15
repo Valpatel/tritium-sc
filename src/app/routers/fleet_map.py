@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import time
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
+
+from app.auth import optional_auth
 
 router = APIRouter(prefix="/api/fleet/map", tags=["fleet-map"])
 
@@ -28,7 +30,7 @@ def _get_edge_tracker(request: Request):
 
 
 @router.get("/devices")
-async def get_fleet_map_devices(request: Request):
+async def get_fleet_map_devices(request: Request, user: dict | None = Depends(optional_auth)):
     """Return all edge devices with map-relevant data.
 
     Each device includes:
@@ -131,7 +133,7 @@ async def get_fleet_map_devices(request: Request):
 
 
 @router.get("/coverage")
-async def get_fleet_coverage(request: Request):
+async def get_fleet_coverage(request: Request, user: dict | None = Depends(optional_auth)):
     """Return coverage overlay data for all positioned devices.
 
     Each entry is a circle: center (lat/lng), radius, and color based

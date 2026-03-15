@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
+
+from app.auth import optional_auth
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +23,7 @@ def _get_dwell_tracker(request: Request):
 
 
 @router.get("/active")
-async def dwell_active(request: Request):
+async def dwell_active(request: Request, user: dict | None = Depends(optional_auth)):
     """GET /api/dwell/active — list all currently active dwell events.
 
     Returns targets that have been stationary for longer than the dwell
@@ -40,7 +42,7 @@ async def dwell_active(request: Request):
 
 
 @router.get("/history")
-async def dwell_history(request: Request):
+async def dwell_history(request: Request, user: dict | None = Depends(optional_auth)):
     """GET /api/dwell/history — list completed dwell events.
 
     Returns up to 200 most recent completed dwell events.
@@ -58,7 +60,7 @@ async def dwell_history(request: Request):
 
 
 @router.get("/target/{target_id}")
-async def dwell_for_target(request: Request, target_id: str):
+async def dwell_for_target(request: Request, target_id: str, user: dict | None = Depends(optional_auth)):
     """GET /api/dwell/target/{target_id} — get active dwell for a specific target."""
     tracker = _get_dwell_tracker(request)
     if tracker is None:

@@ -14,6 +14,24 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-15 — Wave 128: Security Audit + OWASP Pass
+
+| Change | Verification |
+|--------|-------------|
+| OWASP auth pass: added `require_auth` to POST `/api/intelligence/retrain`, `optional_auth` to POST `/anomaly/describe`, `/features/ingest`, `/feedback/classify` | 14 tests passing |
+| OWASP auth pass: added `optional_auth` to GET `/api/dwell/*` (3 endpoints), GET `/api/fleet/map/*` (2 endpoints), GET `/api/fleet/commands/stats` | Signature inspection tests |
+| Prompt injection mitigation: `_sanitize_context_value()` truncates to 200 chars, strips control chars; anomaly_type restricted to known values or sanitized to alnum+dash+underscore | 5 tests passing |
+| Input validation: `limit` parameter on `/api/intelligence/features` now bounded `ge=1, le=1000` | Code review |
+| New security audit trail API: GET `/api/security/audit-trail` and `/api/security/audit-stats` — aggregates 401/403/429/5xx events from audit store | Unit tested, auth-protected |
+| New Security Audit Trail panel — shows failed auth, rate limit hits, CORS/CSP rejections with severity badges and filter dropdown | Panel registered, menu bar entry |
+| ESC-50 dataset downloaded (1.4 GB, 2000 clips, 50 classes) to `data/library/audio/ESC-50/` | Verified 2000 files |
+| MANIFEST.json created for data library — tracks downloaded and queued datasets | Created |
+| CATALOG.md updated with ESC-50 download status | Updated |
+| gb10-02 synced: tritium-lib 2334 tests passing, all submodules updated | Remote verified |
+| RL model status: 6-feature model at 51.3% accuracy — training data lacks new 10-feature columns, needs fresh correlation decisions to accumulate | Investigated |
+
+---
+
 ## 2026-03-15 — Wave 127: Maintenance + Dossier Enrichment
 
 | Change | Verification |

@@ -87,6 +87,7 @@ import { MapReplayPanelDef } from './panels/map-replay.js';
 import { VoiceCommandPanelDef } from './panels/voice-command.js';
 import { WiFiFingerprintPanelDef } from './panels/wifi-fingerprint.js';
 import { CommandHistoryPanelDef } from './panels/command-history.js';
+import { SecurityAuditPanelDef } from './panels/security-audit.js';
 import { DwellMonitorPanelDef } from './panels/dwell-monitor.js';
 import { FederationPanelDef } from './panels/federation.js';
 import { PredictionEllipseManager } from './prediction-ellipses.js';
@@ -643,6 +644,7 @@ function initPanelSystem(container) {
     panelManager.register(VoiceCommandPanelDef);
     panelManager.register(WiFiFingerprintPanelDef);
     panelManager.register(CommandHistoryPanelDef);
+    panelManager.register(SecurityAuditPanelDef);
     panelManager.register(DwellMonitorPanelDef);
     panelManager.register(FederationPanelDef);
 

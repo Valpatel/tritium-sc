@@ -79,7 +79,7 @@ async def command_history(
 
 
 @router.get("/stats")
-async def command_stats(request: Request):
+async def command_stats(request: Request, user: dict | None = Depends(optional_auth)):
     """GET /api/fleet/commands/stats — summary statistics for command history."""
     store = getattr(request.app.state, "command_history_store", None)
     if store is None:
