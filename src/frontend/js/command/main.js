@@ -633,7 +633,7 @@ function _showWelcomeTooltip() {
     const tip = document.createElement('div');
     tip.id = 'welcome-tooltip';
     tip.style.cssText = `
-        position: fixed; bottom: 24px; right: 24px; z-index: 10000;
+        position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(12px); z-index: 10000;
         max-width: 340px; padding: 16px 20px;
         background: rgba(10, 10, 20, 0.95);
         border: 1px solid #00f0ff44;
@@ -642,7 +642,7 @@ function _showWelcomeTooltip() {
         font-size: 11px; line-height: 1.6;
         color: #c0c0d0;
         box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6), 0 0 12px rgba(0, 240, 255, 0.08);
-        opacity: 0; transform: translateY(12px);
+        opacity: 0;
         transition: opacity 0.4s ease, transform 0.4s ease;
         pointer-events: auto;
     `;
@@ -664,7 +664,7 @@ function _showWelcomeTooltip() {
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             tip.style.opacity = '1';
-            tip.style.transform = 'translateY(0)';
+            tip.style.transform = 'translateX(-50%) translateY(0)';
         });
     });
 

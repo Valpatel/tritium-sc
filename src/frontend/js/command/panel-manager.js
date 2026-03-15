@@ -396,6 +396,10 @@ export class PanelManager {
         }
 
         const panel = new Panel(def, this);
+
+        // Find a non-overlapping position before mounting
+        this._positionWithoutOverlap(panel);
+
         this._panels.set(id, panel);
         this.container.appendChild(panel.el);
         try {
@@ -488,6 +492,74 @@ export class PanelManager {
      */
     _nextZ() {
         return ++this._zCounter;
+    }
+
+    // ------ Auto-positioning ------
+
+    /**
+     * Position a panel so it doesn't overlap any existing open panels.
+     * Uses a simple cascade: try the default position first, then shift
+     * right/down in 32px steps until a free slot is found.
+     * Panels prefer corners: Amy→bottom-left, minimap→bottom-right, etc.
+     */
+    _positionWithoutOverlap(panel) {
+        const cw = this.container?.clientWidth || 1920;
+        const ch = this.container?.clientHeight || 1000;
+
+        // Collect rects of all currently visible panels
+        const occupied = [];
+        for (const [, existing] of this._panels) {
+            if (existing._visible) {
+                occupied.push({ x: existing.x, y: existing.y, w: existing.w, h: existing.h });
+            }
+        }
+
+        // If no other panels, keep default position
+        if (occupied.length === 0) return;
+
+        // Check if current position overlaps anything
+        const overlaps = (px, py, pw, ph) => {
+            for (const r of occupied) {
+                if (px < r.x + r.w && px + pw > r.x && py < r.y + r.h && py + ph > r.y) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        // If default position is clear, keep it
+        if (!overlaps(panel.x, panel.y, panel.w, panel.h)) return;
+
+        // Try cascade positions: shift right and down in steps
+        const STEP = 32;
+        for (let attempt = 1; attempt < 40; attempt++) {
+            // Try shifting right
+            const nx = panel.x + STEP * attempt;
+            if (nx + panel.w <= cw && !overlaps(nx, panel.y, panel.w, panel.h)) {
+                panel.x = nx;
+                panel._applyTransform();
+                return;
+            }
+            // Try shifting down
+            const ny = panel.y + STEP * attempt;
+            if (ny + panel.h <= ch && !overlaps(panel.x, ny, panel.w, panel.h)) {
+                panel.y = ny;
+                panel._applyTransform();
+                return;
+            }
+            // Try shifting both
+            if (nx + panel.w <= cw && ny + panel.h <= ch && !overlaps(nx, ny, panel.w, panel.h)) {
+                panel.x = nx;
+                panel.y = ny;
+                panel._applyTransform();
+                return;
+            }
+        }
+
+        // Fallback: center on screen
+        panel.x = Math.round((cw - panel.w) / 2);
+        panel.y = Math.round((ch - panel.h) / 2);
+        panel._applyTransform();
     }
 
     // ------ Layout persistence ------
