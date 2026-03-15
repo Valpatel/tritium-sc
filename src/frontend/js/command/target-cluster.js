@@ -23,6 +23,7 @@
  * @property {number} count - Number of targets in this cluster
  * @property {string} dominant_alliance - Most common alliance in cluster
  * @property {string} dominant_type - Most common asset_type in cluster
+ * @property {Object} alliance_counts - { friendly: N, hostile: N, ... } breakdown
  * @property {Array} target_ids - IDs of targets in this cluster
  */
 
@@ -126,6 +127,7 @@ export class TargetClusterer {
                 count,
                 dominant_alliance: dominantAlliance,
                 dominant_type: dominantType,
+                alliance_counts: { ...allianceCounts },
                 target_ids: members.map(m => m.target_id || m.id || ''),
             });
         }
@@ -143,44 +145,105 @@ export class TargetClusterer {
     }
 }
 
+const ALLIANCE_COLORS = {
+    friendly: '#05ffa1',
+    hostile: '#ff2a6d',
+    neutral: '#00a0ff',
+    unknown: '#fcee0a',
+};
+
 /**
- * Create a MapLibre marker DOM element for a cluster.
- * Shows count badge with alliance color.
+ * Create an SVG donut chart showing alliance breakdown for a cluster.
+ * Each alliance gets a proportional arc segment colored by alliance.
+ * The count is displayed as text in the center.
+ *
+ * @param {Cluster} cluster
+ * @returns {HTMLElement}
  */
 export function createClusterMarkerElement(cluster) {
     const el = document.createElement('div');
     el.className = 'tritium-cluster-marker';
 
-    const colors = {
-        friendly: '#05ffa1',
-        hostile: '#ff2a6d',
-        neutral: '#00a0ff',
-        unknown: '#fcee0a',
-    };
-    const color = colors[cluster.dominant_alliance] || colors.unknown;
-
     // Size scales with count
-    const size = Math.min(24 + Math.sqrt(cluster.count) * 8, 64);
+    const size = Math.min(28 + Math.sqrt(cluster.count) * 8, 72);
+    const half = size / 2;
+    const strokeWidth = Math.max(4, size * 0.14);
+    const radius = half - strokeWidth / 2 - 1;
+    const circumference = 2 * Math.PI * radius;
+
+    // Build donut segments from alliance_counts
+    const counts = cluster.alliance_counts || {};
+    const total = cluster.count || 1;
+    const segments = [];
+    const order = ['friendly', 'hostile', 'unknown', 'neutral'];
+
+    for (const alliance of order) {
+        const n = counts[alliance];
+        if (n && n > 0) {
+            segments.push({ alliance, count: n });
+        }
+    }
+    // Add any alliances not in the standard order
+    for (const [alliance, n] of Object.entries(counts)) {
+        if (!order.includes(alliance) && n > 0) {
+            segments.push({ alliance, count: n });
+        }
+    }
+
+    // If no segments (shouldn't happen), fall back to dominant alliance
+    if (segments.length === 0) {
+        segments.push({ alliance: cluster.dominant_alliance || 'unknown', count: total });
+    }
+
+    // Build SVG arcs
+    let arcs = '';
+    let offset = 0;
+    for (const seg of segments) {
+        const fraction = seg.count / total;
+        const dashLen = fraction * circumference;
+        const gapLen = circumference - dashLen;
+        const color = ALLIANCE_COLORS[seg.alliance] || ALLIANCE_COLORS.unknown;
+
+        arcs += `<circle cx="${half}" cy="${half}" r="${radius}" fill="none"
+            stroke="${color}" stroke-width="${strokeWidth}"
+            stroke-dasharray="${dashLen} ${gapLen}"
+            stroke-dashoffset="${-offset}"
+            stroke-linecap="butt" />`;
+        offset += dashLen;
+    }
+
+    // Determine text color from dominant alliance
+    const textColor = ALLIANCE_COLORS[cluster.dominant_alliance] || ALLIANCE_COLORS.unknown;
+    const fontSize = Math.max(10, size * 0.32);
+
+    // Glow filter for the donut
+    const glowColor = textColor;
+
+    el.innerHTML = `
+        <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <filter id="cluster-glow-${cluster.cluster_id}" x="-50%" y="-50%" width="200%" height="200%">
+                    <feDropShadow dx="0" dy="0" stdDeviation="${size * 0.06}" flood-color="${glowColor}" flood-opacity="0.5"/>
+                </filter>
+            </defs>
+            <g filter="url(#cluster-glow-${cluster.cluster_id})"
+               transform="rotate(-90 ${half} ${half})">
+                ${arcs}
+            </g>
+            <circle cx="${half}" cy="${half}" r="${radius - strokeWidth / 2}" fill="#0a0a0fcc" />
+            <text x="${half}" y="${half}" text-anchor="middle" dominant-baseline="central"
+                fill="${textColor}" font-family="'JetBrains Mono', monospace"
+                font-size="${fontSize}px" font-weight="bold">${cluster.count}</text>
+        </svg>
+    `;
 
     el.style.cssText = `
         width: ${size}px;
         height: ${size}px;
-        border-radius: 50%;
-        background: ${color}22;
-        border: 2px solid ${color};
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: ${Math.max(10, size * 0.35)}px;
-        font-weight: bold;
-        color: ${color};
         cursor: pointer;
         transition: transform 0.2s ease;
-        box-shadow: 0 0 ${size * 0.4}px ${color}44;
         pointer-events: auto;
     `;
-    el.textContent = cluster.count;
 
     el.addEventListener('mouseenter', () => {
         el.style.transform = 'scale(1.2)';
@@ -188,6 +251,10 @@ export function createClusterMarkerElement(cluster) {
     el.addEventListener('mouseleave', () => {
         el.style.transform = 'scale(1)';
     });
+
+    // Tooltip showing breakdown
+    const breakdown = segments.map(s => `${s.alliance}: ${s.count}`).join(', ');
+    el.title = `${cluster.count} targets (${breakdown})`;
 
     return el;
 }
