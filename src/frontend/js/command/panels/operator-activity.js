@@ -69,10 +69,36 @@ export const OperatorActivityPanelDef = {
 
         async function poll() {
             try {
-                const resp = await fetch('/api/operator-activity?limit=50');
-                if (!resp.ok) return;
-                const data = await resp.json();
-                entries = data.activities || [];
+                // Fetch both operator activity and collaboration workspace events
+                const [actResp, wsResp] = await Promise.all([
+                    fetch('/api/operator-activity?limit=50').catch(() => null),
+                    fetch('/api/collaboration/workspaces').catch(() => null),
+                ]);
+
+                const activities = [];
+                if (actResp && actResp.ok) {
+                    const actData = await actResp.json();
+                    activities.push(...(actData.activities || []));
+                }
+                // Merge workspace collaboration events into the activity feed
+                if (wsResp && wsResp.ok) {
+                    const wsData = await wsResp.json();
+                    for (const ws of (wsData.workspaces || [])) {
+                        for (const evt of (ws.recent_events || [])) {
+                            activities.push({
+                                timestamp: evt.timestamp,
+                                username: evt.operator_name || evt.operator_id || 'system',
+                                role: 'operator',
+                                action: `[collab] ${evt.event_type || 'event'}`,
+                                detail: evt.entity_id ? `entity: ${evt.entity_id}` : (evt.note ? evt.note.slice(0, 80) : ws.title || ''),
+                            });
+                        }
+                    }
+                }
+
+                // Sort by timestamp descending, limit
+                activities.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                entries = activities.slice(0, 50);
                 render();
             } catch (e) { /* silent */ }
         }

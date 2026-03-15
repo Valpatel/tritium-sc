@@ -183,6 +183,29 @@ export const MapSharePanelDef = {
                     background: rgba(255, 42, 109, 0.15); border: 1px solid #ff2a6d;
                     color: #ff2a6d; cursor: pointer; font-family: inherit; font-size: 11px;
                 ">BROADCAST VIEW TO ALL</button>
+
+                <div style="margin-top: 12px; border-top: 1px solid rgba(0,240,255,0.15); padding-top: 8px;">
+                    <div style="color: #fcee0a; font-size: 10px; margin-bottom: 6px;">COLLABORATIVE DRAWINGS</div>
+                    <div id="map-share-draw-count" style="color: #888; font-size: 10px; margin-bottom: 6px;">Loading...</div>
+                    <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                        <button class="map-share-draw-btn" data-draw-type="freehand" style="
+                            padding: 4px 8px; background: rgba(0,240,255,0.08); border: 1px solid rgba(0,240,255,0.3);
+                            color: #00f0ff; cursor: pointer; font-family: inherit; font-size: 10px;">FREEHAND</button>
+                        <button class="map-share-draw-btn" data-draw-type="circle" style="
+                            padding: 4px 8px; background: rgba(5,255,161,0.08); border: 1px solid rgba(5,255,161,0.3);
+                            color: #05ffa1; cursor: pointer; font-family: inherit; font-size: 10px;">CIRCLE</button>
+                        <button class="map-share-draw-btn" data-draw-type="arrow" style="
+                            padding: 4px 8px; background: rgba(252,238,10,0.08); border: 1px solid rgba(252,238,10,0.3);
+                            color: #fcee0a; cursor: pointer; font-family: inherit; font-size: 10px;">ARROW</button>
+                        <button class="map-share-draw-btn" data-draw-type="text" style="
+                            padding: 4px 8px; background: rgba(255,42,109,0.08); border: 1px solid rgba(255,42,109,0.3);
+                            color: #ff2a6d; cursor: pointer; font-family: inherit; font-size: 10px;">TEXT</button>
+                    </div>
+                    <button id="map-share-clear-drawings" style="
+                        width: 100%; padding: 4px; margin-top: 6px;
+                        background: rgba(255,42,109,0.08); border: 1px solid rgba(255,42,109,0.2);
+                        color: #ff2a6d; cursor: pointer; font-family: inherit; font-size: 10px;">CLEAR ALL DRAWINGS</button>
+                </div>
             </div>
         `;
 
@@ -191,6 +214,78 @@ export const MapSharePanelDef = {
             const msg = container.querySelector('#map-share-msg').value || '';
             broadcastView(msg);
         };
+
+        // Collaborative drawings — wire /api/collaboration/drawings
+        const drawCountEl = container.querySelector('#map-share-draw-count');
+
+        async function refreshDrawCount() {
+            try {
+                const r = await fetch('/api/collaboration/drawings');
+                if (r.ok) {
+                    const data = await r.json();
+                    const count = (data.drawings || []).length;
+                    if (drawCountEl) drawCountEl.textContent = `${count} shared drawing(s) on map`;
+                }
+            } catch { /* silent */ }
+        }
+        refreshDrawCount();
+
+        container.querySelectorAll('.map-share-draw-btn').forEach(btn => {
+            btn.onclick = async () => {
+                const drawType = btn.dataset.drawType;
+                const map = window._tritiumMapInstance;
+                const center = map ? map.getCenter() : { lng: 0, lat: 0 };
+                let drawReq = {
+                    drawing_type: drawType,
+                    operator_id: 'local_op',
+                    operator_name: 'Operator',
+                    color: '#00f0ff',
+                    coordinates: [[center.lat, center.lng]],
+                    layer: 'default',
+                };
+                if (drawType === 'circle') {
+                    drawReq.radius = 50;
+                }
+                if (drawType === 'text') {
+                    const text = prompt('Drawing text:');
+                    if (!text) return;
+                    drawReq.text = text;
+                }
+                if (drawType === 'arrow') {
+                    drawReq.coordinates = [
+                        [center.lat, center.lng],
+                        [center.lat + 0.001, center.lng + 0.001],
+                    ];
+                }
+                try {
+                    const r = await fetch('/api/collaboration/drawings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(drawReq),
+                    });
+                    if (r.ok) {
+                        EventBus.emit('toast:show', { message: `${drawType} drawing added`, type: 'success' });
+                        refreshDrawCount();
+                    }
+                } catch (e) {
+                    console.error('[MAP-SHARE] Draw failed:', e);
+                }
+            };
+        });
+
+        container.querySelector('#map-share-clear-drawings').onclick = async () => {
+            if (!confirm('Clear all shared drawings?')) return;
+            try {
+                await fetch('/api/collaboration/drawings', { method: 'DELETE' });
+                EventBus.emit('toast:show', { message: 'All drawings cleared', type: 'success' });
+                refreshDrawCount();
+            } catch {}
+        };
+
+        // Stop keyboard propagation from inputs
+        container.querySelectorAll('input').forEach(inp => {
+            inp.addEventListener('keydown', (e) => e.stopPropagation());
+        });
     },
 };
 
