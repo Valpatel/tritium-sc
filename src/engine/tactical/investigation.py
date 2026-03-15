@@ -779,3 +779,159 @@ class InvestigationEngine:
             inv.inv_id[:8], threat_level, dossier_id[:8],
         )
         return inv
+
+    # ------------------------------------------------------------------
+    # Auto-close
+    # ------------------------------------------------------------------
+
+    def check_auto_close(
+        self,
+        dossier_store=None,
+        target_tracker=None,
+        auto_close_delay_s: float = 1800.0,
+    ) -> list[str]:
+        """Check open investigations for auto-close eligibility.
+
+        An investigation is eligible for auto-close when ALL of its
+        entities have been resolved:
+        - Dossier threat_level is "none" or "low"
+        - Target alliance is "friendly" (classified as non-threat)
+        - Entity no longer exists in tracker (departed/expired)
+
+        The investigation is closed after ``auto_close_delay_s`` seconds
+        (default 30 minutes) of all entities being resolved, to allow
+        analysts time to review before automatic closure.
+
+        Parameters
+        ----------
+        dossier_store:
+            DossierStore for looking up entity threat levels.
+            Falls back to self._dossier_store if None.
+        target_tracker:
+            TargetTracker for checking target alliances.
+        auto_close_delay_s:
+            Delay in seconds before closing after all entities resolve
+            (default 1800 = 30 minutes).
+
+        Returns
+        -------
+        list[str]:
+            List of investigation IDs that were auto-closed.
+        """
+        store = dossier_store or self._dossier_store
+        closed_ids: list[str] = []
+        now = time.time()
+
+        for inv in self.list_investigations(status="open"):
+            all_resolved = True
+            entity_ids = inv.all_entity_ids()
+
+            if not entity_ids:
+                # No entities — consider resolved
+                pass
+            else:
+                for entity_id in entity_ids:
+                    resolved = self._is_entity_resolved(
+                        entity_id, store, target_tracker
+                    )
+                    if not resolved:
+                        all_resolved = False
+                        break
+
+            if not all_resolved:
+                continue
+
+            # Check if we have an auto-close annotation with a scheduled time
+            close_scheduled = None
+            for ann in inv.annotations:
+                if ann.note.startswith("AUTO-CLOSE SCHEDULED:"):
+                    try:
+                        close_scheduled = float(
+                            ann.note.split(":", 1)[1].strip()
+                        )
+                    except (ValueError, IndexError):
+                        pass
+
+            if close_scheduled is None:
+                # Schedule auto-close
+                scheduled_time = now + auto_close_delay_s
+                ann = Annotation(
+                    entity_id="",
+                    note=f"AUTO-CLOSE SCHEDULED: {scheduled_time}",
+                    analyst="system",
+                )
+                inv.annotations.append(ann)
+                self._save_investigation(inv)
+                self._save_annotation(inv.inv_id, ann)
+                logger.info(
+                    "Investigation %s scheduled for auto-close in %.0fs",
+                    inv.inv_id[:8], auto_close_delay_s,
+                )
+            elif now >= close_scheduled:
+                # Time to close
+                ann = Annotation(
+                    entity_id="",
+                    note=(
+                        "Auto-closed: all entities resolved "
+                        "(threats cleared or targets classified as friendly)"
+                    ),
+                    analyst="system",
+                )
+                inv.annotations.append(ann)
+                inv.status = "closed"
+                self._save_investigation(inv)
+                self._save_annotation(inv.inv_id, ann)
+                closed_ids.append(inv.inv_id)
+                logger.info(
+                    "Investigation %s auto-closed (all entities resolved)",
+                    inv.inv_id[:8],
+                )
+
+        return closed_ids
+
+    def _is_entity_resolved(
+        self,
+        entity_id: str,
+        dossier_store=None,
+        target_tracker=None,
+    ) -> bool:
+        """Check if an entity is considered resolved (non-threatening).
+
+        An entity is resolved if:
+        1. Its dossier threat_level is "none" or "low", OR
+        2. Its tracked target alliance is "friendly", OR
+        3. It no longer exists in either the dossier store or tracker
+           (departed / expired).
+
+        Returns True if resolved, False if still an active concern.
+        """
+        resolved_threat_levels = {"none", "low", ""}
+
+        # Check dossier
+        if dossier_store is not None:
+            try:
+                dossier = dossier_store.get_dossier(entity_id)
+                if dossier is not None:
+                    level = dossier.get("threat_level", "unknown")
+                    if level not in resolved_threat_levels:
+                        return False
+                    # Dossier exists and threat is low — resolved
+                    return True
+            except Exception:
+                pass
+
+        # Check target tracker
+        if target_tracker is not None:
+            try:
+                targets = target_tracker.get_all()
+                target = targets.get(entity_id)
+                if target is not None:
+                    if target.alliance == "friendly":
+                        return True
+                    if target.alliance in ("hostile", "unknown"):
+                        return False
+            except Exception:
+                pass
+
+        # Entity not found in any store — consider it resolved (departed)
+        return True

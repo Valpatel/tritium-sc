@@ -122,6 +122,9 @@ class MeshtasticPlugin(PluginInterface):
         # Subscribe to MQTT meshtastic topics from external bridge
         self._subscribe_mqtt_bridge(ctx)
 
+        # Subscribe to operator chat events for mesh forwarding
+        self._subscribe_operator_chat(ctx)
+
         self._logger.info(
             "Meshtastic plugin configured (connection=%s, enabled=%s)",
             self._config.connection_type,
@@ -262,6 +265,74 @@ class MeshtasticPlugin(PluginInterface):
         # Also emit an operator chat event for WebSocket broadcast
         if self._event_bus:
             self._event_bus.publish("operator:chat_message", data=chat_payload)
+
+    def _subscribe_operator_chat(self, ctx: PluginContext) -> None:
+        """Subscribe to operator chat events for mesh forwarding.
+
+        When an operator sends a chat message in the SC UI destined for
+        the mesh network, forward it to the Meshtastic radio. This enables
+        bidirectional communication: mesh users see operator messages.
+        """
+        if self._event_bus is None:
+            return
+
+        # Subscribe to MQTT-based operator chat destined for mesh
+        mqtt_bridge = self._mqtt_bridge
+        if mqtt_bridge:
+            site = self._config.site_id
+            try:
+                mqtt_bridge.subscribe(
+                    f"tritium/{site}/chat/operator_to_mesh",
+                    self._on_mqtt_operator_to_mesh,
+                )
+                self._logger.info(
+                    "Subscribed to operator-to-mesh chat topic"
+                )
+            except Exception as exc:
+                self._logger.debug(
+                    "Could not subscribe to operator-to-mesh topic: %s", exc
+                )
+
+    def _on_mqtt_operator_to_mesh(self, topic: str, payload: bytes | str) -> None:
+        """Handle operator chat messages destined for the mesh network.
+
+        Forwards the message text to the Meshtastic radio for broadcast
+        to mesh users.
+        """
+        try:
+            data = json.loads(payload) if isinstance(payload, (bytes, str)) else payload
+            text = data.get("text") or data.get("content", "")
+            sender = data.get("sender") or data.get("operator_name", "SC")
+
+            if not text:
+                return
+
+            # Prefix with sender name so mesh users know who sent it
+            mesh_text = f"[{sender}] {text}"
+            if len(mesh_text) > 228:
+                mesh_text = mesh_text[:225] + "..."
+
+            sent = self.send_text(mesh_text)
+            self._logger.info(
+                "Forwarded operator message to mesh: %s -> %s",
+                sender, text[:50],
+            )
+
+            # Log in local message buffer
+            msg = {
+                "from_name": sender,
+                "text": text,
+                "channel": 0,
+                "timestamp": time.time(),
+                "source": "operator",
+                "forwarded_to_mesh": sent,
+            }
+            self._messages.append(msg)
+            if len(self._messages) > self._max_messages:
+                self._messages = self._messages[-self._max_messages:]
+
+        except Exception as exc:
+            self._logger.error("Error forwarding operator message to mesh: %s", exc)
 
     def _on_mqtt_position(self, topic: str, payload: bytes | str) -> None:
         """Handle position update from the external bridge."""
