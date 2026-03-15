@@ -87,6 +87,16 @@ class FederationPlugin(PluginInterface):
         # Intelligence packages: package_id -> package dict
         self._intel_packages: dict[str, dict] = {}
 
+        # Target deduplication index: canonical_key -> list of target_ids
+        # canonical_key is built from identifiers (MAC, name, entity_type+position)
+        self._dedup_index: dict[str, list[str]] = {}
+
+        # Shared threat assessments: target_id -> ThreatAssessment dict
+        self._threat_assessments: dict[str, dict] = {}
+
+        # Site health metrics: site_id -> HealthMetrics dict
+        self._health_metrics: dict[str, dict] = {}
+
     # -- PluginInterface identity -------------------------------------------
 
     @property
@@ -99,11 +109,11 @@ class FederationPlugin(PluginInterface):
 
     @property
     def version(self) -> str:
-        return "1.0.0"
+        return "2.0.0"
 
     @property
     def capabilities(self) -> set[str]:
-        return {"bridge", "data_source", "routes"}
+        return {"bridge", "data_source", "routes", "dedup", "threat_sharing", "health_monitor"}
 
     # -- PluginInterface lifecycle ------------------------------------------
 
@@ -274,22 +284,6 @@ class FederationPlugin(PluginInterface):
         """Get all shared targets from federated sites."""
         with self._lock:
             return [t.model_dump() for t in self._shared_targets.values()]
-
-    def get_stats(self) -> dict:
-        """Get federation statistics."""
-        with self._lock:
-            connected = sum(
-                1 for c in self._connections.values()
-                if c.state == ConnectionState.CONNECTED
-            )
-            return {
-                "total_sites": len(self._sites),
-                "connected_sites": connected,
-                "shared_targets": len(self._shared_targets),
-                "enabled_sites": sum(
-                    1 for s in self._sites.values() if s.enabled
-                ),
-            }
 
     # -- Persistence --------------------------------------------------------
 
@@ -621,6 +615,421 @@ class FederationPlugin(PluginInterface):
             del self._intel_packages[package_id]
         self._logger.info("Deleted intel package %s", package_id)
         return True
+
+    # -- Target deduplication -----------------------------------------------
+
+    def _canonical_key(self, target: dict) -> str:
+        """Build a canonical dedup key from target identifiers.
+
+        Priority: MAC address > name+entity_type > target_id prefix.
+        Two targets from different sites with the same MAC are the same entity.
+        """
+        # Try MAC-based dedup first (most reliable)
+        identifiers = target.get("identifiers", {})
+        mac = identifiers.get("mac", "").lower().strip()
+        if mac:
+            return f"mac:{mac}"
+
+        # Try BLE target_id pattern (ble_AABBCCDDEEFF)
+        tid = target.get("target_id", "")
+        if tid.startswith("ble_") and len(tid) > 4:
+            return f"mac:{tid[4:].lower()}"
+
+        # Try WiFi BSSID pattern
+        if tid.startswith("wifi_") and len(tid) > 5:
+            return f"bssid:{tid[5:].lower()}"
+
+        # Name + entity_type composite key (weaker)
+        name = target.get("name", "").strip().lower()
+        etype = target.get("entity_type", "unknown")
+        if name and name != "unknown":
+            return f"name:{etype}:{name}"
+
+        # Fall back to target_id itself (no dedup possible)
+        return f"id:{tid}"
+
+    def deduplicate_target(self, target_data: dict) -> dict:
+        """Check if a target from a remote site duplicates a local target.
+
+        Returns a dict with:
+        - is_duplicate: bool
+        - canonical_key: str
+        - existing_ids: list of already-known target_ids for this entity
+        - merged_target_id: the canonical target_id to use (first seen wins)
+        """
+        key = self._canonical_key(target_data)
+        tid = target_data.get("target_id", "")
+
+        with self._lock:
+            existing = self._dedup_index.get(key, [])
+            is_dup = len(existing) > 0 and tid not in existing
+
+            if tid not in existing:
+                self._dedup_index.setdefault(key, []).append(tid)
+                existing = self._dedup_index[key]
+
+            merged_id = existing[0] if existing else tid
+
+        result = {
+            "is_duplicate": is_dup,
+            "canonical_key": key,
+            "existing_ids": list(existing),
+            "merged_target_id": merged_id,
+        }
+
+        if is_dup and self._event_bus:
+            self._event_bus.publish("federation:target_deduplicated", data={
+                "canonical_key": key,
+                "target_id": tid,
+                "merged_into": merged_id,
+                "total_sightings": len(existing),
+            })
+
+        return result
+
+    def get_dedup_stats(self) -> dict:
+        """Get deduplication statistics."""
+        with self._lock:
+            total_keys = len(self._dedup_index)
+            total_ids = sum(len(v) for v in self._dedup_index.values())
+            duplicates = sum(1 for v in self._dedup_index.values() if len(v) > 1)
+            return {
+                "unique_entities": total_keys,
+                "total_target_ids": total_ids,
+                "duplicated_entities": duplicates,
+                "dedup_savings": total_ids - total_keys if total_ids > total_keys else 0,
+            }
+
+    def get_dedup_index(self) -> dict[str, list[str]]:
+        """Get the full deduplication index (canonical_key -> target_ids)."""
+        with self._lock:
+            return dict(self._dedup_index)
+
+    # -- Shared threat assessments ------------------------------------------
+
+    def share_threat_assessment(
+        self,
+        target_id: str,
+        threat_score: float,
+        threat_level: str = "none",
+        reasons: list[str] | None = None,
+        source_site_id: str = "",
+        assessor: str = "",
+    ) -> dict:
+        """Create or update a shared threat assessment for a target.
+
+        Threat assessments propagate across federated sites so all
+        installations share a common threat picture.
+
+        Args:
+            target_id: The target being assessed
+            threat_score: 0.0 (benign) to 1.0 (critical threat)
+            threat_level: none/low/medium/high/critical
+            reasons: List of reasons for the threat score
+            source_site_id: Site originating the assessment
+            assessor: Who/what made the assessment (operator, AI, rule)
+        """
+        if not source_site_id:
+            source_site_id = self._settings.get("site_id", "local")
+
+        assessment = {
+            "target_id": target_id,
+            "threat_score": max(0.0, min(1.0, threat_score)),
+            "threat_level": threat_level,
+            "reasons": reasons or [],
+            "source_site_id": source_site_id,
+            "assessor": assessor,
+            "timestamp": time.time(),
+            "consensus_score": 0.0,
+            "site_scores": {},
+        }
+
+        with self._lock:
+            existing = self._threat_assessments.get(target_id)
+            if existing:
+                # Merge: keep per-site scores for consensus
+                site_scores = existing.get("site_scores", {})
+                site_scores[source_site_id] = threat_score
+                assessment["site_scores"] = site_scores
+                # Consensus = average of all site scores
+                if site_scores:
+                    assessment["consensus_score"] = sum(site_scores.values()) / len(site_scores)
+                # Merge reasons (deduplicate)
+                all_reasons = set(existing.get("reasons", []))
+                all_reasons.update(reasons or [])
+                assessment["reasons"] = sorted(all_reasons)
+            else:
+                assessment["site_scores"] = {source_site_id: threat_score}
+                assessment["consensus_score"] = threat_score
+
+            self._threat_assessments[target_id] = assessment
+
+        if self._event_bus:
+            self._event_bus.publish("federation:threat_assessment", data={
+                "target_id": target_id,
+                "threat_score": assessment["threat_score"],
+                "consensus_score": assessment["consensus_score"],
+                "threat_level": threat_level,
+                "source_site_id": source_site_id,
+            })
+
+        self._logger.info(
+            "Threat assessment for %s: score=%.2f consensus=%.2f level=%s",
+            target_id, threat_score, assessment["consensus_score"], threat_level,
+        )
+
+        return assessment
+
+    def get_threat_assessment(self, target_id: str) -> Optional[dict]:
+        """Get the shared threat assessment for a target."""
+        with self._lock:
+            return self._threat_assessments.get(target_id)
+
+    def list_threat_assessments(self, min_score: float = 0.0) -> list[dict]:
+        """List all shared threat assessments, optionally filtered by minimum score."""
+        with self._lock:
+            results = []
+            for assessment in self._threat_assessments.values():
+                if assessment.get("consensus_score", 0.0) >= min_score:
+                    results.append(dict(assessment))
+            results.sort(key=lambda a: a.get("consensus_score", 0.0), reverse=True)
+            return results
+
+    def clear_threat_assessment(self, target_id: str) -> bool:
+        """Remove a threat assessment. Returns True if found."""
+        with self._lock:
+            if target_id in self._threat_assessments:
+                del self._threat_assessments[target_id]
+                return True
+            return False
+
+    # -- Site health monitoring ---------------------------------------------
+
+    def record_health_ping(
+        self,
+        site_id: str,
+        latency_ms: float,
+        success: bool = True,
+        error: str = "",
+    ) -> dict:
+        """Record a health ping result for a federated site.
+
+        Maintains a rolling window of ping results for latency stats.
+        """
+        now = time.time()
+        with self._lock:
+            metrics = self._health_metrics.get(site_id)
+            if metrics is None:
+                metrics = {
+                    "site_id": site_id,
+                    "ping_history": [],
+                    "total_pings": 0,
+                    "successful_pings": 0,
+                    "failed_pings": 0,
+                    "avg_latency_ms": 0.0,
+                    "min_latency_ms": float("inf"),
+                    "max_latency_ms": 0.0,
+                    "last_ping_at": 0.0,
+                    "last_success_at": 0.0,
+                    "last_failure_at": 0.0,
+                    "last_error": "",
+                    "uptime_pct": 100.0,
+                    "status": "unknown",
+                }
+                self._health_metrics[site_id] = metrics
+
+            # Add to history (keep last 100 pings)
+            metrics["ping_history"].append({
+                "timestamp": now,
+                "latency_ms": latency_ms,
+                "success": success,
+                "error": error,
+            })
+            if len(metrics["ping_history"]) > 100:
+                metrics["ping_history"] = metrics["ping_history"][-100:]
+
+            metrics["total_pings"] += 1
+            metrics["last_ping_at"] = now
+
+            if success:
+                metrics["successful_pings"] += 1
+                metrics["last_success_at"] = now
+                metrics["min_latency_ms"] = min(metrics["min_latency_ms"], latency_ms)
+                metrics["max_latency_ms"] = max(metrics["max_latency_ms"], latency_ms)
+            else:
+                metrics["failed_pings"] += 1
+                metrics["last_failure_at"] = now
+                metrics["last_error"] = error
+
+            # Calculate averages from history
+            recent = [p for p in metrics["ping_history"] if p["success"]]
+            if recent:
+                metrics["avg_latency_ms"] = sum(p["latency_ms"] for p in recent) / len(recent)
+
+            # Uptime percentage
+            total = metrics["total_pings"]
+            if total > 0:
+                metrics["uptime_pct"] = (metrics["successful_pings"] / total) * 100.0
+
+            # Determine status based on recent pings
+            last_5 = metrics["ping_history"][-5:]
+            if not last_5:
+                metrics["status"] = "unknown"
+            elif all(p["success"] for p in last_5):
+                metrics["status"] = "healthy"
+            elif any(p["success"] for p in last_5):
+                metrics["status"] = "degraded"
+            else:
+                metrics["status"] = "down"
+
+            # Update the SiteConnection latency if we have one
+            conn = self._connections.get(site_id)
+            if conn and success:
+                conn.latency_ms = latency_ms
+
+            result = dict(metrics)
+            # Don't include full history in the return (too verbose)
+            result.pop("ping_history", None)
+
+        return result
+
+    def get_health_metrics(self, site_id: str) -> Optional[dict]:
+        """Get health metrics for a specific site."""
+        with self._lock:
+            metrics = self._health_metrics.get(site_id)
+            if metrics is None:
+                return None
+            result = dict(metrics)
+            result.pop("ping_history", None)
+            return result
+
+    def get_all_health_metrics(self) -> list[dict]:
+        """Get health metrics for all monitored sites."""
+        with self._lock:
+            results = []
+            for metrics in self._health_metrics.values():
+                entry = dict(metrics)
+                entry.pop("ping_history", None)
+                results.append(entry)
+            return results
+
+    def get_health_summary(self) -> dict:
+        """Get a summary of federation health across all sites."""
+        with self._lock:
+            total = len(self._health_metrics)
+            healthy = sum(
+                1 for m in self._health_metrics.values()
+                if m.get("status") == "healthy"
+            )
+            degraded = sum(
+                1 for m in self._health_metrics.values()
+                if m.get("status") == "degraded"
+            )
+            down = sum(
+                1 for m in self._health_metrics.values()
+                if m.get("status") == "down"
+            )
+
+            all_latencies = []
+            for m in self._health_metrics.values():
+                recent = [p for p in m.get("ping_history", []) if p.get("success")]
+                all_latencies.extend(p["latency_ms"] for p in recent[-10:])
+
+            return {
+                "total_monitored": total,
+                "healthy": healthy,
+                "degraded": degraded,
+                "down": down,
+                "avg_latency_ms": (
+                    sum(all_latencies) / len(all_latencies)
+                    if all_latencies else 0.0
+                ),
+            }
+
+    # -- Enhanced receive with dedup ----------------------------------------
+
+    def receive_target_dedup(self, target: SharedTarget) -> dict:
+        """Process a target received from a federated site with deduplication.
+
+        Returns dedup result including whether this was a duplicate.
+        """
+        target_data = {
+            "target_id": target.target_id,
+            "name": target.name,
+            "entity_type": target.entity_type,
+            "identifiers": target.identifiers,
+        }
+        dedup = self.deduplicate_target(target_data)
+
+        with self._lock:
+            self._shared_targets[target.target_id] = target
+
+        # Push to tracker using merged ID
+        if self._tracker is not None:
+            self._tracker.update_from_federation({
+                "target_id": dedup["merged_target_id"],
+                "source_site": target.source_site_id,
+                "name": target.name,
+                "entity_type": target.entity_type,
+                "alliance": target.alliance,
+                "lat": target.lat,
+                "lng": target.lng,
+                "confidence": target.confidence,
+                "source": target.source,
+                "is_federated_duplicate": dedup["is_duplicate"],
+                "canonical_key": dedup["canonical_key"],
+            })
+
+        if self._event_bus:
+            self._event_bus.publish("federation:target_received", data={
+                "target_id": target.target_id,
+                "source_site_id": target.source_site_id,
+                "is_duplicate": dedup["is_duplicate"],
+                "merged_target_id": dedup["merged_target_id"],
+            })
+
+        return dedup
+
+    # -- Enhanced stats with new features -----------------------------------
+
+    def get_stats(self) -> dict:
+        """Get federation statistics including dedup and health."""
+        with self._lock:
+            connected = sum(
+                1 for c in self._connections.values()
+                if c.state == ConnectionState.CONNECTED
+            )
+            dedup_stats = {
+                "unique_entities": len(self._dedup_index),
+                "total_target_ids": sum(len(v) for v in self._dedup_index.values()),
+                "duplicated_entities": sum(
+                    1 for v in self._dedup_index.values() if len(v) > 1
+                ),
+            }
+            threat_count = len(self._threat_assessments)
+            high_threats = sum(
+                1 for a in self._threat_assessments.values()
+                if a.get("consensus_score", 0) >= 0.7
+            )
+            health_summary = {}
+            for status_val in ("healthy", "degraded", "down", "unknown"):
+                health_summary[status_val] = sum(
+                    1 for m in self._health_metrics.values()
+                    if m.get("status") == status_val
+                )
+
+            return {
+                "total_sites": len(self._sites),
+                "connected_sites": connected,
+                "shared_targets": len(self._shared_targets),
+                "enabled_sites": sum(
+                    1 for s in self._sites.values() if s.enabled
+                ),
+                "dedup": dedup_stats,
+                "threat_assessments": threat_count,
+                "high_threats": high_threats,
+                "health": health_summary,
+            }
 
     # -- HTTP routes --------------------------------------------------------
 

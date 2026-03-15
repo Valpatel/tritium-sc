@@ -86,6 +86,24 @@ class IntelPackageImportRequest(BaseModel):
     merge_dossiers: bool = True
 
 
+class ThreatAssessmentRequest(BaseModel):
+    """Request body for sharing a threat assessment."""
+    target_id: str
+    threat_score: float = Field(ge=0.0, le=1.0)
+    threat_level: str = "none"
+    reasons: list[str] = Field(default_factory=list)
+    source_site_id: str = ""
+    assessor: str = ""
+
+
+class HealthPingRequest(BaseModel):
+    """Request body for recording a health ping."""
+    site_id: str
+    latency_ms: float = Field(ge=0.0)
+    success: bool = True
+    error: str = ""
+
+
 def create_router(plugin: FederationPlugin) -> APIRouter:
     """Create and return the federation API router."""
     router = APIRouter(prefix="/api/federation", tags=["federation"])
@@ -235,5 +253,103 @@ def create_router(plugin: FederationPlugin) -> APIRouter:
         if not plugin.delete_intel_package(package_id):
             raise HTTPException(status_code=404, detail="Package not found")
         return {"status": "deleted", "package_id": package_id}
+
+    # -- Target deduplication routes ----------------------------------------
+
+    @router.get("/dedup/stats")
+    async def get_dedup_stats():
+        """Get target deduplication statistics."""
+        return plugin.get_dedup_stats()
+
+    @router.get("/dedup/index")
+    async def get_dedup_index():
+        """Get the full dedup index showing canonical keys and their target IDs."""
+        index = plugin.get_dedup_index()
+        return {
+            "index": index,
+            "unique_entities": len(index),
+            "total_ids": sum(len(v) for v in index.values()),
+        }
+
+    @router.post("/dedup/check")
+    async def check_dedup(target_data: dict):
+        """Check if a target would be deduplicated against known targets."""
+        return plugin.deduplicate_target(target_data)
+
+    # -- Shared threat assessment routes ------------------------------------
+
+    @router.post("/threats")
+    async def share_threat_assessment(
+        req: ThreatAssessmentRequest,
+        user: dict = Depends(require_auth),
+    ):
+        """Share a threat assessment for a target across federated sites."""
+        return plugin.share_threat_assessment(
+            target_id=req.target_id,
+            threat_score=req.threat_score,
+            threat_level=req.threat_level,
+            reasons=req.reasons,
+            source_site_id=req.source_site_id,
+            assessor=req.assessor,
+        )
+
+    @router.get("/threats")
+    async def list_threat_assessments(min_score: float = 0.0):
+        """List all shared threat assessments, optionally filtered by minimum score."""
+        assessments = plugin.list_threat_assessments(min_score=min_score)
+        return {"assessments": assessments, "count": len(assessments)}
+
+    @router.get("/threats/{target_id}")
+    async def get_threat_assessment(target_id: str):
+        """Get the shared threat assessment for a specific target."""
+        assessment = plugin.get_threat_assessment(target_id)
+        if assessment is None:
+            raise HTTPException(status_code=404, detail="No threat assessment found")
+        return assessment
+
+    @router.delete("/threats/{target_id}")
+    async def clear_threat_assessment(
+        target_id: str,
+        user: dict = Depends(require_auth),
+    ):
+        """Clear a threat assessment."""
+        if not plugin.clear_threat_assessment(target_id):
+            raise HTTPException(status_code=404, detail="No threat assessment found")
+        return {"status": "cleared", "target_id": target_id}
+
+    # -- Site health monitoring routes --------------------------------------
+
+    @router.post("/health/ping")
+    async def record_health_ping(
+        req: HealthPingRequest,
+        user: dict = Depends(require_auth),
+    ):
+        """Record a health ping result for a federated site."""
+        return plugin.record_health_ping(
+            site_id=req.site_id,
+            latency_ms=req.latency_ms,
+            success=req.success,
+            error=req.error,
+        )
+
+    @router.get("/health")
+    async def get_all_health():
+        """Get health metrics for all monitored sites."""
+        metrics = plugin.get_all_health_metrics()
+        summary = plugin.get_health_summary()
+        return {"sites": metrics, "summary": summary}
+
+    @router.get("/health/{site_id}")
+    async def get_site_health(site_id: str):
+        """Get health metrics for a specific site."""
+        metrics = plugin.get_health_metrics(site_id)
+        if metrics is None:
+            raise HTTPException(status_code=404, detail="No health data for this site")
+        return metrics
+
+    @router.get("/health/summary")
+    async def get_health_summary():
+        """Get a summary of federation health across all sites."""
+        return plugin.get_health_summary()
 
     return router

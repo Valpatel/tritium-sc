@@ -53,6 +53,37 @@ function _sharePolicyLabel(policy) {
     return labels[policy] || policy || 'Unknown';
 }
 
+function _healthStatusBadge(status) {
+    const colors = {
+        healthy: '#05ffa1',
+        degraded: '#fcee0a',
+        down: '#ff2a6d',
+        unknown: '#888',
+    };
+    const color = colors[status] || '#888';
+    return `<span class="fed-health-badge" style="color:${color};border-color:${color}">${(status || 'UNKNOWN').toUpperCase()}</span>`;
+}
+
+function _threatBadge(level, score) {
+    const colors = {
+        critical: '#ff2a6d',
+        high: '#ff6b35',
+        medium: '#fcee0a',
+        low: '#05ffa1',
+        none: '#888',
+    };
+    const color = colors[level] || '#888';
+    const pct = Math.round((score || 0) * 100);
+    return `<span class="fed-threat-badge" style="color:${color};border-color:${color}">${(level || 'NONE').toUpperCase()} ${pct}%</span>`;
+}
+
+function _latencyLabel(ms) {
+    if (ms === null || ms === undefined || ms === 0) return '--';
+    if (ms < 50) return `<span style="color:#05ffa1">${ms.toFixed(0)}ms</span>`;
+    if (ms < 200) return `<span style="color:#fcee0a">${ms.toFixed(0)}ms</span>`;
+    return `<span style="color:#ff2a6d">${ms.toFixed(0)}ms</span>`;
+}
+
 // ============================================================
 // Panel Definition
 // ============================================================
@@ -61,7 +92,7 @@ export const FederationPanelDef = {
     id: 'federation',
     title: 'FEDERATION SITES',
     defaultPosition: { x: null, y: null },
-    defaultSize: { w: 520, h: 480 },
+    defaultSize: { w: 560, h: 640 },
 
     create(panel) {
         const el = document.createElement('div');
@@ -84,6 +115,24 @@ export const FederationPanelDef = {
                     <span class="fed-stat-value mono" data-bind="packages" style="color:var(--yellow, #fcee0a)">0</span>
                     <span class="fed-stat-label">INTEL PKGS</span>
                 </div>
+                <div class="fed-stat">
+                    <span class="fed-stat-value mono" data-bind="dedup-savings" style="color:var(--magenta, #ff2a6d)">0</span>
+                    <span class="fed-stat-label">DEDUP SAVES</span>
+                </div>
+                <div class="fed-stat">
+                    <span class="fed-stat-value mono" data-bind="threats" style="color:var(--magenta, #ff2a6d)">0</span>
+                    <span class="fed-stat-label">THREATS</span>
+                </div>
+            </div>
+
+            <div class="fed-section-header mono" data-bind="health-header">SITE HEALTH</div>
+            <div class="fed-health-grid" data-bind="health-grid">
+                <div class="fed-empty mono">No health data yet</div>
+            </div>
+
+            <div class="fed-section-header mono" data-bind="threats-header">SHARED THREATS</div>
+            <div class="fed-threats-list" data-bind="threats-list">
+                <div class="fed-empty mono">No shared threat assessments</div>
             </div>
 
             <div class="fed-actions">
@@ -142,24 +191,73 @@ export const FederationPanelDef = {
         const _connectedEl = el.querySelector('[data-bind="connected"]');
         const _sharedEl = el.querySelector('[data-bind="shared"]');
         const _packagesEl = el.querySelector('[data-bind="packages"]');
+        const _dedupEl = el.querySelector('[data-bind="dedup-savings"]');
+        const _threatsCountEl = el.querySelector('[data-bind="threats"]');
+        const _healthGrid = el.querySelector('[data-bind="health-grid"]');
+        const _threatsList = el.querySelector('[data-bind="threats-list"]');
 
         // --- Fetch data ---
         async function _fetchAndRender() {
             try {
-                const [sitesRes, statsRes, pkgsRes] = await Promise.all([
+                const [sitesRes, statsRes, pkgsRes, healthRes, threatsRes] = await Promise.all([
                     fetch('/api/federation/sites').then(r => r.json()).catch(() => ({ sites: [] })),
                     fetch('/api/federation/stats').then(r => r.json()).catch(() => ({})),
                     fetch('/api/federation/intel-packages').then(r => r.json()).catch(() => ({ count: 0 })),
+                    fetch('/api/federation/health').then(r => r.json()).catch(() => ({ sites: [], summary: {} })),
+                    fetch('/api/federation/threats').then(r => r.json()).catch(() => ({ assessments: [], count: 0 })),
                 ]);
 
                 const sites = sitesRes.sites || [];
                 const stats = statsRes || {};
+                const healthData = healthRes || { sites: [], summary: {} };
+                const threatData = threatsRes || { assessments: [], count: 0 };
 
                 // Update summary
                 _totalEl.textContent = String(stats.total_sites || sites.length);
                 _connectedEl.textContent = String(stats.connected_sites || 0);
                 _sharedEl.textContent = String(stats.shared_targets || 0);
                 _packagesEl.textContent = String(pkgsRes.count || 0);
+                const dedupStats = stats.dedup || {};
+                _dedupEl.textContent = String(dedupStats.dedup_savings || dedupStats.duplicated_entities || 0);
+                _threatsCountEl.textContent = String(stats.high_threats || threatData.count || 0);
+
+                // Render health grid
+                const healthSites = healthData.sites || [];
+                if (healthSites.length === 0) {
+                    _healthGrid.innerHTML = '<div class="fed-empty mono">No health data yet</div>';
+                } else {
+                    let hhtml = '';
+                    for (const h of healthSites) {
+                        const siteName = (sites.find(s => s.site_id === h.site_id) || {}).name || h.site_id.slice(0, 8);
+                        hhtml += `
+                            <div class="fed-health-card">
+                                <div class="fed-health-name mono">${_esc(siteName)}</div>
+                                ${_healthStatusBadge(h.status)}
+                                <div class="fed-health-latency mono">${_latencyLabel(h.avg_latency_ms)}</div>
+                                <div class="fed-health-uptime mono" style="color:#00f0ff">${(h.uptime_pct || 0).toFixed(0)}%</div>
+                            </div>
+                        `;
+                    }
+                    _healthGrid.innerHTML = hhtml;
+                }
+
+                // Render threats list
+                const threats = threatData.assessments || [];
+                if (threats.length === 0) {
+                    _threatsList.innerHTML = '<div class="fed-empty mono">No shared threat assessments</div>';
+                } else {
+                    let thtml = '';
+                    for (const t of threats.slice(0, 10)) {
+                        thtml += `
+                            <div class="fed-threat-row">
+                                <span class="fed-threat-target mono">${_esc(t.target_id || '--')}</span>
+                                ${_threatBadge(t.threat_level, t.consensus_score)}
+                                <span class="fed-threat-sites mono" style="color:var(--text-dim, #666)">${Object.keys(t.site_scores || {}).length} site(s)</span>
+                            </div>
+                        `;
+                    }
+                    _threatsList.innerHTML = thtml;
+                }
 
                 // Render site list
                 if (sites.length === 0) {

@@ -3916,3 +3916,102 @@ button:disabled:hover {
     border-color: rgba(255, 255, 255, 0.15);
     color: var(--text-dim, #888);
 }
+
+/* Federation: Section headers */
+.fed-section-header {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--cyan, #00f0ff);
+    padding: 8px 12px 4px;
+    border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+    margin-top: 8px;
+}
+
+/* Federation: Health grid */
+.fed-health-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 12px;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.fed-health-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    padding: 4px 10px;
+    flex: 1 1 200px;
+    min-width: 200px;
+}
+
+.fed-health-name {
+    font-size: 11px;
+    color: var(--text, #ccc);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fed-health-badge {
+    font-size: 9px;
+    letter-spacing: 1px;
+    border: 1px solid;
+    border-radius: 3px;
+    padding: 1px 5px;
+}
+
+.fed-health-latency {
+    font-size: 11px;
+    min-width: 50px;
+    text-align: right;
+}
+
+.fed-health-uptime {
+    font-size: 11px;
+    min-width: 35px;
+    text-align: right;
+}
+
+/* Federation: Threats list */
+.fed-threats-list {
+    padding: 6px 12px;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.fed-threat-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.fed-threat-target {
+    font-size: 11px;
+    color: var(--text, #ccc);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fed-threat-badge {
+    font-size: 9px;
+    letter-spacing: 1px;
+    border: 1px solid;
+    border-radius: 3px;
+    padding: 1px 5px;
+}
+
+.fed-threat-sites {
+    font-size: 10px;
+    min-width: 50px;
+    text-align: right;
+}
