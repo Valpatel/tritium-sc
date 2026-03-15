@@ -31,6 +31,7 @@ from engine.synthetic.data_generators import (
     MeshtasticNodeGenerator,
 )
 from engine.synthetic.fusion_scenario import FusionScenario
+from engine.synthetic.rl_training_generator import RLTrainingGenerator
 
 if TYPE_CHECKING:
     from engine.comms.event_bus import EventBus
@@ -80,6 +81,7 @@ class DemoController:
         self._mesh_gen: MeshtasticNodeGenerator | None = None
         self._camera_gens: list[CameraDetectionGenerator] = []
         self._fusion: FusionScenario | None = None
+        self._rl_training: RLTrainingGenerator | None = None
 
     @property
     def active(self) -> bool:
@@ -129,6 +131,16 @@ class DemoController:
         )
         self._fusion.start()
 
+        # RL training data generator — produces synthetic correlation
+        # and classification decisions that accumulate in TrainingStore.
+        # At 3s interval, generates ~100 decisions in 5 minutes, enough
+        # to trigger a CorrelationLearner retrain.
+        self._rl_training = RLTrainingGenerator(
+            interval=3.0,
+            event_bus=self._event_bus,
+        )
+        self._rl_training.start()
+
         self._active = True
         self._event_bus.publish("demo:started", {
             "ble_devices": self._ble_device_count,
@@ -165,6 +177,10 @@ class DemoController:
         if self._fusion is not None:
             self._fusion.stop()
             self._fusion = None
+
+        if self._rl_training is not None:
+            self._rl_training.stop()
+            self._rl_training = None
 
         self._active = False
         self._event_bus.publish("demo:stopped", {})
@@ -225,6 +241,18 @@ class DemoController:
                     "actors": 3,
                     "interval": 2.0,
                 },
+            })
+
+        if self._rl_training is not None:
+            rl_stats = self._rl_training.get_stats()
+            generators.append({
+                "name": "RLTrainingGenerator",
+                "running": self._rl_training.running,
+                "tick_count": self._rl_training.tick_count,
+                "config": {
+                    "interval": 3.0,
+                },
+                "training_store": rl_stats.get("training_store"),
             })
 
         uptime = None
