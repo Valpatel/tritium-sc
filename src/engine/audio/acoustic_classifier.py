@@ -4,14 +4,18 @@
 """Acoustic event classifier for the Tritium sensing pipeline.
 
 Classifies audio events into categories like gunshot, voice, vehicle,
-animal, glass break, etc. Two classification modes:
+animal, glass break, etc. Three classification tiers:
 
 1. Rule-based: energy/frequency thresholds (always available, no deps)
-2. ML-based: KNN on MFCC + spectral features (when numpy available)
+2. Pure-Python KNN: MFCC-like DCT features + euclidean KNN (no ML deps)
+3. MFCC+KNN (scipy/sklearn): Real 13-coefficient MFCC via mel filterbank
+   + sklearn KNeighborsClassifier (k=5). Falls back to tier 2 if deps
+   missing or no training data.
 
 The ML classifier trains on a built-in dataset of labeled audio feature
 profiles. Each sound class has characteristic MFCC patterns, spectral
-centroids, zero-crossing rates, and energy profiles.
+centroids, zero-crossing rates, and energy profiles. Can also train on
+real WAV files (e.g. ESC-50) for dramatically improved accuracy.
 
 Integration:
 - Receives audio features via MQTT on `tritium/{site}/audio/{device}/raw`
@@ -32,6 +36,31 @@ from tritium_lib.models import (
     AcousticTrainingSet,
     TrainingSource,
 )
+
+# Optional ML dependencies — graceful degradation
+_HAS_SCIPY = False
+_HAS_SKLEARN = False
+_HAS_NUMPY = False
+
+try:
+    import numpy as np
+    _HAS_NUMPY = True
+except ImportError:
+    np = None  # type: ignore[assignment]
+
+try:
+    from scipy.fft import dct  # type: ignore[import-untyped]
+    _HAS_SCIPY = True
+except ImportError:
+    dct = None  # type: ignore[assignment]
+
+try:
+    from sklearn.neighbors import KNeighborsClassifier as SklearnKNN  # type: ignore[import-untyped]
+    from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
+    _HAS_SKLEARN = True
+except ImportError:
+    SklearnKNN = None  # type: ignore[assignment]
+    StandardScaler = None  # type: ignore[assignment]
 
 
 class AcousticEventType(str, Enum):
@@ -185,6 +214,104 @@ def _euclidean_distance(a: list[float], b: list[float]) -> float:
     return math.sqrt(total)
 
 
+def _mel_filterbank(n_fft: int, sample_rate: int, n_mels: int = 26) -> "np.ndarray":
+    """Build a mel-scale triangular filterbank matrix.
+
+    Returns an (n_mels, n_fft//2+1) numpy array of filter weights.
+    """
+    def hz_to_mel(hz: float) -> float:
+        return 2595.0 * math.log10(1.0 + hz / 700.0)
+
+    def mel_to_hz(mel: float) -> float:
+        return 700.0 * (10.0 ** (mel / 2595.0) - 1.0)
+
+    low_mel = hz_to_mel(0)
+    high_mel = hz_to_mel(sample_rate / 2)
+    mel_points = np.linspace(low_mel, high_mel, n_mels + 2)
+    hz_points = np.array([mel_to_hz(m) for m in mel_points])
+    bin_points = np.floor((n_fft + 1) * hz_points / sample_rate).astype(int)
+
+    n_bins = n_fft // 2 + 1
+    filters = np.zeros((n_mels, n_bins))
+
+    for i in range(n_mels):
+        left = bin_points[i]
+        center = bin_points[i + 1]
+        right = bin_points[i + 2]
+        for j in range(left, center):
+            if center > left:
+                filters[i, j] = (j - left) / (center - left)
+        for j in range(center, right):
+            if right > center:
+                filters[i, j] = (right - j) / (right - center)
+
+    return filters
+
+
+def extract_mfcc_scipy(
+    samples: list[float],
+    sample_rate: int,
+    n_mfcc: int = 13,
+    n_fft: int = 2048,
+    hop_length: int = 512,
+    n_mels: int = 26,
+) -> Optional[list[float]]:
+    """Extract real MFCC coefficients using scipy/numpy.
+
+    Implements the standard MFCC pipeline:
+    1. STFT with Hann window
+    2. Mel filterbank energy
+    3. Log compression
+    4. DCT to get cepstral coefficients
+    5. Average across frames to get 13 summary coefficients
+
+    Returns None if scipy/numpy are not available.
+    """
+    if not _HAS_SCIPY or not _HAS_NUMPY:
+        return None
+
+    arr = np.array(samples, dtype=np.float64)
+    n = len(arr)
+    if n < n_fft:
+        return None
+
+    # Build mel filterbank
+    mel_fb = _mel_filterbank(n_fft, sample_rate, n_mels)
+
+    # Hann window
+    window = np.hanning(n_fft)
+
+    # STFT frames
+    n_frames = max(1, (n - n_fft) // hop_length + 1)
+    mfcc_frames = []
+
+    for i in range(n_frames):
+        start = i * hop_length
+        frame = arr[start:start + n_fft]
+        if len(frame) < n_fft:
+            frame = np.pad(frame, (0, n_fft - len(frame)))
+        windowed = frame * window
+
+        # Power spectrum
+        spectrum = np.abs(np.fft.rfft(windowed)) ** 2
+
+        # Mel energies
+        mel_energies = mel_fb @ spectrum
+        mel_energies = np.maximum(mel_energies, 1e-10)
+        log_mel = np.log(mel_energies)
+
+        # DCT to get cepstral coefficients
+        cepstral = dct(log_mel, type=2, norm="ortho")
+        mfcc_frames.append(cepstral[:n_mfcc])
+
+    if not mfcc_frames:
+        return None
+
+    # Average MFCCs across all frames
+    mfcc_mean = np.mean(mfcc_frames, axis=0)
+    return mfcc_mean.tolist()
+
+
 def _extract_wav_features(wav_path: str) -> Optional[tuple[str, list[float], float, float, float, float, int]]:
     """Extract features from a WAV file and return in TRAINING_DATA format.
 
@@ -286,25 +413,28 @@ def _extract_wav_features(wav_path: str) -> Optional[tuple[str, list[float], flo
     centroid = max(0.0, min(dominant_freq, framerate / 2))
     bandwidth = centroid * 0.5
 
-    # MFCC-like coefficients via windowed energy + DCT
-    frame_size = min(1024, n // 4)
-    hop = frame_size // 2
-    n_frames_local = max(1, (n - frame_size) // hop + 1)
-    frame_energies = []
-    for i in range(n_frames_local):
-        start = i * hop
-        end = min(start + frame_size, n)
-        frame = samples[start:end]
-        energy = sum(s * s for s in frame) / len(frame)
-        frame_energies.append(math.log(energy + 1e-10))
+    # Try real MFCC extraction via scipy first, fall back to DCT approximation
+    mfcc = extract_mfcc_scipy(samples, framerate)
+    if mfcc is None:
+        # Fallback: MFCC-like coefficients via windowed energy + DCT
+        frame_size = min(1024, n // 4)
+        hop = frame_size // 2
+        n_frames_local = max(1, (n - frame_size) // hop + 1)
+        frame_energies = []
+        for i in range(n_frames_local):
+            start = i * hop
+            end = min(start + frame_size, n)
+            frame = samples[start:end]
+            energy = sum(s * s for s in frame) / len(frame)
+            frame_energies.append(math.log(energy + 1e-10))
 
-    m = len(frame_energies)
-    mfcc = []
-    for k in range(13):
-        coeff = 0.0
-        for j in range(m):
-            coeff += frame_energies[j] * math.cos(math.pi * k * (2 * j + 1) / (2 * m))
-        mfcc.append(coeff / m)
+        m = len(frame_energies)
+        mfcc = []
+        for k in range(13):
+            coeff = 0.0
+            for j in range(m):
+                coeff += frame_energies[j] * math.cos(math.pi * k * (2 * j + 1) / (2 * m))
+            mfcc.append(coeff / m)
 
     return ("", mfcc, centroid, zcr, rms, bandwidth, duration_ms)
 
@@ -441,7 +571,12 @@ ESC50_CATEGORY_MAP: dict[str, str] = {
 class MFCCClassifier:
     """K-Nearest Neighbors classifier on MFCC + spectral features.
 
-    Uses the built-in training dataset. No external ML deps required.
+    Two backends:
+    - sklearn KNeighborsClassifier (k=5) with StandardScaler — used when
+      sklearn is available. Provides proper distance-weighted voting.
+    - Pure-Python KNN with z-score normalization — fallback when sklearn
+      is not installed.
+
     Feature vector = 13 MFCCs + spectral_centroid + zcr + rms_energy +
                      spectral_bandwidth + duration_ms (normalized).
 
@@ -449,9 +584,9 @@ class MFCCClassifier:
     via train_from_wavs() or by passing extracted data to train().
     """
 
-    MODEL_VERSION = "mfcc_knn_v2"
+    MODEL_VERSION = "mfcc_knn_v3"
 
-    def __init__(self, k: int = 3) -> None:
+    def __init__(self, k: int = 5) -> None:
         self.k = k
         self._training_vectors: list[tuple[str, list[float]]] = []
         self._trained = False
@@ -459,6 +594,20 @@ class MFCCClassifier:
         self._feature_stds: list[float] = []
         self._training_sample_count: int = 0
         self._training_class_count: int = 0
+        self._use_sklearn: bool = _HAS_SKLEARN and _HAS_NUMPY
+        self._sklearn_knn: Optional[object] = None  # SklearnKNN instance
+        self._sklearn_scaler: Optional[object] = None  # StandardScaler instance
+        self._label_list: list[str] = []  # ordered labels for sklearn
+
+    @property
+    def uses_sklearn(self) -> bool:
+        """Whether sklearn backend is active."""
+        return self._use_sklearn and self._sklearn_knn is not None
+
+    @property
+    def uses_scipy_mfcc(self) -> bool:
+        """Whether scipy-based MFCC extraction is available."""
+        return _HAS_SCIPY and _HAS_NUMPY
 
     def train(self, data: Optional[list] = None) -> None:
         """Train on built-in or custom dataset."""
@@ -473,9 +622,51 @@ class MFCCClassifier:
             fv = list(mfcc) + [centroid, zcr, rms, bw, float(dur)]
             raw_vectors.append((label, fv))
 
-        # Compute normalization stats (z-score)
         n_features = len(raw_vectors[0][1])
         n_samples = len(raw_vectors)
+
+        # Try sklearn backend first
+        if self._use_sklearn:
+            try:
+                X = np.array([fv for _, fv in raw_vectors])
+                y = [label for label, _ in raw_vectors]
+
+                scaler = StandardScaler()
+                X_scaled = scaler.fit_transform(X)
+
+                knn = SklearnKNN(
+                    n_neighbors=min(self.k, n_samples),
+                    weights="distance",
+                    metric="euclidean",
+                )
+                knn.fit(X_scaled, y)
+
+                self._sklearn_knn = knn
+                self._sklearn_scaler = scaler
+                self._label_list = y
+
+                # Also store pure-python stats for export compatibility
+                self._feature_means = scaler.mean_.tolist()
+                self._feature_stds = scaler.scale_.tolist()
+                self._training_vectors = []
+                for label, fv in raw_vectors:
+                    norm_fv = [(v - m) / s for v, m, s in zip(fv, self._feature_means, self._feature_stds)]
+                    self._training_vectors.append((label, norm_fv))
+
+                self._trained = True
+                self._training_sample_count = n_samples
+                self._training_class_count = len(set(y))
+                logger.info(
+                    "MFCC classifier trained (sklearn KNN k={}) on {} samples, {} classes",
+                    self.k, n_samples, self._training_class_count,
+                )
+                return
+            except Exception as exc:
+                logger.warning("sklearn training failed, falling back to pure-python: {}", exc)
+                self._sklearn_knn = None
+                self._sklearn_scaler = None
+
+        # Pure-Python fallback: z-score normalization + manual KNN
         means = [0.0] * n_features
         for _, fv in raw_vectors:
             for i, v in enumerate(fv):
@@ -487,13 +678,11 @@ class MFCCClassifier:
             for i, v in enumerate(fv):
                 stds[i] += (v - means[i]) ** 2
         stds = [math.sqrt(s / n_samples) if s > 0 else 1.0 for s in stds]
-        # Avoid zero division
         stds = [s if s > 1e-10 else 1.0 for s in stds]
 
         self._feature_means = means
         self._feature_stds = stds
 
-        # Normalize all training vectors
         self._training_vectors = []
         for label, fv in raw_vectors:
             norm_fv = [(v - m) / s for v, m, s in zip(fv, means, stds)]
@@ -503,9 +692,8 @@ class MFCCClassifier:
         self._training_sample_count = n_samples
         self._training_class_count = len(set(label for label, _ in raw_vectors))
         logger.info(
-            "MFCC classifier trained on {} samples, {} classes",
-            n_samples,
-            self._training_class_count,
+            "MFCC classifier trained (pure-python KNN k={}) on {} samples, {} classes",
+            self.k, n_samples, self._training_class_count,
         )
 
     def train_from_wavs(
@@ -552,6 +740,8 @@ class MFCCClassifier:
     def classify(self, features: AudioFeatures) -> tuple[str, float, list[dict]]:
         """Classify features using KNN.
 
+        Uses sklearn backend if available, otherwise pure-python KNN.
+
         Returns:
             (best_class, confidence, top_predictions)
         """
@@ -560,7 +750,6 @@ class MFCCClassifier:
 
         # Build feature vector
         mfcc = features.mfcc if features.mfcc else [0.0] * 13
-        # Pad or truncate to 13
         mfcc = (mfcc + [0.0] * 13)[:13]
         fv = mfcc + [
             features.spectral_centroid,
@@ -570,13 +759,44 @@ class MFCCClassifier:
             float(features.duration_ms),
         ]
 
-        # Normalize
+        # sklearn backend
+        if self._sklearn_knn is not None and self._sklearn_scaler is not None:
+            return self._classify_sklearn(fv)
+
+        # Pure-python fallback
+        return self._classify_pure_python(fv)
+
+    def _classify_sklearn(self, fv: list[float]) -> tuple[str, float, list[dict]]:
+        """Classify using sklearn KNeighborsClassifier."""
+        X = np.array([fv])
+        X_scaled = self._sklearn_scaler.transform(X)  # type: ignore[union-attr]
+
+        # Get probability estimates
+        proba = self._sklearn_knn.predict_proba(X_scaled)[0]  # type: ignore[union-attr]
+        classes = self._sklearn_knn.classes_  # type: ignore[union-attr]
+
+        # Sort by probability
+        class_proba = list(zip(classes, proba))
+        class_proba.sort(key=lambda x: x[1], reverse=True)
+
+        best_class = class_proba[0][0]
+        confidence = round(float(class_proba[0][1]), 3)
+
+        predictions = [
+            {"class_name": str(cls), "confidence": round(float(p), 3)}
+            for cls, p in class_proba[:5]
+            if p > 0.001
+        ]
+
+        return best_class, confidence, predictions
+
+    def _classify_pure_python(self, fv: list[float]) -> tuple[str, float, list[dict]]:
+        """Classify using pure-python KNN (fallback)."""
         norm_fv = [
             (v - m) / s
             for v, m, s in zip(fv, self._feature_means, self._feature_stds)
         ]
 
-        # Find K nearest neighbors
         distances: list[tuple[float, str]] = []
         for label, train_fv in self._training_vectors:
             d = _euclidean_distance(norm_fv, train_fv)
@@ -585,7 +805,6 @@ class MFCCClassifier:
         distances.sort(key=lambda x: x[0])
         k_nearest = distances[: self.k]
 
-        # Vote with inverse-distance weighting
         votes: dict[str, float] = {}
         for dist, label in k_nearest:
             weight = 1.0 / (dist + 1e-6)
@@ -595,12 +814,10 @@ class MFCCClassifier:
         if total_weight <= 0:
             return "unknown", 0.0, []
 
-        # Sort by vote weight
         sorted_votes = sorted(votes.items(), key=lambda x: x[1], reverse=True)
         best_class = sorted_votes[0][0]
         confidence = sorted_votes[0][1] / total_weight
 
-        # Top predictions
         predictions = [
             {"class_name": cls, "confidence": round(w / total_weight, 3)}
             for cls, w in sorted_votes[:5]
@@ -633,7 +850,7 @@ class MFCCClassifier:
         return ts
 
     @classmethod
-    def from_training_set(cls, training_set: AcousticTrainingSet, k: int = 3) -> "MFCCClassifier":
+    def from_training_set(cls, training_set: AcousticTrainingSet, k: int = 5) -> "MFCCClassifier":
         """Create and train an MFCCClassifier from an AcousticTrainingSet.
 
         Args:
@@ -673,7 +890,7 @@ class AcousticClassifier:
 
         if enable_ml:
             try:
-                self._ml_classifier = MFCCClassifier(k=3)
+                self._ml_classifier = MFCCClassifier(k=5)
                 self._ml_classifier.train()
             except Exception as exc:
                 logger.warning("ML classifier init failed, rule-based only: {}", exc)

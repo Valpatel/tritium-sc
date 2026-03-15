@@ -74,7 +74,7 @@ class TestMFCCClassifierV2:
 
     def test_model_version(self):
         clf = MFCCClassifier()
-        assert clf.MODEL_VERSION == "mfcc_knn_v2"
+        assert clf.MODEL_VERSION == "mfcc_knn_v3"
 
     def test_train_default(self):
         clf = MFCCClassifier()
