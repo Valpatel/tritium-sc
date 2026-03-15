@@ -14,6 +14,17 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 88: Collaboration + Operator Chat
+
+| Change | Verification |
+|--------|-------------|
+| routers/collaboration.py — shared investigation workspaces with WebSocket broadcast | Unit Tested (26 tests) |
+| Workspace join/leave/entity/annotate/status with real-time WebSocket events | Unit Tested |
+| Map drawing collaboration — freehand, shapes, measurements, geofences shared in real time | Unit Tested |
+| Operator chat panel — text chat with audit logging, multi-channel support | Unit Tested |
+| ws.py — drawing_update and chat_message WebSocket handlers for live collaboration | Code Review |
+| Router registered in main.py | Verified |
+
 ## 2026-03-14 — Wave 86: Cross-Camera ReID, Mission-Target Binding, Threat Narration
 
 | Change | Verification |

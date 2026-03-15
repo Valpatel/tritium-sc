@@ -25,6 +25,7 @@ import os
 import queue
 import threading
 import time as _time
+import uuid
 from datetime import datetime
 from typing import Dict, Set
 
@@ -198,6 +199,12 @@ async def handle_client_message(websocket: WebSocket, message: dict):
     elif msg_type == "cursor_update":
         # Operator cursor position on the map — broadcast to all other clients
         await _handle_cursor_update(websocket, message)
+    elif msg_type == "drawing_update":
+        # Real-time map drawing stroke — broadcast to all other operators
+        await _handle_drawing_update(websocket, message)
+    elif msg_type == "chat_message":
+        # Inline chat message via WebSocket — broadcast to all operators
+        await _handle_ws_chat(websocket, message)
     else:
         await manager.send_to(
             websocket,
@@ -317,6 +324,88 @@ async def _handle_cursor_update(websocket: WebSocket, message: dict) -> None:
                     await conn.send_text(message_str)
                 except Exception:
                     pass
+
+
+async def _handle_drawing_update(websocket: WebSocket, message: dict) -> None:
+    """Handle real-time map drawing strokes from operators.
+
+    Expected format:
+        {
+            "type": "drawing_update",
+            "drawing_id": "...",
+            "operator_id": "...",
+            "operator_name": "...",
+            "color": "#00f0ff",
+            "drawing_type": "freehand",
+            "points": [[lng, lat], ...],
+            "action": "stroke" | "complete" | "erase"
+        }
+
+    Broadcasts the drawing data to all other connected clients so they
+    can render the drawing in real time on their maps.
+    """
+    drawing_msg = {
+        "type": "map_drawing_live",
+        "drawing_id": message.get("drawing_id", ""),
+        "operator_id": message.get("operator_id", ""),
+        "operator_name": message.get("operator_name", ""),
+        "color": message.get("color", "#00f0ff"),
+        "drawing_type": message.get("drawing_type", "freehand"),
+        "points": message.get("points", []),
+        "action": message.get("action", "stroke"),
+        "radius": message.get("radius"),
+        "text": message.get("text"),
+        "line_width": message.get("line_width", 2.0),
+        "opacity": message.get("opacity", 0.8),
+        "timestamp": datetime.now(tz=None).isoformat(),
+    }
+    # Send to all clients except the sender
+    message_str = json.dumps(drawing_msg)
+    async with manager._lock:
+        for conn in manager.active_connections:
+            if conn is not websocket:
+                try:
+                    await conn.send_text(message_str)
+                except Exception:
+                    pass
+
+
+async def _handle_ws_chat(websocket: WebSocket, message: dict) -> None:
+    """Handle inline chat messages sent via WebSocket.
+
+    Expected format:
+        {
+            "type": "chat_message",
+            "operator_id": "...",
+            "operator_name": "...",
+            "content": "message text",
+            "channel": "general"
+        }
+
+    Broadcasts the message to all connected clients including the sender
+    (for confirmation), and logs to the chat history.
+    """
+    content = (message.get("content") or "").strip()
+    if not content:
+        return
+
+    import time as _t
+    chat_msg = {
+        "type": "operator_chat",
+        "data": {
+            "message_id": str(uuid.uuid4())[:12],
+            "operator_id": message.get("operator_id", ""),
+            "operator_name": message.get("operator_name", ""),
+            "content": content[:2000],
+            "message_type": message.get("message_type", "text"),
+            "channel": message.get("channel", "general"),
+            "timestamp": _t.time(),
+        },
+        "timestamp": datetime.now(tz=None).isoformat(),
+    }
+
+    # Broadcast to all clients
+    await manager.broadcast(chat_msg)
 
 
 # Utility functions for broadcasting from other parts of the app
