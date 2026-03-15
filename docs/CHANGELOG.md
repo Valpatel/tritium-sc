@@ -14,6 +14,19 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 80: MILESTONE + Security + System Version
+
+| Change | Verification |
+|--------|-------------|
+| `/api/system/version` endpoint: git commit, branch, build date, wave number, feature count, plugin/router/route counts | Unit tested — returns correct git hash and all metadata |
+| Health router test baseline updated: tritium_lib 1584->1822, tritium_sc_pytest 1400->7800 | Unit tested |
+| OWASP security review of Waves 73-79 endpoints (floorplan upload, acoustic, behavioral intelligence, fleet, AR export) | Documented in MILESTONE_WAVE80.md |
+| Server import verification: 502 routes load cleanly, no import errors | Verified |
+| Comprehensive Wave 80 milestone report: 672K total LOC, 10,531+ tests, 16 plugins, 77 routers | Documented |
+| Wave 81-85 planning | Documented |
+
+---
+
 ## 2026-03-14 — Wave 79: Acoustic Intelligence Pipeline
 
 | Change | Verification |

@@ -118,8 +118,8 @@ class TestHealthResponseStructure:
         data = health_client.get("/api/health").json()
         assert "test_baselines" in data
         baselines = data["test_baselines"]
-        assert baselines["tritium_lib"] == 1584
-        assert baselines["tritium_sc_pytest"] == 1400
+        assert baselines["tritium_lib"] == 1822
+        assert baselines["tritium_sc_pytest"] == 7800
         assert baselines["tritium_sc_js"] == 281
         assert baselines["tritium_edge_warnings"] == 0
 

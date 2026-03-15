@@ -573,6 +573,7 @@ export const GraphExplorerPanelDef = {
                 <input type="text" class="ge-search-input" data-bind="ge-search"
                        placeholder="Entity ID or name..." spellcheck="false">
                 <button class="ge-btn mono" data-action="ge-search-go">SEARCH</button>
+                <button class="ge-btn mono" data-action="ge-show-all">ALL CORRELATIONS</button>
                 <button class="ge-btn mono" data-action="ge-clear">CLEAR</button>
                 <span class="ge-status mono" data-bind="ge-status">0 nodes</span>
             </div>
@@ -597,6 +598,7 @@ export const GraphExplorerPanelDef = {
         const searchInput = bodyEl.querySelector('[data-bind="ge-search"]');
         const statusEl = bodyEl.querySelector('[data-bind="ge-status"]');
         const searchBtn = bodyEl.querySelector('[data-action="ge-search-go"]');
+        const showAllBtn = bodyEl.querySelector('[data-action="ge-show-all"]');
         const clearBtn = bodyEl.querySelector('[data-action="ge-clear"]');
 
         const graph = new ForceGraph(canvasEl);
@@ -633,6 +635,12 @@ export const GraphExplorerPanelDef = {
         searchBtn.addEventListener('click', doSearch);
         searchInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') doSearch();
+        });
+
+        // Show all correlations
+        showAllBtn.addEventListener('click', async () => {
+            await this._loadAllCorrelations(graph);
+            this._updateStatus();
         });
 
         // Clear
@@ -783,4 +791,137 @@ export const GraphExplorerPanelDef = {
             }
         } catch (_) { /* skip */ }
     },
+
+    /**
+     * Load ALL active target correlations at once and display them
+     * as a unified graph. Each correlated pair becomes two nodes
+     * connected by an edge with the correlation confidence and reason.
+     * Also pulls in target metadata from /api/targets for richer labels.
+     */
+    async _loadAllCorrelations(graph) {
+        graph.clear();
+
+        // Fetch all correlations
+        let correlations = [];
+        try {
+            const res = await fetch('/api/correlations');
+            if (res.ok) {
+                const data = await res.json();
+                correlations = data.correlations || [];
+            }
+        } catch (_) { /* skip */ }
+
+        if (correlations.length === 0) {
+            // No correlations — show a placeholder
+            graph.addNode('_empty', 'No correlations found', 'unknown', {
+                note: 'No active target correlations. Start a demo or wait for sensor data.',
+            });
+            return;
+        }
+
+        // Collect unique target IDs
+        const targetIds = new Set();
+        for (const corr of correlations) {
+            if (corr.primary_id) targetIds.add(corr.primary_id);
+            if (corr.secondary_id) targetIds.add(corr.secondary_id);
+        }
+
+        // Try to fetch target metadata for richer node labels
+        let targetMeta = {};
+        try {
+            const res = await fetch('/api/targets');
+            if (res.ok) {
+                const data = await res.json();
+                const targets = data.targets || data || [];
+                if (Array.isArray(targets)) {
+                    for (const t of targets) {
+                        const tid = t.target_id || t.id;
+                        if (tid) targetMeta[tid] = t;
+                    }
+                }
+            }
+        } catch (_) { /* skip */ }
+
+        // Also try dossier data for entity types
+        let dossierMeta = {};
+        try {
+            const res = await fetch('/api/dossiers?limit=200');
+            if (res.ok) {
+                const data = await res.json();
+                const dossiers = data.dossiers || data.results || [];
+                if (Array.isArray(dossiers)) {
+                    for (const d of dossiers) {
+                        const did = d.id || d.entity_id || d.dossier_id;
+                        if (did) dossierMeta[did] = d;
+                    }
+                }
+            }
+        } catch (_) { /* skip */ }
+
+        // Add nodes for each unique target
+        for (const tid of targetIds) {
+            const meta = targetMeta[tid] || {};
+            const dossier = dossierMeta[tid] || {};
+            const label = meta.name || dossier.name || dossier.label || _shortenId(tid);
+            const entityType = _classifyTargetType(tid, meta, dossier);
+            graph.addNode(tid, label, entityType, {
+                ...meta,
+                ...dossier,
+                target_id: tid,
+            });
+        }
+
+        // Add edges for each correlation
+        for (const corr of correlations) {
+            if (!corr.primary_id || !corr.secondary_id) continue;
+            const label = corr.reason || _buildStrategyLabel(corr.strategies);
+            graph.addEdge(
+                corr.primary_id,
+                corr.secondary_id,
+                label,
+                corr.confidence || 0.5,
+            );
+        }
+    },
 };
+
+/**
+ * Shorten a target ID for display (e.g. "ble_AA:BB:CC:DD:EE:FF" -> "ble_AA:BB..FF")
+ */
+function _shortenId(id) {
+    if (!id) return 'unknown';
+    if (id.length <= 16) return id;
+    return id.slice(0, 10) + '..' + id.slice(-4);
+}
+
+/**
+ * Classify target type from ID prefix and metadata.
+ */
+function _classifyTargetType(id, meta, dossier) {
+    const etype = dossier.entity_type || meta.entity_type || meta.classification || '';
+    if (etype) {
+        if (etype.includes('person') || etype.includes('human')) return 'person';
+        if (etype.includes('vehicle') || etype.includes('car') || etype.includes('truck')) return 'vehicle';
+        if (etype.includes('mesh') || etype.includes('radio')) return 'mesh';
+        if (etype.includes('device') || etype.includes('ble') || etype.includes('wifi')) return 'device';
+    }
+    // Fallback: classify by ID prefix
+    if (id.startsWith('ble_') || id.startsWith('wifi_')) return 'device';
+    if (id.startsWith('det_person') || id.startsWith('det_human')) return 'person';
+    if (id.startsWith('det_car') || id.startsWith('det_truck') || id.startsWith('det_vehicle')) return 'vehicle';
+    if (id.startsWith('mesh_')) return 'mesh';
+    return 'unknown';
+}
+
+/**
+ * Build a short label from strategy scores for an edge.
+ */
+function _buildStrategyLabel(strategies) {
+    if (!strategies || strategies.length === 0) return '';
+    // Use the highest-scoring strategy as the label
+    let best = strategies[0];
+    for (const s of strategies) {
+        if (s.score > best.score) best = s;
+    }
+    return best.name || '';
+}
