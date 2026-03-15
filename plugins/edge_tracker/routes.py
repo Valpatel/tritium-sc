@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 # Trilateration — may not be available if tritium-lib is still building.
@@ -164,7 +164,7 @@ def create_router(
     # -- History -----------------------------------------------------------
 
     @router.get("/history/{mac:path}")
-    async def get_device_history(mac: str, limit: int = 200):
+    async def get_device_history(mac: str, limit: int = Query(default=200, ge=1, le=2000)):
         """Sighting history for a specific MAC address."""
         s = _require_store()
         history = s.get_device_history(mac, limit=limit)
@@ -363,7 +363,7 @@ def create_router(
     # -- WiFi History ------------------------------------------------------
 
     @wifi_router.get("/history/{bssid:path}")
-    async def get_wifi_history(bssid: str, limit: int = 200):
+    async def get_wifi_history(bssid: str, limit: int = Query(default=200, ge=1, le=2000)):
         """Sighting history for a specific BSSID."""
         s = _require_store()
         history = s.get_wifi_history(bssid, limit=limit)

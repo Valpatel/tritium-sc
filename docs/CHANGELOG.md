@@ -14,6 +14,19 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-15 — Wave 133: Maintenance + Security — Geofence Node Position Fix
+
+| Change | Verification |
+|--------|-------------|
+| CRITICAL FIX: BLE target node position auto-registration — edge tracker now extracts node_lat/node_lon from fleet.ble_presence events and stores in BleStore, enabling trilateration engine to compute BLE positions | 8 geofence tests passing |
+| Geofence BLE lat/lon test — validates that BLE targets with trilaterated positions trigger geofence enter/exit events (test_ble_target_geofence_latlon) | Unit Tested |
+| Security: added optional_auth dependency to /api/wifi-fingerprint/proximity and /proximity/{mac}/closest endpoints | Code review |
+| Security: input validation bounds (Query ge=1, le=1000) on proximity limit param, (ge=1, le=2000) on BLE/WiFi history limit params | Code review |
+| Security: MAC address length validation (max 40 chars) on proximity closest-node endpoint | Code review |
+| Lib pytest: 2,381 tests passing | Verified |
+
+---
+
 ## 2026-03-15 — Wave 132: Indoor-Outdoor Transitions, Probe Proximity, Geofence Fix
 
 | Change | Verification |

@@ -250,6 +250,17 @@ class EdgeTrackerPlugin(PluginInterface):
         node_id = data.get("node_id", "unknown")
         node_ip = data.get("node_ip", "")
 
+        # Auto-register node lat/lon if provided in event data (e.g. from demo generators)
+        node_lat = data.get("node_lat")
+        node_lon = data.get("node_lon")
+        if node_lat is not None and node_lon is not None:
+            try:
+                self._store.set_node_position(
+                    node_id, x=0, y=0, lat=node_lat, lon=node_lon, label=node_id,
+                )
+            except Exception:
+                pass
+
         sightings = []
         for dev in devices:
             sightings.append({

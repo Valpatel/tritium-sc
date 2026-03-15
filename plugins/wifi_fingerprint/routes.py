@@ -11,10 +11,17 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .correlator import ProbeCorrelator
 from .probe_proximity import ProbeProximityEstimator
+
+# Auth — optional import (tests may not have app.auth available)
+try:
+    from app.auth import optional_auth
+except ImportError:  # pragma: no cover
+    async def optional_auth():  # type: ignore[misc]
+        return None
 
 
 def create_router(
@@ -64,7 +71,8 @@ def create_router(
     @router.get("/proximity")
     async def get_proximity_estimates(
         device_mac: Optional[str] = None,
-        limit: int = 50,
+        limit: int = Query(default=50, ge=1, le=1000),
+        _user: dict = Depends(optional_auth),
     ):
         """Get recent probe proximity estimates (multi-node proximity detection)."""
         if proximity_estimator is None:
@@ -75,14 +83,18 @@ def create_router(
         return {"estimates": estimates, "count": len(estimates), "available": True}
 
     @router.get("/proximity/{device_mac}/closest")
-    async def get_closest_node(device_mac: str):
+    async def get_closest_node(device_mac: str, _user: dict = Depends(optional_auth)):
         """Get the closest edge node for a specific device MAC."""
         if proximity_estimator is None:
             raise HTTPException(status_code=503, detail="Proximity estimator not available")
-        closest = proximity_estimator.get_closest_node(device_mac)
+        # Validate MAC format (basic sanitization)
+        clean_mac = device_mac.strip().lower()
+        if len(clean_mac) > 40:
+            raise HTTPException(status_code=400, detail="Invalid MAC address")
+        closest = proximity_estimator.get_closest_node(clean_mac)
         if closest is None:
             raise HTTPException(status_code=404, detail="No proximity estimate for device")
-        return {"device_mac": device_mac, "closest_node": closest}
+        return {"device_mac": clean_mac, "closest_node": closest}
 
     @router.post("/prune")
     async def prune_stale(max_age: float = 3600.0):

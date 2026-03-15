@@ -154,6 +154,47 @@ class TestGeofenceE2E:
         assert "z1" in zones
         assert "z2" in zones
 
+    def test_ble_target_geofence_latlon(self):
+        """Wave 133: BLE targets with lat/lon positions trigger geofence events.
+
+        This verifies the Wave 132 fix: edge BLE targets with trilaterated
+        lat/lon positions are checked against geofence zones, not just sim
+        targets.
+        """
+        bus = MockEventBus()
+        engine = GeofenceEngine(event_bus=bus)
+
+        # Create a zone around San Francisco demo area (trilateration demo coords)
+        zone = GeoZone(
+            zone_id="sf-zone",
+            name="SF Demo Zone",
+            polygon=[
+                (37.773, -122.421),
+                (37.773, -122.415),
+                (37.778, -122.415),
+                (37.778, -122.421),
+                (37.773, -122.421),
+            ],
+            zone_type="restricted",
+            alert_on_enter=True,
+        )
+        engine.add_zone(zone)
+
+        # BLE target inside zone (trilateration demo center area)
+        events = engine.check("ble_ttrila_t00001", (37.775, -122.418))
+        enter_events = [e for e in events if e.event_type == "enter"]
+        assert len(enter_events) == 1, "BLE target inside lat/lon zone should trigger enter"
+        assert enter_events[0].zone_name == "SF Demo Zone"
+
+        # BLE target outside zone
+        events2 = engine.check("ble_ttrila_t00099", (38.0, -122.0))
+        enter_events2 = [e for e in events2 if e.event_type == "enter"]
+        assert len(enter_events2) == 0, "BLE target outside zone should not trigger"
+
+        # Verify EventBus received geofence:enter
+        bus_enters = [e for e in bus.events if e["type"] == "geofence:enter"]
+        assert len(bus_enters) == 1
+
     def test_disabled_zone_ignored(self):
         """Disabled zones should not trigger events."""
         engine = GeofenceEngine()
