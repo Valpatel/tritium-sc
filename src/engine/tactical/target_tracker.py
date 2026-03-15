@@ -47,6 +47,7 @@ import time
 from dataclasses import dataclass, field
 
 from .target_history import TargetHistory
+from .target_reappearance import TargetReappearanceMonitor
 
 
 # ---------------------------------------------------------------------------
@@ -157,11 +158,15 @@ class TargetTracker:
     # Stale timeout — remove YOLO detections older than this
     STALE_TIMEOUT = 30.0
 
-    def __init__(self) -> None:
+    def __init__(self, event_bus=None) -> None:
         self._targets: dict[str, TrackedTarget] = {}
         self._lock = threading.Lock()
         self._detection_counter: int = 0
         self.history = TargetHistory()
+        self.reappearance_monitor = TargetReappearanceMonitor(
+            event_bus=event_bus,
+            min_absence_seconds=60.0,
+        )
 
     def _check_velocity(self, target: TrackedTarget, new_pos: tuple[float, float]) -> None:
         """Check if position change implies impossible velocity (teleportation).
@@ -373,6 +378,14 @@ class TargetTracker:
                     _initial_confidence=confidence,
                     confirming_sources={"ble"},
                 )
+                # Check if this is a returning target
+                self.reappearance_monitor.check_reappearance(
+                    target_id=tid,
+                    name=name,
+                    source="ble",
+                    asset_type=asset_type,
+                    position=position,
+                )
         # Only record position if we have a meaningful location
         if pos_source != "unknown":
             self.history.record(tid, position)
@@ -509,7 +522,11 @@ class TargetTracker:
     SIM_STALE_TIMEOUT = 10.0
 
     def _prune_stale(self) -> None:
-        """Remove targets that haven't been updated recently."""
+        """Remove targets that haven't been updated recently.
+
+        Records departures in the reappearance monitor so returning
+        targets can be detected.
+        """
         now = time.monotonic()
         with self._lock:
             stale = [
@@ -520,5 +537,14 @@ class TargetTracker:
                 or (t.source == "rf_motion" and (now - t.last_seen) > self.RF_MOTION_STALE_TIMEOUT)
             ]
             for tid in stale:
+                t = self._targets[tid]
+                # Record departure for reappearance monitoring
+                self.reappearance_monitor.record_departure(
+                    target_id=tid,
+                    name=t.name,
+                    source=t.source,
+                    asset_type=t.asset_type,
+                    last_position=t.position,
+                )
                 del self._targets[tid]
                 self.history.clear(tid)

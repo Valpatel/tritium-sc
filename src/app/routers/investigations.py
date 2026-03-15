@@ -621,3 +621,114 @@ async def filter_by_type(
 
     filtered = engine.filter_by_type(inv_id, entity_types)
     return {"inv_id": inv_id, "filtered_entities": filtered, "count": len(filtered)}
+
+
+@router.get("/{inv_id}/timeline")
+async def get_investigation_timeline(
+    inv_id: str,
+    limit: int = Query(200, ge=1, le=1000),
+):
+    """Return a chronological timeline of all events for investigation entities.
+
+    Collects signals from all entity dossiers in the investigation and
+    returns them sorted by timestamp with entity metadata for rendering
+    an investigation-scoped timeline panel.
+    """
+    engine = _get_engine()
+    if engine is None:
+        raise HTTPException(status_code=503, detail="Investigation engine unavailable")
+
+    inv = engine.get(inv_id)
+    if inv is None:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+
+    # Entity type icons for frontend rendering
+    ENTITY_ICONS = {
+        "person": "P",
+        "vehicle": "V",
+        "device": "D",
+        "animal": "A",
+        "unknown": "?",
+    }
+
+    # Event type colors for frontend rendering
+    EVENT_COLORS = {
+        "mac_sighting": "#00f0ff",
+        "visual_detection": "#05ffa1",
+        "correlation": "#b48eff",
+        "probe_request": "#fcee0a",
+        "enrichment": "#fcee0a",
+        "classification": "#ff2a6d",
+        "geofence": "#ff2a6d",
+        "tracker_sync": "#888888",
+    }
+
+    timeline_events = []
+
+    if engine._dossier_store is not None:
+        for eid in inv.all_entity_ids():
+            dossier = engine._dossier_store.get_dossier(eid)
+            if not dossier:
+                continue
+
+            entity_name = dossier.get("name", eid[:12])
+            entity_type = dossier.get("entity_type", "unknown")
+            entity_icon = ENTITY_ICONS.get(entity_type, "?")
+
+            for signal in dossier.get("signals", []):
+                signal_type = signal.get("signal_type", "unknown")
+                event = {
+                    "timestamp": signal.get("timestamp", 0),
+                    "entity_id": eid,
+                    "entity_name": entity_name,
+                    "entity_type": entity_type,
+                    "entity_icon": entity_icon,
+                    "is_seed": eid in inv.seed_entities,
+                    "signal_id": signal.get("signal_id", ""),
+                    "signal_type": signal_type,
+                    "source": signal.get("source", "unknown"),
+                    "confidence": signal.get("confidence", 0.0),
+                    "color": EVENT_COLORS.get(signal_type, "#888888"),
+                    "data": signal.get("data", {}),
+                }
+
+                # Add position if available
+                pos = signal.get("position")
+                if pos and isinstance(pos, (list, tuple)) and len(pos) >= 2:
+                    event["position"] = {"x": pos[0], "y": pos[1]}
+
+                timeline_events.append(event)
+
+            # Include annotations as timeline events
+            for ann in inv.annotations:
+                if ann.entity_id == eid or ann.entity_id == "":
+                    timeline_events.append({
+                        "timestamp": ann.timestamp,
+                        "entity_id": ann.entity_id or "investigation",
+                        "entity_name": entity_name if ann.entity_id == eid else "Investigation",
+                        "entity_type": entity_type if ann.entity_id == eid else "system",
+                        "entity_icon": entity_icon if ann.entity_id == eid else "N",
+                        "is_seed": False,
+                        "signal_id": ann.annotation_id,
+                        "signal_type": "annotation",
+                        "source": ann.analyst,
+                        "confidence": 1.0,
+                        "color": "#ffffff",
+                        "data": {"note": ann.note, "analyst": ann.analyst},
+                    })
+
+    # Sort by timestamp ascending (chronological)
+    timeline_events.sort(key=lambda e: e.get("timestamp", 0))
+
+    # Apply limit (most recent events)
+    if len(timeline_events) > limit:
+        timeline_events = timeline_events[-limit:]
+
+    return {
+        "inv_id": inv_id,
+        "title": inv.title,
+        "status": inv.status,
+        "events": timeline_events,
+        "total_events": len(timeline_events),
+        "entity_count": len(inv.all_entity_ids()),
+    }
