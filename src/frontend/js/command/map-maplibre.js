@@ -114,6 +114,7 @@ const _state = {
     showFog: false,            // fog of war
     showMesh: true,            // mesh radio overlay
     showPredictionCones: false, // target prediction uncertainty cones
+    showCoverageOverlap: false, // sensor coverage overlap analysis
     showPatrolRoutes: true,    // patrol route lines for friendly units
 
     // Layer visibility — combat FX (debug toggles)
@@ -7382,6 +7383,156 @@ export function toggleAutoFollow() {
     }
 }
 
+export function toggleCoverageOverlap() {
+    _state.showCoverageOverlap = !_state.showCoverageOverlap;
+    if (_state.showCoverageOverlap) {
+        _fetchAndRenderCoverage();
+    } else {
+        _removeCoverageLayer();
+    }
+    console.log(`[MAP-ML] Coverage Overlap ${_state.showCoverageOverlap ? 'ON' : 'OFF'}`);
+}
+
+// Coverage overlap rendering
+const COVERAGE_SOURCE = 'coverage-overlap-src';
+const COVERAGE_FILL_1 = 'coverage-overlap-fill-1';
+const COVERAGE_FILL_2 = 'coverage-overlap-fill-2';
+const COVERAGE_FILL_3 = 'coverage-overlap-fill-3';
+
+async function _fetchAndRenderCoverage() {
+    if (!_state.map) return;
+
+    try {
+        const resp = await fetch('/api/fleet/coverage');
+        const data = await resp.ok ? resp.json() : { coverage: [] };
+        const coverage = (await data).coverage || data.coverage || [];
+
+        // Build GeoJSON circles from sensor positions
+        // Each sensor gets a coverage radius circle; overlaps are computed via layering
+        const features = [];
+        const sensorPositions = [];
+
+        for (const sensor of coverage) {
+            const lng = sensor.longitude || sensor.lng;
+            const lat = sensor.latitude || sensor.lat;
+            const radius = sensor.range_m || sensor.radius || 50;
+            if (lng === undefined || lat === undefined) continue;
+            sensorPositions.push({ lng, lat, radius, id: sensor.device_id || sensor.id });
+
+            // Create a circle polygon (36 vertices)
+            const circle = _createCirclePolygon(lng, lat, radius, 36);
+            features.push({
+                type: 'Feature',
+                properties: { sensor_count: 1, sensor_id: sensor.device_id || sensor.id },
+                geometry: { type: 'Polygon', coordinates: [circle] },
+            });
+        }
+
+        // If no sensors have positions, generate grid-based coverage from unit positions
+        if (features.length === 0) {
+            // Fallback: use unit positions from store as sensor locations
+            TritiumStore.units.forEach((u, id) => {
+                const type = (u.asset_type || u.type || '').toLowerCase();
+                if (type.includes('sensor') || type.includes('camera') || type === 'ble_device' || type === 'mesh_radio') {
+                    const pos = u.position;
+                    if (pos && pos.x !== undefined) {
+                        const lngLat = _gameToLngLat(pos.x, pos.y);
+                        const radius = type.includes('camera') ? 30 : type === 'mesh_radio' ? 100 : 50;
+                        const circle = _createCirclePolygon(lngLat[0], lngLat[1], radius, 36);
+                        features.push({
+                            type: 'Feature',
+                            properties: { sensor_count: 1 },
+                            geometry: { type: 'Polygon', coordinates: [circle] },
+                        });
+                    }
+                }
+            });
+        }
+
+        const geojson = { type: 'FeatureCollection', features };
+
+        // Remove old layers
+        _removeCoverageLayer();
+
+        // Add source and layers
+        _state.map.addSource(COVERAGE_SOURCE, { type: 'geojson', data: geojson });
+
+        // Single-coverage layer (subtle green)
+        _state.map.addLayer({
+            id: COVERAGE_FILL_1,
+            type: 'fill',
+            source: COVERAGE_SOURCE,
+            paint: {
+                'fill-color': '#05ffa1',
+                'fill-opacity': 0.06,
+            },
+        });
+
+        // For overlap detection, we add the same data again with different opacity
+        // MapLibre renders overlapping polygons with additive opacity
+        _state.map.addLayer({
+            id: COVERAGE_FILL_2,
+            type: 'fill',
+            source: COVERAGE_SOURCE,
+            paint: {
+                'fill-color': '#00f0ff',
+                'fill-opacity': 0.05,
+            },
+        });
+
+        // Outline for each sensor coverage area
+        _state.map.addLayer({
+            id: COVERAGE_FILL_3,
+            type: 'line',
+            source: COVERAGE_SOURCE,
+            paint: {
+                'line-color': '#05ffa1',
+                'line-opacity': 0.25,
+                'line-width': 1,
+                'line-dasharray': [4, 4],
+            },
+        });
+
+    } catch (e) {
+        console.warn('[MAP-ML] Coverage fetch failed:', e);
+        // Render fallback with unit positions
+    }
+}
+
+function _removeCoverageLayer() {
+    if (!_state.map) return;
+    for (const layerId of [COVERAGE_FILL_1, COVERAGE_FILL_2, COVERAGE_FILL_3]) {
+        if (_state.map.getLayer(layerId)) {
+            try { _state.map.removeLayer(layerId); } catch (e) {}
+        }
+    }
+    if (_state.map.getSource(COVERAGE_SOURCE)) {
+        try { _state.map.removeSource(COVERAGE_SOURCE); } catch (e) {}
+    }
+}
+
+function _createCirclePolygon(lng, lat, radiusMeters, numVertices) {
+    const coords = [];
+    const earthRadius = 6371000;
+    const angularDist = radiusMeters / earthRadius;
+    const latRad = lat * Math.PI / 180;
+    const lngRad = lng * Math.PI / 180;
+
+    for (let i = 0; i <= numVertices; i++) {
+        const bearing = (2 * Math.PI * i) / numVertices;
+        const vertLat = Math.asin(
+            Math.sin(latRad) * Math.cos(angularDist) +
+            Math.cos(latRad) * Math.sin(angularDist) * Math.cos(bearing)
+        );
+        const vertLng = lngRad + Math.atan2(
+            Math.sin(bearing) * Math.sin(angularDist) * Math.cos(latRad),
+            Math.cos(angularDist) - Math.sin(latRad) * Math.sin(vertLat)
+        );
+        coords.push([vertLng * 180 / Math.PI, vertLat * 180 / Math.PI]);
+    }
+    return coords;
+}
+
 export function centerOnAction() {
     let sumLng = 0, sumLat = 0, count = 0;
     TritiumStore.units.forEach(u => {
@@ -7442,6 +7593,7 @@ export function getMapState() {
         showParks: _state.showParks,
         showMesh: _state.showMesh,
         showPredictionCones: _state.showPredictionCones,
+        showCoverageOverlap: _state.showCoverageOverlap,
         showPatrolRoutes: _state.showPatrolRoutes,
         showThoughts: _state.showThoughts,
         showTracers: _state.showTracers,

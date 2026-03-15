@@ -59,6 +59,11 @@ const LAYER_CATEGORIES = [
             { id: 'heatmap', label: 'Combat Heatmap', description: 'Heat overlay showing where combat is concentrated', color: '#ff4400', source: 'Replay System', key: 'showHeatmap' },
             { id: 'crowdDensity', label: 'Crowd Density', description: 'Civilian crowd density heatmap (civil unrest mode)', color: '#ff8800', source: 'Population Model', key: 'showCrowdDensity' },
             { id: 'activityHeatmap', label: 'Activity Heatmap', description: 'Multi-source activity density: BLE, camera, motion sensors', color: '#ff2a6d', source: 'Heatmap Engine', key: 'showActivityHeatmap' },
+            { id: 'coverageOverlap', label: 'Coverage Overlap', description: 'Highlights areas covered by 2+ sensors in brighter colors. Shows network redundancy vs gaps.', color: '#05ffa1', source: 'Fleet/Sensors', key: 'showCoverageOverlap', legend: [
+                { color: 'rgba(5,255,161,0.08)', shape: 'square', label: '1 sensor (gap risk)' },
+                { color: 'rgba(0,240,255,0.20)', shape: 'square', label: '2 sensors (redundant)' },
+                { color: 'rgba(252,238,10,0.30)', shape: 'square', label: '3+ sensors (strong)' },
+            ]},
         ],
     },
     {
