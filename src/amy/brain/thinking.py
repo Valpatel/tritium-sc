@@ -488,27 +488,36 @@ class ThinkingThread:
 
         t0 = time.monotonic()
         try:
-            router = getattr(commander, "model_router", None)
-            if router is not None:
-                from engine.inference.model_router import TaskType
-                # Classify based on battlespace state
-                hostile_count = len(tracker.get_hostiles()) if tracker else 0
-                active_threats = 0
-                classifier = getattr(commander, "threat_classifier", None)
-                if classifier is not None:
-                    active_threats = len(classifier.get_active_threats())
-                has_images = any("images" in m for m in messages)
-                task_type = router.classify_task(
-                    messages=messages,
-                    context={
-                        "hostile_count": hostile_count,
-                        "active_threats": active_threats,
-                    },
-                    has_images=has_images,
-                )
-                response = router.infer(task_type, messages)
-            else:
-                response = ollama_chat(model=self._model, messages=messages)
+            # Use a timeout wrapper so thinking doesn't stall for 300s
+            # if Ollama is unreachable — fall back to scripted thoughts quickly
+            import concurrent.futures
+            llm_timeout = 15  # seconds — keeps thinking responsive
+
+            def _call_llm():
+                router = getattr(commander, "model_router", None)
+                if router is not None:
+                    from engine.inference.model_router import TaskType
+                    hostile_count_inner = len(tracker.get_hostiles()) if tracker else 0
+                    active_threats_inner = 0
+                    classifier_inner = getattr(commander, "threat_classifier", None)
+                    if classifier_inner is not None:
+                        active_threats_inner = len(classifier_inner.get_active_threats())
+                    has_images = any("images" in m for m in messages)
+                    task_type = router.classify_task(
+                        messages=messages,
+                        context={
+                            "hostile_count": hostile_count_inner,
+                            "active_threats": active_threats_inner,
+                        },
+                        has_images=has_images,
+                    )
+                    return router.infer(task_type, messages)
+                else:
+                    return ollama_chat(model=self._model, messages=messages)
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(_call_llm)
+                response = future.result(timeout=llm_timeout)
         except Exception as e:
             print(f"  [thinking LLM error: {e}] — using fallback")
             # Use fallback thought generator when LLM is unavailable
@@ -552,6 +561,12 @@ class ThinkingThread:
                 else:
                     print(f"  [fallback->{formatted}]")
                 self._dispatch(result)
+            else:
+                # Ensure at least a raw thought gets published even if parse fails
+                raw = response_text.strip()[:120] if response_text else "Monitoring the battlespace..."
+                commander.sensorium.push("thought", raw)
+                commander.event_bus.publish("thought", {"text": raw})
+                print(f"  [fallback raw]: {raw}")
             return
 
         response_text = response.get("message", {}).get("content", "").strip()

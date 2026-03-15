@@ -206,7 +206,7 @@ function _gameMenuItems(mapActions) {
             }
         }},
         { separator: true },
-        { label: 'New Mission', shortcut: 'B',
+        { label: 'Start Battle', shortcut: 'B',
           action: () => { if (mapActions.beginWar) mapActions.beginWar(); } },
         { separator: true },
         { label: 'Reset Game',

@@ -3598,6 +3598,12 @@ body.v2 {
    In light mode, full brightness.
    ======================================== */
 
+/* MapLibre map container: z-index 0 so HUD overlays (kill feed z:30,
+   score panel z:30, wave banner, countdown, game-over) render above it. */
+#maplibre-map {
+    z-index: 0;
+}
+
 /* Dark mode (default): dim and slightly tint the map tiles */
 #maplibre-map .maplibregl-canvas {
     filter: brightness(0.65) contrast(1.15) saturate(0.7) hue-rotate(200deg);

@@ -4365,6 +4365,67 @@
     font-style: italic;
 }
 
+/* Correlated targets section */
+.tdm-corr-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.tdm-corr-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    background: rgba(0, 240, 255, 0.04);
+    border: 1px solid rgba(0, 240, 255, 0.15);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.tdm-corr-item:hover {
+    background: rgba(0, 240, 255, 0.12);
+    border-color: rgba(0, 240, 255, 0.5);
+}
+
+.tdm-corr-id {
+    font-size: 0.6rem;
+    color: #00f0ff;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tdm-corr-source {
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #05ffa1;
+    background: rgba(5, 255, 161, 0.12);
+    padding: 1px 4px;
+    border-radius: 2px;
+}
+
+.tdm-corr-type {
+    font-size: 0.5rem;
+    font-weight: 600;
+    color: #fcee0a;
+    background: rgba(252, 238, 10, 0.1);
+    padding: 1px 4px;
+    border-radius: 2px;
+}
+
+.tdm-corr-conf {
+    font-size: 0.5rem;
+    color: rgba(0, 240, 255, 0.6);
+    margin-left: 4px;
+    font-style: italic;
+}
+
 /* Dossier action button highlight */
 .tdm-action-dossier {
     border-color: rgba(255, 42, 109, 0.4);

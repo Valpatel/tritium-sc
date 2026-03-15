@@ -123,6 +123,9 @@ function warHudUpdateGameState(data) {
     if (scoreEl) {
         scoreEl.style.display = (_hudState.gameState === 'active' || _hudState.gameState === 'wave_complete') ? 'block' : 'none';
     }
+
+    // Show standalone wave counter at top-center during active play
+    _updateWaveCounter();
 }
 
 // ============================================================
@@ -366,6 +369,24 @@ function _updateScoreDisplay() {
 setInterval(() => {
     if (_hudState.displayScore < _hudState.score) _updateScoreDisplay();
 }, 50);
+
+// ============================================================
+// Wave counter (top-center, always visible during battle)
+// ============================================================
+
+function _updateWaveCounter() {
+    const el = document.getElementById('war-wave-counter');
+    if (!el) return;
+
+    const isActive = _hudState.gameState === 'active' || _hudState.gameState === 'wave_complete' || _hudState.gameState === 'countdown';
+    if (!isActive) {
+        el.style.display = 'none';
+        return;
+    }
+
+    el.style.display = 'block';
+    el.textContent = 'WAVE ' + _hudState.wave + '/' + _hudState.totalWaves;
+}
 
 // ============================================================
 // BEGIN WAR button

@@ -4104,6 +4104,30 @@ async function _openTargetDetailModal(targetId, unit) {
         }
     } catch (_) { /* skip */ }
 
+    // Build correlated targets section
+    let correlatedHtml = '';
+    const correlatedIds = unit.correlated_ids || [];
+    if (correlatedIds.length > 0) {
+        const correlatedItems = correlatedIds.map(cid => {
+            const linkedUnit = TritiumStore.units.get(cid);
+            const linkedSource = linkedUnit ? (linkedUnit.source || '').toUpperCase() : '';
+            const linkedType = linkedUnit ? (linkedUnit.asset_type || linkedUnit.type || '').toUpperCase() : '';
+            const linkedBadge = linkedSource ? `<span class="tdm-corr-source">${_escMap(linkedSource)}</span>` : '';
+            const linkedTypeBadge = linkedType ? `<span class="tdm-corr-type">${_escMap(linkedType)}</span>` : '';
+            const truncId = cid.length > 24 ? cid.substring(0, 22) + '..' : cid;
+            return `<div class="tdm-corr-item" data-corr-target="${_escMap(cid)}" title="Click to inspect ${_escMap(cid)}">
+                <span class="tdm-corr-id mono">${_escMap(truncId)}</span>
+                ${linkedBadge}${linkedTypeBadge}
+            </div>`;
+        }).join('');
+        const confHtml = unit.correlation_confidence != null
+            ? `<span class="tdm-corr-conf">${Math.round(unit.correlation_confidence * 100)}% confidence</span>`
+            : '';
+        correlatedHtml = `
+            <div class="tdm-section-title" style="margin-top:12px">CORRELATED TARGETS ${confHtml}</div>
+            <div class="tdm-corr-list">${correlatedItems}</div>`;
+    }
+
     // Fetch dossier for enrichments + RL classification
     let enrichHtml = '';
     let dossierLink = '';
@@ -4190,6 +4214,8 @@ async function _openTargetDetailModal(targetId, unit) {
                 <div class="tdm-col tdm-col-right">
                     <div class="tdm-section-title">POSITION TRAIL</div>
                     <div class="tdm-trail-container">${trailHtml}</div>
+
+                    ${correlatedHtml}
 
                     <div class="tdm-section-title" style="margin-top:12px">TAG TARGET</div>
                     <div class="tdm-tag-buttons">
@@ -4377,6 +4403,22 @@ function _bindQuickActionButtons(modal, targetId) {
             } catch (_) {
                 btn.textContent = 'ERROR';
                 btn.style.background = '#ff2a6d';
+            }
+        });
+    });
+
+    // Correlated target items — click to inspect linked target
+    modal.querySelectorAll('.tdm-corr-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const corrId = item.dataset.corrTarget;
+            if (!corrId) return;
+            // Select on map and open detail modal for the correlated target
+            TritiumStore.set('map.selectedUnitId', corrId);
+            EventBus.emit('unit:selected', { id: corrId });
+            modal.remove();
+            const corrUnit = TritiumStore.units.get(corrId);
+            if (corrUnit) {
+                _openTargetDetailModal(corrId, corrUnit);
             }
         });
     });

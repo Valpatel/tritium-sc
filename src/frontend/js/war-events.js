@@ -106,6 +106,12 @@ WarEventMapper.prototype.onGameStateChange = function(data) {
     if (!data) return;
     var state = data.state || data.new_state;
 
+    // Ensure audio is initialized on any game state change (user has already
+    // interacted by clicking BEGIN WAR, so AudioContext will be allowed)
+    if (typeof _initWarAudioOnGesture === 'function') {
+        _initWarAudioOnGesture();
+    }
+
     if (state === 'active') {
         this._gameActive = true;
         this._audio.startAmbient();

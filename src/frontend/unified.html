@@ -137,10 +137,11 @@
             <!-- Combat HUD overlays (populated by war-hud.js) -->
             <div id="war-countdown" class="war-countdown" style="display:none"></div>
             <div id="war-wave-banner" class="war-wave-banner" style="display:none"></div>
+            <div id="war-wave-counter" class="war-wave-counter" style="display:none"></div>
             <div id="war-elimination-feed" class="war-elimination-feed"></div>
             <div id="war-score" class="war-score" style="display:none"></div>
             <div id="war-begin-btn" class="war-begin-btn" style="display:none">
-                <button class="game-btn game-btn-primary mono" title="Start a 10-wave Nerf battle simulation (keyboard: B)" onclick="if(typeof _onBeginWar==='function')_onBeginWar();else if(typeof warHudShowBeginWarButton==='function'){fetch('/api/game/begin',{method:'POST'}).catch(()=>{})}">[ BEGIN WAR ]</button>
+                <button id="battle-start-btn" class="game-btn game-btn-primary mono battle-start-btn" title="Start a 10-wave Nerf battle simulation (keyboard: B)">[ START BATTLE ]</button>
             </div>
             <div id="war-game-over" class="war-game-over" style="display:none"></div>
             <div id="war-amy-toast" class="war-announcement" style="opacity:0"></div>

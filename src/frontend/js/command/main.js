@@ -579,6 +579,9 @@ function init() {
     };
     document.addEventListener('click', _initAudio, { once: true });
     document.addEventListener('keydown', _initAudio, { once: true });
+    // Also init audio on game state changes (user has already clicked BEGIN WAR
+    // before game_state events arrive, so AudioContext will be unlocked)
+    EventBus.on('game:state', _initAudio);
 
     // Demo start button — visible when no targets on map, hidden once targets appear
     const demoOverlay = document.getElementById('demo-start-overlay');
@@ -614,6 +617,31 @@ function init() {
         fetch('/api/demo/status').then(r => r.ok ? r.json() : {}).then(d => {
             if (d.active) demoOverlay.classList.add('hidden');
         }).catch(() => {});
+    }
+
+    // Start Battle button — visible when targets on map and game is idle
+    const battleOverlay = document.getElementById('war-begin-btn');
+    const battleBtn = document.getElementById('battle-start-btn');
+    if (battleBtn && battleOverlay) {
+        battleBtn.addEventListener('click', () => {
+            beginWar();
+        });
+
+        // Show battle button when targets appear and game is idle
+        function _updateBattleBtn() {
+            const phase = TritiumStore.game.phase;
+            const hasTargets = TritiumStore.units && TritiumStore.units.size > 0;
+            const isIdle = !phase || phase === 'idle' || phase === 'setup';
+            if (hasTargets && isIdle) {
+                battleOverlay.style.display = '';
+            } else {
+                battleOverlay.style.display = 'none';
+            }
+        }
+        TritiumStore.on('units', _updateBattleBtn);
+        TritiumStore.on('game.phase', _updateBattleBtn);
+        // Initial check
+        _updateBattleBtn();
     }
 
     // Welcome tooltip — show once on first visit

@@ -3085,34 +3085,52 @@ button:disabled:hover {
     color: #ff2a6d;
 }
 
-/* BEGIN WAR button */
+/* Wave progress indicator — top-center of map */
+.war-wave-counter {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10, 10, 20, 0.85);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    padding: 4px 16px;
+    border-radius: 3px;
+    pointer-events: none;
+    z-index: 35;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    color: #00f0ff;
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+}
+
+/* BEGIN WAR / START BATTLE button container */
 .war-begin-btn {
     position: absolute;
-    top: 50%;
+    bottom: 48px;
     left: 50%;
-    transform: translate(-50%, -50%);
-    font-family: 'Orbitron', monospace;
-    font-size: 1.4rem;
-    font-weight: 700;
-    letter-spacing: 4px;
-    color: #ff2a6d;
-    background: rgba(255, 42, 109, 0.1);
-    border: 2px solid #ff2a6d;
-    padding: 18px 48px;
-    cursor: pointer;
+    transform: translateX(-50%);
     z-index: 45;
     pointer-events: auto;
-    transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
-    animation: war-begin-pulse 2s ease-in-out infinite;
+    transition: opacity 0.3s;
 }
-.war-begin-btn:hover {
-    background: rgba(255, 42, 109, 0.25);
-    box-shadow: 0 0 30px rgba(255, 42, 109, 0.5), 0 0 60px rgba(255, 42, 109, 0.2);
-    transform: translate(-50%, -50%) scale(1.05);
+.war-begin-btn.hidden { display: none; }
+.battle-start-btn {
+    font-size: 0.85rem;
+    letter-spacing: 3px;
+    color: #ff2a6d;
+    border-color: rgba(255, 42, 109, 0.3);
+    background: rgba(255, 42, 109, 0.06);
+    padding: 10px 32px;
+    animation: battle-btn-pulse 2.5s ease-in-out infinite;
 }
-@keyframes war-begin-pulse {
-    0%, 100% { box-shadow: 0 0 15px rgba(255, 42, 109, 0.3); }
-    50% { box-shadow: 0 0 30px rgba(255, 42, 109, 0.6), 0 0 60px rgba(255, 42, 109, 0.2); }
+.battle-start-btn:hover {
+    background: rgba(255, 42, 109, 0.15);
+    box-shadow: 0 0 20px rgba(255, 42, 109, 0.4), 0 0 40px rgba(255, 42, 109, 0.15);
+}
+@keyframes battle-btn-pulse {
+    0%, 100% { box-shadow: 0 0 10px rgba(255, 42, 109, 0.2); }
+    50% { box-shadow: 0 0 20px rgba(255, 42, 109, 0.5), 0 0 40px rgba(255, 42, 109, 0.15); }
 }
 
 /* START DEMO overlay */
