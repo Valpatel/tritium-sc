@@ -1,3 +1,6 @@
 [submodule "frontend/common"]
 	path = frontend/common
 	url = git@github.com:Valpatel/games-common.git
+[submodule "vendor/plfm-radar"]
+	path = vendor/plfm-radar
+	url = https://github.com/NawfalMotii79/PLFM_RADAR.git
