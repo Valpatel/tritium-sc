@@ -14,6 +14,16 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 82: Dossier Enrichment, Weather, Operator Viewports
+
+| Change | Verification |
+|--------|-------------|
+| `engine/tactical/dossier_env_enrichment.py` — auto-enriches BLE target dossiers with Meshtastic environment data (temp/humidity/pressure) | Unit tested (7 tests) |
+| `app/routers/weather.py` — Weather API proxying Open-Meteo (no API key), 10min cache, WMO codes, compass wind direction | Unit tested (7 tests) |
+| `frontend/js/command/panels/weather-overlay.js` — compact weather widget at top-right of map, auto-refreshes on pan | Code reviewed |
+| Operator viewport sharing — cursor_update extended with zoom/bounds/viewport_label fields, dashed viewport rectangles rendered on other operators' maps | Code reviewed |
+| WebSocket handler updated to propagate viewport bounds from cursor_position messages | Code reviewed |
+
 ## 2026-03-14 — Wave 80: MILESTONE + Security + System Version
 
 | Change | Verification |

@@ -52,7 +52,8 @@ function _onMapMouseMove(data) {
     const lng = data.lng || data.latlng?.lng;
     if (lat == null || lng == null) return;
 
-    _wsManager.send({
+    // Include viewport data for operator presence on map
+    const msg = {
         type: 'cursor_update',
         session_id: _sessionInfo.session_id,
         username: _sessionInfo.username,
@@ -61,7 +62,15 @@ function _onMapMouseMove(data) {
         color: _sessionInfo.color,
         lat,
         lng,
-    });
+    };
+
+    // Attach viewport bounds and zoom if available from store
+    const mapZoom = TritiumStore.get('map.zoom');
+    const mapBounds = TritiumStore.get('map.bounds');
+    if (mapZoom != null) msg.zoom = mapZoom;
+    if (mapBounds) msg.bounds = mapBounds; // {north, south, east, west}
+
+    _wsManager.send(msg);
 }
 
 function _startRender() {
@@ -136,7 +145,63 @@ function _renderCursors() {
         _ctx.fillRect(labelX - 2, labelY - 11, textWidth + 4, 14);
         _ctx.fillStyle = color;
         _ctx.fillText(name, labelX, labelY);
+
+        // Draw viewport rectangle if bounds are available
+        if (cursor.bounds && project) {
+            _renderViewportRect(project, cursor, color, name, w, h);
+        }
     }
+}
+
+/**
+ * Render an operator's viewport as a dashed rectangle on the map.
+ * Shows where each operator is looking for coordination awareness.
+ */
+function _renderViewportRect(project, cursor, color, name, canvasW, canvasH) {
+    const b = cursor.bounds;
+    if (!b || b.north == null || b.south == null || b.east == null || b.west == null) return;
+
+    let nw, se;
+    try {
+        nw = project(b.north, b.west);
+        se = project(b.south, b.east);
+    } catch {
+        return;
+    }
+    if (!nw || !se) return;
+
+    const rx = Math.min(nw.x, se.x);
+    const ry = Math.min(nw.y, se.y);
+    const rw = Math.abs(se.x - nw.x);
+    const rh = Math.abs(se.y - nw.y);
+
+    // Skip if viewport rect is too large (covers most of screen) or too small
+    if (rw < 10 || rh < 10) return;
+    if (rw > canvasW * 0.95 && rh > canvasH * 0.95) return;
+
+    // Draw dashed rectangle
+    _ctx.setLineDash([6, 4]);
+    _ctx.strokeStyle = color + '88';
+    _ctx.lineWidth = 1.5;
+    _ctx.strokeRect(rx, ry, rw, rh);
+    _ctx.setLineDash([]);
+
+    // Fill with very faint tint
+    _ctx.fillStyle = color + '0a';
+    _ctx.fillRect(rx, ry, rw, rh);
+
+    // Label at top of viewport rect
+    const roleLabel = cursor.role || 'observer';
+    const viewLabel = cursor.viewport_label || `${name} [${roleLabel}]`;
+    _ctx.font = '10px monospace';
+    const lblWidth = _ctx.measureText(viewLabel).width;
+    const lblX = rx + 4;
+    const lblY = ry + 12;
+
+    _ctx.fillStyle = '#0a0a0fcc';
+    _ctx.fillRect(lblX - 2, lblY - 10, lblWidth + 4, 13);
+    _ctx.fillStyle = color + 'cc';
+    _ctx.fillText(viewLabel, lblX, lblY);
 }
 
 export function destroyCursorSharing() {

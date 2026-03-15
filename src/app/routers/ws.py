@@ -288,7 +288,7 @@ async def _handle_cursor_update(websocket: WebSocket, message: dict) -> None:
         except Exception:
             pass
 
-    # Broadcast cursor to all other clients
+    # Broadcast cursor to all other clients (includes viewport if provided)
     cursor_msg = {
         "type": "cursor_position",
         "session_id": session_id,
@@ -300,6 +300,13 @@ async def _handle_cursor_update(websocket: WebSocket, message: dict) -> None:
         "lng": lng,
         "timestamp": datetime.now(tz=None).isoformat(),
     }
+    # Operator viewport: zoom level and visible bounds for coordination
+    if message.get("zoom") is not None:
+        cursor_msg["zoom"] = message["zoom"]
+    if message.get("bounds"):
+        cursor_msg["bounds"] = message["bounds"]  # {north, south, east, west}
+    if message.get("viewport_label"):
+        cursor_msg["viewport_label"] = message["viewport_label"]
 
     # Send to all clients except the sender
     message_str = json.dumps(cursor_msg)

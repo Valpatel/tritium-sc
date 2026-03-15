@@ -95,6 +95,8 @@ from app.routers.ollama_health import router as ollama_health_router
 from app.routers.movement_analytics import router as movement_analytics_router
 from app.routers.amy_briefing import router as amy_briefing_router
 from app.routers.ar_export import router as ar_export_router
+from app.routers.weather import router as weather_router
+from app.routers.history_analytics import router as history_analytics_router
 
 
 # ---------------------------------------------------------------------------
@@ -1236,6 +1238,8 @@ app.include_router(ollama_health_router)
 app.include_router(movement_analytics_router)
 app.include_router(amy_briefing_router)
 app.include_router(ar_export_router)
+app.include_router(weather_router)
+app.include_router(history_analytics_router)
 
 # Static files
 frontend_path = Path(__file__).parent.parent / "frontend"

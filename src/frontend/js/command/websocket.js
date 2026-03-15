@@ -1145,9 +1145,9 @@ export class WebSocketManager {
 
             // -- Operator cursor sharing ----------------------------
             case 'cursor_position': {
-                // Another operator's cursor position on the map
+                // Another operator's cursor position and viewport on the map
                 const cursor = msg;
-                TritiumStore.setOperatorCursor(cursor.session_id, {
+                const cursorData = {
                     session_id: cursor.session_id,
                     username: cursor.username,
                     display_name: cursor.display_name,
@@ -1156,8 +1156,13 @@ export class WebSocketManager {
                     lat: cursor.lat,
                     lng: cursor.lng,
                     timestamp: cursor.timestamp,
-                });
-                EventBus.emit('operator:cursor', cursor);
+                };
+                // Include viewport data if present (zoom, bounds, label)
+                if (cursor.zoom !== undefined) cursorData.zoom = cursor.zoom;
+                if (cursor.bounds) cursorData.bounds = cursor.bounds;
+                if (cursor.viewport_label) cursorData.viewport_label = cursor.viewport_label;
+                TritiumStore.setOperatorCursor(cursor.session_id, cursorData);
+                EventBus.emit('operator:cursor', cursorData);
                 break;
             }
 
