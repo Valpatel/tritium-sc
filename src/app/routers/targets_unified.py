@@ -145,10 +145,103 @@ async def export_target_trail_gpx(
 
     Supported formats:
     - ``gpx`` — GPX 1.1 XML (default, for ATAK/Google Earth)
-    - ``csv`` / ``json`` / ``geojson`` — delegates to history/export
+    - ``geojson`` — GeoJSON Feature with LineString geometry (web-friendly)
+    - ``csv`` / ``json`` — delegates to history/export
     """
-    # Delegate non-GPX formats to existing history/export
-    if format.lower().strip() != "gpx":
+    fmt = format.lower().strip()
+
+    # GeoJSON: direct implementation for trail-specific export
+    if fmt == "geojson":
+        import json
+        from fastapi.responses import Response
+
+        tracker = _get_tracker(request)
+        if tracker is None:
+            return {"error": "No tracker available"}
+
+        target = tracker.get_target(target_id)
+        if target is None:
+            return {"error": "Target not found"}
+
+        trail = tracker.history.get_trail_dicts(target_id, max_points=max_points)
+        target_dict = target.to_dict()
+        safe_id = target_id.replace("/", "_").replace("\\", "_")
+
+        coordinates: list[list[float]] = []
+        timestamps: list = []
+        speeds: list = []
+        headings: list = []
+
+        for pt in trail:
+            lat = pt.get("lat", 0.0) or 0.0
+            lng = pt.get("lng", 0.0) or 0.0
+            if lat == 0.0 and lng == 0.0:
+                lng = pt.get("x", 0.0)
+                lat = pt.get("y", 0.0)
+            ele = pt.get("ele", pt.get("altitude"))
+            coord = [lng, lat]
+            if ele is not None:
+                coord.append(float(ele))
+            coordinates.append(coord)
+            timestamps.append(pt.get("time", pt.get("timestamp", "")))
+            speeds.append(pt.get("speed", None))
+            headings.append(pt.get("heading", None))
+
+        # Build GeoJSON Feature with LineString
+        geojson = {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": coordinates,
+                    } if len(coordinates) >= 2 else {
+                        "type": "Point",
+                        "coordinates": coordinates[0] if coordinates else [0, 0],
+                    },
+                    "properties": {
+                        "target_id": target_id,
+                        "name": target_dict.get("name", ""),
+                        "alliance": target_dict.get("alliance", ""),
+                        "source": target_dict.get("source", ""),
+                        "classification": target_dict.get("classification",
+                                                          target_dict.get("asset_type", "")),
+                        "point_count": len(trail),
+                        "timestamps": timestamps,
+                        "speeds": [s for s in speeds if s is not None],
+                        "headings": [h for h in headings if h is not None],
+                    },
+                },
+            ],
+        }
+
+        # Add start/end waypoints as Point features
+        if trail:
+            for label, idx in [("start", 0), ("end", -1)]:
+                pt = trail[idx]
+                lat = pt.get("lat", 0.0) or pt.get("y", 0.0) or 0.0
+                lng = pt.get("lng", 0.0) or pt.get("x", 0.0) or 0.0
+                geojson["features"].append({
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": [lng, lat]},
+                    "properties": {
+                        "marker": label,
+                        "target_id": target_id,
+                        "timestamp": pt.get("time", pt.get("timestamp", "")),
+                    },
+                })
+
+        return Response(
+            content=json.dumps(geojson, default=str),
+            media_type="application/geo+json",
+            headers={
+                "Content-Disposition": f"attachment; filename={safe_id}_trail.geojson",
+            },
+        )
+
+    # Delegate non-GPX/non-GeoJSON formats to existing history/export
+    if fmt != "gpx":
         return await export_target_history(
             request, target_id, format=format, max_points=max_points,
         )

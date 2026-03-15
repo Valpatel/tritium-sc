@@ -54,6 +54,8 @@ class InstinctLayer:
     GEOFENCE_DISPATCH_COOLDOWN = 15.0
     BLE_WATCHLIST_COOLDOWN = 10.0
     CORRELATION_NARRATE_COOLDOWN = 5.0
+    VEHICLE_SUSPICIOUS_COOLDOWN = 20.0
+    VEHICLE_CHECK_INTERVAL = 5.0  # How often to poll vehicle tracker
 
     def __init__(self, commander: Commander) -> None:
         self._commander = commander
@@ -66,6 +68,8 @@ class InstinctLayer:
         self._last_geofence_dispatch: dict[str, float] = {}
         self._last_ble_watchlist: dict[str, float] = {}
         self._last_correlation: float = 0.0
+        self._last_vehicle_alert: dict[str, float] = {}
+        self._last_vehicle_check: float = 0.0
 
         # Watch list: set of MAC addresses under increased surveillance
         self._watch_list: set[str] = set()
@@ -127,6 +131,11 @@ class InstinctLayer:
             try:
                 msg = self._sub.get(timeout=1.0)
             except queue_mod.Empty:
+                # No event -- use idle time for periodic vehicle checks
+                try:
+                    self._periodic_vehicle_check()
+                except Exception as e:
+                    logger.debug("Vehicle check error: %s", e)
                 continue
             except Exception:
                 continue
@@ -376,6 +385,106 @@ class InstinctLayer:
         })
 
         self._response_count += 1
+
+    # ------------------------------------------------------------------
+    # Vehicle behavior awareness
+    # ------------------------------------------------------------------
+
+    def _periodic_vehicle_check(self) -> None:
+        """Periodically poll VehicleTrackingManager for suspicious vehicles.
+
+        Amy proactively monitors vehicles for loitering, slow crawling,
+        and erratic movement without waiting for an explicit event.
+        """
+        now = time.monotonic()
+        if now - self._last_vehicle_check < self.VEHICLE_CHECK_INTERVAL:
+            return
+        self._last_vehicle_check = now
+
+        commander = self._commander
+        vehicle_mgr = getattr(commander, "vehicle_tracker", None)
+        if vehicle_mgr is None:
+            return
+
+        suspicious = vehicle_mgr.get_suspicious(threshold=0.3)
+        if not suspicious:
+            return
+
+        for vb in suspicious:
+            # Cooldown per vehicle
+            if now - self._last_vehicle_alert.get(vb.target_id, 0) < self.VEHICLE_SUSPICIOUS_COOLDOWN:
+                continue
+            self._last_vehicle_alert[vb.target_id] = now
+
+            score = vb.get_suspicious_score()
+            narration = self._build_vehicle_narration(vb, score)
+
+            importance = 0.5 + min(0.4, score)
+            commander.sensorium.push(
+                "thought",
+                narration,
+                importance=importance,
+            )
+            commander.event_bus.publish("vehicle_suspicious", {
+                "target_id": vb.target_id,
+                "vehicle_class": vb.vehicle_class,
+                "suspicious_score": score,
+                "speed_mph": round(vb.speed_mph, 1),
+                "narration": narration,
+            })
+            self._response_count += 1
+
+    def _build_vehicle_narration(self, vb, score: float) -> str:
+        """Build a natural-language narration of suspicious vehicle behavior.
+
+        Amy explains what the vehicle is doing and why it is suspicious.
+        """
+        reasons: list[str] = []
+
+        # Loitering
+        stopped = vb.stopped_duration_s
+        if stopped > 300:
+            minutes = stopped / 60
+            reasons.append(f"stopped for {minutes:.0f} minutes")
+        elif stopped > 60:
+            reasons.append(f"stopped for {stopped:.0f} seconds")
+
+        # Slow crawling (possible surveillance)
+        if 2.0 < vb.speed_mph < 10.0:
+            reasons.append(
+                f"crawling at {vb.speed_mph:.1f} mph heading {vb.direction_label} "
+                f"(possible surveillance)"
+            )
+
+        # Erratic speed
+        sv = vb.speed_variance
+        if sv > 100:
+            reasons.append("highly erratic speed changes")
+        elif sv > 25:
+            reasons.append("inconsistent speed pattern")
+
+        # Erratic heading
+        hcr = vb.heading_change_rate
+        if hcr > 30:
+            reasons.append("frequent direction changes (circling)")
+        elif hcr > 10:
+            reasons.append("unusual direction changes")
+
+        # Parked
+        if vb.is_parked:
+            reasons.append("parked in an unusual location")
+
+        if not reasons:
+            reasons.append("multiple behavioral indicators elevated")
+
+        reasons_text = "; ".join(reasons)
+        severity = "high" if score > 0.6 else "moderate" if score > 0.4 else "low"
+
+        return (
+            f"Suspicious {vb.vehicle_class} detected ({vb.target_id[:8]}): "
+            f"{reasons_text}. Threat score: {score:.0%} ({severity}). "
+            f"Maintaining surveillance."
+        )
 
     # ------------------------------------------------------------------
     # Threat narration

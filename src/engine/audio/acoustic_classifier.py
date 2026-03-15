@@ -179,15 +179,220 @@ def _euclidean_distance(a: list[float], b: list[float]) -> float:
     return math.sqrt(total)
 
 
+def _extract_wav_features(wav_path: str) -> Optional[tuple[str, list[float], float, float, float, float, int]]:
+    """Extract features from a WAV file and return in TRAINING_DATA format.
+
+    Returns a tuple (label, mfcc_13, centroid, zcr, rms, bandwidth, duration_ms)
+    or None if extraction fails. Label is empty string (caller must fill).
+
+    No numpy/scipy/librosa required -- pure stdlib.
+    """
+    import struct
+    import wave as wave_mod
+
+    try:
+        with wave_mod.open(wav_path, "rb") as wf:
+            n_channels = wf.getnchannels()
+            sample_width = wf.getsampwidth()
+            framerate = wf.getframerate()
+            n_frames = wf.getnframes()
+            raw_data = wf.readframes(n_frames)
+    except Exception:
+        return None
+
+    duration_ms = int(n_frames / framerate * 1000) if framerate > 0 else 0
+
+    # Convert to float samples
+    try:
+        if sample_width == 2:
+            fmt = f"<{n_frames * n_channels}h"
+            samples_int = struct.unpack(fmt, raw_data)
+        elif sample_width == 4:
+            fmt = f"<{n_frames * n_channels}i"
+            samples_int = struct.unpack(fmt, raw_data)
+        else:
+            samples_int = [b - 128 for b in raw_data]
+    except Exception:
+        return None
+
+    # Mix to mono
+    if n_channels > 1:
+        mono = []
+        for i in range(0, len(samples_int), n_channels):
+            mono.append(sum(samples_int[i:i + n_channels]) / n_channels)
+        samples_int = mono
+
+    max_val = 2 ** (sample_width * 8 - 1)
+    samples = [s / max_val for s in samples_int]
+    n = len(samples)
+    if n < 256:
+        return None
+
+    # RMS energy
+    rms = math.sqrt(sum(s * s for s in samples) / n)
+
+    # Zero crossing rate
+    crossings = sum(1 for i in range(1, n) if (samples[i] >= 0) != (samples[i - 1] >= 0))
+    zcr = crossings / n if n > 1 else 0.0
+
+    # Approximate spectral centroid from ZCR-based frequency
+    if crossings > 0:
+        avg_period = n / (crossings / 2)
+        dominant_freq = framerate / avg_period if avg_period > 0 else 0.0
+    else:
+        dominant_freq = 0.0
+    centroid = max(0.0, min(dominant_freq, framerate / 2))
+    bandwidth = centroid * 0.5
+
+    # MFCC-like coefficients via windowed energy + DCT
+    frame_size = min(1024, n // 4)
+    hop = frame_size // 2
+    n_frames_local = max(1, (n - frame_size) // hop + 1)
+    frame_energies = []
+    for i in range(n_frames_local):
+        start = i * hop
+        end = min(start + frame_size, n)
+        frame = samples[start:end]
+        energy = sum(s * s for s in frame) / len(frame)
+        frame_energies.append(math.log(energy + 1e-10))
+
+    m = len(frame_energies)
+    mfcc = []
+    for k in range(13):
+        coeff = 0.0
+        for j in range(m):
+            coeff += frame_energies[j] * math.cos(math.pi * k * (2 * j + 1) / (2 * m))
+        mfcc.append(coeff / m)
+
+    return ("", mfcc, centroid, zcr, rms, bandwidth, duration_ms)
+
+
+def train_from_wav_directory(
+    wav_dir: str,
+    category_map: Optional[dict[str, str]] = None,
+    metadata_csv: Optional[str] = None,
+    max_per_category: int = 10,
+) -> list[tuple[str, list[float], float, float, float, float, int]]:
+    """Extract training data from a directory of WAV files.
+
+    Supports two modes:
+    1. ESC-50 style: metadata CSV with filename, category columns
+    2. Subdirectory style: wav_dir/category_name/file.wav
+
+    Args:
+        wav_dir: Path to directory containing WAV files.
+        category_map: Mapping from dataset category names to Tritium classes.
+        metadata_csv: Path to metadata CSV (ESC-50 format).
+        max_per_category: Maximum samples per category to extract.
+
+    Returns:
+        List of training tuples compatible with MFCCClassifier.train().
+    """
+    import csv
+    from pathlib import Path
+
+    training_data: list[tuple[str, list[float], float, float, float, float, int]] = []
+    wav_path = Path(wav_dir)
+
+    if metadata_csv:
+        # ESC-50 style: CSV with filename, category
+        csv_path = Path(metadata_csv)
+        if not csv_path.exists():
+            logger.warning("Metadata CSV not found: {}", metadata_csv)
+            return training_data
+
+        category_counts: dict[str, int] = {}
+        with open(csv_path, "r") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                cat = row.get("category", "")
+                label = cat
+                if category_map:
+                    label = category_map.get(cat, "")
+                    if not label or label == "unknown":
+                        continue
+
+                if category_counts.get(label, 0) >= max_per_category:
+                    continue
+
+                filename = row.get("filename", "")
+                fpath = wav_path / filename
+                if not fpath.exists():
+                    continue
+
+                result = _extract_wav_features(str(fpath))
+                if result is None:
+                    continue
+
+                _, mfcc, centroid, zcr, rms, bw, dur = result
+                training_data.append((label, mfcc, centroid, zcr, rms, bw, dur))
+                category_counts[label] = category_counts.get(label, 0) + 1
+
+    else:
+        # Subdirectory style
+        if not wav_path.is_dir():
+            return training_data
+        for subdir in sorted(wav_path.iterdir()):
+            if not subdir.is_dir():
+                continue
+            cat = subdir.name
+            label = cat
+            if category_map:
+                label = category_map.get(cat, "")
+                if not label or label == "unknown":
+                    continue
+
+            count = 0
+            for wav_file in sorted(subdir.glob("*.wav")):
+                if count >= max_per_category:
+                    break
+                result = _extract_wav_features(str(wav_file))
+                if result is None:
+                    continue
+                _, mfcc, centroid, zcr, rms, bw, dur = result
+                training_data.append((label, mfcc, centroid, zcr, rms, bw, dur))
+                count += 1
+
+    logger.info(
+        "Extracted {} training samples from WAV files ({} classes)",
+        len(training_data),
+        len(set(t[0] for t in training_data)),
+    )
+    return training_data
+
+
+# Default ESC-50 category mapping for train_from_wav_directory()
+ESC50_CATEGORY_MAP: dict[str, str] = {
+    "dog": "animal", "cat": "animal", "rooster": "animal", "pig": "animal",
+    "cow": "animal", "frog": "animal", "hen": "animal", "crow": "animal",
+    "sheep": "animal", "insects": "animal", "crickets": "animal",
+    "chirping_birds": "animal",
+    "siren": "siren",
+    "car_horn": "vehicle", "engine": "vehicle", "train": "vehicle",
+    "helicopter": "vehicle", "airplane": "vehicle",
+    "fireworks": "explosion", "thunderstorm": "explosion",
+    "glass_breaking": "glass_break",
+    "chainsaw": "machinery", "vacuum_cleaner": "machinery",
+    "washing_machine": "machinery", "hand_saw": "machinery",
+    "clock_alarm": "alarm", "church_bells": "alarm",
+    "laughing": "voice", "crying_baby": "voice", "coughing": "voice",
+    "sneezing": "voice", "breathing": "voice", "snoring": "voice",
+    "footsteps": "footsteps",
+}
+
+
 class MFCCClassifier:
     """K-Nearest Neighbors classifier on MFCC + spectral features.
 
     Uses the built-in training dataset. No external ML deps required.
     Feature vector = 13 MFCCs + spectral_centroid + zcr + rms_energy +
                      spectral_bandwidth + duration_ms (normalized).
+
+    Can be retrained on real WAV files (e.g. ESC-50) for improved accuracy
+    via train_from_wavs() or by passing extracted data to train().
     """
 
-    MODEL_VERSION = "mfcc_knn_v1"
+    MODEL_VERSION = "mfcc_knn_v2"
 
     def __init__(self, k: int = 3) -> None:
         self.k = k
@@ -195,6 +400,8 @@ class MFCCClassifier:
         self._trained = False
         self._feature_means: list[float] = []
         self._feature_stds: list[float] = []
+        self._training_sample_count: int = 0
+        self._training_class_count: int = 0
 
     def train(self, data: Optional[list] = None) -> None:
         """Train on built-in or custom dataset."""
@@ -236,11 +443,54 @@ class MFCCClassifier:
             self._training_vectors.append((label, norm_fv))
 
         self._trained = True
+        self._training_sample_count = n_samples
+        self._training_class_count = len(set(label for label, _ in raw_vectors))
         logger.info(
             "MFCC classifier trained on {} samples, {} classes",
             n_samples,
-            len(set(label for label, _ in raw_vectors)),
+            self._training_class_count,
         )
+
+    def train_from_wavs(
+        self,
+        wav_dir: str,
+        category_map: Optional[dict[str, str]] = None,
+        metadata_csv: Optional[str] = None,
+        max_per_category: int = 10,
+        augment_with_builtin: bool = True,
+    ) -> int:
+        """Train classifier using real WAV files for dramatically better accuracy.
+
+        Extracts MFCC features from WAV files and trains the KNN.
+        Optionally augments with built-in synthetic profiles.
+
+        Args:
+            wav_dir: Path to directory containing WAV files.
+            category_map: Mapping from dataset category names to Tritium classes.
+            metadata_csv: Path to metadata CSV (ESC-50 format).
+            max_per_category: Maximum samples per category.
+            augment_with_builtin: Whether to also include built-in training data.
+
+        Returns:
+            Number of WAV-derived training samples used.
+        """
+        wav_data = train_from_wav_directory(
+            wav_dir, category_map=category_map,
+            metadata_csv=metadata_csv,
+            max_per_category=max_per_category,
+        )
+
+        if not wav_data:
+            logger.warning("No WAV training data extracted, falling back to built-in")
+            self.train()
+            return 0
+
+        combined = list(wav_data)
+        if augment_with_builtin:
+            combined.extend(TRAINING_DATA)
+
+        self.train(combined)
+        return len(wav_data)
 
     def classify(self, features: AudioFeatures) -> tuple[str, float, list[dict]]:
         """Classify features using KNN.
