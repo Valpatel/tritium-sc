@@ -363,6 +363,8 @@ class DossierManager:
                         self._handle_detection(data)
                     elif event_type == "enrichment_complete":
                         self._handle_enrichment(data)
+                    elif event_type in ("meshtastic:nodes_updated", "meshtastic:node_update"):
+                        self._handle_meshtastic(data)
                     elif event_type in ("geofence:enter", "geofence:exit"):
                         self._handle_geofence_event(event_type, data)
                 except Exception:
@@ -614,6 +616,48 @@ class DossierManager:
                 enriched_count, node_id, len(all_ssids),
             )
 
+    def _handle_meshtastic(self, data: dict) -> None:
+        """Handle meshtastic:nodes_updated events — create dossiers for mesh radio nodes."""
+        nodes = data.get("nodes", [])
+        for node in nodes:
+            node_id = node.get("id", node.get("node_id", ""))
+            if not node_id:
+                continue
+            target_id = f"mesh_{node_id}"
+            name = node.get("long_name") or node.get("short_name") or node.get("name") or node_id
+
+            identifiers = {"node_id": str(node_id)}
+            if node.get("long_name"):
+                identifiers["long_name"] = node["long_name"]
+
+            self.find_or_create_for_target(
+                target_id,
+                name=name,
+                entity_type="mesh_radio",
+                identifiers=identifiers,
+                tags=["meshtastic", "lora"],
+            )
+
+            signal_data = {
+                "node_id": node_id,
+                "name": name,
+            }
+            if node.get("lat") is not None:
+                signal_data["lat"] = node["lat"]
+                signal_data["lon"] = node.get("lon", node.get("lng", 0))
+            if node.get("snr") is not None:
+                signal_data["snr"] = node["snr"]
+            if node.get("battery") is not None:
+                signal_data["battery"] = node["battery"]
+
+            self.add_signal_to_target(
+                target_id,
+                source="meshtastic",
+                signal_type="node_telemetry",
+                data=signal_data,
+                confidence=0.9,
+            )
+
     def _handle_detection(self, data: dict) -> None:
         """Handle a YOLO detection event."""
         detections = data.get("detections", [])
@@ -621,13 +665,14 @@ class DossierManager:
             detections = data
 
         for det in detections:
-            class_name = det.get("class_name", "unknown")
+            # Generators may use 'label' instead of 'class_name'
+            class_name = det.get("class_name") or det.get("label", "unknown")
             confidence = det.get("confidence", 0.0)
             if confidence < 0.4:
                 continue
 
             # Build a target_id matching TargetTracker convention
-            det_id = det.get("target_id", f"det_{class_name}")
+            det_id = det.get("target_id") or det.get("id", f"det_{class_name}")
 
             entity_type = "person" if class_name == "person" else "unknown"
             if class_name in ("car", "motorcycle", "bicycle", "truck", "bus"):
@@ -1145,10 +1190,91 @@ class DossierManager:
     # Periodic flush
     # ------------------------------------------------------------------
 
+    def _sync_tracker_targets(self) -> None:
+        """Create dossiers for any tracker targets that don't have one yet.
+
+        This is the catch-all: regardless of which EventBus events were
+        received, every target in the TargetTracker gets a persistent dossier.
+        Runs periodically from the flush loop so demo-mode targets, real
+        edge-device targets, and any other source all get dossiers.
+        """
+        if self._tracker is None:
+            return
+
+        try:
+            all_targets = self._tracker.get_all()
+        except Exception:
+            logger.debug("Tracker sync skipped (get_all failed)", exc_info=True)
+            return
+
+        created = 0
+        for target in all_targets:
+            tid = target.target_id
+            with self._lock:
+                already_mapped = tid in self._target_dossier_map
+            if already_mapped:
+                continue
+
+            # Determine entity type from target source/asset_type
+            entity_type = "unknown"
+            identifiers: dict[str, str] = {}
+            tags: list[str] = []
+
+            if tid.startswith("ble_"):
+                entity_type = "device"
+                raw = tid[4:]
+                if len(raw) == 12:
+                    mac = ":".join(raw[i:i + 2] for i in range(0, 12, 2)).upper()
+                    identifiers["mac"] = mac
+                tags.append("ble")
+                if target.asset_type in ("phone", "smartphone"):
+                    entity_type = "phone"
+                elif target.asset_type in ("watch", "wearable"):
+                    entity_type = "wearable"
+            elif tid.startswith("det_"):
+                if target.asset_type == "person":
+                    entity_type = "person"
+                elif target.asset_type == "vehicle":
+                    entity_type = "vehicle"
+                tags.extend(["yolo", target.classification or target.asset_type])
+            elif tid.startswith("mesh_"):
+                entity_type = "mesh_radio"
+                identifiers["node_id"] = tid[5:]
+                tags.extend(["meshtastic", "lora"])
+            elif tid.startswith("wifi_"):
+                entity_type = "wifi_device"
+                tags.append("wifi")
+            elif tid.startswith("rf_motion_"):
+                entity_type = "motion_detected"
+                tags.append("rf_motion")
+            else:
+                # Simulation targets, manual targets, etc.
+                entity_type = target.asset_type or "unknown"
+                tags.append(target.source)
+
+            self.find_or_create_for_target(
+                tid,
+                name=target.name,
+                entity_type=entity_type,
+                identifiers=identifiers,
+                tags=tags,
+            )
+            # Mark as dirty so the next flush writes position data
+            with self._lock:
+                dossier_id = self._target_dossier_map.get(tid)
+                if dossier_id:
+                    self._dirty.add(dossier_id)
+            created += 1
+
+        if created > 0:
+            logger.info("Tracker sync: created %d new dossiers (%d total targets)",
+                        created, len(all_targets))
+
     def _flush_loop(self) -> None:
-        """Periodically flush dirty dossiers."""
+        """Periodically flush dirty dossiers and sync tracker targets."""
         while self._running:
             time.sleep(self._flush_interval)
+            self._sync_tracker_targets()
             self._flush_dirty()
 
     def _flush_dirty(self) -> None:

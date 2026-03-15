@@ -1,0 +1,38 @@
+{
+  "step1_map": true,
+  "step2_game_menu": true,
+  "step2_new_mission": true,
+  "step3_modal_has_modes": true,
+  "step4_begin": {
+    "status": "countdown_started",
+    "wave": 1,
+    "countdown": 5
+  },
+  "step5_state": "active",
+  "step5_wave": 1,
+  "step5_score": 0,
+  "step6_hostiles": "{'targets': [{'target_id': 'det_person_6', 'name': 'Person #6', 'alliance': 'hostile', 'asset_type': 'person', 'position': {'x': 0.24113532796548628, 'y': 10.613959155821796}, 'lat': 37.71599534638120",
+  "step7_markers": {
+    "total": 0,
+    "hostile": 0,
+    "friendly": 0,
+    "other": 0
+  },
+  "step8_amy": "NOT FOUND",
+  "step9_killfeed": {
+    "exists": false
+  },
+  "step10_hud": {
+    "exists": false
+  },
+  "step10_wave_text": "WAVE\n1",
+  "step11_wav_count": 0,
+  "step11_sfx_available": 35,
+  "step12_state": "active",
+  "step12_eliminations": 0,
+  "step12_stats_panel": {
+    "exists": false
+  },
+  "errors_count": 0,
+  "errors_sample": []
+}
