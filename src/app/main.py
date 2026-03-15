@@ -41,7 +41,7 @@ from app.routers.plugins import router as plugins_router
 from app.routers.devices import router as devices_router
 from app.routers.tak import router as tak_router
 from app.routers.fleet import router as fleet_router
-from app.routers.demo import router as demo_router
+from app.routers.demo import router as demo_router, robots_router
 from app.routers.geofence import router as geofence_router
 from app.routers.target_search import router as target_search_router
 from app.routers.layers import router as layers_router
@@ -1266,6 +1266,7 @@ app.include_router(devices_router)
 app.include_router(tak_router)
 app.include_router(fleet_router)
 app.include_router(demo_router)
+app.include_router(robots_router)
 app.include_router(geofence_router)
 app.include_router(layers_router)
 app.include_router(enrichment_router)

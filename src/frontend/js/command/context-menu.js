@@ -53,7 +53,9 @@ function getMenuItems(selectedUnitId) {
         });
     } else {
         items.push({ label: 'DROP MARKER',              action: 'marker',              icon: 'x' });
-        items.push({ label: 'CREATE GEOFENCE ZONE HERE', action: 'geofence_here',      icon: '#' });
+        items.push({ label: 'DRAW GEOFENCE HERE',       action: 'geofence_here',       icon: '#' });
+        items.push({ label: 'ADD CAMERA HERE',           action: 'camera_here',         icon: 'C' });
+        items.push({ label: 'DISPATCH UNIT HERE',        action: 'dispatch_here',       icon: '>' });
         items.push({ label: 'PLACE SENSOR HERE',        action: 'place_sensor',        icon: '=' });
         items.push({ label: 'ADD PATROL WAYPOINT HERE', action: 'patrol_waypoint',     icon: '>' });
         items.push({ label: 'MEASURE FROM HERE',        action: 'measure_start',       icon: '~' });
@@ -198,6 +200,18 @@ function handleAction(action, gamePos, selectedUnitId) {
             EventBus.emit('toast:show', { message: 'Geofence zone started at click position', type: 'info' });
             // Open geofence panel if available
             EventBus.emit('panel:request-open', { id: 'geofence' });
+            break;
+
+        case 'camera_here':
+            EventBus.emit('panel:request-open', { id: 'camera-feeds' });
+            EventBus.emit('toast:show', { message: 'Open Camera Feeds panel to add a camera at this location', type: 'info' });
+            break;
+
+        case 'dispatch_here':
+            // Open unit inspector / assets panel and prompt dispatch
+            EventBus.emit('panel:request-open', { id: 'assets' });
+            EventBus.emit('map:dispatch-to', { x: gamePos.x, y: gamePos.y });
+            EventBus.emit('toast:show', { message: 'Select a unit from Assets panel to dispatch here', type: 'info' });
             break;
 
         case 'place_sensor':

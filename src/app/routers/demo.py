@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/demo", tags=["demo"])
 
+# Standalone /api/robots endpoint (no /api/demo prefix) for direct access
+robots_router = APIRouter(tags=["robots"])
+
 
 def _get_demo_controller(request: Request):
     """Retrieve or create the DemoController from app state."""
@@ -105,6 +108,33 @@ async def demo_status(request: Request):
     return controller.status()
 
 
+@router.get("/robots")
+async def demo_robots(request: Request):
+    """GET /api/demo/robots — list demo robot entities and their state.
+
+    Returns the 3 synthetic robots (rover, drone, scout) with positions,
+    battery, heading, and patrol state.  Returns empty list if demo is
+    not active or robot generator is not running.
+    """
+    controller = getattr(request.app.state, "demo_controller", None)
+    if controller is None or not controller.active:
+        return {"robots": [], "count": 0, "demo_active": False}
+
+    robot_gen = getattr(controller, "_robot_demo", None)
+    if robot_gen is None or not robot_gen.running:
+        return {"robots": [], "count": 0, "demo_active": True, "generator_running": False}
+
+    stats = robot_gen.get_stats()
+    robots = stats.get("robots", [])
+    return {
+        "robots": robots,
+        "count": len(robots),
+        "demo_active": True,
+        "generator_running": True,
+        "tick_count": stats.get("tick_count", 0),
+    }
+
+
 @router.get("/scenario")
 async def demo_scenario(request: Request):
     """GET /api/demo/scenario — fusion scenario description + live dossiers.
@@ -122,3 +152,56 @@ async def demo_scenario(request: Request):
         info["dossiers"] = []
         return info
     return controller.get_scenario_info()
+
+
+# ============================================================
+# Standalone /api/robots endpoint
+# ============================================================
+
+@robots_router.get("/api/robots")
+async def list_robots(request: Request):
+    """GET /api/robots — list all robot entities.
+
+    Returns robots from the demo generator (if active) and/or from
+    the TargetTracker (robot_* targets).  This endpoint always returns
+    data regardless of demo mode — real MQTT robots will also appear
+    via the TargetTracker.
+    """
+    robots = []
+    seen_ids = set()
+
+    # 1. Demo robots (if demo mode active with robot generator)
+    controller = getattr(request.app.state, "demo_controller", None)
+    if controller is not None and controller.active:
+        robot_gen = getattr(controller, "_robot_demo", None)
+        if robot_gen is not None and robot_gen.running:
+            stats = robot_gen.get_stats()
+            for r in stats.get("robots", []):
+                rid = r.get("robot_id", "")
+                robots.append({**r, "source": "demo"})
+                seen_ids.add(f"robot_{rid}")
+
+    # 2. Real robots from TargetTracker (robot_* target IDs)
+    amy = getattr(request.app.state, "amy", None)
+    tracker = getattr(amy, "target_tracker", None) if amy else None
+    if tracker is not None:
+        try:
+            all_targets = tracker.get_all()
+            for t in all_targets:
+                tid = getattr(t, "target_id", "") or ""
+                if tid.startswith("robot_") and tid not in seen_ids:
+                    robots.append({
+                        "robot_id": tid.replace("robot_", "", 1),
+                        "name": getattr(t, "name", tid),
+                        "type": getattr(t, "asset_type", "unknown"),
+                        "lat": None,
+                        "lng": None,
+                        "heading": getattr(t, "heading", 0),
+                        "battery": getattr(t, "battery", None),
+                        "status": getattr(t, "status", "active"),
+                        "source": "tracker",
+                    })
+        except Exception:
+            pass
+
+    return {"robots": robots, "count": len(robots)}
