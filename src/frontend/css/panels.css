@@ -5423,3 +5423,113 @@
 .lsw-toggle input:checked + .lsw-toggle-track .lsw-toggle-thumb {
     transform: translateX(12px); background: #00f0ff;
 }
+
+/* ============================================================
+   Unified Alerts Panel
+   ============================================================ */
+.ua-panel-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    height: 100%;
+}
+
+.ua-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.ua-counts {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.ua-count-badge {
+    font-size: 0.42rem;
+    font-weight: bold;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.ua-count-critical {
+    background: rgba(255, 42, 109, 0.2);
+    color: #ff2a6d;
+    border: 1px solid rgba(255, 42, 109, 0.4);
+}
+
+.ua-count-high {
+    background: rgba(255, 68, 68, 0.2);
+    color: #ff4444;
+    border: 1px solid rgba(255, 68, 68, 0.4);
+}
+
+.ua-count-medium {
+    background: rgba(252, 238, 10, 0.15);
+    color: #fcee0a;
+    border: 1px solid rgba(252, 238, 10, 0.3);
+}
+
+.ua-count-low {
+    background: rgba(0, 240, 255, 0.1);
+    color: #00f0ff;
+    border: 1px solid rgba(0, 240, 255, 0.25);
+}
+
+.ua-controls {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.ua-filters {
+    flex-shrink: 0;
+    padding: 2px 0;
+}
+
+.ua-filter-row {
+    display: flex;
+    gap: 4px;
+}
+
+.ua-filter-select {
+    flex: 1;
+    background: rgba(10, 10, 15, 0.6);
+    border: 1px solid rgba(0, 240, 255, 0.15);
+    color: var(--text-main, #e0e0e8);
+    font-size: 0.42rem;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    padding: 3px 4px;
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.ua-filter-select:focus {
+    border-color: rgba(0, 240, 255, 0.4);
+    outline: none;
+}
+
+.ua-filter-select option {
+    background: #0e0e14;
+    color: #e0e0e8;
+}
+
+.ua-feed {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.ua-alert-item {
+    transition: background 0.15s;
+    margin-bottom: 1px;
+}
+
+.ua-alert-item:hover {
+    background: rgba(0, 240, 255, 0.05);
+}

@@ -118,6 +118,7 @@ from app.routers.dwell import router as dwell_router
 from app.routers.mesh_environment import router as mesh_environment_router
 from app.routers.target_groups import router as target_groups_router
 from app.routers.reid import router as reid_router
+from app.routers.unified_alerts import router as unified_alerts_router
 
 
 # ---------------------------------------------------------------------------
@@ -1320,6 +1321,7 @@ app.include_router(dwell_router)
 app.include_router(mesh_environment_router)
 app.include_router(target_groups_router)
 app.include_router(reid_router)
+app.include_router(unified_alerts_router)
 
 # Static files
 frontend_path = Path(__file__).parent.parent / "frontend"
