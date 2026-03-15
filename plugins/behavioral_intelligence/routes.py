@@ -22,6 +22,11 @@ try:
 except ImportError:
     PatternAlert = None  # type: ignore[assignment,misc]
 
+try:
+    from tritium_lib.models.clustering import ClusterSummary
+except ImportError:
+    ClusterSummary = None  # type: ignore[assignment,misc]
+
 
 # -- Request/Response models -----------------------------------------------
 
@@ -204,6 +209,47 @@ def create_router(plugin: BehavioralIntelligencePlugin) -> APIRouter:
             "heatmap": heatmap,
             "days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
             "total_sightings": len(sightings),
+        }
+
+    # -- Behavioral clustering ---------------------------------------------
+
+    @router.get("/clusters")
+    async def list_clusters():
+        """List all behavior clusters — targets grouped by movement similarity.
+
+        Automatically clusters targets based on speed range, time-of-day
+        activity, and spatial proximity. Triggers re-analysis if needed.
+        """
+        clusters = plugin.detector.cluster_by_behavior()
+        if ClusterSummary is not None:
+            summaries = [ClusterSummary.from_cluster(c).model_dump() for c in clusters]
+        else:
+            summaries = [c.model_dump() for c in clusters]
+        return {
+            "clusters": summaries,
+            "count": len(clusters),
+        }
+
+    @router.get("/clusters/{cluster_id}")
+    async def get_cluster(cluster_id: str):
+        """Get detailed information about a specific behavior cluster."""
+        clusters = plugin.detector.get_clusters()
+        for c in clusters:
+            if c.cluster_id == cluster_id:
+                return c.model_dump()
+        raise HTTPException(status_code=404, detail="Cluster not found")
+
+    @router.post("/clusters/refresh")
+    async def refresh_clusters():
+        """Force re-computation of behavior clusters.
+
+        Resets the clustering timer and runs analysis immediately.
+        """
+        plugin.detector._last_cluster_analysis = 0.0
+        clusters = plugin.detector.cluster_by_behavior()
+        return {
+            "clusters_found": len(clusters),
+            "targets_clustered": sum(c.target_count for c in clusters),
         }
 
     return router

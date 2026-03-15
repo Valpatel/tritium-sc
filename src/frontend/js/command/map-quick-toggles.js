@@ -62,6 +62,13 @@ const QUICK_TOGGLES = [
         toggleFn: 'toggleMesh',
     },
     {
+        id: 'night',
+        icon: 'NIT',
+        title: 'Toggle night mode',
+        stateKey: 'nightMode',
+        toggleFn: 'toggleNightMode',
+    },
+    {
         id: 'trails',
         icon: 'TRL',
         title: 'Toggle target movement trails',

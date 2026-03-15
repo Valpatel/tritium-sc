@@ -175,6 +175,13 @@ const _state = {
     geofenceDrawing: false,
     geofenceVertices: [],  // [{x, y}, ...] in world coords
 
+    // Night mode — auto-dim map between sunset and sunrise
+    nightMode: false,
+    nightModeAuto: true,       // auto-detect based on local time
+    _nightCheckTimer: null,
+    _sunriseHour: 6,           // default sunrise hour (local)
+    _sunsetHour: 19,           // default sunset hour (local)
+
     // Patrol waypoint drawing mode
     patrolDrawing: false,
     patrolUnitId: null,
@@ -346,6 +353,10 @@ export function initMap() {
     // Fetch initial zones
     _fetchZones();
 
+    // Night mode — auto-detect based on local time
+    _fetchSunTimes();
+    _startNightModeCheck();
+
     // Start render loop
     _state.lastFrameTime = performance.now();
     _renderLoop();
@@ -374,6 +385,9 @@ export function destroyMap() {
 
     // Stop hostile objective polling
     _stopHostileObjectivePoll();
+
+    // Stop night mode check
+    _stopNightModeCheck();
 
     // Stop ResizeObserver
     if (_state.resizeObserver) {
@@ -527,6 +541,11 @@ function _draw() {
     // Layer 1.8: Road polylines (OSM street graph)
     if (_state.showRoads && _state.overlayRoads.length > 0) {
         _drawRoadPolylines(ctx);
+    }
+
+    // Layer 1.9: Night mode overlay — darkens tiles and warms colors
+    if (_state.nightMode) {
+        _drawNightOverlay(ctx, cssW, cssH);
     }
 
     // Layer 2: Grid (adaptive spacing based on zoom)
@@ -4774,6 +4793,85 @@ function _loadRoadTileImage(zoom, tx, ty, centerLat, centerLng, n, latRad) {
 }
 
 // ============================================================
+// Night mode
+// ============================================================
+
+/**
+ * Draw a semi-transparent dark overlay for night mode.
+ * Dims the map tiles and adds a warm amber tint to simulate nighttime.
+ */
+function _drawNightOverlay(ctx, cssW, cssH) {
+    // Dark overlay — dims the whole map
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = 'rgba(20, 15, 30, 0.55)';
+    ctx.fillRect(0, 0, cssW, cssH);
+    ctx.restore();
+
+    // Warm amber vignette at edges
+    const cx = cssW / 2;
+    const cy = cssH / 2;
+    const maxR = Math.sqrt(cx * cx + cy * cy);
+    const gradient = ctx.createRadialGradient(cx, cy, maxR * 0.3, cx, cy, maxR);
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    gradient.addColorStop(1, 'rgba(10, 5, 20, 0.3)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, cssW, cssH);
+}
+
+/**
+ * Check local time and update night mode state.
+ * If nightModeAuto is enabled, enables night mode between sunset and sunrise.
+ */
+function _checkNightMode() {
+    if (!_state.nightModeAuto) return;
+
+    const hour = new Date().getHours();
+    const isNight = hour >= _state._sunsetHour || hour < _state._sunriseHour;
+
+    if (isNight !== _state.nightMode) {
+        _state.nightMode = isNight;
+        console.log(`[MAP] Night mode auto-${isNight ? 'enabled' : 'disabled'} (hour=${hour})`);
+    }
+}
+
+/**
+ * Start periodic night mode checks (every 60 seconds).
+ */
+function _startNightModeCheck() {
+    _checkNightMode(); // immediate check
+    _state._nightCheckTimer = setInterval(_checkNightMode, 60000);
+}
+
+/**
+ * Stop night mode checks.
+ */
+function _stopNightModeCheck() {
+    if (_state._nightCheckTimer) {
+        clearInterval(_state._nightCheckTimer);
+        _state._nightCheckTimer = null;
+    }
+}
+
+/**
+ * Fetch sunrise/sunset times from weather API if available.
+ * Falls back to defaults (06:00 sunrise, 19:00 sunset).
+ */
+async function _fetchSunTimes() {
+    try {
+        const resp = await fetch('/api/geo/sun-times');
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data.sunrise_hour !== undefined) _state._sunriseHour = data.sunrise_hour;
+            if (data.sunset_hour !== undefined) _state._sunsetHour = data.sunset_hour;
+            console.log(`[MAP] Sun times: sunrise=${_state._sunriseHour}, sunset=${_state._sunsetHour}`);
+        }
+    } catch {
+        // Use defaults — no weather API available
+    }
+}
+
+// ============================================================
 // Zones / Exports
 // ============================================================
 
@@ -4870,6 +4968,28 @@ export function togglePredictionCones() {
     console.log(`[MAP] Prediction cones ${_state.showPredictionCones ? 'ON' : 'OFF'}`);
 }
 
+/**
+ * Toggle night mode manually. Disables auto-detection.
+ */
+export function toggleNightMode() {
+    _state.nightModeAuto = false;
+    _state.nightMode = !_state.nightMode;
+    console.log(`[MAP] Night mode ${_state.nightMode ? 'ON' : 'OFF'} (manual)`);
+}
+
+/**
+ * Toggle automatic night mode (based on local sunrise/sunset).
+ */
+export function toggleNightModeAuto() {
+    _state.nightModeAuto = !_state.nightModeAuto;
+    if (_state.nightModeAuto) {
+        _checkNightMode();
+        console.log(`[MAP] Night mode auto-detection ON`);
+    } else {
+        console.log(`[MAP] Night mode auto-detection OFF`);
+    }
+}
+
 export function getMapState() {
     return {
         showSatellite: _state.showSatellite,
@@ -4884,6 +5004,8 @@ export function getMapState() {
         showMeshCoverage: _state.showMeshCoverage,
         showThoughts: _state.showThoughts,
         showPredictionCones: _state.showPredictionCones,
+        nightMode: _state.nightMode,
+        nightModeAuto: _state.nightModeAuto,
     };
 }
 

@@ -35,6 +35,16 @@ try:
 except ImportError:
     BehaviorPattern = None  # type: ignore[assignment,misc]
 
+try:
+    from tritium_lib.models.clustering import (
+        BehaviorCluster,
+        ClusterSummary,
+        CommonPattern,
+        FormationType,
+    )
+except ImportError:
+    BehaviorCluster = None  # type: ignore[assignment,misc]
+
 
 class SightingRecord:
     """Lightweight sighting record for pattern analysis."""
@@ -93,6 +103,11 @@ class PatternDetector:
         # Anomalies: list of recent PatternAnomaly
         self._anomalies: list[Any] = []
         self._max_anomalies = 500
+
+        # Behavior clusters: cluster_id -> BehaviorCluster
+        self._clusters: dict[str, Any] = {}
+        self._last_cluster_analysis: float = 0.0
+        self._cluster_interval_s = 600.0  # re-cluster every 10 minutes
 
         # Track last analysis time per target to avoid redundant work
         self._last_analysis: dict[str, float] = {}
@@ -405,6 +420,234 @@ class PatternDetector:
             anomalies = [a for a in anomalies if a.target_id == target_id]
         return anomalies[-limit:]
 
+    # -- Behavioral clustering ------------------------------------------------
+
+    def cluster_by_behavior(self) -> list[Any]:
+        """Group targets with similar movement patterns into clusters.
+
+        Analyzes speed range, time-of-day activity, and spatial overlap
+        to find targets that behave similarly. Returns list of new or
+        updated BehaviorCluster objects.
+        """
+        if BehaviorCluster is None or BehaviorPattern is None:
+            return []
+
+        now = time.time()
+        if now - self._last_cluster_analysis < self._cluster_interval_s:
+            return list(self._clusters.values())
+        self._last_cluster_analysis = now
+
+        # Build per-target behavior profiles
+        profiles: dict[str, dict] = {}
+        for target_id, sightings in self._sightings.items():
+            if len(sightings) < self._min_observations:
+                continue
+            profile = self._build_behavior_profile(target_id, sightings)
+            if profile:
+                profiles[target_id] = profile
+
+        if len(profiles) < 2:
+            return list(self._clusters.values())
+
+        # Pairwise similarity and greedy clustering
+        target_ids = list(profiles.keys())
+        assigned: set[str] = set()
+        new_clusters: list[Any] = []
+
+        for i, tid_a in enumerate(target_ids):
+            if tid_a in assigned:
+                continue
+            group = [tid_a]
+            assigned.add(tid_a)
+
+            for tid_b in target_ids[i + 1:]:
+                if tid_b in assigned:
+                    continue
+                sim = self._behavior_similarity(profiles[tid_a], profiles[tid_b])
+                if sim >= 0.6:  # similarity threshold
+                    group.append(tid_b)
+                    assigned.add(tid_b)
+
+            if len(group) >= 2:
+                cluster = self._build_cluster(group, profiles)
+                new_clusters.append(cluster)
+
+        # Update stored clusters
+        self._clusters = {c.cluster_id: c for c in new_clusters}
+        return new_clusters
+
+    def get_clusters(self) -> list[Any]:
+        """Get all current behavior clusters."""
+        return list(self._clusters.values())
+
+    def _build_behavior_profile(
+        self, target_id: str, sightings: list[SightingRecord]
+    ) -> Optional[dict]:
+        """Build a behavior profile for clustering."""
+        from datetime import datetime, timezone
+
+        timestamps = [s.timestamp for s in sightings]
+        if not timestamps:
+            return None
+
+        # Speed estimation from consecutive sightings
+        speeds = []
+        sorted_sightings = sorted(sightings, key=lambda s: s.timestamp)
+        for j in range(1, len(sorted_sightings)):
+            s_prev = sorted_sightings[j - 1]
+            s_curr = sorted_sightings[j]
+            dt = s_curr.timestamp - s_prev.timestamp
+            if dt > 0 and dt < 3600:  # within 1 hour
+                if (s_prev.lat != 0 or s_prev.lng != 0) and (s_curr.lat != 0 or s_curr.lng != 0):
+                    dist = self._haversine_m(s_prev.lat, s_prev.lng, s_curr.lat, s_curr.lng)
+                    speeds.append(dist / dt)
+
+        # Time of day distribution (hour histogram)
+        hour_counts = [0] * 24
+        for ts in timestamps:
+            dt_obj = datetime.fromtimestamp(ts, tz=timezone.utc)
+            hour_counts[dt_obj.hour] += 1
+
+        # Active hours (hours with >10% of sightings)
+        total = sum(hour_counts)
+        threshold = total * 0.1
+        active_hours = [h for h in range(24) if hour_counts[h] >= threshold]
+
+        # Spatial centroid
+        geo = [s for s in sightings if s.lat != 0 or s.lng != 0]
+        centroid_lat = sum(s.lat for s in geo) / len(geo) if geo else 0.0
+        centroid_lng = sum(s.lng for s in geo) / len(geo) if geo else 0.0
+
+        return {
+            "target_id": target_id,
+            "speed_min": min(speeds) if speeds else 0.0,
+            "speed_max": max(speeds) if speeds else 0.0,
+            "speed_avg": sum(speeds) / len(speeds) if speeds else 0.0,
+            "active_hours": active_hours,
+            "hour_counts": hour_counts,
+            "centroid_lat": centroid_lat,
+            "centroid_lng": centroid_lng,
+            "sighting_count": len(sightings),
+        }
+
+    def _behavior_similarity(self, profile_a: dict, profile_b: dict) -> float:
+        """Compute behavioral similarity between two target profiles (0-1)."""
+        scores = []
+
+        # Speed range overlap
+        a_min, a_max = profile_a["speed_min"], profile_a["speed_max"]
+        b_min, b_max = profile_b["speed_min"], profile_b["speed_max"]
+        if a_max > 0 or b_max > 0:
+            overlap_min = max(a_min, b_min)
+            overlap_max = min(a_max, b_max)
+            union_range = max(a_max, b_max) - min(a_min, b_min)
+            if union_range > 0:
+                speed_sim = max(0.0, (overlap_max - overlap_min) / union_range)
+            else:
+                speed_sim = 1.0
+            scores.append(speed_sim)
+
+        # Time-of-day similarity (cosine similarity of hour histograms)
+        ha = profile_a["hour_counts"]
+        hb = profile_b["hour_counts"]
+        dot = sum(ha[i] * hb[i] for i in range(24))
+        mag_a = math.sqrt(sum(x * x for x in ha))
+        mag_b = math.sqrt(sum(x * x for x in hb))
+        if mag_a > 0 and mag_b > 0:
+            time_sim = dot / (mag_a * mag_b)
+        else:
+            time_sim = 0.0
+        scores.append(time_sim)
+
+        # Spatial proximity (closer = more similar)
+        if (profile_a["centroid_lat"] != 0 or profile_a["centroid_lng"] != 0) and \
+           (profile_b["centroid_lat"] != 0 or profile_b["centroid_lng"] != 0):
+            dist = self._haversine_m(
+                profile_a["centroid_lat"], profile_a["centroid_lng"],
+                profile_b["centroid_lat"], profile_b["centroid_lng"],
+            )
+            spatial_sim = max(0.0, 1.0 - dist / 500.0)  # 500m = 0 similarity
+            scores.append(spatial_sim)
+
+        return sum(scores) / len(scores) if scores else 0.0
+
+    def _build_cluster(self, target_ids: list[str], profiles: dict) -> Any:
+        """Build a BehaviorCluster from a group of similar targets."""
+        cluster_id = f"bclust_{uuid.uuid4().hex[:12]}"
+
+        # Aggregate profiles
+        all_speeds_min = []
+        all_speeds_max = []
+        all_lats = []
+        all_lngs = []
+        all_hour_counts = [0] * 24
+        obs_count = 0
+
+        for tid in target_ids:
+            p = profiles[tid]
+            all_speeds_min.append(p["speed_min"])
+            all_speeds_max.append(p["speed_max"])
+            if p["centroid_lat"] != 0 or p["centroid_lng"] != 0:
+                all_lats.append(p["centroid_lat"])
+                all_lngs.append(p["centroid_lng"])
+            for h in range(24):
+                all_hour_counts[h] += p["hour_counts"][h]
+            obs_count += p["sighting_count"]
+
+        # Determine active hours
+        total = sum(all_hour_counts)
+        threshold = total * 0.1
+        active_start = 0
+        active_end = 23
+        for h in range(24):
+            if all_hour_counts[h] >= threshold:
+                active_start = h
+                break
+        for h in range(23, -1, -1):
+            if all_hour_counts[h] >= threshold:
+                active_end = h
+                break
+
+        centroid_lat = sum(all_lats) / len(all_lats) if all_lats else 0.0
+        centroid_lng = sum(all_lngs) / len(all_lngs) if all_lngs else 0.0
+
+        # Compute radius from centroid
+        radius = 100.0
+        for lat, lng in zip(all_lats, all_lngs):
+            d = self._haversine_m(centroid_lat, centroid_lng, lat, lng)
+            radius = max(radius, d * 1.5)
+
+        # Determine formation type based on speed
+        avg_speed = sum(all_speeds_max) / len(all_speeds_max) if all_speeds_max else 0.0
+        if avg_speed < 0.5:
+            formation = FormationType.STATIONARY
+        elif avg_speed < 2.0:
+            formation = FormationType.DISPERSED
+        elif avg_speed < 5.0:
+            formation = FormationType.PATROL
+        else:
+            formation = FormationType.CONVOY
+
+        common = CommonPattern(
+            speed_min_mps=min(all_speeds_min) if all_speeds_min else 0.0,
+            speed_max_mps=max(all_speeds_max) if all_speeds_max else 0.0,
+            active_hour_start=active_start,
+            active_hour_end=active_end,
+            regularity_score=0.7,
+        )
+
+        return BehaviorCluster(
+            cluster_id=cluster_id,
+            targets=target_ids,
+            common_pattern=common,
+            centroid_lat=centroid_lat,
+            centroid_lng=centroid_lng,
+            radius_m=radius,
+            formation_type=formation,
+            confidence=min(1.0, obs_count / 50.0),
+            observation_count=obs_count,
+        )
+
     def get_stats(self) -> dict:
         """Return detector statistics."""
         return {
@@ -422,6 +665,7 @@ class PatternDetector:
             ),
             "total_anomalies": len(self._anomalies),
             "active_alerts": len(self._alerts),
+            "behavior_clusters": len(self._clusters),
         }
 
     # -- Internal helpers --

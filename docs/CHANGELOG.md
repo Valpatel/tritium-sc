@@ -14,6 +14,20 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-15 — Wave 141: Target Clustering + Night Mode + RL Retrain
+
+| Change | Verification |
+|--------|-------------|
+| Behavioral clustering: /api/patterns/clusters endpoint groups targets by movement similarity (speed, time-of-day, spatial proximity) | Synthetic data verified, 5 clusters detected |
+| Clustering uses BehaviorCluster model from tritium-lib with FormationType enum (convoy/swarm/patrol/dispersed/stationary) | Import verified |
+| Added /api/patterns/clusters/refresh to force re-computation | Syntax checked |
+| Map night mode: auto-dims tiles between sunset/sunrise, warm amber vignette overlay | JS syntax verified |
+| Night mode quick toggle (NIT) added to map toggle bar | JS parse verified |
+| toggleNightMode() and toggleNightModeAuto() exports for manual/auto switching | Export verified |
+| RL model retrained: 10-feature model, 3,802 examples, 49.4% accuracy (new features have zero data in training set) | Retrain executed |
+
+---
+
 ## 2026-03-15 — Wave 140: Orphan Panel Registration + Ops Dashboard Uptime Widget
 
 | Change | Verification |

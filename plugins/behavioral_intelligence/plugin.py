@@ -324,6 +324,17 @@ class BehavioralIntelligencePlugin(PluginInterface):
             if self._event_bus:
                 self._event_bus.publish("behavior:alert_fired", data=alert_data)
 
+        # Run behavioral clustering
+        clusters = self._detector.cluster_by_behavior()
+        if clusters and self._event_bus:
+            self._event_bus.publish(
+                "behavior:clusters_updated",
+                data={
+                    "cluster_count": len(clusters),
+                    "targets_clustered": sum(c.target_count for c in clusters),
+                },
+            )
+
     # -- Persistence -------------------------------------------------------
 
     def _load_alerts(self) -> None:
