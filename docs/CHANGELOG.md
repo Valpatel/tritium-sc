@@ -14,6 +14,16 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 101: Quick Actions, Amy Plugin Phase 2
+
+| Change | Verification |
+|--------|-------------|
+| /api/quick-actions endpoint — one-click tactical actions (investigate, watch, classify, track, dismiss, escalate) | Unit Tested (9 tests) |
+| Quick action buttons in target detail modal — INVESTIGATE, WATCH, CLASSIFY, TRACK with cyberpunk styling | Unit Tested |
+| Amy Commander plugin Phase 2 — router registration moved from main.py to plugins/amy/plugin.py _register_routes() | Unit Tested |
+| Quick action CSS — .tdm-qa-btn grid, per-action color coding (green/yellow/magenta/cyan) | Code Review |
+| Quick action log — /api/quick-actions/log endpoint for recent action history | Unit Tested |
+
 ## 2026-03-14 — Wave 97: Sensor Fusion Improvements
 
 | Change | Verification |

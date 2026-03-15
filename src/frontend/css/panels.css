@@ -4116,6 +4116,77 @@
     background: rgba(252, 238, 10, 0.2);
 }
 
+/* Quick action buttons in target detail modal */
+.tdm-quick-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.tdm-qa-btn {
+    background: rgba(0, 240, 255, 0.08);
+    border: 1px solid rgba(0, 240, 255, 0.25);
+    color: #00f0ff;
+    padding: 8px 4px;
+    font-size: 0.6rem;
+    font-family: 'Share Tech Mono', monospace;
+    cursor: pointer;
+    border-radius: 2px;
+    letter-spacing: 0.5px;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.tdm-qa-btn:hover:not(:disabled) {
+    background: rgba(0, 240, 255, 0.2);
+    border-color: rgba(0, 240, 255, 0.5);
+}
+
+.tdm-qa-btn:disabled {
+    opacity: 0.7;
+    cursor: default;
+}
+
+.tdm-qa-investigate {
+    border-color: rgba(5, 255, 161, 0.3);
+    color: #05ffa1;
+    background: rgba(5, 255, 161, 0.08);
+}
+
+.tdm-qa-investigate:hover:not(:disabled) {
+    background: rgba(5, 255, 161, 0.2);
+}
+
+.tdm-qa-watch {
+    border-color: rgba(252, 238, 10, 0.3);
+    color: #fcee0a;
+    background: rgba(252, 238, 10, 0.08);
+}
+
+.tdm-qa-watch:hover:not(:disabled) {
+    background: rgba(252, 238, 10, 0.2);
+}
+
+.tdm-qa-classify {
+    border-color: rgba(255, 42, 109, 0.3);
+    color: #ff2a6d;
+    background: rgba(255, 42, 109, 0.08);
+}
+
+.tdm-qa-classify:hover:not(:disabled) {
+    background: rgba(255, 42, 109, 0.2);
+}
+
+.tdm-qa-track {
+    border-color: rgba(0, 240, 255, 0.3);
+    color: #00f0ff;
+    background: rgba(0, 240, 255, 0.08);
+}
+
+.tdm-qa-track:hover:not(:disabled) {
+    background: rgba(0, 240, 255, 0.2);
+}
+
 @media (max-width: 600px) {
     .tdm-body { flex-direction: column; }
     .tdm-col-right { width: 100%; }

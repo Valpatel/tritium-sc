@@ -25,7 +25,7 @@ from app.routers.ai import router as ai_router
 from app.routers.search import router as search_router
 from app.routers.zones import router as zones_router
 from app.routers.assets import router as assets_router
-from amy.router import router as amy_router
+
 from app.routers.scenarios import router as scenarios_router
 from app.routers.tts import router as tts_router
 from app.routers.targets_unified import router as targets_unified_router
@@ -104,6 +104,7 @@ from app.routers.fusion_dashboard import router as fusion_dashboard_router
 from app.routers.collaboration import router as collaboration_router
 from app.routers.forensics import router as forensics_router
 from app.routers.sensor_health import router as sensor_health_router
+from app.routers.quick_actions import router as quick_actions_router
 
 
 # ---------------------------------------------------------------------------
@@ -1175,7 +1176,7 @@ app.include_router(ai_router)
 app.include_router(search_router)
 app.include_router(zones_router)
 app.include_router(assets_router)
-app.include_router(amy_router)
+
 app.include_router(scenarios_router)
 app.include_router(tts_router)
 app.include_router(targets_unified_router)
@@ -1254,6 +1255,7 @@ app.include_router(fusion_dashboard_router)
 app.include_router(collaboration_router)
 app.include_router(forensics_router)
 app.include_router(sensor_health_router)
+app.include_router(quick_actions_router)
 
 # Static files
 frontend_path = Path(__file__).parent.parent / "frontend"

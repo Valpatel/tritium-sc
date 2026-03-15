@@ -122,9 +122,15 @@ class TestRouterRegistration:
         paths = [r.path for r in app.routes if hasattr(r, "path")]
         assert any("/api/cameras" in p for p in paths)
 
-    def test_amy_router_included(self, app):
-        paths = [r.path for r in app.routes if hasattr(r, "path")]
-        assert any("/api/amy" in p for p in paths)
+    def test_amy_router_registered_by_plugin(self, app):
+        """Amy routes are registered by AmyCommanderPlugin, not main.py.
+
+        Phase 2: Amy router moved to plugins/amy/plugin.py _register_routes().
+        Without running lifespan (which starts plugins), Amy routes won't be
+        present. This test verifies the router module itself is importable.
+        """
+        from amy.router import router
+        assert router.prefix == "/api/amy"
 
     def test_game_router_included(self, app):
         paths = [r.path for r in app.routes if hasattr(r, "path")]

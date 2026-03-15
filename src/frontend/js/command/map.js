@@ -3796,10 +3796,17 @@ async function _openTargetDetailModal(targetId, unit) {
                     <div class="tdm-section-title">POSITION TRAIL</div>
                     <div class="tdm-trail-container">${trailHtml}</div>
 
-                    <div class="tdm-actions">
+                    <div class="tdm-section-title" style="margin-top:12px">QUICK ACTIONS</div>
+                    <div class="tdm-quick-actions">
+                        <button class="tdm-qa-btn tdm-qa-investigate" data-target="${_escMap(targetId)}" title="Create investigation for this target">INVESTIGATE</button>
+                        <button class="tdm-qa-btn tdm-qa-watch" data-target="${_escMap(targetId)}" title="Add to watch list">WATCH</button>
+                        <button class="tdm-qa-btn tdm-qa-classify" data-target="${_escMap(targetId)}" title="Override alliance classification">CLASSIFY</button>
+                        <button class="tdm-qa-btn tdm-qa-track" data-target="${_escMap(targetId)}" title="Enable prediction cones">TRACK</button>
+                    </div>
+
+                    <div class="tdm-actions" style="margin-top:8px">
                         <button class="tdm-action-btn" onclick="window.EventBus && window.EventBus.emit('panel:request-open', {id: 'graph-explorer'}); document.getElementById('target-detail-modal')?.remove()">GRAPH</button>
                         <button class="tdm-action-btn" onclick="window.EventBus && window.EventBus.emit('panel:request-open', {id: 'unit-inspector'}); document.getElementById('target-detail-modal')?.remove()">INSPECT</button>
-                        <button class="tdm-action-btn tdm-action-track">TRACK</button>
                     </div>
                 </div>
             </div>
@@ -3818,6 +3825,114 @@ async function _openTargetDetailModal(targetId, unit) {
     document.addEventListener('keydown', escHandler);
 
     document.body.appendChild(modal);
+
+    // Wire quick-action buttons
+    _bindQuickActionButtons(modal, targetId);
+}
+
+/**
+ * Execute a quick action via the /api/quick-actions endpoint.
+ */
+async function _executeQuickAction(actionType, targetId, params = {}, notes = '') {
+    try {
+        const res = await fetch('/api/quick-actions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action_type: actionType,
+                target_id: targetId,
+                params,
+                notes,
+            }),
+        });
+        if (res.ok) {
+            const data = await res.json();
+            return data;
+        }
+    } catch (e) {
+        console.warn('Quick action failed:', e);
+    }
+    return null;
+}
+
+/**
+ * Bind click handlers to quick-action buttons in the target detail modal.
+ */
+function _bindQuickActionButtons(modal, targetId) {
+    const investigateBtn = modal.querySelector('.tdm-qa-investigate');
+    if (investigateBtn) {
+        investigateBtn.addEventListener('click', async () => {
+            investigateBtn.textContent = '...';
+            investigateBtn.disabled = true;
+            const result = await _executeQuickAction('investigate', targetId);
+            if (result && result.details && result.details.created) {
+                investigateBtn.textContent = 'CREATED';
+                investigateBtn.style.background = '#05ffa1';
+                investigateBtn.style.color = '#0a0a0f';
+            } else {
+                investigateBtn.textContent = 'FAILED';
+                investigateBtn.style.background = '#ff2a6d';
+            }
+        });
+    }
+
+    const watchBtn = modal.querySelector('.tdm-qa-watch');
+    if (watchBtn) {
+        watchBtn.addEventListener('click', async () => {
+            watchBtn.textContent = '...';
+            watchBtn.disabled = true;
+            const result = await _executeQuickAction('watch', targetId);
+            if (result && result.details && result.details.added) {
+                watchBtn.textContent = 'WATCHING';
+                watchBtn.style.background = '#fcee0a';
+                watchBtn.style.color = '#0a0a0f';
+            } else {
+                watchBtn.textContent = 'FAILED';
+                watchBtn.style.background = '#ff2a6d';
+            }
+        });
+    }
+
+    const classifyBtn = modal.querySelector('.tdm-qa-classify');
+    if (classifyBtn) {
+        classifyBtn.addEventListener('click', async () => {
+            // Cycle through alliances on click
+            const alliances = ['hostile', 'friendly', 'neutral', 'unknown'];
+            const currentIdx = alliances.indexOf(classifyBtn.dataset.currentAlliance || 'hostile');
+            const nextAlliance = alliances[(currentIdx + 1) % alliances.length];
+            classifyBtn.dataset.currentAlliance = nextAlliance;
+            classifyBtn.textContent = '...';
+            classifyBtn.disabled = true;
+            const result = await _executeQuickAction('classify', targetId, { alliance: nextAlliance });
+            if (result && result.details && result.details.classified) {
+                const colors = { hostile: '#ff2a6d', friendly: '#05ffa1', neutral: '#fcee0a', unknown: '#888' };
+                classifyBtn.textContent = nextAlliance.toUpperCase();
+                classifyBtn.style.background = colors[nextAlliance] || '#888';
+                classifyBtn.style.color = '#0a0a0f';
+                classifyBtn.disabled = false;
+            } else {
+                classifyBtn.textContent = 'FAILED';
+                classifyBtn.style.background = '#ff2a6d';
+            }
+        });
+    }
+
+    const trackBtn = modal.querySelector('.tdm-qa-track');
+    if (trackBtn) {
+        trackBtn.addEventListener('click', async () => {
+            trackBtn.textContent = '...';
+            trackBtn.disabled = true;
+            const result = await _executeQuickAction('track', targetId, { prediction_cone: true, minutes_ahead: 5 });
+            if (result && result.details && result.details.tracking) {
+                trackBtn.textContent = 'TRACKING';
+                trackBtn.style.background = '#00f0ff';
+                trackBtn.style.color = '#0a0a0f';
+            } else {
+                trackBtn.textContent = 'FAILED';
+                trackBtn.style.background = '#ff2a6d';
+            }
+        });
+    }
 }
 
 /**

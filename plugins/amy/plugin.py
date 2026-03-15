@@ -1,14 +1,14 @@
 # Created by Matthew Valancy
 # Copyright 2026 Valpatel Software LLC
 # Licensed under AGPL-3.0 — see LICENSE for details.
-"""AmyCommanderPlugin — Phase 1 plugin shell for the Amy AI Commander.
+"""AmyCommanderPlugin — Phase 2 plugin for the Amy AI Commander.
 
 This wraps the existing src/amy/ code WITHOUT moving any files. It provides
 a PluginInterface-compliant wrapper so Amy can be discovered, configured,
 and managed through the plugin system alongside other plugins.
 
-Phase 1: Plugin shell wrapping existing code.
-Phase 2 (future): Move Amy router registration into this plugin.
+Phase 1 (done): Plugin shell wrapping existing code.
+Phase 2 (current): Move Amy router registration into this plugin.
 Phase 3 (future): Move Amy lifecycle (create/start/stop) fully into plugin.
 """
 
@@ -25,11 +25,9 @@ log = logging.getLogger("amy-plugin")
 class AmyCommanderPlugin(PluginInterface):
     """Plugin wrapper around the existing Amy AI Commander.
 
-    In phase 1, this plugin acts as a thin adapter:
-    - Reports Amy's health status through the plugin health check
-    - Provides plugin metadata for plugin manager discovery
-    - References the existing Amy commander instance (set via app.state)
-    - Does NOT duplicate any Amy functionality — just wraps it
+    Phase 2: This plugin now owns Amy's route registration via
+    _register_routes(), which is called during configure(). The
+    main.py no longer needs to directly include the Amy router.
 
     The actual Amy lifecycle is still managed by src/app/main.py's lifespan.
     This plugin provides the bridge so plugin-aware systems (fleet dashboard,
@@ -54,7 +52,7 @@ class AmyCommanderPlugin(PluginInterface):
 
     @property
     def version(self) -> str:
-        return "1.0.0"
+        return "2.0.0"
 
     @property
     def capabilities(self) -> set[str]:
@@ -63,7 +61,7 @@ class AmyCommanderPlugin(PluginInterface):
     # -- PluginInterface lifecycle -----------------------------------------
 
     def configure(self, ctx: PluginContext) -> None:
-        """Store references. Try to find existing Amy instance from app.state."""
+        """Store references, register routes, find existing Amy instance."""
         self._app = ctx.app
         self._logger = ctx.logger or self._logger
 
@@ -76,6 +74,27 @@ class AmyCommanderPlugin(PluginInterface):
                 self._logger.info(
                     "Amy commander not yet initialized (will be set later by lifespan)"
                 )
+
+        # Phase 2: Register Amy's routes through the plugin system
+        self._register_routes()
+
+    def _register_routes(self) -> None:
+        """Register Amy's FastAPI routes on the app.
+
+        Imports and includes the router from src/amy/router.py. This
+        replaces the direct `app.include_router(amy_router)` call that
+        was previously in src/app/main.py.
+        """
+        if self._app is None:
+            self._logger.warning("No app reference, cannot register Amy routes")
+            return
+
+        try:
+            from amy.router import router as amy_router
+            self._app.include_router(amy_router)
+            self._logger.info("Amy router registered: /api/amy/*")
+        except Exception as exc:
+            self._logger.error("Failed to register Amy routes: %s", exc)
 
     def start(self) -> None:
         """Mark plugin as running.
