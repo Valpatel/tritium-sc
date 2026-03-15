@@ -4068,7 +4068,7 @@ async function _openTargetDetailModal(targetId, unit) {
     let dossierLink = '';
     let rlClassHtml = '';
     try {
-        const dosRes = await fetch(`/api/dossiers/${encodeURIComponent(targetId)}`);
+        const dosRes = await fetch(`/api/dossiers/by-target?target_id=${encodeURIComponent(targetId)}`);
         if (dosRes.ok) {
             const dossier = await dosRes.json();
             dossierLink = `<a href="#" class="tdm-dossier-link" data-action="open-dossier" data-target-id="${_escMap(targetId)}">VIEW FULL DOSSIER</a>`;

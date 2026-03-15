@@ -191,11 +191,25 @@ export const UnitInspectorPanelDef = {
             _lastRenderedType = resolvedType;
 
             contentEl.innerHTML = control.render(unit) + '<div class="dc-stats-live">' + _renderStats(unit) + '</div>' +
-                '<div class="ui-ar-export" style="margin-top:8px;padding-top:6px;border-top:1px solid var(--border)">' +
-                    '<button class="panel-action-btn" data-action="ar-export" style="width:100%;font-size:0.45rem">EXPORT FOR AR OVERLAY</button>' +
-                    '<div class="ui-ar-export-result" data-bind="ar-result" style="display:none;margin-top:6px;font-size:0.4rem;color:var(--text-ghost);max-height:120px;overflow:auto"></div>' +
-                '</div>';
+                '<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--border);display:flex;gap:4px">' +
+                    '<button class="panel-action-btn" data-action="investigate" style="flex:1;font-size:0.45rem;background:rgba(0,240,255,0.12);border:1px solid #00f0ff;color:#00f0ff;font-weight:700;letter-spacing:0.06em;cursor:pointer;padding:6px">INVESTIGATE</button>' +
+                    '<button class="panel-action-btn" data-action="ar-export" style="flex:1;font-size:0.45rem">EXPORT AR</button>' +
+                '</div>' +
+                '<div class="ui-ar-export-result" data-bind="ar-result" style="display:none;margin-top:6px;font-size:0.4rem;color:var(--text-ghost);max-height:120px;overflow:auto"></div>';
             control.bind(contentEl, unit, DeviceAPI);
+
+            // Wire INVESTIGATE button — opens dossier panel for this target
+            const investigateBtn = contentEl.querySelector('[data-action="investigate"]');
+            if (investigateBtn) {
+                investigateBtn.addEventListener('click', () => {
+                    // Open the dossiers panel
+                    if (window.panelManager) {
+                        window.panelManager.open('dossiers');
+                    }
+                    // Emit event to load this target's dossier
+                    EventBus.emit('dossier:load-target', { target_id: unit.id });
+                });
+            }
 
             // Wire AR export button
             const arBtn = contentEl.querySelector('[data-action="ar-export"]');

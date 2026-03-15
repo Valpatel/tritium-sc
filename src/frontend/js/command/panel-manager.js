@@ -467,6 +467,14 @@ export class PanelManager {
     }
 
     /**
+     * Get the registry map (alias for debug access via window.panelManager.panels).
+     * @returns {Map<string, Object>}
+     */
+    get panels() {
+        return this._registry;
+    }
+
+    /**
      * Get list of all registered panel IDs.
      * @returns {string[]}
      */

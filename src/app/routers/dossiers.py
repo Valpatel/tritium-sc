@@ -137,6 +137,41 @@ async def search_dossiers(
     return {"results": results, "total": len(results), "query": q}
 
 
+@router.get("/by-target")
+async def get_dossier_by_target(
+    request: Request,
+    target_id: str = Query(..., description="Target ID (e.g. ble_AABBCC112201)"),
+):
+    """Look up the dossier linked to a tracked target.
+
+    Returns the full dossier detail, or 404 if no dossier exists for the target.
+    """
+    mgr = _get_manager(request)
+    if mgr is not None:
+        dossier = mgr.get_dossier_for_target(target_id)
+        if dossier:
+            return dossier
+    # Fallback: try store identifier lookup for BLE MACs
+    store = _get_store()
+    if store is not None and target_id.startswith("ble_"):
+        raw = target_id[4:]
+        if len(raw) == 12:
+            mac = ":".join(raw[i:i + 2] for i in range(0, 12, 2)).upper()
+            dossier = store.find_by_identifier("mac", mac)
+            if dossier:
+                return dossier
+        # Also try raw value as MAC (with colons)
+        dossier = store.find_by_identifier("mac", raw)
+        if dossier:
+            return dossier
+    # Try name match as last resort
+    if store is not None:
+        results = store.search(target_id)
+        if results:
+            return results[0]
+    raise HTTPException(status_code=404, detail=f"No dossier found for target {target_id}")
+
+
 @router.get("/{dossier_id}")
 async def get_dossier(request: Request, dossier_id: str):
     """Get full dossier detail including signals, enrichments, positions."""

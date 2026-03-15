@@ -763,20 +763,46 @@ export const DossiersPanelDef = {
         panel._unsubs.push(() => clearInterval(refreshInterval));
         panel._unsubs.push(() => clearTimeout(typeaheadTimer));
 
-        // Listen for dossier:load-target event from target detail modal
-        const _onLoadTarget = (data) => {
+        // Listen for dossier:load-target event from unit inspector / target detail
+        const _onLoadTarget = async (data) => {
             if (data && data.target_id) {
-                selectedId = data.target_id;
-                loadDetail(data.target_id);
-                // Also try to highlight it in the list
+                // If a dossier_id was provided directly, load it
+                if (data.dossier_id) {
+                    selectedId = data.dossier_id;
+                    loadDetail(data.dossier_id);
+                } else {
+                    // Look up dossier by target_id via the by-target API
+                    try {
+                        const resp = await fetch(`/api/dossiers/by-target?target_id=${encodeURIComponent(data.target_id)}`);
+                        if (resp.ok) {
+                            const dossier = await resp.json();
+                            const did = dossier.dossier_id;
+                            if (did) {
+                                selectedId = did;
+                                loadDetail(did);
+                            }
+                        } else {
+                            // No dossier found — show placeholder with target info
+                            if (detailEl) {
+                                detailEl.innerHTML = `<div class="dossier-detail-placeholder">No dossier found for target: ${_esc(data.target_id)}</div>`;
+                            }
+                        }
+                    } catch (_err) {
+                        if (detailEl) {
+                            detailEl.innerHTML = '<div class="dossier-detail-placeholder">Failed to look up dossier</div>';
+                        }
+                    }
+                }
+                // Highlight in the list after a short delay
                 setTimeout(() => {
-                    const item = listEl?.querySelector(`[data-dossier-id="${data.target_id}"]`);
+                    if (!selectedId || !listEl) return;
+                    const item = listEl.querySelector(`[data-dossier-id="${selectedId}"]`);
                     if (item) {
                         listEl.querySelectorAll('.dossier-list-item').forEach(li =>
-                            li.classList.toggle('dossier-list-item-selected', li.dataset.dossierId === data.target_id));
+                            li.classList.toggle('dossier-list-item-selected', li.dataset.dossierId === selectedId));
                         item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     }
-                }, 300);
+                }, 500);
             }
         };
         EventBus.on('dossier:load-target', _onLoadTarget);
