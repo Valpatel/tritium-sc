@@ -263,7 +263,13 @@ class MQTTSource(CameraSourceBase):
 
 
 class RTSPSource(CameraSourceBase):
-    """Captures frames from an RTSP stream via OpenCV."""
+    """Captures frames from an RTSP stream via OpenCV.
+
+    Uses a background thread with a 3-second timeout for the initial
+    RTSP probe so unreachable cameras never block server startup.
+    """
+
+    OPEN_TIMEOUT = 3.0  # seconds — max time for RTSP probe
 
     def __init__(self, config: CameraSourceConfig) -> None:
         super().__init__(config)
@@ -288,15 +294,49 @@ class RTSPSource(CameraSourceBase):
             self._cap.release()
             self._cap = None
 
+    def _open_capture(self) -> cv2.VideoCapture | None:
+        """Open RTSP capture with a timeout to avoid blocking.
+
+        Runs cv2.VideoCapture in a helper thread with a 3-second
+        deadline.  Returns the capture if opened in time, else None.
+        """
+        result: list[cv2.VideoCapture | None] = [None]
+
+        def _do_open():
+            cap = cv2.VideoCapture(self.config.uri)
+            result[0] = cap
+
+        opener = threading.Thread(target=_do_open, daemon=True, name="rtsp-open")
+        opener.start()
+        opener.join(timeout=self.OPEN_TIMEOUT)
+
+        if opener.is_alive():
+            log.warning(
+                "RTSP probe timed out after %.1fs: %s",
+                self.OPEN_TIMEOUT, self.config.uri,
+            )
+            # Thread will finish eventually and the capture will be
+            # garbage-collected; we just don't use it.
+            return None
+
+        cap = result[0]
+        if cap is not None and cap.isOpened():
+            return cap
+
+        # Capture failed to open within timeout
+        if cap is not None:
+            cap.release()
+        return None
+
     def _capture_loop(self) -> None:
-        self._cap = cv2.VideoCapture(self.config.uri)
+        self._cap = self._open_capture()
         fps = max(1, self.config.fps)
         interval = 1.0 / fps
         while self._running:
             if self._cap is None or not self._cap.isOpened():
                 log.warning("RTSP stream not open: %s", self.config.uri)
                 time.sleep(2.0)
-                self._cap = cv2.VideoCapture(self.config.uri)
+                self._cap = self._open_capture()
                 continue
             ret, frame = self._cap.read()
             if ret and frame is not None:

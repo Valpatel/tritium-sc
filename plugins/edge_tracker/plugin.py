@@ -91,6 +91,8 @@ class EdgeTrackerPlugin(PluginInterface):
         self._edge_device_types: dict[str, str] = {}  # mac -> device_type
         # Cache GATT interrogation profiles per MAC
         self._gatt_profiles: dict[str, Any] = {}  # mac -> BleGATTProfile dict
+        # Track all seen MACs for first-seen notification
+        self._seen_macs: set[str] = set()
 
     # -- PluginInterface identity ------------------------------------------
 
@@ -275,6 +277,27 @@ class EdgeTrackerPlugin(PluginInterface):
 
         if sightings:
             self._store.record_sightings_batch(sightings)
+
+        # Emit first-seen notification for new BLE MACs
+        for dev in devices:
+            mac = dev.get("mac", "")
+            if mac and mac not in self._seen_macs:
+                self._seen_macs.add(mac)
+                dev_name = dev.get("name", "") or "Unknown"
+                rssi = dev.get("rssi", -100)
+                if self._event_bus is not None:
+                    self._event_bus.publish("ble:first_seen", data={
+                        "mac": mac,
+                        "name": dev_name,
+                        "rssi": rssi,
+                        "node_id": node_id,
+                        "title": "New BLE Device",
+                        "message": f"First sighting: {dev_name} ({mac}) RSSI {rssi} via {node_id}",
+                        "severity": "info",
+                        "source": "edge_tracker",
+                        "entity_id": f"ble_{mac.replace(':', '').lower()}",
+                        "timestamp": time.time(),
+                    })
 
         # Track sensor health — record a sighting for this node
         if self._sensor_health is not None and devices:
