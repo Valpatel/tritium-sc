@@ -162,6 +162,9 @@ const _state = {
 
     // Mesh radio overlay
     showMesh: true,
+    showMeshNodes: true,
+    showMeshLinks: true,
+    showMeshCoverage: false,
 
     // NPC thought bubbles
     showThoughts: true,
@@ -713,12 +716,15 @@ function _buildMeshTargets() {
         if ((unit.type || unit.asset_type) !== 'mesh_radio') continue;
         const pos = unit.position;
         if (!pos || pos.x === undefined) continue;
+        const meta = unit.metadata || {};
         result.push({
             target_id: id,
             x: pos.x,
             y: pos.y,
             asset_type: 'mesh_radio',
-            metadata: unit.metadata || {},
+            metadata: meta,
+            name: unit.name || meta.short_name || meta.long_name || '',
+            snr: unit.snr !== undefined ? unit.snr : meta.snr,
         });
     }
     return result;
@@ -4826,7 +4832,26 @@ export function toggleFog() {
  */
 export function toggleMesh() {
     _state.showMesh = !_state.showMesh;
+    if (typeof meshState !== 'undefined') meshState.visible = _state.showMesh;
     console.log(`[MAP] Mesh network ${_state.showMesh ? 'ON' : 'OFF'}`);
+}
+
+export function toggleMeshNodes() {
+    _state.showMeshNodes = !_state.showMeshNodes;
+    if (typeof meshState !== 'undefined') meshState.showNodes = _state.showMeshNodes;
+    console.log(`[MAP] Mesh nodes ${_state.showMeshNodes ? 'ON' : 'OFF'}`);
+}
+
+export function toggleMeshLinks() {
+    _state.showMeshLinks = !_state.showMeshLinks;
+    if (typeof meshState !== 'undefined') meshState.showLinks = _state.showMeshLinks;
+    console.log(`[MAP] Mesh links ${_state.showMeshLinks ? 'ON' : 'OFF'}`);
+}
+
+export function toggleMeshCoverage() {
+    _state.showMeshCoverage = !_state.showMeshCoverage;
+    if (typeof meshState !== 'undefined') meshState.showCoverage = _state.showMeshCoverage;
+    console.log(`[MAP] Mesh coverage ${_state.showMeshCoverage ? 'ON' : 'OFF'}`);
 }
 
 /**
@@ -4854,6 +4879,9 @@ export function getMapState() {
         showFog: _state.fogEnabled,
         fogEnabled: _state.fogEnabled,
         showMesh: _state.showMesh,
+        showMeshNodes: _state.showMeshNodes,
+        showMeshLinks: _state.showMeshLinks,
+        showMeshCoverage: _state.showMeshCoverage,
         showThoughts: _state.showThoughts,
         showPredictionCones: _state.showPredictionCones,
     };

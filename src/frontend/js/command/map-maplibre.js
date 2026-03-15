@@ -112,7 +112,10 @@ const _state = {
     showLabels: true,          // DOM unit name labels
     showModels3d: true,        // Three.js 3D unit models
     showFog: false,            // fog of war
-    showMesh: true,            // mesh radio overlay
+    showMesh: true,            // mesh radio overlay (master toggle)
+    showMeshNodes: true,       // mesh node icons
+    showMeshLinks: true,       // mesh link lines
+    showMeshCoverage: false,   // mesh LoRa coverage circles
     showPredictionCones: false, // target prediction uncertainty cones
     showCoverageOverlap: false, // sensor coverage overlap analysis
     showPatrolRoutes: true,    // patrol route lines for friendly units
@@ -7114,9 +7117,31 @@ export function toggleTilt() {
 
 export function toggleMesh() {
     _state.showMesh = !_state.showMesh;
+    // Sync with meshState global if available
+    if (typeof meshState !== 'undefined') {
+        meshState.visible = _state.showMesh;
+    }
     // Mesh overlay is drawn on the canvas overlay, not a MapLibre layer,
     // so just toggle the state flag and the render loop will pick it up.
     console.log(`[MAP-ML] Mesh network ${_state.showMesh ? 'ON' : 'OFF'}`);
+}
+
+export function toggleMeshNodes() {
+    _state.showMeshNodes = !_state.showMeshNodes;
+    if (typeof meshState !== 'undefined') meshState.showNodes = _state.showMeshNodes;
+    console.log(`[MAP-ML] Mesh nodes ${_state.showMeshNodes ? 'ON' : 'OFF'}`);
+}
+
+export function toggleMeshLinks() {
+    _state.showMeshLinks = !_state.showMeshLinks;
+    if (typeof meshState !== 'undefined') meshState.showLinks = _state.showMeshLinks;
+    console.log(`[MAP-ML] Mesh links ${_state.showMeshLinks ? 'ON' : 'OFF'}`);
+}
+
+export function toggleMeshCoverage() {
+    _state.showMeshCoverage = !_state.showMeshCoverage;
+    if (typeof meshState !== 'undefined') meshState.showCoverage = _state.showMeshCoverage;
+    console.log(`[MAP-ML] Mesh coverage ${_state.showMeshCoverage ? 'ON' : 'OFF'}`);
 }
 
 export function togglePredictionCones() {
@@ -7592,6 +7617,9 @@ export function getMapState() {
         showWaterways: _state.showWaterways,
         showParks: _state.showParks,
         showMesh: _state.showMesh,
+        showMeshNodes: _state.showMeshNodes,
+        showMeshLinks: _state.showMeshLinks,
+        showMeshCoverage: _state.showMeshCoverage,
         showPredictionCones: _state.showPredictionCones,
         showCoverageOverlap: _state.showCoverageOverlap,
         showPatrolRoutes: _state.showPatrolRoutes,

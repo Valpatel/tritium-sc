@@ -8,6 +8,14 @@
 import { EventBus } from '../events.js';
 import { _esc } from '../panel-utils.js';
 
+// Mesh layer state reference (populated at runtime from mesh-layer.js global)
+function _getMeshState() {
+    return (typeof meshState !== 'undefined') ? meshState : null;
+}
+function _getMeshNodeCount() {
+    return (typeof meshGetNodeCount === 'function') ? meshGetNodeCount() : 0;
+}
+
 // Layer definitions — categorized with human-readable descriptions.
 // Each layer has: id (matches map-maplibre toggle), label, description, color, source.
 const LAYER_CATEGORIES = [
@@ -22,6 +30,22 @@ const LAYER_CATEGORIES = [
             { id: 'parks', label: 'Parks & Green Spaces', description: 'Parks, fields, and green areas', color: '#1a5a2a', source: 'OpenFreeMap', key: 'showParks' },
             { id: 'grid', label: 'Coordinate Grid', description: 'Tactical reference grid overlay', color: '#00f0ff', source: 'Generated', key: 'showGrid' },
             { id: 'terrain', label: '3D Terrain', description: 'Elevation mesh from digital elevation models', color: null, source: 'Mapzen DEM', key: 'showTerrain' },
+        ],
+    },
+    {
+        name: 'MESH NETWORK',
+        description: 'Meshtastic LoRa mesh radio network overlay',
+        meshNetwork: true, // Flag for dynamic node count in label
+        layers: [
+            { id: 'mesh', label: 'Meshtastic Network', description: 'Master toggle for all mesh radio layers. Shows LoRa mesh nodes with GPS positions.', color: '#00d4aa', source: 'Meshtastic API', key: 'showMesh', meshMaster: true },
+            { id: 'meshNodes', label: 'Mesh Nodes', description: 'Green radio icons with node name labels, sized by SNR quality', color: '#00d4aa', source: 'Meshtastic API', key: 'showMeshNodes' },
+            { id: 'meshLinks', label: 'Mesh Links', description: 'Lines between nodes that have communicated recently, colored by link quality', color: '#00d4aa', source: 'Meshtastic API', key: 'showMeshLinks', legend: [
+                { color: 'rgba(5,255,161,0.5)', shape: 'square', label: 'Excellent (SNR > 5 dB)' },
+                { color: 'rgba(0,212,170,0.35)', shape: 'square', label: 'Good (SNR 0..5 dB)' },
+                { color: 'rgba(252,238,10,0.3)', shape: 'square', label: 'Fair (SNR -5..0 dB)' },
+                { color: 'rgba(255,42,109,0.25)', shape: 'square', label: 'Poor (SNR < -5 dB)' },
+            ]},
+            { id: 'meshCoverage', label: 'Mesh Coverage', description: 'Estimated LoRa coverage circles (~10km radius) per node', color: 'rgba(0,212,170,0.3)', source: 'Meshtastic API', key: 'showMeshCoverage' },
         ],
     },
     {
@@ -54,7 +78,6 @@ const LAYER_CATEGORIES = [
             { id: 'coverPoints', label: 'Cover Points', description: 'Tactical cover positions with directional protection', color: '#fcee0a', source: 'Cover System', key: 'showCoverPoints' },
             { id: 'hazardZones', label: 'Hazard Zones', description: 'Environmental hazards: fires, floods, roadblocks', color: '#ff8800', source: 'Hazard System', key: 'showHazardZones' },
             { id: 'unitSignals', label: 'Unit Signals', description: 'Communication signals (distress, contact, rally)', color: '#fcee0a', source: 'Comms System', key: 'showUnitSignals' },
-            { id: 'mesh', label: 'Mesh Network', description: 'Meshtastic radio mesh connectivity overlay', color: '#00f0ff', source: 'MQTT Mesh', key: 'showMesh' },
             { id: 'fog', label: 'Fog of War', description: 'Areas outside unit vision radius are darkened', color: '#000000', source: 'Vision System', key: 'showFog' },
             { id: 'heatmap', label: 'Combat Heatmap', description: 'Heat overlay showing where combat is concentrated', color: '#ff4400', source: 'Replay System', key: 'showHeatmap' },
             { id: 'crowdDensity', label: 'Crowd Density', description: 'Civilian crowd density heatmap (civil unrest mode)', color: '#ff8800', source: 'Population Model', key: 'showCrowdDensity' },
@@ -168,8 +191,16 @@ export const LayersPanelDef = {
         const gisPluginEnabled = new Set();
         const gisPluginOpacity = {}; // layer_id -> 0.0-1.0
 
+        // Mesh sub-layer opacity (for the opacity slider)
+        let meshLayerOpacity = 1.0;
+
         function getState(key) {
             if (!mapActions || !mapActions.getMapState) return false;
+            // Mesh sub-layer states live in meshState, not mapState
+            const ms = _getMeshState();
+            if (key === 'showMeshNodes') return ms ? ms.showNodes : true;
+            if (key === 'showMeshLinks') return ms ? ms.showLinks : true;
+            if (key === 'showMeshCoverage') return ms ? ms.showCoverage : false;
             // Individual GIS layers
             if (key && key.startsWith('_gis_')) {
                 return !gisLayerOff.has(key);
@@ -183,6 +214,23 @@ export const LayersPanelDef = {
         }
 
         function toggleLayer(layerDef) {
+            // Mesh sub-layer toggles (nodes, links, coverage)
+            const ms = _getMeshState();
+            if (ms && layerDef.key === 'showMeshNodes') {
+                ms.showNodes = !ms.showNodes;
+                render();
+                return;
+            }
+            if (ms && layerDef.key === 'showMeshLinks') {
+                ms.showLinks = !ms.showLinks;
+                render();
+                return;
+            }
+            if (ms && layerDef.key === 'showMeshCoverage') {
+                ms.showCoverage = !ms.showCoverage;
+                render();
+                return;
+            }
             // GIS plugin data source layer toggle
             if (layerDef.gisPlugin) {
                 const key = layerDef.key;
@@ -299,11 +347,12 @@ export const LayersPanelDef = {
                 for (const layer of layers) {
                     const on = layer.key ? getState(layer.key) : false;
                     const isGisChild = layer.gisChild;
+                    const isMeshSub = (layer.key === 'showMeshNodes' || layer.key === 'showMeshLinks' || layer.key === 'showMeshCoverage');
                     const swatch = layer.color
                         ? `<span class="layer-swatch" style="background:${layer.color}" title="${layer.color}"></span>`
                         : `<span class="layer-swatch layer-swatch-none" title="No color"></span>`;
 
-                    html += `<div class="layer-item${on ? ' active' : ''}${isGisChild ? ' gis-child' : ''}" `;
+                    html += `<div class="layer-item${on ? ' active' : ''}${isGisChild ? ' gis-child' : ''}${isMeshSub ? ' mesh-sub' : ''}" `;
                     html += `data-layer-id="${_esc(layer.id)}" `;
                     html += `title="${_esc(layer.description)}">`;
                     if (layer.key) {
@@ -316,7 +365,14 @@ export const LayersPanelDef = {
                     }
                     html += swatch;
                     html += `<span class="layer-label-group">`;
-                    html += `<span class="layer-label">${_esc(layer.label)}</span>`;
+                    // Show node count on mesh master toggle
+                    if (layer.meshMaster) {
+                        const nodeCount = _getMeshNodeCount();
+                        const countStr = nodeCount > 0 ? ` (${nodeCount})` : '';
+                        html += `<span class="layer-label">${_esc(layer.label)}${countStr}</span>`;
+                    } else {
+                        html += `<span class="layer-label">${_esc(layer.label)}</span>`;
+                    }
                     html += `<span class="layer-desc">${_esc(layer.description)}</span>`;
                     html += `</span>`;
                     html += `<span class="layer-source" title="Data source: ${_esc(layer.source)}">${_esc(layer.source)}</span>`;
@@ -347,6 +403,16 @@ export const LayersPanelDef = {
                         if (layer.source) {
                             html += `<div class="layer-attribution">${_esc(layer.source)}</div>`;
                         }
+                    }
+
+                    // Opacity slider for mesh master toggle when enabled
+                    if (layer.meshMaster && on) {
+                        const meshPct = Math.round(meshLayerOpacity * 100);
+                        html += `<div class="layer-opacity-row" data-mesh-opacity="mesh">`;
+                        html += `<span class="layer-opacity-label">OPACITY</span>`;
+                        html += `<input type="range" class="layer-opacity-slider mesh-opacity-slider" min="0" max="100" value="${meshPct}" />`;
+                        html += `<span class="layer-opacity-value">${meshPct}%</span>`;
+                        html += `</div>`;
                     }
                 }
 
@@ -399,14 +465,27 @@ export const LayersPanelDef = {
             }
 
             // Bind opacity sliders for GIS plugin layers
-            for (const slider of treeEl.querySelectorAll('.layer-opacity-slider')) {
+            for (const slider of treeEl.querySelectorAll('.layer-opacity-slider:not(.mesh-opacity-slider)')) {
                 slider.addEventListener('input', () => {
                     const layerId = slider.dataset.gisLayer;
+                    if (!layerId) return;
                     const val = parseInt(slider.value, 10) / 100;
                     gisPluginOpacity[layerId] = val;
                     const valLabel = slider.parentElement.querySelector('.layer-opacity-value');
                     if (valLabel) valLabel.textContent = `${slider.value}%`;
                     EventBus.emit('gis:layer-opacity', { layerId, opacity: val });
+                });
+            }
+
+            // Bind mesh opacity slider
+            for (const slider of treeEl.querySelectorAll('.mesh-opacity-slider')) {
+                slider.addEventListener('input', () => {
+                    const val = parseInt(slider.value, 10) / 100;
+                    meshLayerOpacity = val;
+                    const ms = _getMeshState();
+                    if (ms) ms.opacity = val;
+                    const valLabel = slider.parentElement.querySelector('.layer-opacity-value');
+                    if (valLabel) valLabel.textContent = `${slider.value}%`;
                 });
             }
 
@@ -427,11 +506,25 @@ export const LayersPanelDef = {
         const stateHandler = () => render(searchEl ? searchEl.value : '');
         EventBus.on('map:layers-changed', stateHandler);
 
+        // Start mesh node auto-refresh if available
+        if (typeof meshStartAutoRefresh === 'function') {
+            meshStartAutoRefresh();
+        }
+
+        // Periodically re-render to update mesh node count in label (every 30s)
+        const meshCountInterval = setInterval(() => {
+            render(searchEl ? searchEl.value : '');
+        }, 30000);
+
         // Initial render
         render();
 
         return () => {
             EventBus.off('map:layers-changed', stateHandler);
+            clearInterval(meshCountInterval);
+            if (typeof meshStopAutoRefresh === 'function') {
+                meshStopAutoRefresh();
+            }
         };
     },
 };
