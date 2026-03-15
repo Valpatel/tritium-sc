@@ -14,6 +14,16 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 89: Forensic Replay + Incident Reports
+
+| Change | Verification |
+|--------|-------------|
+| engine/tactical/forensic_reconstructor.py — reconstruct events in time/area window, target timelines, evidence chains, sensor coverage | Unit Tested (12 tests) |
+| routers/forensics.py — POST /api/forensics/reconstruct, GET /api/forensics/{id}, GET /api/forensics, POST /api/forensics/report | Unit Tested |
+| Incident report generator — auto-classification, findings, recommendations, timeline summary | Unit Tested |
+| frontend/js/command/panels/map-replay.js — video-player controls for SSE-based map replay with trails | Code Review |
+| Router registered in main.py | Verified |
+
 ## 2026-03-14 — Wave 88: Collaboration + Operator Chat
 
 | Change | Verification |
