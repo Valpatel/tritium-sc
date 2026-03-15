@@ -605,3 +605,322 @@ class TestWiFiProbeEnrichment:
         data = wifi_enrichments[0].get("data", {})
         assert "CoffeeShop-WiFi" in data.get("ap_ssids", [])
         store.close()
+
+
+class TestAutoEnrichOnCorrelation:
+    """Auto-enrichment when BLE + camera (or other sources) are correlated."""
+
+    @pytest.mark.unit
+    def test_correlation_creates_fusion_enrichment(self):
+        """Correlating BLE + camera should add a fusion_profile enrichment."""
+        store = _make_store()
+        mgr = DossierManager(store=store)
+        mgr.find_or_create_for_target("ble_aabb", name="Phone")
+        mgr.find_or_create_for_target("det_person_1", name="Person")
+
+        mgr._handle_correlation({
+            "primary_id": "ble_aabb",
+            "secondary_id": "det_person_1",
+            "confidence": 0.85,
+            "reason": "ble+yolo within 3m",
+        })
+
+        dossier = mgr.get_dossier_for_target("ble_aabb")
+        enrichments = dossier.get("enrichments", [])
+        fusion = [e for e in enrichments if e.get("enrichment_type") == "fusion_profile"]
+        assert len(fusion) >= 1
+        data = fusion[0].get("data", {})
+        assert data["fusion_type"] == "ble+camera"
+        assert data["source_count"] == 2
+        assert data["inferred_entity"] == "person_with_device"
+        store.close()
+
+    @pytest.mark.unit
+    def test_correlation_same_source_type(self):
+        """Correlating two BLE targets should still create enrichment."""
+        store = _make_store()
+        mgr = DossierManager(store=store)
+        mgr.find_or_create_for_target("ble_1111", name="Phone1")
+        mgr.find_or_create_for_target("ble_2222", name="Phone2")
+
+        mgr._handle_correlation({
+            "primary_id": "ble_1111",
+            "secondary_id": "ble_2222",
+            "confidence": 0.6,
+        })
+
+        dossier = mgr.get_dossier_for_target("ble_1111")
+        enrichments = dossier.get("enrichments", [])
+        fusion = [e for e in enrichments if e.get("enrichment_type") == "fusion_profile"]
+        assert len(fusion) >= 1
+        assert fusion[0]["data"]["fusion_type"] == "ble"
+        store.close()
+
+
+class TestGeofenceEventHandling:
+    """Geofence enter/exit events recorded in dossier history."""
+
+    @pytest.mark.unit
+    def test_geofence_enter_adds_signal(self):
+        """Entering a zone should add a zone_entered signal to the dossier."""
+        store = _make_store()
+        mgr = DossierManager(store=store)
+        mgr.find_or_create_for_target("ble_abc123", name="Phone")
+
+        mgr._handle_geofence_event("geofence:enter", {
+            "target_id": "ble_abc123",
+            "zone_id": "zone-1",
+            "zone_name": "Parking Lot",
+            "zone_type": "monitored",
+            "position": [10.0, 20.0],
+            "timestamp": 1700000000.0,
+        })
+
+        dossier = mgr.get_dossier_for_target("ble_abc123")
+        signals = dossier.get("signals", [])
+        geo_signals = [s for s in signals if s.get("source") == "geofence"]
+        assert len(geo_signals) >= 1
+        assert geo_signals[0]["signal_type"] == "zone_entered"
+        assert geo_signals[0]["data"]["zone_name"] == "Parking Lot"
+        store.close()
+
+    @pytest.mark.unit
+    def test_geofence_exit_adds_signal(self):
+        """Exiting a zone should add a zone_exited signal."""
+        store = _make_store()
+        mgr = DossierManager(store=store)
+        mgr.find_or_create_for_target("ble_def456", name="Watch")
+
+        mgr._handle_geofence_event("geofence:exit", {
+            "target_id": "ble_def456",
+            "zone_id": "zone-2",
+            "zone_name": "Lobby",
+            "zone_type": "safe",
+            "position": [5.0, 15.0],
+        })
+
+        dossier = mgr.get_dossier_for_target("ble_def456")
+        signals = dossier.get("signals", [])
+        geo_signals = [s for s in signals if s.get("source") == "geofence"]
+        assert len(geo_signals) >= 1
+        assert geo_signals[0]["signal_type"] == "zone_exited"
+        store.close()
+
+    @pytest.mark.unit
+    def test_geofence_unknown_target_restricted_creates_dossier(self):
+        """Unknown target entering restricted zone should create a dossier."""
+        store = _make_store()
+        mgr = DossierManager(store=store)
+
+        mgr._handle_geofence_event("geofence:enter", {
+            "target_id": "ble_unknown1",
+            "zone_id": "zone-restricted",
+            "zone_name": "Server Room",
+            "zone_type": "restricted",
+            "position": [0.0, 0.0],
+        })
+
+        dossier = mgr.get_dossier_for_target("ble_unknown1")
+        assert dossier is not None
+        assert "geofence_alert" in dossier.get("tags", [])
+        store.close()
+
+    @pytest.mark.unit
+    def test_geofence_unknown_target_monitored_ignored(self):
+        """Unknown target in monitored zone should NOT create a dossier."""
+        store = _make_store()
+        mgr = DossierManager(store=store)
+
+        mgr._handle_geofence_event("geofence:enter", {
+            "target_id": "ble_nobody",
+            "zone_name": "Garden",
+            "zone_type": "monitored",
+            "position": [1.0, 2.0],
+        })
+
+        dossier = mgr.get_dossier_for_target("ble_nobody")
+        assert dossier is None
+        store.close()
+
+
+class TestSignalHistory:
+    """Signal history timeline API."""
+
+    @pytest.mark.unit
+    def test_signal_history_returns_timeline(self):
+        store = _make_store()
+        mgr = DossierManager(store=store)
+        did = mgr.find_or_create_for_target("ble_hist1", name="Phone")
+
+        # Add several signals with RSSI
+        for i in range(5):
+            mgr.add_signal_to_target(
+                "ble_hist1", source="ble", signal_type="presence",
+                data={"rssi": -60 + i * 2, "mac": "AA:BB:CC:DD:EE:01"},
+                confidence=0.7,
+            )
+
+        timeline = mgr.get_signal_history(did)
+        assert len(timeline) == 5
+        # Should be chronological (oldest first)
+        for i in range(1, len(timeline)):
+            assert timeline[i]["timestamp"] >= timeline[i - 1]["timestamp"]
+        # Should have RSSI values
+        assert all("rssi" in t for t in timeline)
+        store.close()
+
+    @pytest.mark.unit
+    def test_signal_history_filter_by_source(self):
+        store = _make_store()
+        mgr = DossierManager(store=store)
+        did = mgr.find_or_create_for_target("t_filter", name="Target")
+
+        mgr.add_signal_to_target("t_filter", source="ble", signal_type="presence",
+                                  data={"rssi": -50})
+        mgr.add_signal_to_target("t_filter", source="yolo", signal_type="detection",
+                                  data={"class": "person"})
+
+        ble_only = mgr.get_signal_history(did, source="ble")
+        assert len(ble_only) == 1
+        assert ble_only[0]["source"] == "ble"
+        store.close()
+
+    @pytest.mark.unit
+    def test_signal_history_nonexistent_dossier(self):
+        store = _make_store()
+        mgr = DossierManager(store=store)
+        result = mgr.get_signal_history("fake_id")
+        assert result == []
+        store.close()
+
+
+class TestLocationSummary:
+    """Location history summary."""
+
+    @pytest.mark.unit
+    def test_location_summary_with_positions(self):
+        store = _make_store()
+        mgr = DossierManager(store=store)
+        did = mgr.find_or_create_for_target("t_loc", name="Mover")
+
+        # Add positioned signals
+        store.add_signal(did, "ble", "presence", {"rssi": -50},
+                         position_x=0.0, position_y=0.0)
+        store.add_signal(did, "ble", "presence", {"rssi": -55},
+                         position_x=3.0, position_y=4.0)
+
+        summary = mgr.get_location_summary(did)
+        assert summary["position_count"] == 2
+        assert summary["total_distance"] == 5.0  # 3-4-5 triangle
+        assert len(summary["positions"]) == 2
+        store.close()
+
+    @pytest.mark.unit
+    def test_location_summary_nonexistent(self):
+        store = _make_store()
+        mgr = DossierManager(store=store)
+        summary = mgr.get_location_summary("fake")
+        assert summary["position_count"] == 0
+        assert summary["total_distance"] == 0.0
+        store.close()
+
+
+class TestBehavioralProfile:
+    """Behavioral profile analysis."""
+
+    @pytest.mark.unit
+    def test_stationary_profile(self):
+        store = _make_store()
+        mgr = DossierManager(store=store)
+        did = mgr.find_or_create_for_target("t_stat", name="Static")
+
+        # Add signals all at same position
+        now = time.time()
+        for i in range(5):
+            store.add_signal(did, "ble", "presence", {"rssi": -50},
+                             position_x=1.0, position_y=1.0,
+                             timestamp=now + i * 10)
+
+        profile = mgr.get_behavioral_profile(did)
+        assert profile["movement_pattern"] == "stationary"
+        assert profile["average_speed"] == 0.0
+        assert profile["signal_count"] == 5
+        assert "ble" in profile["source_breakdown"]
+        store.close()
+
+    @pytest.mark.unit
+    def test_mobile_profile(self):
+        store = _make_store()
+        mgr = DossierManager(store=store)
+        did = mgr.find_or_create_for_target("t_mobile", name="Walker")
+
+        now = time.time()
+        # Move in a straight line
+        for i in range(5):
+            store.add_signal(did, "ble", "presence", {"rssi": -60},
+                             position_x=float(i * 10), position_y=0.0,
+                             timestamp=now + i * 5)
+
+        profile = mgr.get_behavioral_profile(did)
+        assert profile["movement_pattern"] == "mobile"
+        assert profile["average_speed"] > 0
+        assert profile["signal_count"] == 5
+        store.close()
+
+    @pytest.mark.unit
+    def test_rssi_stats(self):
+        store = _make_store()
+        mgr = DossierManager(store=store)
+        did = mgr.find_or_create_for_target("t_rssi", name="Device")
+
+        now = time.time()
+        rssi_values = [-80, -70, -60, -50, -40]
+        for i, rssi in enumerate(rssi_values):
+            store.add_signal(did, "ble", "presence", {"rssi": rssi},
+                             timestamp=now + i * 10)
+
+        profile = mgr.get_behavioral_profile(did)
+        assert profile["rssi_stats"]["min"] == -80
+        assert profile["rssi_stats"]["max"] == -40
+        assert profile["rssi_stats"]["trend"] == "approaching"
+        store.close()
+
+    @pytest.mark.unit
+    def test_rssi_receding_trend(self):
+        store = _make_store()
+        mgr = DossierManager(store=store)
+        did = mgr.find_or_create_for_target("t_recede", name="Leaving")
+
+        now = time.time()
+        rssi_values = [-40, -50, -60, -70, -80]
+        for i, rssi in enumerate(rssi_values):
+            store.add_signal(did, "ble", "presence", {"rssi": rssi},
+                             timestamp=now + i * 10)
+
+        profile = mgr.get_behavioral_profile(did)
+        assert profile["rssi_stats"]["trend"] == "receding"
+        store.close()
+
+    @pytest.mark.unit
+    def test_behavioral_profile_nonexistent(self):
+        store = _make_store()
+        mgr = DossierManager(store=store)
+        profile = mgr.get_behavioral_profile("nonexistent")
+        assert profile["movement_pattern"] == "unknown"
+        assert profile["signal_count"] == 0
+        store.close()
+
+    @pytest.mark.unit
+    def test_source_breakdown(self):
+        store = _make_store()
+        mgr = DossierManager(store=store)
+        did = mgr.find_or_create_for_target("t_multi", name="Multi")
+
+        store.add_signal(did, "ble", "presence", {"rssi": -50})
+        store.add_signal(did, "ble", "presence", {"rssi": -55})
+        store.add_signal(did, "yolo", "detection", {"class": "person"})
+
+        profile = mgr.get_behavioral_profile(did)
+        assert profile["source_breakdown"]["ble"] == 2
+        assert profile["source_breakdown"]["yolo"] == 1
+        store.close()

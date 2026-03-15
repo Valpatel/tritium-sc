@@ -23,9 +23,11 @@ Thread-safety: all public methods are safe to call from any thread.
 from __future__ import annotations
 
 import logging
+import math
 import queue as queue_mod
 import threading
 import time
+from collections import defaultdict
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -360,13 +362,19 @@ class DossierManager:
                         self._handle_detection(data)
                     elif event_type == "enrichment_complete":
                         self._handle_enrichment(data)
+                    elif event_type in ("geofence:enter", "geofence:exit"):
+                        self._handle_geofence_event(event_type, data)
                 except Exception:
                     logger.warning("DossierManager event error", exc_info=True)
         finally:
             self._event_bus.unsubscribe(bus_queue)
 
     def _handle_correlation(self, data: dict) -> None:
-        """Handle a correlation event: two targets were fused."""
+        """Handle a correlation event: two targets were fused.
+
+        When BLE + camera (or any two sources) are correlated, auto-enrich
+        the merged dossier with combined intelligence from both sources.
+        """
         primary_id = data.get("primary_id", "")
         secondary_id = data.get("secondary_id", "")
         if not primary_id or not secondary_id:
@@ -398,6 +406,9 @@ class DossierManager:
         # If they have different dossiers, merge them
         if p_dossier != s_dossier:
             self.merge(p_dossier, s_dossier)
+
+        # Auto-enrich the merged dossier with correlation context
+        self._auto_enrich_on_correlation(p_dossier, primary_id, secondary_id, data)
 
     def _handle_ble_presence(self, data: dict) -> None:
         """Handle fleet.ble_presence events (from demo generators and edge nodes).
@@ -654,6 +665,479 @@ class DossierManager:
                 enrichment_type=result.get("enrichment_type", "unknown"),
                 data=result.get("data", {}),
             )
+
+    # ------------------------------------------------------------------
+    # Auto-enrichment on correlation
+    # ------------------------------------------------------------------
+
+    def _auto_enrich_on_correlation(
+        self,
+        dossier_id: str,
+        primary_id: str,
+        secondary_id: str,
+        data: dict,
+    ) -> None:
+        """Auto-populate dossier when a target is first correlated.
+
+        When BLE + camera are fused, combine the intelligence:
+        - BLE provides MAC, manufacturer, device type, RSSI history
+        - Camera provides visual class, bounding box, appearance
+        This creates a richer dossier than either source alone.
+        """
+        sources = set()
+        if primary_id.startswith("ble_"):
+            sources.add("ble")
+        elif primary_id.startswith("det_"):
+            sources.add("camera")
+        elif primary_id.startswith("mesh_"):
+            sources.add("mesh")
+        elif primary_id.startswith("wifi_"):
+            sources.add("wifi")
+
+        if secondary_id.startswith("ble_"):
+            sources.add("ble")
+        elif secondary_id.startswith("det_"):
+            sources.add("camera")
+        elif secondary_id.startswith("mesh_"):
+            sources.add("mesh")
+        elif secondary_id.startswith("wifi_"):
+            sources.add("wifi")
+
+        # Build fusion summary
+        fusion_type = "+".join(sorted(sources)) if sources else "unknown"
+        confidence = data.get("confidence", 0.0)
+
+        enrichment_data = {
+            "fusion_type": fusion_type,
+            "primary_id": primary_id,
+            "secondary_id": secondary_id,
+            "source_count": len(sources),
+            "sources": sorted(sources),
+            "confidence": confidence,
+            "reason": data.get("reason", ""),
+        }
+
+        # Infer entity type upgrade from correlation
+        if "ble" in sources and "camera" in sources:
+            enrichment_data["inferred_entity"] = "person_with_device"
+            enrichment_data["description"] = (
+                f"BLE device {primary_id if primary_id.startswith('ble_') else secondary_id} "
+                f"correlated with visual detection — confirmed as person carrying device"
+            )
+        elif "mesh" in sources and "camera" in sources:
+            enrichment_data["inferred_entity"] = "person_with_radio"
+            enrichment_data["description"] = (
+                "Mesh radio correlated with visual detection — person carrying LoRa device"
+            )
+        else:
+            enrichment_data["description"] = (
+                f"Multi-sensor correlation: {fusion_type} (confidence={confidence:.2f})"
+            )
+
+        self._store.add_enrichment(
+            dossier_id=dossier_id,
+            provider="auto_correlation",
+            enrichment_type="fusion_profile",
+            data=enrichment_data,
+        )
+
+        with self._lock:
+            self._dirty.add(dossier_id)
+
+        logger.info(
+            "Auto-enriched dossier %s on %s correlation (confidence=%.2f)",
+            dossier_id[:8], fusion_type, confidence,
+        )
+
+    # ------------------------------------------------------------------
+    # Geofence event handling
+    # ------------------------------------------------------------------
+
+    def _handle_geofence_event(self, event_type: str, data: dict) -> None:
+        """Record geofence enter/exit events in the target's dossier history.
+
+        When a dossier target enters or exits a geofence zone, add an event
+        signal to their dossier for timeline display.
+        """
+        target_id = data.get("target_id", "")
+        if not target_id:
+            return
+
+        zone_name = data.get("zone_name", "unknown")
+        zone_type = data.get("zone_type", "monitored")
+        zone_id = data.get("zone_id", "")
+        position = data.get("position", [0.0, 0.0])
+        timestamp = data.get("timestamp", time.time())
+
+        transition = "entered" if event_type == "geofence:enter" else "exited"
+
+        # Find or create dossier for this target
+        with self._lock:
+            dossier_id = self._target_dossier_map.get(target_id)
+        if dossier_id is None:
+            # Only create dossier if target enters a restricted zone
+            if event_type == "geofence:enter" and zone_type == "restricted":
+                dossier_id = self.find_or_create_for_target(
+                    target_id, name=target_id, tags=["geofence_alert"],
+                )
+            else:
+                return
+
+        # Add geofence signal to dossier
+        pos_x = position[0] if len(position) > 0 else None
+        pos_y = position[1] if len(position) > 1 else None
+
+        self._store.add_signal(
+            dossier_id=dossier_id,
+            source="geofence",
+            signal_type=f"zone_{transition}",
+            data={
+                "zone_id": zone_id,
+                "zone_name": zone_name,
+                "zone_type": zone_type,
+                "transition": transition,
+            },
+            position_x=pos_x,
+            position_y=pos_y,
+            confidence=1.0,
+            timestamp=timestamp,
+        )
+
+        with self._lock:
+            self._dirty.add(dossier_id)
+
+        logger.info(
+            "Dossier %s: target %s %s zone '%s' (%s)",
+            dossier_id[:8], target_id[:12], transition, zone_name, zone_type,
+        )
+
+    # ------------------------------------------------------------------
+    # Signal history timeline
+    # ------------------------------------------------------------------
+
+    def get_signal_history(
+        self,
+        dossier_id: str,
+        signal_type: str | None = None,
+        source: str | None = None,
+        limit: int = 200,
+        since: float | None = None,
+    ) -> list[dict]:
+        """Get signal history timeline for a dossier.
+
+        Returns chronologically ordered signals with RSSI values,
+        timestamps, and positions for chart rendering.
+
+        Parameters
+        ----------
+        dossier_id:
+            The dossier to query.
+        signal_type:
+            Filter by signal type (e.g. 'presence', 'sighting').
+        source:
+            Filter by source (e.g. 'ble', 'yolo').
+        limit:
+            Max records to return.
+        since:
+            Only signals after this timestamp.
+        """
+        dossier = self._store.get_dossier(dossier_id)
+        if dossier is None:
+            return []
+
+        signals = dossier.get("signals", [])
+
+        # Filter
+        if signal_type:
+            signals = [s for s in signals if s.get("signal_type") == signal_type]
+        if source:
+            signals = [s for s in signals if s.get("source") == source]
+        if since:
+            signals = [s for s in signals if s.get("timestamp", 0) >= since]
+
+        # Sort chronologically (oldest first for timeline)
+        signals.sort(key=lambda s: s.get("timestamp", 0))
+
+        # Extract timeline data points
+        timeline = []
+        for sig in signals[-limit:]:
+            data = sig.get("data", {})
+            point = {
+                "timestamp": sig.get("timestamp", 0),
+                "source": sig.get("source", ""),
+                "signal_type": sig.get("signal_type", ""),
+                "confidence": sig.get("confidence", 0),
+            }
+            # Include RSSI if available
+            rssi = data.get("rssi")
+            if rssi is not None:
+                point["rssi"] = rssi
+            # Include position if available
+            if sig.get("position_x") is not None:
+                point["position_x"] = sig["position_x"]
+                point["position_y"] = sig.get("position_y")
+            # Include geofence data if present
+            if sig.get("signal_type", "").startswith("zone_"):
+                point["zone_name"] = data.get("zone_name", "")
+                point["zone_type"] = data.get("zone_type", "")
+                point["transition"] = data.get("transition", "")
+            timeline.append(point)
+
+        return timeline
+
+    # ------------------------------------------------------------------
+    # Location history summary
+    # ------------------------------------------------------------------
+
+    def get_location_summary(self, dossier_id: str) -> dict:
+        """Build a location history summary for a dossier.
+
+        Computes zones visited, time spent per zone, and position history
+        from geofence signals and tracker sync signals.
+
+        Returns
+        -------
+        dict with:
+            zones_visited: list of {zone_name, zone_type, first_seen, last_seen, duration_s, visit_count}
+            position_count: number of position records
+            positions: list of {x, y, timestamp} (last 50)
+            total_distance: estimated total distance traveled
+        """
+        dossier = self._store.get_dossier(dossier_id)
+        if dossier is None:
+            return {"zones_visited": [], "position_count": 0, "positions": [], "total_distance": 0.0}
+
+        signals = dossier.get("signals", [])
+        signals.sort(key=lambda s: s.get("timestamp", 0))
+
+        # Build zone visit timeline from geofence signals
+        zone_visits: dict[str, dict] = {}  # zone_id -> aggregated visit data
+        zone_entries: dict[str, float] = {}  # zone_id -> last entry timestamp
+
+        for sig in signals:
+            stype = sig.get("signal_type", "")
+            data = sig.get("data", {})
+            ts = sig.get("timestamp", 0)
+
+            if stype == "zone_entered":
+                zone_id = data.get("zone_id", "")
+                if zone_id:
+                    zone_entries[zone_id] = ts
+                    if zone_id not in zone_visits:
+                        zone_visits[zone_id] = {
+                            "zone_name": data.get("zone_name", "unknown"),
+                            "zone_type": data.get("zone_type", "monitored"),
+                            "first_seen": ts,
+                            "last_seen": ts,
+                            "duration_s": 0.0,
+                            "visit_count": 1,
+                        }
+                    else:
+                        zone_visits[zone_id]["visit_count"] += 1
+                        zone_visits[zone_id]["last_seen"] = ts
+
+            elif stype == "zone_exited":
+                zone_id = data.get("zone_id", "")
+                if zone_id and zone_id in zone_entries:
+                    entry_ts = zone_entries.pop(zone_id, ts)
+                    duration = max(0, ts - entry_ts)
+                    if zone_id in zone_visits:
+                        zone_visits[zone_id]["duration_s"] += duration
+                        zone_visits[zone_id]["last_seen"] = ts
+
+        # Collect position history from tracker_sync and positioned signals
+        positions = []
+        for sig in signals:
+            px = sig.get("position_x")
+            py = sig.get("position_y")
+            if px is not None and py is not None:
+                positions.append({
+                    "x": px,
+                    "y": py,
+                    "timestamp": sig.get("timestamp", 0),
+                })
+
+        # Calculate total distance
+        total_distance = 0.0
+        for i in range(1, len(positions)):
+            dx = positions[i]["x"] - positions[i - 1]["x"]
+            dy = positions[i]["y"] - positions[i - 1]["y"]
+            total_distance += math.sqrt(dx * dx + dy * dy)
+
+        return {
+            "zones_visited": sorted(
+                zone_visits.values(),
+                key=lambda z: z["duration_s"],
+                reverse=True,
+            ),
+            "position_count": len(positions),
+            "positions": positions[-50:],  # last 50 positions
+            "total_distance": round(total_distance, 2),
+        }
+
+    # ------------------------------------------------------------------
+    # Behavioral profile
+    # ------------------------------------------------------------------
+
+    def get_behavioral_profile(self, dossier_id: str) -> dict:
+        """Compute a behavioral profile from signal history.
+
+        Analyzes movement patterns from position data, RSSI trends,
+        and activity timestamps to classify behavior.
+
+        Returns
+        -------
+        dict with:
+            movement_pattern: 'stationary' | 'mobile' | 'patrol' | 'unknown'
+            average_speed: float (units per second)
+            max_speed: float
+            activity_hours: list of ints (hours of day when active, 0-23)
+            signal_count: int
+            source_breakdown: dict[source, count]
+            rssi_stats: {min, max, mean, trend}
+            first_seen: float
+            last_seen: float
+            active_duration_s: float
+        """
+        dossier = self._store.get_dossier(dossier_id)
+        if dossier is None:
+            return {
+                "movement_pattern": "unknown",
+                "average_speed": 0.0,
+                "max_speed": 0.0,
+                "activity_hours": [],
+                "signal_count": 0,
+                "source_breakdown": {},
+                "rssi_stats": {},
+                "first_seen": 0,
+                "last_seen": 0,
+                "active_duration_s": 0,
+            }
+
+        signals = dossier.get("signals", [])
+        signals.sort(key=lambda s: s.get("timestamp", 0))
+
+        if not signals:
+            return {
+                "movement_pattern": "unknown",
+                "average_speed": 0.0,
+                "max_speed": 0.0,
+                "activity_hours": [],
+                "signal_count": 0,
+                "source_breakdown": {},
+                "rssi_stats": {},
+                "first_seen": dossier.get("first_seen", 0),
+                "last_seen": dossier.get("last_seen", 0),
+                "active_duration_s": 0,
+            }
+
+        # Source breakdown
+        source_breakdown: dict[str, int] = defaultdict(int)
+        for sig in signals:
+            source_breakdown[sig.get("source", "unknown")] += 1
+
+        # RSSI stats from BLE signals
+        rssi_values = []
+        for sig in signals:
+            data = sig.get("data", {})
+            if isinstance(data, dict):
+                rssi = data.get("rssi")
+                if rssi is not None and isinstance(rssi, (int, float)):
+                    rssi_values.append(rssi)
+
+        rssi_stats: dict = {}
+        if rssi_values:
+            rssi_stats["min"] = min(rssi_values)
+            rssi_stats["max"] = max(rssi_values)
+            rssi_stats["mean"] = round(sum(rssi_values) / len(rssi_values), 1)
+            # Simple trend: compare first half avg to second half avg
+            mid = len(rssi_values) // 2
+            if mid > 0:
+                first_half = sum(rssi_values[:mid]) / mid
+                second_half = sum(rssi_values[mid:]) / (len(rssi_values) - mid)
+                diff = second_half - first_half
+                if diff > 3:
+                    rssi_stats["trend"] = "approaching"
+                elif diff < -3:
+                    rssi_stats["trend"] = "receding"
+                else:
+                    rssi_stats["trend"] = "stable"
+            else:
+                rssi_stats["trend"] = "insufficient_data"
+
+        # Activity hours
+        activity_hours_set: set[int] = set()
+        for sig in signals:
+            ts = sig.get("timestamp", 0)
+            if ts > 0:
+                import datetime as dt
+                hour = dt.datetime.fromtimestamp(ts, tz=dt.timezone.utc).hour
+                activity_hours_set.add(hour)
+
+        # Position-based movement analysis
+        positions_with_time = []
+        for sig in signals:
+            px = sig.get("position_x")
+            py = sig.get("position_y")
+            ts = sig.get("timestamp", 0)
+            if px is not None and py is not None and ts > 0:
+                positions_with_time.append((px, py, ts))
+
+        speeds = []
+        total_distance = 0.0
+        for i in range(1, len(positions_with_time)):
+            x1, y1, t1 = positions_with_time[i - 1]
+            x2, y2, t2 = positions_with_time[i]
+            dist = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+            dt_sec = t2 - t1
+            if dt_sec > 0:
+                speed = dist / dt_sec
+                speeds.append(speed)
+                total_distance += dist
+
+        avg_speed = sum(speeds) / len(speeds) if speeds else 0.0
+        max_speed = max(speeds) if speeds else 0.0
+
+        # Classify movement pattern
+        if not positions_with_time or len(positions_with_time) < 2:
+            movement_pattern = "stationary"
+        elif total_distance < 2.0:
+            movement_pattern = "stationary"
+        elif avg_speed > 0.5:
+            # Check for patrol pattern: does the target revisit areas?
+            if len(positions_with_time) >= 6:
+                # Simple heuristic: check if bounding box is much smaller
+                # than total distance (indicates circling/patrol)
+                xs = [p[0] for p in positions_with_time]
+                ys = [p[1] for p in positions_with_time]
+                bbox_diag = math.sqrt(
+                    (max(xs) - min(xs)) ** 2 + (max(ys) - min(ys)) ** 2
+                )
+                if bbox_diag > 0 and total_distance / bbox_diag > 3.0:
+                    movement_pattern = "patrol"
+                else:
+                    movement_pattern = "mobile"
+            else:
+                movement_pattern = "mobile"
+        else:
+            movement_pattern = "stationary"
+
+        first_seen = dossier.get("first_seen", 0)
+        last_seen = dossier.get("last_seen", 0)
+        active_duration = last_seen - first_seen if last_seen > first_seen else 0
+
+        return {
+            "movement_pattern": movement_pattern,
+            "average_speed": round(avg_speed, 3),
+            "max_speed": round(max_speed, 3),
+            "activity_hours": sorted(activity_hours_set),
+            "signal_count": len(signals),
+            "source_breakdown": dict(source_breakdown),
+            "rssi_stats": rssi_stats,
+            "first_seen": first_seen,
+            "last_seen": last_seen,
+            "active_duration_s": round(active_duration, 1),
+        }
 
     # ------------------------------------------------------------------
     # Periodic flush

@@ -211,6 +211,111 @@ async def merge_dossiers_body(
     return {"ok": True, "primary_id": primary_id, "merged_from": secondary_id}
 
 
+@router.get("/{dossier_id}/signal-history")
+async def get_signal_history(
+    request: Request,
+    dossier_id: str,
+    signal_type: Optional[str] = Query(None),
+    source: Optional[str] = Query(None),
+    limit: int = Query(200, ge=1, le=2000),
+    since: Optional[float] = Query(None),
+):
+    """Get signal history timeline for a dossier (RSSI over time, etc.)."""
+    mgr = _get_manager(request)
+    if mgr is not None:
+        timeline = mgr.get_signal_history(
+            dossier_id, signal_type=signal_type, source=source,
+            limit=limit, since=since,
+        )
+        return {"dossier_id": dossier_id, "timeline": timeline, "count": len(timeline)}
+
+    store = _get_store()
+    if store is None:
+        raise HTTPException(status_code=503, detail="Dossier store unavailable")
+
+    dossier = store.get_dossier(dossier_id)
+    if dossier is None:
+        raise HTTPException(status_code=404, detail="Dossier not found")
+
+    signals = dossier.get("signals", [])
+    if signal_type:
+        signals = [s for s in signals if s.get("signal_type") == signal_type]
+    if source:
+        signals = [s for s in signals if s.get("source") == source]
+    if since:
+        signals = [s for s in signals if s.get("timestamp", 0) >= since]
+    signals.sort(key=lambda s: s.get("timestamp", 0))
+
+    timeline = []
+    for sig in signals[-limit:]:
+        data = sig.get("data", {})
+        point = {
+            "timestamp": sig.get("timestamp", 0),
+            "source": sig.get("source", ""),
+            "signal_type": sig.get("signal_type", ""),
+            "confidence": sig.get("confidence", 0),
+        }
+        rssi = data.get("rssi") if isinstance(data, dict) else None
+        if rssi is not None:
+            point["rssi"] = rssi
+        if sig.get("position_x") is not None:
+            point["position_x"] = sig["position_x"]
+            point["position_y"] = sig.get("position_y")
+        timeline.append(point)
+
+    return {"dossier_id": dossier_id, "timeline": timeline, "count": len(timeline)}
+
+
+@router.get("/{dossier_id}/location-summary")
+async def get_location_summary(request: Request, dossier_id: str):
+    """Get location history summary — zones visited, time per zone, distance."""
+    mgr = _get_manager(request)
+    if mgr is not None:
+        summary = mgr.get_location_summary(dossier_id)
+        return {"dossier_id": dossier_id, **summary}
+
+    store = _get_store()
+    if store is None:
+        raise HTTPException(status_code=503, detail="Dossier store unavailable")
+
+    dossier = store.get_dossier(dossier_id)
+    if dossier is None:
+        raise HTTPException(status_code=404, detail="Dossier not found")
+
+    return {"dossier_id": dossier_id, "zones_visited": [], "position_count": 0, "positions": [], "total_distance": 0.0}
+
+
+@router.get("/{dossier_id}/behavioral-profile")
+async def get_behavioral_profile(request: Request, dossier_id: str):
+    """Get behavioral profile — movement pattern, speed, activity hours, RSSI trends."""
+    mgr = _get_manager(request)
+    if mgr is not None:
+        profile = mgr.get_behavioral_profile(dossier_id)
+        return {"dossier_id": dossier_id, **profile}
+
+    store = _get_store()
+    if store is None:
+        raise HTTPException(status_code=503, detail="Dossier store unavailable")
+
+    dossier = store.get_dossier(dossier_id)
+    if dossier is None:
+        raise HTTPException(status_code=404, detail="Dossier not found")
+
+    return {
+        "dossier_id": dossier_id,
+        "movement_pattern": "unknown",
+        "average_speed": 0.0,
+        "max_speed": 0.0,
+        "activity_hours": [],
+        "signal_count": 0,
+        "source_breakdown": {},
+        "rssi_stats": {},
+        "first_seen": dossier.get("first_seen", 0),
+        "last_seen": dossier.get("last_seen", 0),
+        "active_duration_s": 0,
+    }
+
+
 @router.post("/{dossier_id}/tag")
 async def add_tag(
     request: Request,
