@@ -305,19 +305,9 @@ export function createMenuBar(container, panelManager, layoutManager, mapActions
     });
     right.appendChild(searchInput);
 
-    // Right side: quick-access panel toggle buttons
+    // Panel buttons map — only populated for pinned panels (not all 90+).
+    // Use VIEW menu to access panels by category instead.
     const panelButtons = new Map();
-    for (const p of panelManager.getRegisteredPanels()) {
-        const btn = document.createElement('button');
-        btn.className = 'command-bar-btn';
-        if (p.isOpen) btn.classList.add('active');
-        btn.dataset.panel = p.id;
-        btn.textContent = _shortLabel(p.title);
-        btn.title = `Toggle ${p.title} (${_panelKey(p.id)})`;
-        btn.addEventListener('click', () => panelManager.toggle(p.id));
-        right.appendChild(btn);
-        panelButtons.set(p.id, btn);
-    }
 
     // Ctrl+/ shortcut to focus panel search
     document.addEventListener('keydown', (e) => {
