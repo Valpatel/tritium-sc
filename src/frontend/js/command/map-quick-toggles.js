@@ -69,6 +69,14 @@ const QUICK_TOGGLES = [
         toggleFn: null,
         eventToggle: 'trails:toggle',
     },
+    {
+        id: 'prediction-ellipses',
+        icon: 'ELP',
+        title: 'Toggle prediction confidence ellipses',
+        stateKey: null,
+        toggleFn: null,
+        eventToggle: 'prediction-ellipses:toggle',
+    },
 ];
 
 /**

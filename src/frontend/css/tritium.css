@@ -3673,3 +3673,246 @@ button:disabled:hover {
         padding-bottom: 6pt;
     }
 }
+
+/* ========================================
+   Federation Panel
+   ======================================== */
+.fed-panel-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.fed-summary {
+    display: flex;
+    gap: 12px;
+    justify-content: space-around;
+    padding: 8px 4px;
+    border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+}
+
+.fed-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.fed-stat-value {
+    font-size: 20px;
+    font-weight: bold;
+    color: var(--cyan, #00f0ff);
+}
+
+.fed-stat-label {
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--text-dim, #888);
+    text-transform: uppercase;
+}
+
+.fed-actions {
+    display: flex;
+    gap: 8px;
+    padding: 4px 0;
+}
+
+.fed-btn {
+    padding: 4px 12px;
+    font-size: 11px;
+    font-family: var(--font-mono, monospace);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    background: rgba(0, 240, 255, 0.05);
+    color: var(--cyan, #00f0ff);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.fed-btn:hover {
+    background: rgba(0, 240, 255, 0.15);
+}
+
+.fed-btn-sm {
+    padding: 2px 8px;
+    font-size: 10px;
+    font-family: var(--font-mono, monospace);
+    border: 1px solid rgba(255, 42, 109, 0.3);
+    background: rgba(255, 42, 109, 0.05);
+    color: var(--magenta, #ff2a6d);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.fed-btn-sm:hover {
+    background: rgba(255, 42, 109, 0.15);
+}
+
+.fed-site-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.fed-empty {
+    color: var(--text-dim, #888);
+    text-align: center;
+    padding: 24px;
+    font-size: 12px;
+}
+
+.fed-site-card {
+    border: 1px solid rgba(0, 240, 255, 0.15);
+    background: rgba(0, 0, 0, 0.3);
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.fed-site-card:hover {
+    border-color: rgba(0, 240, 255, 0.3);
+    background: rgba(0, 240, 255, 0.03);
+}
+
+.fed-site-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.fed-site-name {
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--text, #e0e0e0);
+    flex: 1;
+}
+
+.fed-health-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.fed-health-dot.fed-pulse {
+    animation: fed-pulse-anim 2s ease-in-out infinite;
+}
+
+@keyframes fed-pulse-anim {
+    0%, 100% { opacity: 1; box-shadow: 0 0 3px currentColor; }
+    50% { opacity: 0.5; box-shadow: 0 0 8px currentColor; }
+}
+
+.fed-status-badge,
+.fed-role-badge {
+    font-size: 9px;
+    padding: 1px 6px;
+    border: 1px solid;
+    letter-spacing: 0.5px;
+}
+
+.fed-site-details {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2px 12px;
+    padding-left: 16px;
+}
+
+.fed-detail-row {
+    display: contents;
+}
+
+.fed-detail-label {
+    font-size: 10px;
+    color: var(--text-dim, #888);
+    letter-spacing: 0.5px;
+}
+
+.fed-detail-value {
+    font-size: 11px;
+    color: var(--text, #e0e0e0);
+}
+
+.fed-site-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.fed-site-id {
+    font-size: 9px;
+}
+
+/* Add site form */
+.fed-add-form {
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    background: rgba(0, 0, 0, 0.4);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.fed-form-title {
+    font-size: 12px;
+    color: var(--cyan, #00f0ff);
+    letter-spacing: 1px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+}
+
+.fed-form-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.fed-form-label {
+    font-size: 10px;
+    color: var(--text-dim, #888);
+    width: 80px;
+    flex-shrink: 0;
+    letter-spacing: 0.5px;
+}
+
+.fed-form-input {
+    flex: 1;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-family: var(--font-mono, monospace);
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    color: var(--text, #e0e0e0);
+    outline: none;
+}
+
+.fed-form-input:focus {
+    border-color: var(--cyan, #00f0ff);
+}
+
+.fed-form-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding-top: 4px;
+}
+
+.fed-btn-save {
+    background: rgba(5, 255, 161, 0.1);
+    border-color: rgba(5, 255, 161, 0.3);
+    color: var(--green, #05ffa1);
+}
+
+.fed-btn-cancel {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: var(--text-dim, #888);
+}

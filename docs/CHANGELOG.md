@@ -14,6 +14,26 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-15 — Wave 123: Prediction Ellipses + Federation Site Status Panel
+
+| Change | Verification |
+|--------|-------------|
+| PredictionEllipseManager: directional confidence ellipses on the map for tracked targets | Syntax + Unit |
+| Ellipses stretch along direction of travel using heading computed from trail history | Syntax + Unit |
+| Longitudinal axis compressed by speed (faster = more confident about direction) | Syntax + Unit |
+| Lateral axis proportional to position uncertainty (1-confidence) | Syntax + Unit |
+| Alliance-colored fill/stroke (friendly=green, hostile=magenta, neutral=blue, unknown=yellow) | Syntax + Unit |
+| MapLibre GeoJSON polygon layers (fill + dashed stroke) | Syntax + Unit |
+| Map quick toggle (ELP) for prediction ellipses | Syntax + Unit |
+| FederationPanelDef: site status panel showing connected federation sites | Syntax + Unit |
+| Summary stats: total sites, connected, shared targets, intel packages | Syntax + Unit |
+| Site cards: name, MQTT host/port, role badge, connection state, share policy | Syntax + Unit |
+| Add site form: name, MQTT host, port, role, share policy | Syntax + Unit |
+| Remove site with confirmation | Syntax + Unit |
+| Auto-refresh every 10s | Syntax + Unit |
+| Federation panel registered in menu-bar under Fleet category | Syntax + Unit |
+| Visual re-verification: 26 targets, 20 dossiers, threat level black, RL model trained (76.7%) | Server-verified |
+
 ## 2026-03-15 — Wave 121: Multi-Node Trilateration Demo + Target Handoff Visualization
 
 | Change | Verification |
