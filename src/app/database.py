@@ -49,6 +49,25 @@ async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+    # Migrate existing tables — add columns that may be missing from older schemas.
+    # SQLAlchemy create_all only creates new tables, it won't ALTER existing ones.
+    async with async_session() as session:
+        _asset_migrations = [
+            ("height_meters", "FLOAT"),
+            ("floor_level", "INTEGER"),
+            ("mounting_type", "VARCHAR(50)"),
+            ("coverage_radius_meters", "FLOAT"),
+            ("coverage_cone_angle", "FLOAT"),
+        ]
+        for col_name, col_type in _asset_migrations:
+            try:
+                await session.execute(
+                    text(f"ALTER TABLE assets ADD COLUMN {col_name} {col_type}")
+                )
+            except Exception:
+                pass  # Column already exists
+        await session.commit()
+
     # Create FTS5 virtual tables if they don't exist
     async with async_session() as session:
         await session.execute(

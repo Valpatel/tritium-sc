@@ -344,7 +344,7 @@ async def get_investigation_map_entities(inv_id: str, request: Request):
 
         # Try to find position from tracker
         if tracker is not None:
-            target = tracker.get(eid)
+            target = tracker.get_target(eid)
             if target is not None:
                 pos = getattr(target, "position", None)
                 if pos is not None:
@@ -422,7 +422,7 @@ async def get_active_investigation_overlay(request: Request):
             }
 
             if tracker is not None:
-                target = tracker.get(eid)
+                target = tracker.get_target(eid)
                 if target is not None:
                     pos = getattr(target, "position", None)
                     if pos is not None:
