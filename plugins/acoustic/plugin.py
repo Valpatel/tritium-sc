@@ -105,6 +105,11 @@ class AcousticPlugin(PluginInterface):
         # Localization results
         self._localization_history: list[dict] = []
 
+        # TDoA observation buffer: event_type -> list of observations
+        self._tdoa_buffer: dict[str, list[Any]] = {}
+        self._tdoa_results: list[dict] = []
+        self._tdoa_window_s = LOCALIZATION_WINDOW_S
+
         # Statistics
         self._stats = {
             "events_processed": 0,
@@ -112,6 +117,8 @@ class AcousticPlugin(PluginInterface):
             "high_severity_count": 0,
             "targets_created": 0,
             "localizations": 0,
+            "tdoa_localizations": 0,
+            "tdoa_observations": 0,
             "ml_classifications": 0,
             "rule_classifications": 0,
         }
@@ -315,6 +322,114 @@ class AcousticPlugin(PluginInterface):
     def get_event_counts(self) -> dict[str, int]:
         """Get count of each event type."""
         return self._classifier.get_event_counts()
+
+    # -- TDoA (Time Difference of Arrival) ---------------------------------
+
+    def submit_tdoa_observation(
+        self,
+        sensor_id: str,
+        arrival_time_ms: float,
+        signal_strength: float = 0.0,
+        event_type: str = "unknown",
+        confidence: float = 1.0,
+        ntp_sync_quality: float = 0.0,
+        lat: float = 0.0,
+        lon: float = 0.0,
+    ) -> Optional[dict]:
+        """Submit a TDoA observation from an edge node.
+
+        Buffers the observation and attempts TDoA localization when 3+
+        sensors have reported the same event type within the time window.
+
+        Returns:
+            TDoA result dict if localization succeeded, None otherwise.
+        """
+        try:
+            from tritium_lib.models.acoustic_tdoa import TDoAObservation, compute_tdoa_position
+        except ImportError:
+            log.debug("tritium_lib.models.acoustic_tdoa not available")
+            return None
+
+        obs = TDoAObservation(
+            sensor_id=sensor_id,
+            arrival_time_ms=arrival_time_ms,
+            signal_strength=signal_strength,
+            event_type=event_type,
+            confidence=confidence,
+            ntp_sync_quality=ntp_sync_quality,
+            lat=lat,
+            lon=lon,
+        )
+
+        now_ms = time.time() * 1000.0
+        cutoff_ms = now_ms - (self._tdoa_window_s * 1000.0)
+
+        with self._lock:
+            self._stats["tdoa_observations"] += 1
+
+            # Use sensor position from registry if not provided
+            if lat == 0.0 and lon == 0.0 and sensor_id in self._sensor_positions:
+                sp = self._sensor_positions[sensor_id]
+                obs = obs.model_copy(update={"lat": sp[0], "lon": sp[1]})
+
+            # Buffer observation
+            if event_type not in self._tdoa_buffer:
+                self._tdoa_buffer[event_type] = []
+            self._tdoa_buffer[event_type].append(obs)
+
+            # Prune old observations
+            self._tdoa_buffer[event_type] = [
+                o for o in self._tdoa_buffer[event_type]
+                if o.arrival_time_ms > cutoff_ms
+            ]
+
+            # Check if we have 3+ unique sensors
+            buffer = self._tdoa_buffer[event_type]
+            unique_sensors = set(o.sensor_id for o in buffer)
+            if len(unique_sensors) < 3:
+                return None
+
+            # De-dup: keep latest observation per sensor
+            latest: dict[str, TDoAObservation] = {}
+            for o in buffer:
+                if o.sensor_id not in latest or o.arrival_time_ms > latest[o.sensor_id].arrival_time_ms:
+                    latest[o.sensor_id] = o
+            observations = list(latest.values())
+
+        # Run TDoA computation outside lock
+        result = compute_tdoa_position(observations)
+
+        if result:
+            result_dict = result.model_dump()
+            with self._lock:
+                self._tdoa_results.append(result_dict)
+                if len(self._tdoa_results) > MAX_EVENT_HISTORY:
+                    self._tdoa_results = self._tdoa_results[-MAX_EVENT_HISTORY:]
+                self._stats["tdoa_localizations"] += 1
+
+            # Publish event
+            if self._event_bus:
+                self._event_bus.publish("acoustic:tdoa_localized", data=result_dict)
+
+            # Create target
+            loc_event = {
+                "event_type": result.event_type,
+                "estimated_lat": result.lat,
+                "estimated_lon": result.lon,
+                "confidence": result.confidence,
+                "observers": len(result.sensors_used),
+                "timestamp": time.time(),
+            }
+            self._create_localized_target(loc_event)
+
+            return result_dict
+
+        return None
+
+    def get_tdoa_results(self, count: int = 50) -> list[dict]:
+        """Get recent TDoA localization results."""
+        with self._lock:
+            return list(self._tdoa_results[-count:])
 
     # -- Sound source localization -----------------------------------------
 

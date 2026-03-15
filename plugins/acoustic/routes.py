@@ -45,6 +45,23 @@ class LocalizeRequest(BaseModel):
     observers: list[dict] = []
 
 
+class TDoASubmitRequest(BaseModel):
+    """Submit a TDoA observation from an edge node.
+
+    When 3+ edge nodes detect the same acoustic event within a short
+    time window, the SC backend computes the source position from
+    arrival time differences.
+    """
+    sensor_id: str
+    arrival_time_ms: float
+    signal_strength: float = 0.0
+    event_type: str = "unknown"
+    confidence: float = 1.0
+    ntp_sync_quality: float = 0.0
+    lat: float = 0.0
+    lon: float = 0.0
+
+
 def create_router(plugin: Any) -> APIRouter:
     """Build acoustic intelligence API router.
 
@@ -137,6 +154,34 @@ def create_router(plugin: Any) -> APIRouter:
         if result:
             return {"localization": result, "status": "ok"}
         return {"localization": None, "status": "insufficient_data"}
+
+    @router.post("/tdoa/submit")
+    async def submit_tdoa_observation(body: TDoASubmitRequest):
+        """Submit a TDoA observation from an edge node.
+
+        When 3+ sensors report the same event type within 2 seconds,
+        the plugin runs TDoA localization using the standardized
+        TDoAObservation/TDoAResult models from tritium-lib.
+        """
+        result = plugin.submit_tdoa_observation(
+            sensor_id=body.sensor_id,
+            arrival_time_ms=body.arrival_time_ms,
+            signal_strength=body.signal_strength,
+            event_type=body.event_type,
+            confidence=body.confidence,
+            ntp_sync_quality=body.ntp_sync_quality,
+            lat=body.lat,
+            lon=body.lon,
+        )
+        if result:
+            return {"status": "localized", "result": result}
+        return {"status": "buffered", "result": None}
+
+    @router.get("/tdoa/results")
+    async def get_tdoa_results(count: int = 50):
+        """Return recent TDoA localization results."""
+        results = plugin.get_tdoa_results(count)
+        return {"results": results, "count": len(results)}
 
     @router.get("/stats")
     async def get_stats():
