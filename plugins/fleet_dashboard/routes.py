@@ -48,6 +48,14 @@ class ApplyTemplateRequest(BaseModel):
     target_group: str
 
 
+class DiagnosticRequest(BaseModel):
+    """Request body for POST /api/fleet/devices/{device_id}/diagnostics."""
+    sections: list[str] = Field(
+        default_factory=lambda: ["heap", "tasks", "wifi", "ble", "nvs", "i2c"],
+        description="Which diagnostic sections to request from the device.",
+    )
+
+
 def create_router(plugin: FleetDashboardPlugin) -> APIRouter:
     """Build and return the fleet dashboard APIRouter."""
 
@@ -256,5 +264,41 @@ def create_router(plugin: FleetDashboardPlugin) -> APIRouter:
         """Get sensor coverage map showing device positions and overlap."""
         coverage = plugin.get_coverage_map()
         return {"coverage": coverage, "count": len(coverage)}
+
+    # -- Remote diagnostics routes -----------------------------------------
+
+    @router.post("/devices/{device_id}/diagnostics")
+    async def request_diagnostics(device_id: str, request: DiagnosticRequest):
+        """Request a diagnostic dump from a specific edge device via MQTT.
+
+        Sends a diag_dump command to the device. The device responds with
+        a diagnostic payload on its heartbeat/diag topic. Results are
+        stored and can be retrieved via GET.
+        """
+        result = plugin.request_diagnostics(device_id, request.sections)
+        if result.get("error"):
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+
+    @router.get("/devices/{device_id}/diagnostics")
+    async def get_diagnostics(device_id: str):
+        """Get the most recent diagnostic dump for a device.
+
+        Returns cached diagnostic data from the last diag_dump response.
+        """
+        diag = plugin.get_diagnostics(device_id)
+        if diag is None:
+            return {
+                "device_id": device_id,
+                "status": "no_data",
+                "message": "No diagnostic data available. Request a dump first.",
+            }
+        return diag
+
+    @router.get("/diagnostics")
+    async def get_all_diagnostics():
+        """Get diagnostic data for all devices that have reported."""
+        all_diag = plugin.get_all_diagnostics()
+        return {"diagnostics": all_diag, "count": len(all_diag)}
 
     return router

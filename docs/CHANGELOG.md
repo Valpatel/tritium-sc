@@ -14,6 +14,17 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 103: Intelligence Packages + Remote Diagnostics
+
+| Change | Verification |
+|--------|-------------|
+| Federation plugin: 7 new intel package routes (create, list, get, finalize, transmit, import, delete) | Unit Tested (18 tests) |
+| Federation plugin: full intel package lifecycle (draft -> finalize -> transmit -> import) | Unit Tested |
+| Fleet dashboard: 3 new remote diagnostics routes (POST request, GET single, GET all) | Unit Tested (11 tests) |
+| Fleet dashboard: diagnostic dump response handling via fleet.diag_response event | Unit Tested |
+| Edge diagnostics panel: JS frontend with device selector, dump request, results rendering | Created |
+| Diagnostics panel renders heap, WiFi, BLE, NVS, I2C, system, and tasks sections | Created |
+
 ## 2026-03-14 — Wave 102: Security Audit — Auth, Rate Limiting, Amy Phase 3
 
 | Change | Verification |

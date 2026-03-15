@@ -41,6 +41,23 @@ try:
 except ImportError:  # pragma: no cover
     FederatedSite = None  # type: ignore[assignment,misc]
 
+try:
+    from tritium_lib.models.intelligence_package import (
+        IntelClassification,
+        IntelligencePackage,
+        PackageDossier,
+        PackageEvent,
+        PackageEvidence,
+        PackageImportResult,
+        PackageStatus,
+        PackageTarget,
+        create_intelligence_package,
+        validate_package_import,
+    )
+    _HAS_INTEL_PKG = True
+except ImportError:  # pragma: no cover
+    _HAS_INTEL_PKG = False
+
 log = logging.getLogger("federation")
 
 
@@ -66,6 +83,9 @@ class FederationPlugin(PluginInterface):
         self._heartbeat_thread: Optional[threading.Thread] = None
 
         self._sites_file: str = ""
+
+        # Intelligence packages: package_id -> package dict
+        self._intel_packages: dict[str, dict] = {}
 
     # -- PluginInterface identity -------------------------------------------
 
@@ -330,6 +350,277 @@ class FederationPlugin(PluginInterface):
             conn = self._connections.get(site.site_id)
             if conn:
                 conn.last_heartbeat = time.time()
+
+    # -- Intelligence packages -----------------------------------------------
+
+    def create_intel_package(
+        self,
+        title: str = "",
+        description: str = "",
+        target_ids: list[str] | None = None,
+        include_events: bool = True,
+        include_dossiers: bool = True,
+        include_evidence: bool = False,
+        classification: str = "unclassified",
+        created_by: str = "",
+        destination_site_id: str = "",
+        destination_site_name: str = "",
+        tags: list[str] | None = None,
+    ) -> dict:
+        """Create an intelligence package from selected targets.
+
+        Gathers target data from the tracker, associated events and dossiers,
+        and bundles them into a portable package.
+        """
+        if not _HAS_INTEL_PKG:
+            return {"error": "Intelligence package models not available"}
+
+        # Map classification string to enum
+        try:
+            cls_enum = IntelClassification(classification)
+        except ValueError:
+            cls_enum = IntelClassification.UNCLASSIFIED
+
+        # Determine source site info
+        site_id = self._settings.get("site_id", "local")
+        site_name = self._settings.get("site_name", "Local Site")
+
+        pkg = create_intelligence_package(
+            source_site_id=site_id,
+            source_site_name=site_name,
+            title=title,
+            description=description,
+            created_by=created_by,
+            classification=cls_enum,
+            tags=tags or [],
+        )
+        pkg.destination_site_id = destination_site_id
+        pkg.destination_site_name = destination_site_name
+
+        # Gather targets from tracker
+        targets_to_include = target_ids or []
+        if self._tracker is not None and targets_to_include:
+            for tid in targets_to_include:
+                target_data = None
+                # Try to get target from tracker
+                if hasattr(self._tracker, "get_target"):
+                    target_data = self._tracker.get_target(tid)
+                elif hasattr(self._tracker, "targets"):
+                    target_data = self._tracker.targets.get(tid)
+
+                if target_data is None:
+                    continue
+
+                # Convert to PackageTarget
+                if isinstance(target_data, dict):
+                    pt = PackageTarget(
+                        target_id=tid,
+                        name=target_data.get("name", ""),
+                        entity_type=target_data.get("entity_type", "unknown"),
+                        classification=target_data.get("classification", "unknown"),
+                        alliance=target_data.get("alliance", "unknown"),
+                        source=target_data.get("source", ""),
+                        lat=target_data.get("lat"),
+                        lng=target_data.get("lng"),
+                        confidence=target_data.get("confidence", 0.5),
+                        identifiers=target_data.get("identifiers", {}),
+                        threat_level=target_data.get("threat_level", "none"),
+                        first_seen=target_data.get("first_seen", 0),
+                        last_seen=target_data.get("last_seen", 0),
+                        sighting_count=target_data.get("sighting_count", 0),
+                    )
+                    pkg.add_target(pt)
+        elif not targets_to_include:
+            # If no specific targets, include all from shared targets
+            with self._lock:
+                for st in self._shared_targets.values():
+                    pt = PackageTarget(
+                        target_id=st.target_id,
+                        name=st.name,
+                        entity_type=st.entity_type,
+                        classification=st.classification,
+                        alliance=st.alliance,
+                        source=st.source,
+                        lat=st.lat,
+                        lng=st.lng,
+                        confidence=st.confidence,
+                    )
+                    pkg.add_target(pt)
+
+        # Store the package
+        pkg_dict = pkg.model_dump()
+        with self._lock:
+            self._intel_packages[pkg.package_id] = pkg_dict
+
+        self._logger.info(
+            "Created intel package %s: %d targets, %d events, %d dossiers",
+            pkg.package_id, pkg.target_count, pkg.event_count, pkg.dossier_count,
+        )
+
+        if self._event_bus:
+            self._event_bus.publish("federation:intel_package_created", data={
+                "package_id": pkg.package_id,
+                "title": title,
+                "target_count": pkg.target_count,
+            })
+
+        return pkg_dict
+
+    def list_intel_packages(self) -> list[dict]:
+        """List all intelligence packages (metadata only)."""
+        with self._lock:
+            return [
+                {
+                    "package_id": p.get("package_id", ""),
+                    "title": p.get("title", ""),
+                    "status": p.get("status", "draft"),
+                    "classification": p.get("classification", "unclassified"),
+                    "source_site_name": p.get("source_site_name", ""),
+                    "target_count": p.get("target_count", 0),
+                    "event_count": p.get("event_count", 0),
+                    "dossier_count": p.get("dossier_count", 0),
+                    "evidence_count": p.get("evidence_count", 0),
+                    "created_at": p.get("created_at", 0),
+                    "created_by": p.get("created_by", ""),
+                    "tags": p.get("tags", []),
+                }
+                for p in self._intel_packages.values()
+            ]
+
+    def get_intel_package(self, package_id: str) -> Optional[dict]:
+        """Get a full intelligence package by ID."""
+        with self._lock:
+            return self._intel_packages.get(package_id)
+
+    def finalize_intel_package(self, package_id: str) -> dict:
+        """Finalize a package, marking it ready for transmission."""
+        with self._lock:
+            pkg = self._intel_packages.get(package_id)
+            if pkg is None:
+                return {"error": "Package not found"}
+            if pkg.get("status") != "draft":
+                return {"error": f"Package is {pkg.get('status')}, not draft"}
+            pkg["status"] = "finalized"
+            pkg["finalized_at"] = time.time()
+        self._logger.info("Finalized intel package %s", package_id)
+        return {"package_id": package_id, "status": "finalized"}
+
+    def transmit_intel_package(self, package_id: str) -> dict:
+        """Transmit a finalized package to its destination site via MQTT."""
+        with self._lock:
+            pkg = self._intel_packages.get(package_id)
+            if pkg is None:
+                return {"error": "Package not found"}
+            if pkg.get("status") != "finalized":
+                return {"error": f"Package must be finalized first (current: {pkg.get('status')})"}
+
+        # Publish via event bus for MQTT bridge to pick up
+        if self._event_bus:
+            self._event_bus.publish("federation:intel_package_transmit", data=pkg)
+
+        with self._lock:
+            pkg["status"] = "transmitted"
+            # Add custody entry
+            custody = pkg.get("custody_chain", [])
+            custody.append({
+                "actor": "system",
+                "action": "transmitted",
+                "timestamp": time.time(),
+                "site_id": pkg.get("source_site_id", ""),
+                "site_name": pkg.get("source_site_name", ""),
+            })
+            pkg["custody_chain"] = custody
+
+        self._logger.info("Transmitted intel package %s", package_id)
+        return {"package_id": package_id, "status": "transmitted"}
+
+    def import_intel_package(
+        self,
+        package_data: dict,
+        merge_targets: bool = True,
+        merge_dossiers: bool = True,
+    ) -> dict:
+        """Import an intelligence package from another site."""
+        if not _HAS_INTEL_PKG:
+            return {"success": False, "errors": ["Intelligence package models not available"]}
+
+        try:
+            pkg = IntelligencePackage(**package_data)
+        except Exception as exc:
+            return {"success": False, "errors": [f"Invalid package data: {exc}"]}
+
+        # Validate
+        site_id = self._settings.get("site_id", "local")
+        validation = validate_package_import(pkg, local_site_id=site_id)
+        if not validation.success:
+            return {
+                "success": False,
+                "errors": validation.errors,
+                "warnings": validation.warnings,
+            }
+
+        # Import targets into tracker
+        targets_imported = 0
+        targets_merged = 0
+        if merge_targets and self._tracker is not None:
+            for target in pkg.targets:
+                target_data = {
+                    "target_id": target.target_id,
+                    "name": target.name,
+                    "entity_type": target.entity_type,
+                    "classification": target.classification,
+                    "alliance": target.alliance,
+                    "source": f"federation:{pkg.source_site_id}",
+                    "lat": target.lat,
+                    "lng": target.lng,
+                    "confidence": target.confidence,
+                }
+                if hasattr(self._tracker, "update_from_federation"):
+                    self._tracker.update_from_federation(target_data)
+                    targets_imported += 1
+
+        # Store the received package
+        pkg.status = PackageStatus.IMPORTED
+        pkg.add_custody_entry(
+            actor="system",
+            action="imported",
+            site_id=site_id,
+        )
+        pkg_dict = pkg.model_dump()
+        with self._lock:
+            self._intel_packages[pkg.package_id] = pkg_dict
+
+        self._logger.info(
+            "Imported intel package %s: %d targets",
+            pkg.package_id, targets_imported,
+        )
+
+        if self._event_bus:
+            self._event_bus.publish("federation:intel_package_imported", data={
+                "package_id": pkg.package_id,
+                "source_site": pkg.source_site_id,
+                "targets_imported": targets_imported,
+            })
+
+        return {
+            "success": True,
+            "package_id": pkg.package_id,
+            "targets_imported": targets_imported,
+            "targets_merged": targets_merged,
+            "events_imported": len(pkg.events),
+            "dossiers_imported": len(pkg.dossiers),
+            "evidence_imported": len(pkg.evidence),
+            "warnings": validation.warnings,
+        }
+
+    def delete_intel_package(self, package_id: str) -> bool:
+        """Delete an intelligence package. Returns True if found."""
+        with self._lock:
+            if package_id not in self._intel_packages:
+                return False
+            del self._intel_packages[package_id]
+        self._logger.info("Deleted intel package %s", package_id)
+        return True
 
     # -- HTTP routes --------------------------------------------------------
 

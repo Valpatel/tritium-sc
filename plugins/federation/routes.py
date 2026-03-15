@@ -1,14 +1,19 @@
 # Created by Matthew Valancy
 # Copyright 2026 Valpatel Software LLC
 # Licensed under AGPL-3.0 — see LICENSE for details.
-"""FastAPI routes for the Federation plugin."""
+"""FastAPI routes for the Federation plugin.
+
+Includes site management, target sharing, and intelligence package
+export/import for portable inter-site intelligence sharing.
+"""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import time
+from typing import TYPE_CHECKING, Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from .plugin import FederationPlugin
@@ -18,6 +23,23 @@ try:
 except ImportError:  # pragma: no cover
     FederatedSite = None  # type: ignore[assignment,misc]
     SharedTarget = None  # type: ignore[assignment,misc]
+
+try:
+    from tritium_lib.models.intelligence_package import (
+        IntelClassification,
+        IntelligencePackage,
+        PackageDossier,
+        PackageEvent,
+        PackageEvidence,
+        PackageImportResult,
+        PackageStatus,
+        PackageTarget,
+        create_intelligence_package,
+        validate_package_import,
+    )
+    _HAS_INTEL_PKG = True
+except ImportError:  # pragma: no cover
+    _HAS_INTEL_PKG = False
 
 
 class AddSiteRequest(BaseModel):
@@ -34,6 +56,28 @@ class AddSiteRequest(BaseModel):
     lng: float | None = None
     tags: list[str] = []
     enabled: bool = True
+
+
+class IntelPackageRequest(BaseModel):
+    """Request body for creating an intelligence package."""
+    title: str = ""
+    description: str = ""
+    target_ids: list[str] = Field(default_factory=list)
+    include_events: bool = True
+    include_dossiers: bool = True
+    include_evidence: bool = False
+    classification: str = "unclassified"
+    created_by: str = ""
+    destination_site_id: str = ""
+    destination_site_name: str = ""
+    tags: list[str] = Field(default_factory=list)
+
+
+class IntelPackageImportRequest(BaseModel):
+    """Request body for importing an intelligence package."""
+    package_data: dict = Field(default_factory=dict)
+    merge_targets: bool = True
+    merge_dossiers: bool = True
 
 
 def create_router(plugin: FederationPlugin) -> APIRouter:
@@ -98,5 +142,92 @@ def create_router(plugin: FederationPlugin) -> APIRouter:
     async def get_stats():
         """Get federation statistics."""
         return plugin.get_stats()
+
+    # -- Intelligence package routes ----------------------------------------
+
+    @router.post("/intel-packages")
+    async def create_intel_package(req: IntelPackageRequest):
+        """Create an intelligence package from selected targets.
+
+        Bundles targets, their events, dossiers, and evidence into a
+        portable package for sharing with another Tritium installation.
+        """
+        if not _HAS_INTEL_PKG:
+            raise HTTPException(
+                status_code=503,
+                detail="Intelligence package models not available",
+            )
+        pkg = plugin.create_intel_package(
+            title=req.title,
+            description=req.description,
+            target_ids=req.target_ids,
+            include_events=req.include_events,
+            include_dossiers=req.include_dossiers,
+            include_evidence=req.include_evidence,
+            classification=req.classification,
+            created_by=req.created_by,
+            destination_site_id=req.destination_site_id,
+            destination_site_name=req.destination_site_name,
+            tags=req.tags,
+        )
+        return {
+            "package_id": pkg.get("package_id", ""),
+            "status": pkg.get("status", "created"),
+            "target_count": pkg.get("target_count", 0),
+            "event_count": pkg.get("event_count", 0),
+            "dossier_count": pkg.get("dossier_count", 0),
+            "evidence_count": pkg.get("evidence_count", 0),
+        }
+
+    @router.get("/intel-packages")
+    async def list_intel_packages():
+        """List all intelligence packages (created and received)."""
+        packages = plugin.list_intel_packages()
+        return {"packages": packages, "count": len(packages)}
+
+    @router.get("/intel-packages/{package_id}")
+    async def get_intel_package(package_id: str):
+        """Get a specific intelligence package with full contents."""
+        pkg = plugin.get_intel_package(package_id)
+        if pkg is None:
+            raise HTTPException(status_code=404, detail="Package not found")
+        return pkg
+
+    @router.post("/intel-packages/{package_id}/finalize")
+    async def finalize_intel_package(package_id: str):
+        """Finalize a package, marking it ready for transmission."""
+        result = plugin.finalize_intel_package(package_id)
+        if result.get("error"):
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+
+    @router.post("/intel-packages/{package_id}/transmit")
+    async def transmit_intel_package(package_id: str):
+        """Transmit a finalized package to its destination site via MQTT."""
+        result = plugin.transmit_intel_package(package_id)
+        if result.get("error"):
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+
+    @router.post("/intel-packages/import")
+    async def import_intel_package(req: IntelPackageImportRequest):
+        """Import an intelligence package from another site.
+
+        Validates the package and imports targets, events, and dossiers
+        into the local tracker and intelligence stores.
+        """
+        result = plugin.import_intel_package(
+            package_data=req.package_data,
+            merge_targets=req.merge_targets,
+            merge_dossiers=req.merge_dossiers,
+        )
+        return result
+
+    @router.delete("/intel-packages/{package_id}")
+    async def delete_intel_package(package_id: str):
+        """Delete an intelligence package."""
+        if not plugin.delete_intel_package(package_id):
+            raise HTTPException(status_code=404, detail="Package not found")
+        return {"status": "deleted", "package_id": package_id}
 
     return router

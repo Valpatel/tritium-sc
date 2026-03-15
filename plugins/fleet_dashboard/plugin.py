@@ -61,6 +61,9 @@ class FleetDashboardPlugin(EventDrainPlugin):
         # Device lifecycle tracking: device_id -> {state, since, history}
         self._lifecycle: dict[str, dict] = {}
 
+        # Remote diagnostics: device_id -> latest diag dump
+        self._diagnostics: dict[str, dict] = {}
+
         # Initialize built-in templates
         self._init_builtin_templates()
 
@@ -110,6 +113,8 @@ class FleetDashboardPlugin(EventDrainPlugin):
             self._on_heartbeat(data)
         elif event_type == "edge:ble_update":
             self._on_ble_update(data)
+        elif event_type == "fleet.diag_response":
+            self._on_diag_response(data)
 
     # -- Device registry ---------------------------------------------------
 
@@ -794,6 +799,150 @@ class FleetDashboardPlugin(EventDrainPlugin):
         """Return lifecycle state for all tracked devices."""
         with self._lock:
             return {did: dict(lc) for did, lc in self._lifecycle.items()}
+
+    # -- Remote diagnostics ------------------------------------------------
+
+    def request_diagnostics(self, device_id: str, sections: list[str] | None = None) -> dict:
+        """Request a diagnostic dump from an edge device via MQTT command.
+
+        Sends a diag_dump command to the specified device. The device will
+        respond with diagnostic data on its heartbeat/diag topic.
+        """
+        if sections is None:
+            sections = ["heap", "tasks", "wifi", "ble", "nvs", "i2c"]
+
+        now = time.time()
+
+        # Check if device exists
+        device = self.get_device(device_id)
+        if device is None:
+            return {"error": f"Device '{device_id}' not found in fleet registry"}
+
+        # Send diag_dump command via event bus
+        if self._event_bus is not None:
+            cmd_event = {
+                "type": "fleet.command",
+                "data": {
+                    "device_id": device_id,
+                    "command_type": "diag_dump",
+                    "payload": {"sections": sections},
+                    "command_id": f"diag_{device_id}_{int(now)}",
+                },
+            }
+            self._event_bus.publish("fleet.command", cmd_event)
+
+        # Store request metadata
+        with self._lock:
+            if device_id not in self._diagnostics:
+                self._diagnostics[device_id] = {}
+            self._diagnostics[device_id]["request_time"] = now
+            self._diagnostics[device_id]["requested_sections"] = sections
+            self._diagnostics[device_id]["status"] = "pending"
+
+        self._logger.info("Requested diagnostics from %s: %s", device_id, sections)
+        return {
+            "device_id": device_id,
+            "status": "requested",
+            "sections": sections,
+            "request_time": now,
+        }
+
+    def _on_diag_response(self, data: dict) -> None:
+        """Handle diagnostic dump response from an edge device."""
+        device_id = data.get("device_id", data.get("node_id", ""))
+        if not device_id:
+            return
+
+        now = time.time()
+        with self._lock:
+            self._diagnostics[device_id] = {
+                "device_id": device_id,
+                "status": "received",
+                "received_at": now,
+                "request_time": self._diagnostics.get(device_id, {}).get("request_time", 0),
+                # Memory / heap
+                "heap": {
+                    "free_heap": data.get("free_heap", 0),
+                    "min_free_heap": data.get("min_free_heap", 0),
+                    "free_psram": data.get("free_psram", 0),
+                    "largest_free_block": data.get("largest_free_block", 0),
+                    "heap_fragmentation_pct": data.get("heap_fragmentation_pct", 0),
+                },
+                # Tasks
+                "tasks": data.get("tasks", []),
+                "task_count": data.get("task_count", len(data.get("tasks", []))),
+                # WiFi
+                "wifi": {
+                    "connected": data.get("wifi_connected", False),
+                    "ssid": data.get("wifi_ssid", ""),
+                    "rssi": data.get("wifi_rssi", 0),
+                    "ip": data.get("ip", ""),
+                    "mac": data.get("wifi_mac", ""),
+                    "channel": data.get("wifi_channel", 0),
+                    "disconnects": data.get("wifi_disconnects", 0),
+                    "tx_power": data.get("wifi_tx_power", 0),
+                },
+                # BLE
+                "ble": {
+                    "enabled": data.get("ble_enabled", False),
+                    "scan_active": data.get("ble_scan_active", False),
+                    "devices_found": data.get("ble_devices_found", 0),
+                    "scan_count": data.get("ble_scan_count", 0),
+                },
+                # NVS (non-volatile storage)
+                "nvs": {
+                    "free_entries": data.get("nvs_free_entries", 0),
+                    "used_entries": data.get("nvs_used_entries", 0),
+                    "total_entries": data.get("nvs_total_entries", 0),
+                    "namespaces": data.get("nvs_namespaces", []),
+                },
+                # I2C bus health
+                "i2c": {
+                    "devices_found": data.get("i2c_devices_found", 0),
+                    "errors": data.get("i2c_errors", 0),
+                    "slaves": data.get("i2c_slaves", []),
+                },
+                # System
+                "system": {
+                    "uptime_s": data.get("uptime_s", 0),
+                    "firmware": data.get("firmware", data.get("version", "")),
+                    "board_type": data.get("board_type", ""),
+                    "reset_reason": data.get("reset_reason", ""),
+                    "reboot_count": data.get("reboot_count", 0),
+                    "cpu_temp_c": data.get("cpu_temp_c"),
+                    "battery_pct": data.get("battery_pct"),
+                    "loop_time_us": data.get("loop_time_us", 0),
+                },
+                # Raw data for anything not categorized
+                "raw": {
+                    k: v for k, v in data.items()
+                    if k not in {
+                        "device_id", "node_id", "free_heap", "min_free_heap",
+                        "free_psram", "largest_free_block", "heap_fragmentation_pct",
+                        "tasks", "task_count", "wifi_connected", "wifi_ssid",
+                        "wifi_rssi", "ip", "wifi_mac", "wifi_channel",
+                        "wifi_disconnects", "wifi_tx_power", "ble_enabled",
+                        "ble_scan_active", "ble_devices_found", "ble_scan_count",
+                        "nvs_free_entries", "nvs_used_entries", "nvs_total_entries",
+                        "nvs_namespaces", "i2c_devices_found", "i2c_errors",
+                        "i2c_slaves", "uptime_s", "firmware", "version",
+                        "board_type", "reset_reason", "reboot_count", "cpu_temp_c",
+                        "battery_pct", "loop_time_us",
+                    }
+                },
+            }
+
+        self._logger.info("Received diagnostics from %s", device_id)
+
+    def get_diagnostics(self, device_id: str) -> Optional[dict]:
+        """Get latest diagnostic data for a device."""
+        with self._lock:
+            return self._diagnostics.get(device_id)
+
+    def get_all_diagnostics(self) -> dict[str, dict]:
+        """Get diagnostic data for all devices."""
+        with self._lock:
+            return dict(self._diagnostics)
 
     # -- HTTP routes -------------------------------------------------------
 
