@@ -41,26 +41,39 @@ _WS_AUTH_TOKEN: str | None = os.environ.get("WS_AUTH_TOKEN")
 # Heartbeat constants
 _PING_INTERVAL_S = 30.0
 _MAX_MISSED_PONGS = 3
+# Warn clients this many seconds before JWT expiry so they can refresh
+_TOKEN_EXPIRY_WARN_S = 120
 
 
 class ConnectionManager:
     """Manages WebSocket connections for real-time updates.
 
     Tracks last-pong timestamps to detect stale connections.
+    Also tracks JWT token expiry per connection for proactive refresh warnings.
     """
 
     def __init__(self):
         self.active_connections: Set[WebSocket] = set()
         self._last_pong: Dict[WebSocket, float] = {}
+        self._token_exp: Dict[WebSocket, float] = {}  # ws -> JWT exp timestamp
+        self._token_warned: Set[WebSocket] = set()  # ws already warned about expiry
         self._lock = asyncio.Lock()
 
-    async def connect(self, websocket: WebSocket):
-        """Accept and register a new WebSocket connection."""
+    async def connect(self, websocket: WebSocket, token_exp: float | None = None):
+        """Accept and register a new WebSocket connection.
+
+        Args:
+            token_exp: Optional JWT expiry timestamp. When provided, the server
+                       sends a ``token_expiring`` message before expiry so the
+                       client can refresh without disconnecting.
+        """
         await websocket.accept()
         now = _time.time()
         async with self._lock:
             self.active_connections.add(websocket)
             self._last_pong[websocket] = now
+            if token_exp is not None:
+                self._token_exp[websocket] = token_exp
         logger.info(f"WebSocket connected. Total connections: {len(self.active_connections)}")
 
     async def disconnect(self, websocket: WebSocket):
@@ -68,11 +81,43 @@ class ConnectionManager:
         async with self._lock:
             self.active_connections.discard(websocket)
             self._last_pong.pop(websocket, None)
+            self._token_exp.pop(websocket, None)
+            self._token_warned.discard(websocket)
         logger.info(f"WebSocket disconnected. Total connections: {len(self.active_connections)}")
 
     def record_pong(self, websocket: WebSocket):
         """Record that a pong was received from a client."""
         self._last_pong[websocket] = _time.time()
+
+    def update_token_exp(self, websocket: WebSocket, exp: float) -> None:
+        """Update the stored JWT expiry for a connection after token refresh."""
+        self._token_exp[websocket] = exp
+        self._token_warned.discard(websocket)
+
+    async def check_token_expiry(self) -> None:
+        """Send ``token_expiring`` warnings to clients whose JWT is about to expire.
+
+        Called periodically from the ping heartbeat. Warns once per connection
+        when the token has ``_TOKEN_EXPIRY_WARN_S`` seconds or fewer remaining.
+        """
+        now = _time.time()
+        async with self._lock:
+            for ws in list(self.active_connections):
+                exp = self._token_exp.get(ws)
+                if exp is None:
+                    continue
+                remaining = exp - now
+                if remaining <= _TOKEN_EXPIRY_WARN_S and ws not in self._token_warned:
+                    self._token_warned.add(ws)
+                    try:
+                        await ws.send_text(json.dumps({
+                            "type": "token_expiring",
+                            "expires_in_seconds": max(0, int(remaining)),
+                            "message": "JWT token expiring soon. Send a token_refresh message with a new token.",
+                            "timestamp": datetime.now(tz=None).isoformat(),
+                        }))
+                    except Exception:
+                        pass
 
     async def broadcast(self, message: dict):
         """Broadcast a message to all connected clients."""
@@ -128,7 +173,18 @@ async def websocket_live(websocket: WebSocket, token: str | None = Query(default
             await websocket.close(code=4003, reason="Forbidden — invalid or missing token")
             return
 
-    await manager.connect(websocket)
+    # Extract JWT expiry timestamp for proactive refresh warnings
+    token_exp: float | None = None
+    if token:
+        try:
+            import jwt as _jwt
+            # Decode without verification just to read exp claim
+            payload = _jwt.decode(token, options={"verify_signature": False})
+            token_exp = payload.get("exp")
+        except Exception:
+            pass
+
+    await manager.connect(websocket, token_exp=token_exp)
 
     # Send initial connection confirmation
     await manager.send_to(
@@ -205,6 +261,10 @@ async def handle_client_message(websocket: WebSocket, message: dict):
     elif msg_type == "chat_message":
         # Inline chat message via WebSocket — broadcast to all operators
         await _handle_ws_chat(websocket, message)
+    elif msg_type == "token_refresh":
+        # Client sends a new JWT token to extend the session without reconnecting.
+        # Expected: {"type": "token_refresh", "token": "<new_jwt>"}
+        await _handle_token_refresh(websocket, message)
     else:
         await manager.send_to(
             websocket,
@@ -421,6 +481,49 @@ async def _handle_ws_chat(websocket: WebSocket, message: dict) -> None:
 
     # Broadcast to all clients
     await manager.broadcast(chat_msg)
+
+
+async def _handle_token_refresh(websocket: WebSocket, message: dict) -> None:
+    """Handle a token_refresh message from a client.
+
+    When a client receives ``token_expiring``, it should obtain a new JWT
+    (via POST /api/auth/refresh) and send it here so the server can update
+    the stored expiry for this connection. This avoids a disconnect/reconnect
+    cycle.
+
+    Expected format:
+        {"type": "token_refresh", "token": "<new_jwt>"}
+    """
+    new_token = message.get("token", "")
+    if not new_token:
+        await manager.send_to(websocket, {
+            "type": "error",
+            "message": "token_refresh requires a 'token' field",
+        })
+        return
+
+    try:
+        from app.auth import decode_token
+        payload = decode_token(new_token)
+        exp = payload.get("exp")
+        if exp is not None:
+            manager.update_token_exp(websocket, float(exp))
+            await manager.send_to(websocket, {
+                "type": "token_refreshed",
+                "expires_at": exp,
+                "timestamp": datetime.now(tz=None).isoformat(),
+            })
+            logger.debug(f"WebSocket token refreshed for user={payload.get('sub')}")
+        else:
+            await manager.send_to(websocket, {
+                "type": "error",
+                "message": "New token has no exp claim",
+            })
+    except Exception as e:
+        await manager.send_to(websocket, {
+            "type": "error",
+            "message": f"Token refresh failed: {e}",
+        })
 
 
 # Utility functions for broadcasting from other parts of the app
@@ -1044,5 +1147,8 @@ def _start_ws_ping_heartbeat(loop: asyncio.AbstractEventLoop) -> None:
                             await ws.send_text(ping_msg)
                     except Exception:
                         pass
+
+            # Check for expiring JWT tokens and warn clients
+            await manager.check_token_expiry()
 
     asyncio.run_coroutine_threadsafe(_ping_loop(), loop)

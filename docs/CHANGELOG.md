@@ -14,6 +14,26 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-15 — Wave 120: Security Audit + WebSocket Token Refresh + Security Status
+
+| Change | Verification |
+|--------|-------------|
+| SECURITY AUDIT: Geofence zone creation validates polygon vertex count, zone type, and sanitizes HTML in names | Unit Tested (35 tests) |
+| SECURITY AUDIT: Dwell, fleet map, notification endpoints return graceful empty responses when backends unavailable | Unit Tested |
+| SECURITY AUDIT: Notification preferences reject invalid severity values; query limit enforced at 500 | Unit Tested |
+| SECURITY AUDIT: Session creation rejects invalid roles; timeout bounds enforced (60-86400s) | Unit Tested |
+| SECURITY AUDIT: Command history redacts hostname and endpoint fields for non-admin users | Unit Tested |
+| WebSocket JWT token refresh: server sends `token_expiring` message 120s before JWT expiry | Unit Tested |
+| WebSocket `token_refresh` message handler: clients can send a new JWT to extend session without reconnecting | Unit Tested |
+| ConnectionManager tracks per-connection JWT expiry and warned state | Unit Tested |
+| CORS origin validation test: verifies restricted origins reject unauthorized requests | Unit Tested |
+| CORS config parsing test: validates comma-separated origin parsing and wildcard fallback | Unit Tested |
+| New `/api/system/security-status` endpoint: one-stop security posture check (auth, TLS, rate limiting, MQTT, CSP, CORS) | Unit Tested + Server Verified |
+| Security status returns overall level (open/minimal/moderate/hardened) based on checks passed | Unit Tested |
+| SKEPTICISM: Server boots cleanly, 8/8 self-tests pass, 21 plugins load, dossier count=16, security-status works | Server Verified |
+
+---
+
 ## 2026-03-15 — Wave 119: Geofence Notifications, Target Trails, Sparkline Widget
 
 | Change | Verification |
