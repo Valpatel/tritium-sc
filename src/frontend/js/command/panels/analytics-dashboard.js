@@ -172,6 +172,51 @@ function _onDragEnd(e) {
 }
 
 // ---------------------------------------------------------------------------
+// Activity heatmap renderer
+// ---------------------------------------------------------------------------
+
+async function _fetchActivityHeatmap() {
+    try {
+        const resp = await fetch('/api/analytics/activity-heatmap?hours=24');
+        if (!resp.ok) return null;
+        return await resp.json();
+    } catch {
+        return null;
+    }
+}
+
+function _renderActivityHeatmap(data) {
+    if (!data || !data.hourly_counts) return '<div class="adash-no-data">No heatmap data</div>';
+    const counts = data.hourly_counts;
+    const maxVal = Math.max(...counts, 1);
+
+    const bars = counts.map((c, h) => {
+        const pct = Math.max(2, Math.round((c / maxVal) * 60));
+        const intensity = c / maxVal;
+        // Color gradient: dim cyan to bright cyan
+        const alpha = Math.max(0.15, intensity);
+        const label = `${String(h).padStart(2, '0')}:00`;
+        return `<div class="adash-heatmap-bar" title="${label}: ${c} sightings"
+                     style="height:${pct}px;background:rgba(0,240,255,${alpha})">
+            <span class="adash-heatmap-hour">${h}</span>
+        </div>`;
+    }).join('');
+
+    const peakLabel = `${String(data.peak_hour).padStart(2, '0')}:00`;
+    const quietList = (data.quiet_hours || []).map(h => `${String(h).padStart(2, '0')}:00`).join(', ') || 'none';
+
+    return `<div class="adash-heatmap-wrap">
+        <div class="adash-heatmap-title" style="color:#00f0ff">24-HOUR ACTIVITY HEATMAP</div>
+        <div class="adash-heatmap-chart">${bars}</div>
+        <div class="adash-heatmap-meta">
+            <span>Peak: <b style="color:#05ffa1">${peakLabel}</b> (${data.peak_count})</span>
+            <span>Total: <b>${data.total_sightings}</b></span>
+            <span>Quiet: <span style="color:var(--text-dim)">${quietList}</span></span>
+        </div>
+    </div>`;
+}
+
+// ---------------------------------------------------------------------------
 // Full render
 // ---------------------------------------------------------------------------
 
@@ -207,11 +252,16 @@ async function _renderDashboard(el) {
         </div>`;
     }).join('');
 
+    // Fetch and render activity heatmap
+    const heatmapData = await _fetchActivityHeatmap();
+    const heatmapHtml = _renderActivityHeatmap(heatmapData);
+
     el.innerHTML = `<div class="adash-toolbar">
         <span class="adash-toolbar-title">ANALYTICS DASHBOARD</span>
         <button class="adash-refresh-btn" title="Refresh all widgets">Refresh</button>
         <button class="adash-reset-btn" title="Reset to default layout">Reset</button>
     </div>
+    ${heatmapHtml}
     <div class="adash-grid">${cards}</div>`;
 
     // Wire drag events

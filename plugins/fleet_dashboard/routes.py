@@ -241,6 +241,50 @@ def create_router(plugin: FleetDashboardPlugin) -> APIRouter:
             raise HTTPException(status_code=404, detail=result["error"])
         return result
 
+    # -- Device first-seen/last-seen summary --------------------------------
+
+    @router.get("/device-activity")
+    async def get_device_activity():
+        """Get first-seen/last-seen summary for all fleet devices.
+
+        Returns each device with first_seen, last_seen timestamps,
+        time since last activity, and a potentially_offline flag for
+        devices not seen in over 1 hour.
+        """
+        import time as _time
+        now = _time.time()
+        devices = plugin.get_devices()
+        activity = []
+        for dev in devices:
+            first_seen = dev.get("first_seen")
+            last_seen = dev.get("last_seen", 0)
+            time_since_last = now - last_seen if last_seen else None
+            potentially_offline = time_since_last is not None and time_since_last > 3600
+
+            activity.append({
+                "device_id": dev.get("device_id", ""),
+                "name": dev.get("name", ""),
+                "first_seen": first_seen,
+                "last_seen": last_seen,
+                "time_since_last_s": round(time_since_last, 1) if time_since_last else None,
+                "potentially_offline": potentially_offline,
+                "status": dev.get("status", "unknown"),
+            })
+
+        # Sort: potentially offline first, then by last_seen descending
+        activity.sort(key=lambda a: (
+            not a["potentially_offline"],
+            -(a["last_seen"] or 0),
+        ))
+
+        offline_count = sum(1 for a in activity if a["potentially_offline"])
+        return {
+            "devices": activity,
+            "count": len(activity),
+            "potentially_offline_count": offline_count,
+            "timestamp": now,
+        }
+
     # -- Fleet analytics routes --------------------------------------------
 
     @router.get("/analytics")

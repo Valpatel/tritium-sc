@@ -84,6 +84,7 @@ export const FleetDashboardPanelDef = {
                             <th>UPTIME</th>
                             <th>BLE</th>
                             <th>WIFI</th>
+                            <th>FIRST SEEN</th>
                             <th>LAST SEEN</th>
                         </tr>
                     </thead>
@@ -142,7 +143,7 @@ export const FleetDashboardPanelDef = {
                 const devices = devData.devices || [];
                 if (tbodyEl) {
                     if (devices.length === 0) {
-                        tbodyEl.innerHTML = '<tr><td colspan="7" class="panel-empty">No fleet devices detected</td></tr>';
+                        tbodyEl.innerHTML = '<tr><td colspan="8" class="panel-empty">No fleet devices detected</td></tr>';
                     } else {
                         // Sort: online first, then stale, then offline
                         const order = { online: 0, stale: 1, offline: 2 };
@@ -150,14 +151,20 @@ export const FleetDashboardPanelDef = {
 
                         tbodyEl.innerHTML = devices.map(d => {
                             const did = _esc(d.device_id || d.name || '--');
-                            return `<tr class="fleet-dash-row">
+                            // Highlight potentially offline (not seen in >1 hour)
+                            const lastSeenTs = d.last_seen || 0;
+                            const ageSec = lastSeenTs > 0 ? (Date.now() / 1000 - lastSeenTs) : Infinity;
+                            const offlineWarn = ageSec > 3600;
+                            const rowClass = offlineWarn ? 'fleet-dash-row fleet-dash-warn' : 'fleet-dash-row';
+                            return `<tr class="${rowClass}">
                                 <td class="mono fleet-dash-device-cell" title="${did}">${did}</td>
                                 <td>${_statusBadge(d.status)}</td>
                                 <td>${_batteryBar(d.battery)}</td>
                                 <td class="mono">${_formatUptime(d.uptime)}</td>
                                 <td class="mono">${d.ble_count ?? 0}</td>
                                 <td class="mono">${d.wifi_count ?? 0}</td>
-                                <td class="mono">${_timeAgo(d.last_seen)}</td>
+                                <td class="mono">${_timeAgo(d.first_seen)}</td>
+                                <td class="mono">${_timeAgo(d.last_seen)}${offlineWarn ? ' <span style="color:var(--magenta)">[!]</span>' : ''}</td>
                             </tr>`;
                         }).join('');
                     }

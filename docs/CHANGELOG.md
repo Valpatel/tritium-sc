@@ -14,6 +14,19 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-15 — Wave 144: Activity Heatmap + Fleet First/Last Seen
+
+| Change | Verification |
+|--------|-------------|
+| /api/analytics/activity-heatmap — 24-bin hourly sighting histogram | Router created |
+| /api/analytics/activity-heatmap/{target_id} — per-target with regularity_score | Router created |
+| Analytics dashboard: embedded heatmap visualization with color intensity bars | JS verified |
+| Fleet dashboard: first_seen/last_seen columns, >1h offline warning [!] | JS verified |
+| /api/fleet/device-activity — first-seen/last-seen summary with potentially_offline flag | Route created |
+| Fleet plugin: tracks first_seen timestamp per device from heartbeat | Code review |
+
+---
+
 ## 2026-03-15 — Wave 143: Security + RL Clean Retrain + Ops Dashboard
 
 | Change | Verification |

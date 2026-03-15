@@ -594,6 +594,9 @@ class FleetDashboardPlugin(EventDrainPlugin):
         now = time.time()
         with self._lock:
             existing = self._devices.get(device_id, {})
+            # Track first_seen — only set once per device
+            if "first_seen" not in existing:
+                existing["first_seen"] = now
             existing.update({
                 "device_id": device_id,
                 "name": data.get("name", data.get("hostname", existing.get("name", device_id))),

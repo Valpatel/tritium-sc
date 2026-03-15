@@ -98,6 +98,7 @@ from app.routers.ar_export import router as ar_export_router
 from app.routers.weather import router as weather_router
 from app.routers.history_analytics import router as history_analytics_router
 from app.routers.analytics_dashboard import router as analytics_dashboard_router
+from app.routers.target_activity_heatmap import router as target_activity_heatmap_router
 from app.routers.readiness import router as readiness_router
 from app.routers.unified_events import router as unified_events_router
 from app.routers.fusion_dashboard import router as fusion_dashboard_router
@@ -1283,6 +1284,7 @@ app.include_router(ar_export_router)
 app.include_router(weather_router)
 app.include_router(history_analytics_router)
 app.include_router(analytics_dashboard_router)
+app.include_router(target_activity_heatmap_router)
 app.include_router(readiness_router)
 app.include_router(unified_events_router)
 app.include_router(fusion_dashboard_router)
