@@ -102,6 +102,7 @@ import { ConvoyPanelDef } from './panels/convoy-panel.js';
 import { OperatorCursorsPanelDef } from './panels/operator-cursors-panel.js';
 import { WeatherOverlayPanelDef } from './panels/weather-overlay-panel.js';
 import { TrailExportPanelDef } from './panels/trail-export-panel.js';
+import { MapLayerSwitcherPanelDef } from './panels/map-layer-switcher.js';
 import { PredictionEllipseManager } from './prediction-ellipses.js';
 import { initScreenshotHotkey } from './panels/map-screenshot.js';
 import { MissionModal, initMissionModal } from './mission-modal.js';
@@ -672,6 +673,7 @@ function initPanelSystem(container) {
     panelManager.register(OperatorCursorsPanelDef);
     panelManager.register(WeatherOverlayPanelDef);
     panelManager.register(TrailExportPanelDef);
+    panelManager.register(MapLayerSwitcherPanelDef);
 
     // Start prediction confidence ellipses on the map
     const predictionEllipses = new PredictionEllipseManager();

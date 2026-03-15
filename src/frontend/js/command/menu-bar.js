@@ -64,7 +64,7 @@ const PANEL_CATEGORIES = {
     'Fleet':         ['fleet', 'fleet-dashboard', 'device-manager', 'device-capabilities', 'assets', 'command-history', 'federation', 'training-dashboard'],
     'AI & Comms':    ['amy', 'amy-conversation', 'graphlings', 'audio', 'notifications', 'notification-prefs', 'voice-command'],
     'Collaboration': ['operator-activity', 'operator-cursors', 'map-share', 'keyboard-macros'],
-    'Map & GIS':     ['grid-overlay', 'floorplan', 'building-occupancy', 'weather-overlay', 'map-replay'],
+    'Map & GIS':     ['map-layer-switcher', 'grid-overlay', 'floorplan', 'building-occupancy', 'weather-overlay', 'map-replay'],
     'Simulation':    ['game', 'battle-stats', 'replay', 'scenarios'],
     'System':        ['system', 'system-health', 'security-audit', 'deployment', 'testing', 'export-scheduler', 'events', 'videos', 'quick-start', 'setup-wizard'],
 };
