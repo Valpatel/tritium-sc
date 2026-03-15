@@ -7,6 +7,7 @@
 // Supports filtering, sorting, tags, notes, merge, position trail mini-map.
 
 import { EventBus } from '../events.js';
+import { TritiumStore } from '../store.js';
 import { _esc, _timeAgo } from '../panel-utils.js';
 
 
@@ -576,43 +577,62 @@ export const DossiersPanelDef = {
             const plotW = w - pad.left - pad.right;
             const plotH = h - pad.top - pad.bottom;
 
-            // Extract RSSI values; filter for numeric rssi entries
-            const points = timeline
+            // Try RSSI values first; fall back to confidence if no RSSI data
+            const rssiPoints = timeline
                 .filter(t => t.rssi != null || (t.data && t.data.rssi != null))
                 .map(t => ({
                     ts: t.timestamp || 0,
-                    rssi: t.rssi ?? (t.data && t.data.rssi) ?? -80,
+                    value: t.rssi ?? (t.data && t.data.rssi) ?? -80,
                 }))
                 .sort((a, b) => a.ts - b.ts);
 
+            const confPoints = timeline
+                .filter(t => t.confidence != null)
+                .map(t => ({
+                    ts: t.timestamp || 0,
+                    value: Math.round((t.confidence || 0) * 100),
+                }))
+                .sort((a, b) => a.ts - b.ts);
+
+            // Use RSSI if available, else confidence
+            const useRssi = rssiPoints.length > 0;
+            const points = useRssi ? rssiPoints : confPoints;
+            const chartTitle = useRssi ? 'RSSI (dBm) over time' : 'Detection Confidence (%) over time';
+            const chartColor = useRssi ? '#00f0ff' : '#05ffa1';
+            const unitLabel = useRssi ? 'dBm' : '%';
+
             if (points.length === 0) {
-                _drawEmptyChart(ctx, w, h, 'No RSSI data in signal history');
+                _drawEmptyChart(ctx, w, h, 'No signal data in history');
                 return;
             }
 
             // Find bounds
-            let minRssi = Infinity, maxRssi = -Infinity;
+            let minVal = Infinity, maxVal = -Infinity;
             let minTs = Infinity, maxTs = -Infinity;
             for (const p of points) {
-                if (p.rssi < minRssi) minRssi = p.rssi;
-                if (p.rssi > maxRssi) maxRssi = p.rssi;
+                if (p.value < minVal) minVal = p.value;
+                if (p.value > maxVal) maxVal = p.value;
                 if (p.ts < minTs) minTs = p.ts;
                 if (p.ts > maxTs) maxTs = p.ts;
             }
             // Ensure some range
-            if (maxRssi === minRssi) { maxRssi += 5; minRssi -= 5; }
+            if (maxVal === minVal) { maxVal += 5; minVal -= 5; }
+            if (!useRssi) { minVal = Math.max(0, minVal - 5); maxVal = Math.min(100, maxVal + 5); }
             if (maxTs === minTs) maxTs = minTs + 60;
 
             const tsRange = maxTs - minTs;
-            const rssiRange = maxRssi - minRssi;
+            const valRange = maxVal - minVal;
 
             function toX(ts) { return pad.left + ((ts - minTs) / tsRange) * plotW; }
-            function toY(rssi) { return pad.top + plotH - ((rssi - minRssi) / rssiRange) * plotH; }
+            function toY(val) { return pad.top + plotH - ((val - minVal) / valRange) * plotH; }
+
+            // Determine grid step
+            const gridStep = useRssi ? 10 : (valRange > 50 ? 20 : 10);
 
             // Draw grid lines (horizontal)
-            ctx.strokeStyle = 'rgba(0, 240, 255, 0.08)';
+            ctx.strokeStyle = `rgba(${useRssi ? '0, 240, 255' : '5, 255, 161'}, 0.08)`;
             ctx.lineWidth = 0.5;
-            for (let r = Math.ceil(minRssi / 10) * 10; r <= maxRssi; r += 10) {
+            for (let r = Math.ceil(minVal / gridStep) * gridStep; r <= maxVal; r += gridStep) {
                 const y = toY(r);
                 ctx.beginPath();
                 ctx.moveTo(pad.left, y);
@@ -627,10 +647,10 @@ export const DossiersPanelDef = {
             }
 
             // Title
-            ctx.fillStyle = '#00f0ff';
+            ctx.fillStyle = chartColor;
             ctx.font = '8px monospace';
             ctx.textAlign = 'left';
-            ctx.fillText('RSSI (dBm) over time', pad.left, 10);
+            ctx.fillText(chartTitle, pad.left, 10);
 
             // Time axis labels
             ctx.fillStyle = 'rgba(224, 224, 224, 0.3)';
@@ -643,14 +663,15 @@ export const DossiersPanelDef = {
             ctx.fillText(fmt(endDate), w - pad.right, h - 3);
 
             // Draw gradient fill under the sparkline
+            const gradRgb = useRssi ? '0, 240, 255' : '5, 255, 161';
             const gradient = ctx.createLinearGradient(0, pad.top, 0, pad.top + plotH);
-            gradient.addColorStop(0, 'rgba(0, 240, 255, 0.15)');
-            gradient.addColorStop(1, 'rgba(0, 240, 255, 0.01)');
+            gradient.addColorStop(0, `rgba(${gradRgb}, 0.15)`);
+            gradient.addColorStop(1, `rgba(${gradRgb}, 0.01)`);
 
             ctx.beginPath();
-            ctx.moveTo(toX(points[0].ts), toY(points[0].rssi));
+            ctx.moveTo(toX(points[0].ts), toY(points[0].value));
             for (let i = 1; i < points.length; i++) {
-                ctx.lineTo(toX(points[i].ts), toY(points[i].rssi));
+                ctx.lineTo(toX(points[i].ts), toY(points[i].value));
             }
             // Close path for fill
             ctx.lineTo(toX(points[points.length - 1].ts), pad.top + plotH);
@@ -661,11 +682,11 @@ export const DossiersPanelDef = {
 
             // Draw sparkline
             ctx.beginPath();
-            ctx.strokeStyle = '#00f0ff';
+            ctx.strokeStyle = chartColor;
             ctx.lineWidth = 1.5;
-            ctx.moveTo(toX(points[0].ts), toY(points[0].rssi));
+            ctx.moveTo(toX(points[0].ts), toY(points[0].value));
             for (let i = 1; i < points.length; i++) {
-                ctx.lineTo(toX(points[i].ts), toY(points[i].rssi));
+                ctx.lineTo(toX(points[i].ts), toY(points[i].value));
             }
             ctx.stroke();
 
@@ -673,9 +694,14 @@ export const DossiersPanelDef = {
             const step = Math.max(1, Math.floor(points.length / 40));
             for (let i = 0; i < points.length; i += step) {
                 const x = toX(points[i].ts);
-                const y = toY(points[i].rssi);
-                const rssiColor = points[i].rssi > -50 ? '#05ffa1' : points[i].rssi > -70 ? '#fcee0a' : '#ff2a6d';
-                ctx.fillStyle = rssiColor;
+                const y = toY(points[i].value);
+                let dotColor;
+                if (useRssi) {
+                    dotColor = points[i].value > -50 ? '#05ffa1' : points[i].value > -70 ? '#fcee0a' : '#ff2a6d';
+                } else {
+                    dotColor = points[i].value > 70 ? '#05ffa1' : points[i].value > 40 ? '#fcee0a' : '#ff2a6d';
+                }
+                ctx.fillStyle = dotColor;
                 ctx.beginPath();
                 ctx.arc(x, y, 2, 0, Math.PI * 2);
                 ctx.fill();
@@ -684,15 +710,15 @@ export const DossiersPanelDef = {
             if (points.length > 1) {
                 const last = points[points.length - 1];
                 const lx = toX(last.ts);
-                const ly = toY(last.rssi);
-                ctx.fillStyle = '#00f0ff';
+                const ly = toY(last.value);
+                ctx.fillStyle = chartColor;
                 ctx.beginPath();
                 ctx.arc(lx, ly, 3, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.fillStyle = '#00f0ff';
+                ctx.fillStyle = chartColor;
                 ctx.font = '7px monospace';
                 ctx.textAlign = 'left';
-                ctx.fillText(`${last.rssi} dBm`, lx + 5, ly + 3);
+                ctx.fillText(`${last.value} ${unitLabel}`, lx + 5, ly + 3);
             }
 
             ctx.textAlign = 'start';
@@ -750,15 +776,20 @@ export const DossiersPanelDef = {
             const hours = profile.activity_hours || [];
             let activityBarsHtml = '';
             if (hours.length > 0) {
-                // hours is an array of {hour, count} or just counts
+                // hours can be: [{hour, count}], [count, count, ...] (24 bins), or [hour, hour, ...] (active hour markers)
                 const hourCounts = new Array(24).fill(0);
                 for (const h of hours) {
                     if (typeof h === 'object' && h.hour != null) {
-                        hourCounts[h.hour] = h.count || 0;
+                        hourCounts[h.hour] = h.count || 1;
                     } else if (typeof h === 'number') {
-                        // index-based
-                        const idx = hours.indexOf(h);
-                        if (idx < 24) hourCounts[idx] = h;
+                        if (hours.length <= 24 && h >= 0 && h <= 23 && Number.isInteger(h)) {
+                            // Active hour markers (e.g. [8, 14, 20]) — mark those hours
+                            hourCounts[h] = (hourCounts[h] || 0) + 1;
+                        } else {
+                            // Index-based counts (24-element array of counts)
+                            const idx = hours.indexOf(h);
+                            if (idx < 24) hourCounts[idx] = h;
+                        }
                     }
                 }
                 const maxCount = Math.max(...hourCounts, 1);
@@ -812,6 +843,7 @@ export const DossiersPanelDef = {
             const zones = data.zones_visited || [];
             const distance = data.total_distance || 0;
             const posCount = data.position_count || 0;
+            const positions = data.positions || [];
 
             let distStr;
             if (distance >= 1000) {
@@ -833,14 +865,32 @@ export const DossiersPanelDef = {
                         <span class="dossier-zone-meta mono">${entries > 0 ? entries + ' visits' : ''} ${timeStr}</span>
                     </div>`;
                 }).join('')
-                : '<div class="dossier-dim">No zone data</div>';
+                : '';
+
+            // If no zones but we have position data, show last known position
+            let positionHtml = '';
+            if (positions.length > 0) {
+                const lastPos = positions[positions.length - 1];
+                const x = (lastPos.x || lastPos.lng || 0).toFixed(5);
+                const y = (lastPos.y || lastPos.lat || 0).toFixed(5);
+                positionHtml = `<div class="dossier-location-pos mono" style="margin-top:4px;color:rgba(224,224,224,0.5);font-size:0.55rem">
+                    Last known: ${y}, ${x}
+                </div>`;
+            }
+
+            // Status message when no detailed data
+            const noDataMsg = (!zonesHtml && posCount === 0)
+                ? '<div class="dossier-dim">No movement data recorded -- target may be stationary or position tracking unavailable</div>'
+                : (!zonesHtml ? '<div class="dossier-dim" style="font-size:0.55rem">No zone crossings detected</div>' : '');
 
             el.innerHTML = `
                 <div class="dossier-location-stats mono">
                     <span>Distance: <span style="color:#00f0ff">${distStr}</span></span>
                     <span>Positions: <span style="color:#00f0ff">${posCount}</span></span>
                 </div>
-                <div class="dossier-zones-list">${zonesHtml}</div>
+                ${zonesHtml ? `<div class="dossier-zones-list">${zonesHtml}</div>` : ''}
+                ${positionHtml}
+                ${noDataMsg}
             `;
         }
 
@@ -854,52 +904,153 @@ export const DossiersPanelDef = {
                 const identifiers = dossier.identifiers || {};
                 const dossierId = dossier.dossier_id || '';
 
-                // Fetch correlations from the correlations API
-                const resp = await fetch('/api/correlations');
-                if (!resp.ok) {
-                    // Fall back to showing identifiers as correlation indicators
-                    _renderCorrelationsFallback(el, identifiers, dossierId);
-                    return;
-                }
-                const data = await resp.json();
-                const allCorrelations = data.correlations || [];
-
-                // Filter for correlations involving any of this dossier's identifiers
+                // Build set of known IDs for this dossier
                 const myIds = new Set();
-                // Add MAC-based target IDs
                 if (identifiers.mac) {
                     const cleanMac = identifiers.mac.replace(/:/g, '');
                     myIds.add(`ble_${cleanMac}`);
                     myIds.add(`ble_${cleanMac.toLowerCase()}`);
                     myIds.add(`ble_${cleanMac.toUpperCase()}`);
                 }
-                // Add any target_ids from dossier
                 if (dossier.target_ids) {
                     for (const tid of dossier.target_ids) myIds.add(tid);
                 }
                 if (dossier.primary_target_id) myIds.add(dossier.primary_target_id);
 
-                const relevant = allCorrelations.filter(c =>
-                    myIds.has(c.primary_id) || myIds.has(c.secondary_id) ||
-                    myIds.has(c.target_a) || myIds.has(c.target_b)
-                );
+                // Fetch correlations from the correlations API
+                let relevant = [];
+                try {
+                    const resp = await fetch('/api/correlations');
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        const allCorrelations = data.correlations || [];
+                        relevant = allCorrelations.filter(c =>
+                            myIds.has(c.primary_id) || myIds.has(c.secondary_id) ||
+                            myIds.has(c.target_a) || myIds.has(c.target_b)
+                        );
+                    }
+                } catch (_) { /* correlation API unavailable */ }
 
-                _renderCorrelations(el, relevant, identifiers, dossierId, myIds);
+                // Also find nearby targets from the store that could be correlated
+                const nearbyTargets = _findNearbyTargetsFromStore(dossier, myIds);
+
+                // Fetch linked targets — targets whose correlated_ids reference
+                // any of this dossier's IDs, or that this dossier's targets reference.
+                const linkedTargets = await _fetchLinkedTargets(myIds);
+
+                _renderCorrelations(el, relevant, identifiers, dossierId, myIds, nearbyTargets, linkedTargets);
             } catch (_) {
                 _renderCorrelationsFallback(el, dossier.identifiers || {}, dossier.dossier_id || '');
             }
         }
 
-        function _renderCorrelations(el, correlations, identifiers, dossierId, myIds) {
-            if (correlations.length === 0 && Object.keys(identifiers).length === 0) {
-                el.innerHTML = '<div class="dossier-dim">No correlations found</div>';
+        async function _fetchLinkedTargets(myIds) {
+            // Fetch all tracked targets and find those with correlated_ids
+            // that overlap with this dossier's IDs, or vice versa.
+            const linked = [];
+            try {
+                const resp = await fetch('/api/targets');
+                if (!resp.ok) return linked;
+                const data = await resp.json();
+                const targets = data.targets || [];
+                for (const t of targets) {
+                    const tid = t.target_id || '';
+                    const corrIds = t.correlated_ids || [];
+                    // Skip self
+                    if (myIds.has(tid)) {
+                        // This target IS one of the dossier's targets.
+                        // Show its correlated_ids as linked targets.
+                        for (const cid of corrIds) {
+                            const ct = targets.find(x => x.target_id === cid);
+                            if (ct && !myIds.has(cid)) {
+                                linked.push({
+                                    target_id: cid,
+                                    name: ct.name || cid,
+                                    source: ct.source || 'unknown',
+                                    asset_type: ct.asset_type || ct.classification || 'unknown',
+                                    alliance: ct.alliance || 'unknown',
+                                    confidence: t.correlation_confidence || 0,
+                                });
+                            }
+                        }
+                        continue;
+                    }
+                    // Check if this target references any of our IDs
+                    if (corrIds.some(cid => myIds.has(cid))) {
+                        linked.push({
+                            target_id: tid,
+                            name: t.name || tid,
+                            source: t.source || 'unknown',
+                            asset_type: t.asset_type || t.classification || 'unknown',
+                            alliance: t.alliance || 'unknown',
+                            confidence: t.correlation_confidence || 0,
+                        });
+                    }
+                }
+            } catch (_) { /* targets API unavailable */ }
+            // Deduplicate
+            const seen = new Set();
+            return linked.filter(t => {
+                if (seen.has(t.target_id)) return false;
+                seen.add(t.target_id);
+                return true;
+            }).slice(0, 15);
+        }
+
+        function _findNearbyTargetsFromStore(dossier, myIds) {
+            // Check TritiumStore for targets near this dossier's position
+            const nearby = [];
+            if (typeof TritiumStore === 'undefined' || !TritiumStore.units) return nearby;
+
+            // Get this dossier's position from signals
+            const signals = dossier.signals || [];
+            let myLat = null, myLng = null;
+            for (const s of signals) {
+                if (s.position_x != null && s.position_y != null) {
+                    myLat = s.position_y;
+                    myLng = s.position_x;
+                    break;
+                }
+            }
+
+            // Check store for co-located targets
+            TritiumStore.units.forEach((unit, unitId) => {
+                if (myIds.has(unitId)) return; // skip self
+                // Check if same source type — different source types near each other = potential correlation
+                const unitSource = unit.source || '';
+                const dossierTags = dossier.tags || [];
+                const isSameSource = dossierTags.includes(unitSource);
+                if (!isSameSource && unit.lat != null && myLat != null) {
+                    const dist = Math.sqrt(Math.pow(unit.lat - myLat, 2) + Math.pow((unit.lng || 0) - (myLng || 0), 2));
+                    if (dist < 0.001) { // ~100m
+                        nearby.push({
+                            target_id: unitId,
+                            source: unitSource,
+                            name: unit.name || unitId,
+                            classification: unit.classification || unit.type || 'unknown',
+                            distance_deg: dist,
+                        });
+                    }
+                }
+            });
+            return nearby.slice(0, 10);
+        }
+
+        function _renderCorrelations(el, correlations, identifiers, dossierId, myIds, nearbyTargets, linkedTargets) {
+            nearbyTargets = nearbyTargets || [];
+            linkedTargets = linkedTargets || [];
+
+            if (correlations.length === 0 && Object.keys(identifiers).length === 0
+                && nearbyTargets.length === 0 && linkedTargets.length === 0) {
+                el.innerHTML = '<div class="dossier-dim">No correlations found -- target has not been fused with other sensor data yet</div>';
                 return;
             }
 
-            // Build correlation cards
+            // Build confirmed correlation cards
             let corrHtml = '';
             if (correlations.length > 0) {
-                corrHtml = correlations.slice(0, 20).map(c => {
+                corrHtml = '<div class="dossier-corr-ids-header">Confirmed Correlations</div>' +
+                    correlations.slice(0, 20).map(c => {
                     const primaryId = c.primary_id || c.target_a || '';
                     const secondaryId = c.secondary_id || c.target_b || '';
                     const otherId = myIds.has(primaryId) ? secondaryId : primaryId;
@@ -915,10 +1066,43 @@ export const DossiersPanelDef = {
                 }).join('');
             }
 
+            // Linked Targets — targets fused via correlated_ids in the tracker
+            const allianceColors = { friendly: '#05ffa1', hostile: '#ff2a6d', unknown: '#fcee0a' };
+            let linkedHtml = '';
+            if (linkedTargets.length > 0) {
+                linkedHtml = '<div class="dossier-corr-ids-header" style="margin-top:6px">Linked Targets</div>' +
+                    linkedTargets.map(t => {
+                        const srcIcon = SOURCE_ICONS[t.source] || '\u{1F4CB}';
+                        const allyColor = allianceColors[t.alliance] || '#888';
+                        const confPct = Math.round((t.confidence || 0) * 100);
+                        const confColor = confPct > 70 ? '#05ffa1' : confPct > 40 ? '#fcee0a' : '#ff2a6d';
+                        return `<div class="dossier-corr-card dossier-linked-target" data-target-id="${_esc(t.target_id)}" title="Click to locate on map">
+                            <span class="dossier-corr-icon">${srcIcon}</span>
+                            <span class="dossier-corr-id mono" style="color:${allyColor}">${_esc(t.name)}</span>
+                            <span class="dossier-corr-method">${_esc(t.source)} / ${_esc(t.asset_type)}</span>
+                            ${confPct > 0 ? `<span class="dossier-corr-conf mono" style="color:${confColor}">${confPct}%</span>` : ''}
+                        </div>`;
+                    }).join('');
+            }
+
+            // Show nearby targets as potential correlations
+            let nearbyHtml = '';
+            if (nearbyTargets.length > 0) {
+                nearbyHtml = '<div class="dossier-corr-ids-header" style="margin-top:6px">Nearby Targets (potential fusion)</div>' +
+                    nearbyTargets.map(t => {
+                        const srcIcon = SOURCE_ICONS[t.source] || '\u{1F4CB}';
+                        return `<div class="dossier-corr-card dossier-corr-candidate">
+                            <span class="dossier-corr-icon">${srcIcon}</span>
+                            <span class="dossier-corr-id mono">${_esc(t.target_id)}</span>
+                            <span class="dossier-corr-method">${_esc(t.source)} / ${_esc(t.classification)}</span>
+                        </div>`;
+                    }).join('');
+            }
+
             // Show fused identifiers as implicit correlations
             const idEntries = Object.entries(identifiers);
             const idHtml = idEntries.length > 0
-                ? `<div class="dossier-corr-ids-header">Fused Identifiers</div>` +
+                ? `<div class="dossier-corr-ids-header" style="margin-top:6px">Fused Identifiers</div>` +
                   idEntries.map(([k, v]) =>
                     `<div class="dossier-corr-fused-row">
                         <span class="dossier-corr-fused-type">${_esc(k)}</span>
@@ -929,9 +1113,22 @@ export const DossiersPanelDef = {
 
             el.innerHTML = `
                 ${corrHtml ? `<div class="dossier-corr-list">${corrHtml}</div>` : ''}
+                ${linkedHtml}
+                ${nearbyHtml}
                 ${idHtml}
-                ${!corrHtml && !idHtml ? '<div class="dossier-dim">No correlations found</div>' : ''}
+                ${!corrHtml && !linkedHtml && !nearbyHtml && !idHtml ? '<div class="dossier-dim">No correlations found</div>' : ''}
             `;
+
+            // Wire linked target clicks — emit event to center map on target
+            el.querySelectorAll('.dossier-linked-target').forEach(card => {
+                card.style.cursor = 'pointer';
+                card.addEventListener('click', () => {
+                    const tid = card.dataset.targetId;
+                    if (tid) {
+                        EventBus.emit('map:centerOnUnit', { id: tid });
+                    }
+                });
+            });
         }
 
         function _renderCorrelationsFallback(el, identifiers, dossierId) {
@@ -1773,6 +1970,25 @@ style.textContent = `
 .dossier-corr-fused-val {
     color: #e0e0e0;
     word-break: break-all;
+}
+
+.dossier-corr-candidate {
+    background: rgba(252, 238, 10, 0.04);
+    border-color: rgba(252, 238, 10, 0.12);
+}
+
+.dossier-corr-icon {
+    font-size: 0.65rem;
+    flex-shrink: 0;
+}
+
+.dossier-linked-target {
+    background: rgba(0, 240, 255, 0.06);
+    border-color: rgba(0, 240, 255, 0.18);
+    transition: background 0.15s;
+}
+.dossier-linked-target:hover {
+    background: rgba(0, 240, 255, 0.14);
 }
 
 /* Scrollbar styling for detail pane */
