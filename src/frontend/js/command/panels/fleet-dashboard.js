@@ -84,6 +84,7 @@ export const FleetDashboardPanelDef = {
                             <th>UPTIME</th>
                             <th>BLE</th>
                             <th>WIFI</th>
+                            <th>INDOOR POS</th>
                             <th>FIRST SEEN</th>
                             <th>LAST SEEN</th>
                         </tr>
@@ -115,9 +116,10 @@ export const FleetDashboardPanelDef = {
 
         async function fetchAndRender() {
             try {
-                const [devRes, sumRes] = await Promise.all([
+                const [devRes, sumRes, indoorRes] = await Promise.all([
                     fetch('/api/fleet/devices'),
                     fetch('/api/fleet/summary'),
+                    fetch('/api/indoor/positions?limit=500').catch(() => null),
                 ]);
 
                 if (!devRes.ok || !sumRes.ok) {
@@ -127,6 +129,17 @@ export const FleetDashboardPanelDef = {
 
                 const devData = await devRes.json();
                 const sumData = await sumRes.json();
+
+                // Build indoor position lookup by target_id
+                const indoorMap = {};
+                if (indoorRes && indoorRes.ok) {
+                    try {
+                        const indoorData = await indoorRes.json();
+                        for (const pos of (indoorData.positions || [])) {
+                            if (pos.target_id) indoorMap[pos.target_id] = pos;
+                        }
+                    } catch (_) { /* indoor API optional */ }
+                }
 
                 // Update summary
                 if (totalEl) totalEl.textContent = sumData.total ?? 0;
@@ -143,7 +156,7 @@ export const FleetDashboardPanelDef = {
                 const devices = devData.devices || [];
                 if (tbodyEl) {
                     if (devices.length === 0) {
-                        tbodyEl.innerHTML = '<tr><td colspan="8" class="panel-empty">No fleet devices detected</td></tr>';
+                        tbodyEl.innerHTML = '<tr><td colspan="9" class="panel-empty">No fleet devices detected</td></tr>';
                     } else {
                         // Sort: online first, then stale, then offline
                         const order = { online: 0, stale: 1, offline: 2 };
@@ -156,6 +169,20 @@ export const FleetDashboardPanelDef = {
                             const ageSec = lastSeenTs > 0 ? (Date.now() / 1000 - lastSeenTs) : Infinity;
                             const offlineWarn = ageSec > 3600;
                             const rowClass = offlineWarn ? 'fleet-dash-row fleet-dash-warn' : 'fleet-dash-row';
+
+                            // Indoor position for this device
+                            const ipos = indoorMap[d.device_id] || indoorMap['ble_' + (d.device_id || '')];
+                            let indoorCell = '<span style="color:var(--text-dim)">--</span>';
+                            if (ipos) {
+                                const room = ipos.room_name || ipos.room_id || '';
+                                const conf = Math.round((ipos.confidence || 0) * 100);
+                                const unc = ipos.uncertainty_m != null ? `\u00b1${ipos.uncertainty_m.toFixed(1)}m` : '';
+                                const mColor = ipos.method === 'fused' ? '#05ffa1' : ipos.method === 'fingerprint' ? '#00f0ff' : '#ff2a6d';
+                                indoorCell = room
+                                    ? `<span style="color:${mColor}" title="${conf}% ${unc}">${_esc(room)}</span>`
+                                    : `<span style="color:${mColor}" title="${conf}% ${unc}">${conf}% ${unc}</span>`;
+                            }
+
                             return `<tr class="${rowClass}">
                                 <td class="mono fleet-dash-device-cell" title="${did}">${did}</td>
                                 <td>${_statusBadge(d.status)}</td>
@@ -163,6 +190,7 @@ export const FleetDashboardPanelDef = {
                                 <td class="mono">${_formatUptime(d.uptime)}</td>
                                 <td class="mono">${d.ble_count ?? 0}</td>
                                 <td class="mono">${d.wifi_count ?? 0}</td>
+                                <td class="mono" style="font-size:0.4rem">${indoorCell}</td>
                                 <td class="mono">${_timeAgo(d.first_seen)}</td>
                                 <td class="mono">${_timeAgo(d.last_seen)}${offlineWarn ? ' <span style="color:var(--magenta)">[!]</span>' : ''}</td>
                             </tr>`;

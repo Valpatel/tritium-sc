@@ -104,6 +104,7 @@ import { WeatherOverlayPanelDef } from './panels/weather-overlay-panel.js';
 import { TrailExportPanelDef } from './panels/trail-export-panel.js';
 import { MapLayerSwitcherPanelDef } from './panels/map-layer-switcher.js';
 import { CollaborationHubPanelDef } from './panels/collaboration-hub.js';
+import { IndoorPositioningPanelDef } from './panels/indoor-positioning-panel.js';
 import { PredictionEllipseManager } from './prediction-ellipses.js';
 import { initScreenshotHotkey } from './panels/map-screenshot.js';
 import { MissionModal, initMissionModal } from './mission-modal.js';
@@ -676,6 +677,7 @@ function initPanelSystem(container) {
     panelManager.register(TrailExportPanelDef);
     panelManager.register(MapLayerSwitcherPanelDef);
     panelManager.register(CollaborationHubPanelDef);
+    panelManager.register(IndoorPositioningPanelDef);
 
     // Start prediction confidence ellipses on the map
     const predictionEllipses = new PredictionEllipseManager();
