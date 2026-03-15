@@ -190,13 +190,68 @@ export const UnitInspectorPanelDef = {
             _lastRenderedId = selectedId;
             _lastRenderedType = resolvedType;
 
+            const currentAlliance = (unit.alliance || 'unknown').toLowerCase();
             contentEl.innerHTML = control.render(unit) + '<div class="dc-stats-live">' + _renderStats(unit) + '</div>' +
-                '<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--border);display:flex;gap:4px">' +
+                '<div class="tag-btn-row" data-bind="ui-tag-buttons" style="margin-top:8px;padding-top:6px;border-top:1px solid var(--border)">' +
+                    '<button class="tag-btn tag-btn-friendly' + (currentAlliance === 'friendly' ? ' active' : '') + '" data-ui-tag="friendly">FRIENDLY</button>' +
+                    '<button class="tag-btn tag-btn-hostile' + (currentAlliance === 'hostile' ? ' active' : '') + '" data-ui-tag="hostile">HOSTILE</button>' +
+                    '<button class="tag-btn tag-btn-vip' + (unit.vip ? ' active' : '') + '" data-ui-tag="vip">VIP</button>' +
+                '</div>' +
+                '<div style="margin-top:6px;display:flex;gap:4px">' +
                     '<button class="panel-action-btn" data-action="investigate" style="flex:1;font-size:0.45rem;background:rgba(0,240,255,0.12);border:1px solid #00f0ff;color:#00f0ff;font-weight:700;letter-spacing:0.06em;cursor:pointer;padding:6px">INVESTIGATE</button>' +
                     '<button class="panel-action-btn" data-action="ar-export" style="flex:1;font-size:0.45rem">EXPORT AR</button>' +
                 '</div>' +
                 '<div class="ui-ar-export-result" data-bind="ar-result" style="display:none;margin-top:6px;font-size:0.4rem;color:var(--text-ghost);max-height:120px;overflow:auto"></div>';
             control.bind(contentEl, unit, DeviceAPI);
+
+            // Wire tagging buttons (FRIENDLY / HOSTILE / VIP)
+            const tagBtns = contentEl.querySelectorAll('[data-ui-tag]');
+            tagBtns.forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const tag = btn.dataset.uiTag;
+                    const targetId = unit.id;
+                    if (!targetId) return;
+
+                    try {
+                        if (tag === 'vip') {
+                            const isVip = btn.classList.contains('active');
+                            await fetch(`/api/targets/${encodeURIComponent(targetId)}/classify`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    target_id: targetId,
+                                    alliance: isVip ? (unit.alliance || 'unknown') : (unit.alliance || 'unknown'),
+                                    reason: isVip ? 'VIP tag removed' : 'Tagged as VIP',
+                                }),
+                            });
+                            unit.vip = !isVip;
+                            btn.classList.toggle('active');
+                            EventBus.emit('toast:show', { message: isVip ? 'VIP tag removed' : `${targetId} tagged as VIP`, type: 'info' });
+                        } else {
+                            const resp = await fetch(`/api/targets/${encodeURIComponent(targetId)}/classify`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    target_id: targetId,
+                                    alliance: tag,
+                                    reason: `Operator tagged as ${tag}`,
+                                }),
+                            });
+                            if (resp.ok) {
+                                unit.alliance = tag;
+                                tagBtns.forEach(b => {
+                                    if (b.dataset.uiTag !== 'vip') {
+                                        b.classList.toggle('active', b.dataset.uiTag === tag);
+                                    }
+                                });
+                                EventBus.emit('toast:show', { message: `${targetId} tagged as ${tag.toUpperCase()}`, type: 'info' });
+                            }
+                        }
+                    } catch (_err) {
+                        EventBus.emit('toast:show', { message: 'Tag update failed', type: 'error' });
+                    }
+                });
+            });
 
             // Wire INVESTIGATE button — opens dossier panel for this target
             const investigateBtn = contentEl.querySelector('[data-action="investigate"]');

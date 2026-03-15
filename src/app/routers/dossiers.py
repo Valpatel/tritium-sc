@@ -141,11 +141,45 @@ async def search_dossiers(
 async def get_dossier_by_target(
     request: Request,
     target_id: str = Query(..., description="Target ID (e.g. ble_AABBCC112201)"),
+    fields: Optional[str] = Query(
+        None,
+        description="'summary' to return metadata only (no signals/enrichments), default returns full detail",
+    ),
 ):
     """Look up the dossier linked to a tracked target.
 
-    Returns the full dossier detail, or 404 if no dossier exists for the target.
+    Returns the dossier metadata (or full detail if fields is not 'summary'),
+    or 404 if no dossier exists for the target.
+
+    Use ``?fields=summary`` to get a lightweight response with just the
+    dossier_id and metadata — avoids loading thousands of signals.
     """
+    summary_only = fields == "summary"
+
+    # Fast path: if we only need the dossier_id + metadata, avoid loading signals
+    if summary_only:
+        did = _resolve_dossier_id_for_target(request, target_id)
+        if did is None:
+            raise HTTPException(status_code=404, detail=f"No dossier found for target {target_id}")
+        store = _get_store()
+        if store is not None:
+            # Lightweight query: just the dossier row, no signals
+            try:
+                row = store._conn.execute(
+                    "SELECT * FROM dossiers WHERE dossier_id = ?", (did,)
+                ).fetchone()
+                if row:
+                    return store._row_to_dossier(row)
+            except Exception:
+                pass
+        # Fallback to full load + strip
+        mgr = _get_manager(request)
+        if mgr is not None:
+            dossier = mgr.get_dossier(did)
+            if dossier:
+                return _strip_signals(dossier)
+        raise HTTPException(status_code=404, detail=f"No dossier found for target {target_id}")
+
     mgr = _get_manager(request)
     if mgr is not None:
         dossier = mgr.get_dossier_for_target(target_id)
@@ -172,9 +206,80 @@ async def get_dossier_by_target(
     raise HTTPException(status_code=404, detail=f"No dossier found for target {target_id}")
 
 
+def _resolve_dossier_id_for_target(request, target_id: str) -> str | None:
+    """Resolve a target_id to a dossier_id without loading the full dossier."""
+    mgr = _get_manager(request)
+    if mgr is not None:
+        with mgr._lock:
+            did = mgr._target_dossier_map.get(target_id)
+        if did:
+            return did
+
+    store = _get_store()
+    if store is None:
+        return None
+
+    # BLE MAC lookup
+    if target_id.startswith("ble_"):
+        raw = target_id[4:]
+        if len(raw) == 12:
+            mac = ":".join(raw[i:i + 2] for i in range(0, 12, 2)).upper()
+            try:
+                row = store._conn.execute(
+                    """SELECT dossier_id FROM dossiers
+                       WHERE json_extract(identifiers, '$.mac') = ?""",
+                    (mac,),
+                ).fetchone()
+                if row:
+                    return row["dossier_id"]
+            except Exception:
+                pass
+        # Try raw
+        try:
+            row = store._conn.execute(
+                """SELECT dossier_id FROM dossiers
+                   WHERE json_extract(identifiers, '$.mac') = ?""",
+                (raw,),
+            ).fetchone()
+            if row:
+                return row["dossier_id"]
+        except Exception:
+            pass
+
+    # Name match as last resort (uses FTS, returns list)
+    if store is not None:
+        results = store.search(target_id)
+        if results:
+            return results[0].get("dossier_id")
+
+    return None
+
+
+def _strip_signals(dossier: dict) -> dict:
+    """Return dossier metadata without heavy signal/enrichment payloads."""
+    return {
+        k: v for k, v in dossier.items()
+        if k not in ("signals", "enrichments", "position_history")
+    }
+
+
 @router.get("/{dossier_id}")
-async def get_dossier(request: Request, dossier_id: str):
-    """Get full dossier detail including signals, enrichments, positions."""
+async def get_dossier(
+    request: Request,
+    dossier_id: str,
+    signal_limit: int = Query(
+        200,
+        ge=0,
+        le=5000,
+        description="Max signals to include in response (0 = none). Keeps response size manageable for large dossiers.",
+    ),
+):
+    """Get full dossier detail including signals, enrichments, positions.
+
+    The ``signal_limit`` parameter caps the number of signals returned
+    (most recent first) to prevent multi-megabyte responses for dossiers
+    with thousands of accumulated signals.
+    """
     mgr = _get_manager(request)
     store = _get_store()
 
@@ -187,6 +292,13 @@ async def get_dossier(request: Request, dossier_id: str):
 
     if dossier is None:
         raise HTTPException(status_code=404, detail="Dossier not found")
+
+    # Cap signal payload to avoid multi-megabyte responses
+    signals = dossier.get("signals", [])
+    if len(signals) > signal_limit:
+        dossier["signals"] = signals[:signal_limit]
+        dossier["signal_truncated"] = True
+        dossier["signal_total"] = len(signals)
 
     # Add position history from signals
     if store is not None:
@@ -351,6 +463,183 @@ async def get_behavioral_profile(request: Request, dossier_id: str):
         "first_seen": dossier.get("first_seen", 0),
         "last_seen": dossier.get("last_seen", 0),
         "active_duration_s": 0,
+    }
+
+
+@router.get("/{dossier_id}/correlated-targets")
+async def get_correlated_targets(request: Request, dossier_id: str):
+    """Find targets correlated with this dossier.
+
+    Returns three categories:
+    - linked: targets whose correlated_ids reference this dossier's targets
+    - nearby_cross_source: targets from different sensor sources at the same location
+    - correlator_records: confirmed correlation records from the TargetCorrelator
+    """
+    import math
+
+    mgr = _get_manager(request)
+    store = _get_store()
+
+    # Get dossier details
+    if mgr is not None:
+        dossier = mgr.get_dossier(dossier_id)
+    elif store is not None:
+        dossier = store.get_dossier(dossier_id)
+    else:
+        raise HTTPException(status_code=503, detail="Dossier store unavailable")
+
+    if dossier is None:
+        raise HTTPException(status_code=404, detail="Dossier not found")
+
+    # Build the set of target IDs belonging to this dossier
+    my_target_ids: set[str] = set()
+
+    # From DossierManager's target_dossier_map
+    if mgr is not None:
+        with mgr._lock:
+            for tid, did in mgr._target_dossier_map.items():
+                if did == dossier_id:
+                    my_target_ids.add(tid)
+
+    # From dossier identifiers (MAC -> ble_XX target ID)
+    identifiers = dossier.get("identifiers", {})
+    if identifiers.get("mac"):
+        mac_clean = identifiers["mac"].replace(":", "").lower()
+        my_target_ids.add(f"ble_{mac_clean}")
+
+    # Get the tracker for live target state
+    tracker = getattr(request.app.state, "tracker", None)
+    all_targets = tracker.get_all() if tracker else []
+    target_map = {t.target_id: t for t in all_targets}
+
+    # Determine this dossier's position and sources from its targets
+    my_sources: set[str] = set()
+    my_positions: list[tuple[float, float]] = []
+    for tid in my_target_ids:
+        t = target_map.get(tid)
+        if t:
+            my_sources.add(t.source)
+            if t.lat and t.lng:
+                my_positions.append((t.lat, t.lng))
+
+    # Also check dossier tags for source info
+    for tag in dossier.get("tags", []):
+        if tag in ("ble", "yolo", "wifi", "mesh", "acoustic", "manual", "mqtt", "simulation"):
+            my_sources.add(tag)
+
+    # Category 1: Linked targets (correlated_ids bidirectional lookup)
+    linked = []
+    for t in all_targets:
+        if t.target_id in my_target_ids:
+            # This is our own target — check its correlated_ids
+            for cid in t.correlated_ids:
+                ct = target_map.get(cid)
+                if ct:
+                    linked.append({
+                        "target_id": cid,
+                        "name": ct.name or cid,
+                        "source": ct.source,
+                        "asset_type": ct.asset_type,
+                        "alliance": ct.alliance,
+                        "confidence": t.correlation_confidence,
+                        "lat": ct.lat,
+                        "lng": ct.lng,
+                        "reason": "correlated_ids (fused by correlator)",
+                    })
+            continue
+        # Check if OTHER targets reference our IDs
+        for cid in t.correlated_ids:
+            if cid in my_target_ids:
+                linked.append({
+                    "target_id": t.target_id,
+                    "name": t.name or t.target_id,
+                    "source": t.source,
+                    "asset_type": t.asset_type,
+                    "alliance": t.alliance,
+                    "confidence": t.correlation_confidence,
+                    "lat": t.lat,
+                    "lng": t.lng,
+                    "reason": "correlated_ids (reverse link)",
+                })
+                break
+
+    # Category 2: Nearby cross-source targets (potential correlations)
+    nearby_cross_source = []
+    if my_positions:
+        proximity_threshold = 0.0005  # ~55 meters in lat/lng degrees
+        for t in all_targets:
+            if t.target_id in my_target_ids:
+                continue
+            if t.source in my_sources:
+                continue  # same source type, less interesting
+            if not t.lat or not t.lng:
+                continue
+            # Check proximity to any of our positions
+            for my_lat, my_lng in my_positions:
+                dist = math.hypot(t.lat - my_lat, t.lng - my_lng)
+                if dist < proximity_threshold:
+                    # Find dossier for this nearby target
+                    nearby_dossier_id = None
+                    if mgr is not None:
+                        nearby_dossier = mgr.get_dossier_for_target(t.target_id)
+                        if nearby_dossier:
+                            nearby_dossier_id = nearby_dossier.get("dossier_id")
+                    nearby_cross_source.append({
+                        "target_id": t.target_id,
+                        "name": t.name or t.target_id,
+                        "source": t.source,
+                        "asset_type": t.asset_type,
+                        "alliance": t.alliance,
+                        "distance_m": round(dist * 111320, 1),  # approximate meters
+                        "lat": t.lat,
+                        "lng": t.lng,
+                        "dossier_id": nearby_dossier_id,
+                        "reason": f"cross-source proximity ({t.source} near {', '.join(my_sources)})",
+                    })
+                    break
+
+    # Category 3: Confirmed correlator records
+    correlator_records = []
+    correlator = getattr(request.app.state, "correlator", None)
+    if correlator:
+        for rec in correlator.get_correlations():
+            if rec.primary_id in my_target_ids or rec.secondary_id in my_target_ids:
+                other_id = rec.secondary_id if rec.primary_id in my_target_ids else rec.primary_id
+                ct = target_map.get(other_id)
+                correlator_records.append({
+                    "target_id": other_id,
+                    "name": ct.name if ct else other_id,
+                    "source": ct.source if ct else "unknown",
+                    "asset_type": ct.asset_type if ct else "unknown",
+                    "confidence": rec.confidence,
+                    "reason": rec.reason,
+                    "strategies": [
+                        {"name": s.strategy_name, "score": round(s.score, 3), "detail": s.detail}
+                        for s in rec.strategy_scores
+                    ],
+                })
+
+    # Deduplicate across categories
+    seen_ids: set[str] = set()
+    def _dedup(items):
+        result = []
+        for item in items:
+            if item["target_id"] not in seen_ids:
+                seen_ids.add(item["target_id"])
+                result.append(item)
+        return result
+
+    correlator_records = _dedup(correlator_records)
+    linked = _dedup(linked)
+    nearby_cross_source = _dedup(nearby_cross_source)
+
+    return {
+        "dossier_id": dossier_id,
+        "my_target_ids": sorted(my_target_ids),
+        "correlator_records": correlator_records,
+        "linked": linked,
+        "nearby_cross_source": nearby_cross_source[:15],
+        "total": len(correlator_records) + len(linked) + len(nearby_cross_source),
     }
 
 

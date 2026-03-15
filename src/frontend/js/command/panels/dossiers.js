@@ -174,7 +174,7 @@ export const DossiersPanelDef = {
             detailEl.innerHTML = '<div class="dossier-detail-placeholder"><span class="panel-spinner"></span> Loading...</div>';
 
             try {
-                const resp = await fetch(`/api/dossiers/${encodeURIComponent(dossierId)}`);
+                const resp = await fetch(`/api/dossiers/${encodeURIComponent(dossierId)}?signal_limit=100`);
                 if (!resp.ok) {
                     detailEl.innerHTML = '<div class="dossier-detail-placeholder">Failed to load dossier</div>';
                     return;
@@ -203,6 +203,9 @@ export const DossiersPanelDef = {
             const positions = d.position_history || [];
             const tags = d.tags || [];
             const notes = d.notes || [];
+            const dossierAlliance = (d.alliance || 'unknown').toLowerCase();
+            const ALLIANCE_COLORS = { friendly: '#05ffa1', hostile: '#ff2a6d', unknown: '#888', neutral: '#fcee0a' };
+            const dossierAllianceColor = ALLIANCE_COLORS[dossierAlliance] || '#888';
 
             // Build identifiers chips
             const idChips = Object.entries(identifiers).map(([k, v]) =>
@@ -256,6 +259,14 @@ export const DossiersPanelDef = {
                             <div class="dossier-confidence-track">
                                 <div class="dossier-confidence-fill" style="width:${confidence}%"></div>
                             </div>
+                        </div>
+                        <div class="dossier-alliance-row" style="margin-top:8px;display:flex;align-items:center;gap:8px">
+                            <span style="font-size:0.45rem;color:var(--text-ghost);text-transform:uppercase;letter-spacing:1px">ALLIANCE:</span>
+                            <span class="dossier-alliance-badge" style="color:${dossierAllianceColor};font-weight:700;font-size:0.5rem;letter-spacing:0.08em">${_esc(dossierAlliance).toUpperCase()}</span>
+                            <span style="flex:1"></span>
+                            <button class="tag-btn tag-btn-friendly${dossierAlliance === 'friendly' ? ' active' : ''}" data-dossier-tag="friendly" style="font-size:0.4rem;padding:3px 8px">FRIENDLY</button>
+                            <button class="tag-btn tag-btn-hostile${dossierAlliance === 'hostile' ? ' active' : ''}" data-dossier-tag="hostile" style="font-size:0.4rem;padding:3px 8px">HOSTILE</button>
+                            <button class="tag-btn tag-btn-vip${tags.includes('VIP') ? ' active' : ''}" data-dossier-tag="vip" style="font-size:0.4rem;padding:3px 8px">VIP</button>
                         </div>
                     </div>
 
@@ -355,6 +366,44 @@ export const DossiersPanelDef = {
                         chip.classList.add('dossier-id-chip-copied');
                         setTimeout(() => chip.classList.remove('dossier-id-chip-copied'), 1200);
                     }
+                });
+            });
+
+            // Dossier alliance tag buttons (FRIENDLY / HOSTILE / VIP)
+            const dossierTagBtns = container.querySelectorAll('[data-dossier-tag]');
+            dossierTagBtns.forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const tag = btn.dataset.dossierTag;
+                    const targetId = dossier.target_id || dossier.dossier_id;
+                    if (!targetId) return;
+                    try {
+                        if (tag === 'vip') {
+                            const isVip = btn.classList.contains('active');
+                            if (!isVip) {
+                                await fetch(`/api/dossiers/${encodeURIComponent(dossierId)}/tags`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ tag: 'VIP' }),
+                                });
+                            } else {
+                                await fetch(`/api/dossiers/${encodeURIComponent(dossierId)}/tags/VIP`, {
+                                    method: 'DELETE',
+                                });
+                            }
+                            loadDetail(dossierId);
+                        } else {
+                            await fetch(`/api/targets/${encodeURIComponent(targetId)}/classify`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    target_id: targetId,
+                                    alliance: tag,
+                                    reason: `Operator tagged as ${tag} via dossier`,
+                                }),
+                            });
+                            loadDetail(dossierId);
+                        }
+                    } catch (_) {}
                 });
             });
 
@@ -912,11 +961,15 @@ export const DossiersPanelDef = {
         async function _fetchAndRenderBehavioral(el, dossierId) {
             try {
                 const resp = await fetch(`/api/dossiers/${encodeURIComponent(dossierId)}/behavioral-profile`);
-                if (!resp.ok) { el.innerHTML = '<div class="dossier-dim">Behavioral data unavailable</div>'; return; }
+                if (!resp.ok) {
+                    if (el.isConnected) el.innerHTML = '<div class="dossier-dim">Behavioral data unavailable</div>';
+                    return;
+                }
                 const p = await resp.json();
-                _renderBehavioralProfile(el, p);
-            } catch (_) {
-                el.innerHTML = '<div class="dossier-dim">Failed to load behavioral profile</div>';
+                if (el.isConnected) _renderBehavioralProfile(el, p);
+            } catch (err) {
+                console.warn('[Dossier] behavioral profile fetch failed:', err.message || err);
+                if (el.isConnected) el.innerHTML = '<div class="dossier-dim">Failed to load behavioral profile</div>';
             }
         }
 
@@ -1012,11 +1065,15 @@ export const DossiersPanelDef = {
         async function _fetchAndRenderLocation(el, dossierId) {
             try {
                 const resp = await fetch(`/api/dossiers/${encodeURIComponent(dossierId)}/location-summary`);
-                if (!resp.ok) { el.innerHTML = '<div class="dossier-dim">Location data unavailable</div>'; return; }
+                if (!resp.ok) {
+                    if (el.isConnected) el.innerHTML = '<div class="dossier-dim">Location data unavailable</div>';
+                    return;
+                }
                 const data = await resp.json();
-                _renderLocationSummary(el, data);
-            } catch (_) {
-                el.innerHTML = '<div class="dossier-dim">Failed to load location data</div>';
+                if (el.isConnected) _renderLocationSummary(el, data);
+            } catch (err) {
+                console.warn('[Dossier] location summary fetch failed:', err.message || err);
+                if (el.isConnected) el.innerHTML = '<div class="dossier-dim">Failed to load location data</div>';
             }
         }
 
@@ -1080,12 +1137,21 @@ export const DossiersPanelDef = {
         // ---------------------------------------------------------------
 
         async function _fetchAndRenderCorrelations(el, dossier) {
-            try {
-                // Get identifiers from dossier to find related target IDs
-                const identifiers = dossier.identifiers || {};
-                const dossierId = dossier.dossier_id || '';
+            const dossierId = dossier.dossier_id || '';
+            const identifiers = dossier.identifiers || {};
 
-                // Build set of known IDs for this dossier
+            try {
+                // Use the dedicated correlated-targets endpoint
+                const resp = await fetch(`/api/dossiers/${encodeURIComponent(dossierId)}/correlated-targets`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    _renderCorrelatedTargets(el, data, identifiers, dossierId);
+                    return;
+                }
+            } catch (_) { /* endpoint unavailable, fall back */ }
+
+            // Fallback: use old approach with client-side proximity matching
+            try {
                 const myIds = new Set();
                 if (identifiers.mac) {
                     const cleanMac = identifiers.mac.replace(/:/g, '');
@@ -1098,36 +1164,16 @@ export const DossiersPanelDef = {
                 }
                 if (dossier.primary_target_id) myIds.add(dossier.primary_target_id);
 
-                // Fetch correlations from the correlations API
-                let relevant = [];
-                try {
-                    const resp = await fetch('/api/correlations');
-                    if (resp.ok) {
-                        const data = await resp.json();
-                        const allCorrelations = data.correlations || [];
-                        relevant = allCorrelations.filter(c =>
-                            myIds.has(c.primary_id) || myIds.has(c.secondary_id) ||
-                            myIds.has(c.target_a) || myIds.has(c.target_b)
-                        );
-                    }
-                } catch (_) { /* correlation API unavailable */ }
-
-                // Also find nearby targets from the store that could be correlated
                 const nearbyTargets = _findNearbyTargetsFromStore(dossier, myIds);
-
-                // Fetch linked targets — targets whose correlated_ids reference
-                // any of this dossier's IDs, or that this dossier's targets reference.
                 const linkedTargets = await _fetchLinkedTargets(myIds);
 
-                _renderCorrelations(el, relevant, identifiers, dossierId, myIds, nearbyTargets, linkedTargets);
+                _renderCorrelatedTargetsFallback(el, identifiers, linkedTargets, nearbyTargets);
             } catch (_) {
-                _renderCorrelationsFallback(el, dossier.identifiers || {}, dossier.dossier_id || '');
+                _renderCorrelationsFallback(el, identifiers);
             }
         }
 
         async function _fetchLinkedTargets(myIds) {
-            // Fetch all tracked targets and find those with correlated_ids
-            // that overlap with this dossier's IDs, or vice versa.
             const linked = [];
             try {
                 const resp = await fetch('/api/targets');
@@ -1137,10 +1183,7 @@ export const DossiersPanelDef = {
                 for (const t of targets) {
                     const tid = t.target_id || '';
                     const corrIds = t.correlated_ids || [];
-                    // Skip self
                     if (myIds.has(tid)) {
-                        // This target IS one of the dossier's targets.
-                        // Show its correlated_ids as linked targets.
                         for (const cid of corrIds) {
                             const ct = targets.find(x => x.target_id === cid);
                             if (ct && !myIds.has(cid)) {
@@ -1156,7 +1199,6 @@ export const DossiersPanelDef = {
                         }
                         continue;
                     }
-                    // Check if this target references any of our IDs
                     if (corrIds.some(cid => myIds.has(cid))) {
                         linked.push({
                             target_id: tid,
@@ -1168,8 +1210,7 @@ export const DossiersPanelDef = {
                         });
                     }
                 }
-            } catch (_) { /* targets API unavailable */ }
-            // Deduplicate
+            } catch (_) {}
             const seen = new Set();
             return linked.filter(t => {
                 if (seen.has(t.target_id)) return false;
@@ -1179,11 +1220,9 @@ export const DossiersPanelDef = {
         }
 
         function _findNearbyTargetsFromStore(dossier, myIds) {
-            // Check TritiumStore for targets near this dossier's position
             const nearby = [];
             if (typeof TritiumStore === 'undefined' || !TritiumStore.units) return nearby;
 
-            // Get this dossier's position from signals
             const signals = dossier.signals || [];
             let myLat = null, myLng = null;
             for (const s of signals) {
@@ -1194,22 +1233,20 @@ export const DossiersPanelDef = {
                 }
             }
 
-            // Check store for co-located targets
             TritiumStore.units.forEach((unit, unitId) => {
-                if (myIds.has(unitId)) return; // skip self
-                // Check if same source type — different source types near each other = potential correlation
+                if (myIds.has(unitId)) return;
                 const unitSource = unit.source || '';
                 const dossierTags = dossier.tags || [];
                 const isSameSource = dossierTags.includes(unitSource);
                 if (!isSameSource && unit.lat != null && myLat != null) {
                     const dist = Math.sqrt(Math.pow(unit.lat - myLat, 2) + Math.pow((unit.lng || 0) - (myLng || 0), 2));
-                    if (dist < 0.001) { // ~100m
+                    if (dist < 0.001) {
                         nearby.push({
                             target_id: unitId,
                             source: unitSource,
                             name: unit.name || unitId,
-                            classification: unit.classification || unit.type || 'unknown',
-                            distance_deg: dist,
+                            asset_type: unit.classification || unit.type || 'unknown',
+                            distance_m: Math.round(dist * 111320),
                         });
                     }
                 }
@@ -1217,73 +1254,86 @@ export const DossiersPanelDef = {
             return nearby.slice(0, 10);
         }
 
-        function _renderCorrelations(el, correlations, identifiers, dossierId, myIds, nearbyTargets, linkedTargets) {
-            nearbyTargets = nearbyTargets || [];
-            linkedTargets = linkedTargets || [];
+        function _renderCorrelatedTargets(el, data, identifiers, dossierId) {
+            const confirmed = data.correlator_records || [];
+            const linked = data.linked || [];
+            const nearby = data.nearby_cross_source || [];
+            const myTargetIds = data.my_target_ids || [];
 
-            if (correlations.length === 0 && Object.keys(identifiers).length === 0
-                && nearbyTargets.length === 0 && linkedTargets.length === 0) {
-                el.innerHTML = '<div class="dossier-dim">No correlations found -- target has not been fused with other sensor data yet</div>';
-                return;
-            }
-
-            // Build confirmed correlation cards
-            let corrHtml = '';
-            if (correlations.length > 0) {
-                corrHtml = '<div class="dossier-corr-ids-header">Confirmed Correlations</div>' +
-                    correlations.slice(0, 20).map(c => {
-                    const primaryId = c.primary_id || c.target_a || '';
-                    const secondaryId = c.secondary_id || c.target_b || '';
-                    const otherId = myIds.has(primaryId) ? secondaryId : primaryId;
-                    const confidence = Math.round((c.confidence || c.score || 0) * 100);
-                    const method = c.method || c.correlation_type || 'unknown';
-                    const confColor = confidence > 70 ? '#05ffa1' : confidence > 40 ? '#fcee0a' : '#ff2a6d';
-
-                    return `<div class="dossier-corr-card">
-                        <span class="dossier-corr-id mono">${_esc(otherId)}</span>
-                        <span class="dossier-corr-method">${_esc(method)}</span>
-                        <span class="dossier-corr-conf mono" style="color:${confColor}">${confidence}%</span>
-                    </div>`;
-                }).join('');
-            }
-
-            // Linked Targets — targets fused via correlated_ids in the tracker
             const allianceColors = { friendly: '#05ffa1', hostile: '#ff2a6d', unknown: '#fcee0a' };
+
+            // Build confirmed correlations section
+            let confirmedHtml = '';
+            if (confirmed.length > 0) {
+                confirmedHtml = '<div class="dossier-corr-section-header">CONFIRMED CORRELATIONS</div>' +
+                    confirmed.map(c => {
+                        const confPct = Math.round((c.confidence || 0) * 100);
+                        const confColor = confPct > 70 ? '#05ffa1' : confPct > 40 ? '#fcee0a' : '#ff2a6d';
+                        const srcIcon = SOURCE_ICONS[c.source] || '\u{1F4CB}';
+                        const strategies = (c.strategies || []).map(s =>
+                            `<span class="dossier-corr-strategy">${_esc(s.name)}: ${Math.round(s.score * 100)}%</span>`
+                        ).join('');
+                        return `<div class="dossier-corr-card dossier-corr-clickable" data-target-id="${_esc(c.target_id)}" title="Click to view dossier">
+                            <div class="dossier-corr-card-main">
+                                <span class="dossier-corr-icon">${srcIcon}</span>
+                                <span class="dossier-corr-id mono">${_esc(c.name || c.target_id)}</span>
+                                <span class="dossier-corr-badge">${_esc(c.source)}</span>
+                                <span class="dossier-corr-badge">${_esc(c.asset_type)}</span>
+                                <span class="dossier-corr-conf mono" style="color:${confColor}">${confPct}%</span>
+                            </div>
+                            ${strategies ? `<div class="dossier-corr-strategies">${strategies}</div>` : ''}
+                            <div class="dossier-corr-reason mono">${_esc(c.reason || '')}</div>
+                        </div>`;
+                    }).join('');
+            }
+
+            // Build linked targets section
             let linkedHtml = '';
-            if (linkedTargets.length > 0) {
-                linkedHtml = '<div class="dossier-corr-ids-header" style="margin-top:6px">Linked Targets</div>' +
-                    linkedTargets.map(t => {
+            if (linked.length > 0) {
+                linkedHtml = '<div class="dossier-corr-section-header">LINKED TARGETS</div>' +
+                    linked.map(t => {
                         const srcIcon = SOURCE_ICONS[t.source] || '\u{1F4CB}';
                         const allyColor = allianceColors[t.alliance] || '#888';
                         const confPct = Math.round((t.confidence || 0) * 100);
                         const confColor = confPct > 70 ? '#05ffa1' : confPct > 40 ? '#fcee0a' : '#ff2a6d';
-                        return `<div class="dossier-corr-card dossier-linked-target" data-target-id="${_esc(t.target_id)}" title="Click to locate on map">
-                            <span class="dossier-corr-icon">${srcIcon}</span>
-                            <span class="dossier-corr-id mono" style="color:${allyColor}">${_esc(t.name)}</span>
-                            <span class="dossier-corr-method">${_esc(t.source)} / ${_esc(t.asset_type)}</span>
-                            ${confPct > 0 ? `<span class="dossier-corr-conf mono" style="color:${confColor}">${confPct}%</span>` : ''}
+                        return `<div class="dossier-corr-card dossier-corr-clickable" data-target-id="${_esc(t.target_id)}" title="Click to view dossier">
+                            <div class="dossier-corr-card-main">
+                                <span class="dossier-corr-icon">${srcIcon}</span>
+                                <span class="dossier-corr-id mono" style="color:${allyColor}">${_esc(t.name)}</span>
+                                <span class="dossier-corr-badge">${_esc(t.source)}</span>
+                                <span class="dossier-corr-badge">${_esc(t.asset_type)}</span>
+                                ${confPct > 0 ? `<span class="dossier-corr-conf mono" style="color:${confColor}">${confPct}%</span>` : ''}
+                            </div>
+                            <div class="dossier-corr-reason mono">${_esc(t.reason || '')}</div>
                         </div>`;
                     }).join('');
             }
 
-            // Show nearby targets as potential correlations
+            // Build nearby cross-source targets section
             let nearbyHtml = '';
-            if (nearbyTargets.length > 0) {
-                nearbyHtml = '<div class="dossier-corr-ids-header" style="margin-top:6px">Nearby Targets (potential fusion)</div>' +
-                    nearbyTargets.map(t => {
+            if (nearby.length > 0) {
+                nearbyHtml = '<div class="dossier-corr-section-header">NEARBY CROSS-SOURCE TARGETS</div>' +
+                    '<div class="dossier-corr-section-desc">Different sensor types detected at the same location — likely the same entity</div>' +
+                    nearby.map(t => {
                         const srcIcon = SOURCE_ICONS[t.source] || '\u{1F4CB}';
-                        return `<div class="dossier-corr-card dossier-corr-candidate">
-                            <span class="dossier-corr-icon">${srcIcon}</span>
-                            <span class="dossier-corr-id mono">${_esc(t.target_id)}</span>
-                            <span class="dossier-corr-method">${_esc(t.source)} / ${_esc(t.classification)}</span>
+                        const distLabel = t.distance_m != null ? `${t.distance_m}m` : '';
+                        return `<div class="dossier-corr-card dossier-corr-clickable dossier-corr-candidate" data-target-id="${_esc(t.target_id)}" data-dossier-id="${_esc(t.dossier_id || '')}" title="Click to view dossier">
+                            <div class="dossier-corr-card-main">
+                                <span class="dossier-corr-icon">${srcIcon}</span>
+                                <span class="dossier-corr-id mono">${_esc(t.name || t.target_id)}</span>
+                                <span class="dossier-corr-badge">${_esc(t.source)}</span>
+                                <span class="dossier-corr-badge">${_esc(t.asset_type)}</span>
+                                ${distLabel ? `<span class="dossier-corr-dist mono">${distLabel}</span>` : ''}
+                            </div>
+                            <div class="dossier-corr-reason mono">${_esc(t.reason || '')}</div>
                         </div>`;
                     }).join('');
             }
 
-            // Show fused identifiers as implicit correlations
+            // Fused identifiers
             const idEntries = Object.entries(identifiers);
             const idHtml = idEntries.length > 0
-                ? `<div class="dossier-corr-ids-header" style="margin-top:6px">Fused Identifiers</div>` +
+                ? `<div class="dossier-corr-section-header" style="margin-top:8px">FUSED IDENTIFIERS</div>` +
                   idEntries.map(([k, v]) =>
                     `<div class="dossier-corr-fused-row">
                         <span class="dossier-corr-fused-type">${_esc(k)}</span>
@@ -1292,71 +1342,150 @@ export const DossiersPanelDef = {
                   ).join('')
                 : '';
 
+            // My target IDs
+            const myIdsHtml = myTargetIds.length > 0
+                ? `<div class="dossier-corr-section-header" style="margin-top:8px">TRACKER TARGET IDS</div>` +
+                  myTargetIds.map(tid =>
+                    `<div class="dossier-corr-fused-row">
+                        <span class="dossier-corr-fused-val mono" style="color:#00f0ff">${_esc(tid)}</span>
+                    </div>`
+                  ).join('')
+                : '';
+
+            const hasContent = confirmedHtml || linkedHtml || nearbyHtml || idHtml;
             el.innerHTML = `
-                ${corrHtml ? `<div class="dossier-corr-list">${corrHtml}</div>` : ''}
+                ${confirmedHtml}
                 ${linkedHtml}
                 ${nearbyHtml}
                 ${idHtml}
-                ${!corrHtml && !linkedHtml && !nearbyHtml && !idHtml ? '<div class="dossier-dim">No correlations found</div>' : ''}
+                ${myIdsHtml}
+                ${!hasContent ? '<div class="dossier-dim">No correlations found -- target has not been fused with other sensor data yet</div>' : ''}
             `;
 
-            // Wire linked target clicks — center map AND try to load dossier
-            el.querySelectorAll('.dossier-linked-target').forEach(card => {
+            // Wire ALL clickable correlation cards
+            _wireCorrelationCardClicks(el);
+        }
+
+        function _renderCorrelatedTargetsFallback(el, identifiers, linkedTargets, nearbyTargets) {
+            const allianceColors = { friendly: '#05ffa1', hostile: '#ff2a6d', unknown: '#fcee0a' };
+
+            let linkedHtml = '';
+            if (linkedTargets && linkedTargets.length > 0) {
+                linkedHtml = '<div class="dossier-corr-section-header">LINKED TARGETS</div>' +
+                    linkedTargets.map(t => {
+                        const srcIcon = SOURCE_ICONS[t.source] || '\u{1F4CB}';
+                        const allyColor = allianceColors[t.alliance] || '#888';
+                        const confPct = Math.round((t.confidence || 0) * 100);
+                        const confColor = confPct > 70 ? '#05ffa1' : confPct > 40 ? '#fcee0a' : '#ff2a6d';
+                        return `<div class="dossier-corr-card dossier-corr-clickable" data-target-id="${_esc(t.target_id)}" title="Click to view dossier">
+                            <div class="dossier-corr-card-main">
+                                <span class="dossier-corr-icon">${srcIcon}</span>
+                                <span class="dossier-corr-id mono" style="color:${allyColor}">${_esc(t.name)}</span>
+                                <span class="dossier-corr-badge">${_esc(t.source)}</span>
+                                <span class="dossier-corr-badge">${_esc(t.asset_type)}</span>
+                                ${confPct > 0 ? `<span class="dossier-corr-conf mono" style="color:${confColor}">${confPct}%</span>` : ''}
+                            </div>
+                        </div>`;
+                    }).join('');
+            }
+
+            let nearbyHtml = '';
+            if (nearbyTargets && nearbyTargets.length > 0) {
+                nearbyHtml = '<div class="dossier-corr-section-header">NEARBY CROSS-SOURCE TARGETS</div>' +
+                    nearbyTargets.map(t => {
+                        const srcIcon = SOURCE_ICONS[t.source] || '\u{1F4CB}';
+                        const distLabel = t.distance_m != null ? `${t.distance_m}m` : '';
+                        return `<div class="dossier-corr-card dossier-corr-clickable dossier-corr-candidate" data-target-id="${_esc(t.target_id)}" title="Click to view dossier">
+                            <div class="dossier-corr-card-main">
+                                <span class="dossier-corr-icon">${srcIcon}</span>
+                                <span class="dossier-corr-id mono">${_esc(t.name || t.target_id)}</span>
+                                <span class="dossier-corr-badge">${_esc(t.source)}</span>
+                                <span class="dossier-corr-badge">${_esc(t.asset_type)}</span>
+                                ${distLabel ? `<span class="dossier-corr-dist mono">${distLabel}</span>` : ''}
+                            </div>
+                        </div>`;
+                    }).join('');
+            }
+
+            const idEntries = Object.entries(identifiers);
+            const idHtml = idEntries.length > 0
+                ? `<div class="dossier-corr-section-header" style="margin-top:8px">FUSED IDENTIFIERS</div>` +
+                  idEntries.map(([k, v]) =>
+                    `<div class="dossier-corr-fused-row">
+                        <span class="dossier-corr-fused-type">${_esc(k)}</span>
+                        <span class="dossier-corr-fused-val mono">${_esc(String(v))}</span>
+                    </div>`
+                  ).join('')
+                : '';
+
+            const hasContent = linkedHtml || nearbyHtml || idHtml;
+            el.innerHTML = `
+                ${linkedHtml}
+                ${nearbyHtml}
+                ${idHtml}
+                ${!hasContent ? '<div class="dossier-dim">No correlations found</div>' : ''}
+            `;
+
+            _wireCorrelationCardClicks(el);
+        }
+
+        function _wireCorrelationCardClicks(container) {
+            container.querySelectorAll('.dossier-corr-clickable').forEach(card => {
                 card.style.cursor = 'pointer';
                 card.addEventListener('click', async () => {
                     const tid = card.dataset.targetId;
-                    if (!tid) return;
-                    // Center the map on this target
-                    EventBus.emit('map:centerOnUnit', { id: tid });
-                    // Try to find and load this target's dossier
-                    try {
-                        const resp = await fetch(`/api/dossiers/search?q=${encodeURIComponent(tid)}`);
-                        if (resp.ok) {
-                            const data = await resp.json();
-                            const results = data.results || [];
-                            if (results.length > 0) {
-                                loadDetail(results[0].dossier_id);
-                                EventBus.emit('toast:show', {
-                                    message: `Navigated to dossier for ${tid.substring(0, 12)}`,
-                                    type: 'info',
-                                });
-                            }
-                        }
-                    } catch (_) { /* dossier search unavailable */ }
-                });
-            });
+                    const directDossierId = card.dataset.dossierId;
+                    if (!tid && !directDossierId) return;
 
-            // Wire confirmed correlation cards to also be clickable for navigation
-            el.querySelectorAll('.dossier-corr-card:not(.dossier-linked-target):not(.dossier-corr-candidate)').forEach(card => {
-                const idEl = card.querySelector('.dossier-corr-id');
-                if (!idEl) return;
-                const otherId = idEl.textContent.trim();
-                if (!otherId) return;
-                card.style.cursor = 'pointer';
-                card.addEventListener('click', async () => {
-                    EventBus.emit('map:centerOnUnit', { id: otherId });
-                    try {
-                        const resp = await fetch(`/api/dossiers/search?q=${encodeURIComponent(otherId)}`);
-                        if (resp.ok) {
-                            const data = await resp.json();
-                            const results = data.results || [];
-                            if (results.length > 0) {
-                                loadDetail(results[0].dossier_id);
+                    // Center the map on this target
+                    if (tid) {
+                        EventBus.emit('map:centerOnUnit', { id: tid });
+                    }
+
+                    // Navigate to the correlated target's dossier
+                    if (directDossierId) {
+                        loadDetail(directDossierId);
+                        EventBus.emit('toast:show', {
+                            message: `Navigated to correlated dossier`,
+                            type: 'info',
+                        });
+                        return;
+                    }
+
+                    // Search for dossier by target ID
+                    if (tid) {
+                        try {
+                            const resp = await fetch(`/api/dossiers/search?q=${encodeURIComponent(tid)}`);
+                            if (resp.ok) {
+                                const data = await resp.json();
+                                const results = data.results || [];
+                                if (results.length > 0) {
+                                    loadDetail(results[0].dossier_id);
+                                    EventBus.emit('toast:show', {
+                                        message: `Navigated to dossier for ${tid.substring(0, 20)}`,
+                                        type: 'info',
+                                    });
+                                } else {
+                                    EventBus.emit('toast:show', {
+                                        message: `No dossier found for ${tid.substring(0, 20)}`,
+                                        type: 'alert',
+                                    });
+                                }
                             }
-                        }
-                    } catch (_) { /* dossier search unavailable */ }
+                        } catch (_) {}
+                    }
                 });
             });
         }
 
-        function _renderCorrelationsFallback(el, identifiers, dossierId) {
+        function _renderCorrelationsFallback(el, identifiers) {
             const entries = Object.entries(identifiers);
             if (entries.length === 0) {
                 el.innerHTML = '<div class="dossier-dim">No correlation data available</div>';
                 return;
             }
             el.innerHTML = `
-                <div class="dossier-corr-ids-header">Fused Identifiers</div>
+                <div class="dossier-corr-section-header">FUSED IDENTIFIERS</div>
                 ${entries.map(([k, v]) =>
                     `<div class="dossier-corr-fused-row">
                         <span class="dossier-corr-fused-type">${_esc(k)}</span>
@@ -1478,9 +1607,10 @@ export const DossiersPanelDef = {
                     selectedId = data.dossier_id;
                     loadDetail(data.dossier_id);
                 } else {
-                    // Look up dossier by target_id via the by-target API
+                    // Look up dossier by target_id — use fields=summary to avoid
+                    // loading thousands of signals just to get the dossier_id
                     try {
-                        const resp = await fetch(`/api/dossiers/by-target?target_id=${encodeURIComponent(data.target_id)}`);
+                        const resp = await fetch(`/api/dossiers/by-target?target_id=${encodeURIComponent(data.target_id)}&fields=summary`);
                         if (resp.ok) {
                             const dossier = await resp.json();
                             const did = dossier.dossier_id;
@@ -2239,10 +2369,94 @@ style.textContent = `
 }
 
 /* Clickable correlation cards */
-.dossier-corr-card[style*="cursor: pointer"]:hover,
-.dossier-linked-target:hover {
+.dossier-corr-clickable {
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.dossier-corr-clickable:hover {
+    background: rgba(0, 240, 255, 0.12);
+    border-color: rgba(0, 240, 255, 0.5);
+    box-shadow: 0 0 6px rgba(0, 240, 255, 0.15);
+}
+
+/* Correlation section header */
+.dossier-corr-section-header {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.5rem;
+    color: #00f0ff;
+    margin: 6px 0 3px 0;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+    padding-bottom: 2px;
+}
+
+/* Section description text */
+.dossier-corr-section-desc {
+    font-size: 0.45rem;
+    color: rgba(224, 224, 224, 0.5);
+    margin-bottom: 4px;
+    font-style: italic;
+}
+
+/* Card main row layout */
+.dossier-corr-card-main {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+/* Source/type badge */
+.dossier-corr-badge {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.45rem;
+    color: rgba(0, 240, 255, 0.7);
     background: rgba(0, 240, 255, 0.08);
-    border-color: rgba(0, 240, 255, 0.4);
+    border: 1px solid rgba(0, 240, 255, 0.15);
+    border-radius: 3px;
+    padding: 0 4px;
+    letter-spacing: 0.03em;
+}
+
+/* Strategy breakdown */
+.dossier-corr-strategies {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+}
+
+.dossier-corr-strategy {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.4rem;
+    color: rgba(5, 255, 161, 0.7);
+    background: rgba(5, 255, 161, 0.06);
+    border: 1px solid rgba(5, 255, 161, 0.12);
+    border-radius: 2px;
+    padding: 0 3px;
+}
+
+/* Reason text */
+.dossier-corr-reason {
+    font-size: 0.42rem;
+    color: rgba(224, 224, 224, 0.4);
+    margin-top: 1px;
+    word-break: break-all;
+}
+
+/* Distance label */
+.dossier-corr-dist {
+    font-size: 0.5rem;
+    color: #fcee0a;
+    font-weight: 600;
+}
+
+/* Candidate (nearby cross-source) — yellow tint */
+.dossier-corr-candidate.dossier-corr-clickable:hover {
+    background: rgba(252, 238, 10, 0.12);
+    border-color: rgba(252, 238, 10, 0.4);
+    box-shadow: 0 0 6px rgba(252, 238, 10, 0.12);
 }
 
 /* Signal chart canvas hover */
