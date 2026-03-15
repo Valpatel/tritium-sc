@@ -214,6 +214,7 @@ export function initWatchlistPanel(container) {
 // PanelDef for PanelManager registration
 export const WatchlistPanelDef = {
     id: 'watchlist',
+    title: 'WATCH LIST',
     label: 'WATCH LIST',
     icon: '\uD83D\uDC41',
     group: 'intel',

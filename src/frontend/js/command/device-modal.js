@@ -882,6 +882,18 @@ const DeviceControlRegistry = {
             'ip_camera': 'camera',
             'ptz_camera': 'camera',
             'synthetic_camera': 'camera',
+            'phone': 'ble_device',
+            'watch': 'ble_device',
+            'laptop': 'ble_device',
+            'tablet': 'ble_device',
+            'headphones': 'ble_device',
+            'speaker': 'ble_device',
+            'beacon': 'ble_device',
+            'wearable': 'ble_device',
+            'iot': 'ble_device',
+            'wifi_ap': 'wifi_device',
+            'wifi_client': 'wifi_device',
+            'edge_node': 'ble_device',
         };
 
         if (aliases[type] && this._controls.has(aliases[type])) {
@@ -897,6 +909,81 @@ const DeviceControlRegistry = {
     },
 };
 
+// TrackedTargetControl — for BLE, WiFi, and edge-tracker detected targets
+const TrackedTargetControl = {
+    type: 'tracked_target',
+    title: 'TRACKED TARGET',
+
+    render(device) {
+        const alliance = (device.alliance || 'unknown').toUpperCase();
+        const allianceColor = { FRIENDLY: '#05ffa1', HOSTILE: '#ff2a6d', UNKNOWN: '#aaa', NEUTRAL: '#fcee0a' }[alliance] || '#aaa';
+        const rssi = device.rssi ?? device.strongest_rssi ?? device.last_rssi ?? null;
+        const confidence = device.confidence != null ? Math.round(device.confidence * 100) + '%' : '--';
+        const source = device.source || device.asset_type || device.type || '--';
+        const firstSeen = device.first_seen ? new Date(device.first_seen).toLocaleString() : '--';
+        const lastSeen = device.last_seen || device.lastSeen ? new Date(device.last_seen || device.lastSeen).toLocaleString() : '--';
+        const manufacturer = device.manufacturer || device.oui_manufacturer || '';
+        const deviceClass = device.device_class || device.classification || '';
+
+        let rssiHtml = '--';
+        if (rssi !== null) {
+            const rssiColor = rssi > -50 ? '#05ffa1' : rssi > -70 ? '#fcee0a' : '#ff2a6d';
+            const pct = Math.max(0, Math.min(100, ((rssi + 100) / 70) * 100));
+            rssiHtml = `<span style="color:${rssiColor}">${rssi} dBm</span>
+                <div style="width:80px;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;display:inline-block;vertical-align:middle;margin-left:6px">
+                    <div style="width:${pct}%;height:100%;background:${rssiColor};border-radius:2px"></div>
+                </div>`;
+        }
+
+        return `
+            <div class="dc-stats">
+                <div class="dc-stat-row"><span class="dc-label">TARGET ID</span><span class="dc-value" style="font-family:'JetBrains Mono',monospace;font-size:0.55rem">${_esc(device.id || '--')}</span></div>
+                <div class="dc-stat-row"><span class="dc-label">NAME</span><span class="dc-value">${_esc(device.name || device.id || '--')}</span></div>
+                <div class="dc-stat-row"><span class="dc-label">TYPE</span><span class="dc-value">${_esc(source)}</span></div>
+                <div class="dc-stat-row"><span class="dc-label">ALLIANCE</span><span class="dc-value" style="color:${allianceColor};font-weight:600">${alliance}</span></div>
+                ${deviceClass ? `<div class="dc-stat-row"><span class="dc-label">CLASS</span><span class="dc-value">${_esc(deviceClass)}</span></div>` : ''}
+                ${manufacturer ? `<div class="dc-stat-row"><span class="dc-label">MANUFACTURER</span><span class="dc-value">${_esc(manufacturer)}</span></div>` : ''}
+                <div class="dc-stat-row"><span class="dc-label">RSSI</span><span class="dc-value">${rssiHtml}</span></div>
+                <div class="dc-stat-row"><span class="dc-label">CONFIDENCE</span><span class="dc-value">${confidence}</span></div>
+                <div class="dc-stat-row"><span class="dc-label">POSITION</span><span class="dc-value">(${(device.position?.x || 0).toFixed(4)}, ${(device.position?.y || 0).toFixed(4)})</span></div>
+                <div class="dc-stat-row"><span class="dc-label">FIRST SEEN</span><span class="dc-value" style="font-size:0.5rem">${firstSeen}</span></div>
+                <div class="dc-stat-row"><span class="dc-label">LAST SEEN</span><span class="dc-value" style="font-size:0.5rem">${lastSeen}</span></div>
+                <div class="dc-stat-row"><span class="dc-label">STATUS</span><span class="dc-value">${(device.status || 'active').toUpperCase()}</span></div>
+            </div>
+        `;
+    },
+
+    bind(container, device) {},
+
+    update(container, device) {
+        // Live update RSSI and last_seen
+        const rows = container.querySelectorAll('.dc-stat-row');
+        for (const row of rows) {
+            const label = row.querySelector('.dc-label');
+            const value = row.querySelector('.dc-value');
+            if (!label || !value) continue;
+            const key = label.textContent;
+            if (key === 'LAST SEEN') {
+                const ls = device.last_seen || device.lastSeen;
+                value.textContent = ls ? new Date(ls).toLocaleString() : '--';
+            } else if (key === 'RSSI') {
+                const rssi = device.rssi ?? device.strongest_rssi ?? device.last_rssi ?? null;
+                if (rssi !== null) {
+                    const rssiColor = rssi > -50 ? '#05ffa1' : rssi > -70 ? '#fcee0a' : '#ff2a6d';
+                    value.innerHTML = `<span style="color:${rssiColor}">${rssi} dBm</span>`;
+                }
+            } else if (key === 'ALLIANCE') {
+                const alliance = (device.alliance || 'unknown').toUpperCase();
+                const allianceColor = { FRIENDLY: '#05ffa1', HOSTILE: '#ff2a6d', UNKNOWN: '#aaa', NEUTRAL: '#fcee0a' }[alliance] || '#aaa';
+                value.style.color = allianceColor;
+                value.textContent = alliance;
+            }
+        }
+    },
+
+    destroy(container) {},
+};
+
 // Register built-in controls
 DeviceControlRegistry.register('rover', RoverControl);
 DeviceControlRegistry.register('drone', DroneControl);
@@ -905,6 +992,9 @@ DeviceControlRegistry.register('sensor', SensorControl);
 DeviceControlRegistry.register('mesh_radio', MeshRadioControl);
 DeviceControlRegistry.register('camera', CameraControl);
 DeviceControlRegistry.register('npc', NPCControl);
+DeviceControlRegistry.register('ble_device', TrackedTargetControl);
+DeviceControlRegistry.register('wifi_device', TrackedTargetControl);
+DeviceControlRegistry.register('tracked_target', TrackedTargetControl);
 
 // ============================================================
 // DeviceModalManager

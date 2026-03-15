@@ -182,6 +182,30 @@ function _mapMenuItems(mapActions) {
 
 function _gameMenuItems(mapActions) {
     return [
+        { label: 'Start Demo', action: async () => {
+            try {
+                const res = await fetch('/api/demo/start', { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    EventBus.emit('toast:show', { message: 'Demo mode started', type: 'info' });
+                } else {
+                    EventBus.emit('toast:show', { message: data.error || 'Failed to start demo', type: 'alert' });
+                }
+            } catch (e) {
+                EventBus.emit('toast:show', { message: 'Demo start failed: ' + e.message, type: 'alert' });
+            }
+        }},
+        { label: 'Stop Demo', action: async () => {
+            try {
+                const res = await fetch('/api/demo/stop', { method: 'POST' });
+                if (res.ok) {
+                    EventBus.emit('toast:show', { message: 'Demo mode stopped', type: 'info' });
+                }
+            } catch (e) {
+                EventBus.emit('toast:show', { message: 'Demo stop failed', type: 'alert' });
+            }
+        }},
+        { separator: true },
         { label: 'New Mission', shortcut: 'B',
           action: () => { if (mapActions.beginWar) mapActions.beginWar(); } },
         { separator: true },

@@ -576,6 +576,42 @@ function init() {
     document.addEventListener('click', _initAudio, { once: true });
     document.addEventListener('keydown', _initAudio, { once: true });
 
+    // Demo start button — visible when no targets on map, hidden once targets appear
+    const demoOverlay = document.getElementById('demo-start-overlay');
+    const demoBtn = document.getElementById('demo-start-btn');
+    if (demoBtn && demoOverlay) {
+        demoBtn.addEventListener('click', async () => {
+            demoBtn.disabled = true;
+            demoBtn.textContent = '[ STARTING... ]';
+            try {
+                const res = await fetch('/api/demo/start', { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    EventBus.emit('toast:show', { message: 'Demo mode started', type: 'info' });
+                    demoOverlay.classList.add('hidden');
+                } else {
+                    EventBus.emit('toast:show', { message: data.error || 'Failed to start demo', type: 'alert' });
+                }
+            } catch (e) {
+                EventBus.emit('toast:show', { message: 'Demo start failed: ' + e.message, type: 'alert' });
+            }
+            demoBtn.disabled = false;
+            demoBtn.textContent = '[ START DEMO ]';
+        });
+
+        // Hide demo button once targets appear on the map
+        TritiumStore.on('units', () => {
+            if (TritiumStore.units.size > 0) {
+                demoOverlay.classList.add('hidden');
+            }
+        });
+
+        // Check demo status — hide button if demo already running
+        fetch('/api/demo/status').then(r => r.ok ? r.json() : {}).then(d => {
+            if (d.active) demoOverlay.classList.add('hidden');
+        }).catch(() => {});
+    }
+
     console.log('%c[TRITIUM] Command Center ready', 'color: #05ffa1; font-weight: bold;');
 }
 

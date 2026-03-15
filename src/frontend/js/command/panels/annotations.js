@@ -311,6 +311,7 @@ export { setDrawMode, getDrawMode, handleMapClick, finishFreehand };
 // PanelDef for PanelManager registration
 export const AnnotationsPanelDef = {
     id: 'annotations',
+    title: 'ANNOTATIONS',
     label: 'ANNOTATIONS',
     icon: '\u270F',
     group: 'map',

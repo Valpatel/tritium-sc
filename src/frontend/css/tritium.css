@@ -3115,6 +3115,37 @@ button:disabled:hover {
     50% { box-shadow: 0 0 30px rgba(255, 42, 109, 0.6), 0 0 60px rgba(255, 42, 109, 0.2); }
 }
 
+/* START DEMO overlay */
+.demo-start-overlay {
+    position: absolute;
+    bottom: 48px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 44;
+    pointer-events: auto;
+    transition: opacity 0.3s;
+}
+.demo-start-overlay.hidden { display: none; }
+.demo-start-btn {
+    font-size: 0.85rem;
+    letter-spacing: 3px;
+    color: #05ffa1;
+    border-color: rgba(5, 255, 161, 0.3);
+    background: rgba(5, 255, 161, 0.06);
+    padding: 10px 32px;
+    animation: demo-btn-pulse 2.5s ease-in-out infinite;
+}
+.demo-start-btn:hover {
+    background: rgba(5, 255, 161, 0.15);
+    box-shadow: 0 0 20px rgba(5, 255, 161, 0.3), 0 0 40px rgba(5, 255, 161, 0.1);
+    color: #05ffa1;
+    border-color: rgba(5, 255, 161, 0.5);
+}
+@keyframes demo-btn-pulse {
+    0%, 100% { box-shadow: 0 0 10px rgba(5, 255, 161, 0.2); }
+    50% { box-shadow: 0 0 20px rgba(5, 255, 161, 0.4), 0 0 40px rgba(5, 255, 161, 0.15); }
+}
+
 /* Game Over overlay */
 .war-game-over {
     position: absolute;
