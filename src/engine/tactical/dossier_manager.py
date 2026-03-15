@@ -350,7 +350,11 @@ class DossierManager:
                         self._handle_correlation(data)
                     elif event_type == "ble:new_device":
                         self._handle_ble_device(data)
-                    elif event_type == "detections":
+                    elif event_type in ("fleet.ble_presence", "edge:ble_update"):
+                        self._handle_ble_presence(data)
+                    elif event_type == "fleet.ble_sighting":
+                        self._handle_ble_sighting(data)
+                    elif event_type in ("detections", "detection:camera", "detection:camera:fusion"):
                         self._handle_detection(data)
                     elif event_type == "enrichment_complete":
                         self._handle_enrichment(data)
@@ -392,6 +396,87 @@ class DossierManager:
         # If they have different dossiers, merge them
         if p_dossier != s_dossier:
             self.merge(p_dossier, s_dossier)
+
+    def _handle_ble_presence(self, data: dict) -> None:
+        """Handle fleet.ble_presence events (from demo generators and edge nodes).
+
+        These contain a list of BLE devices under 'devices', each with
+        'addr' (or 'mac'), 'name', 'rssi', and 'type'.
+        """
+        devices = data.get("devices", [])
+        for dev in devices:
+            mac = dev.get("addr", dev.get("mac", ""))
+            if not mac:
+                continue
+            name = dev.get("name") or mac
+            target_id = f"ble_{mac.replace(':', '').lower()}"
+
+            identifiers = {"mac": mac.upper()}
+            if dev.get("name"):
+                identifiers["name"] = dev["name"]
+
+            entity_type = "device"
+            dev_type = dev.get("type", "")
+            if dev_type in ("phone", "smartphone"):
+                entity_type = "phone"
+            elif dev_type in ("watch", "wearable"):
+                entity_type = "wearable"
+
+            self.find_or_create_for_target(
+                target_id,
+                name=name,
+                entity_type=entity_type,
+                identifiers=identifiers,
+                tags=["ble", dev_type] if dev_type else ["ble"],
+            )
+
+            self.add_signal_to_target(
+                target_id,
+                source="ble",
+                signal_type="presence",
+                data={
+                    "mac": mac,
+                    "rssi": dev.get("rssi", -100),
+                    "name": name,
+                    "type": dev_type,
+                    "node_id": data.get("node_id", ""),
+                },
+                confidence=max(0.0, min(1.0, (dev.get("rssi", -100) + 100) / 70)),
+            )
+
+    def _handle_ble_sighting(self, data: dict) -> None:
+        """Handle fleet.ble_sighting events (from fusion scenario)."""
+        sighting = data.get("sighting", data)
+        mac = sighting.get("mac", "")
+        if not mac:
+            return
+        target_id = f"ble_{mac.replace(':', '').lower()}"
+        name = sighting.get("name") or mac
+
+        identifiers = {"mac": mac.upper()}
+        if sighting.get("name"):
+            identifiers["name"] = sighting["name"]
+
+        self.find_or_create_for_target(
+            target_id,
+            name=name,
+            entity_type="device",
+            identifiers=identifiers,
+            tags=["ble"],
+        )
+
+        self.add_signal_to_target(
+            target_id,
+            source="ble",
+            signal_type="sighting",
+            data={
+                "mac": mac,
+                "rssi": sighting.get("rssi", -100),
+                "manufacturer": sighting.get("manufacturer", ""),
+                "device_class": sighting.get("device_class", ""),
+            },
+            confidence=max(0.0, min(1.0, (sighting.get("rssi", -100) + 100) / 70)),
+        )
 
     def _handle_ble_device(self, data: dict) -> None:
         """Handle a new BLE device event."""

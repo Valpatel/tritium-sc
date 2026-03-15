@@ -197,7 +197,11 @@ class ThreatFeedPlugin(EventDrainPlugin):
     # -- HTTP routes -----------------------------------------------------------
 
     def _register_routes(self) -> None:
-        """Register FastAPI routes for threat feed management."""
+        """Register FastAPI routes for threat feed management.
+
+        Registers routes at /api/threats (primary) and /api/threat-feeds (alias)
+        so both paths are reachable.
+        """
         if not self._app or not self._manager:
             return
 
@@ -205,3 +209,23 @@ class ThreatFeedPlugin(EventDrainPlugin):
 
         router = create_router(self._manager)
         self._app.include_router(router)
+
+        # Register alias at /api/threat-feeds for discoverability
+        from fastapi import APIRouter
+        from fastapi.responses import RedirectResponse
+
+        alias = APIRouter(prefix="/api/threat-feeds", tags=["threat-feeds"])
+
+        @alias.get("/{path:path}")
+        async def threat_feeds_alias_get(path: str = ""):
+            """Redirect /api/threat-feeds/* to /api/threats/*."""
+            target = f"/api/threats/{path}" if path else "/api/threats/"
+            return RedirectResponse(url=target, status_code=307)
+
+        @alias.post("/{path:path}")
+        async def threat_feeds_alias_post(path: str = ""):
+            """Redirect /api/threat-feeds/* POST to /api/threats/*."""
+            target = f"/api/threats/{path}" if path else "/api/threats/"
+            return RedirectResponse(url=target, status_code=307)
+
+        self._app.include_router(alias)

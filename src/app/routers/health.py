@@ -66,7 +66,7 @@ def _subsystem_status(request: Request) -> dict[str, str]:
     pm = getattr(request.app.state, "plugin_manager", None)
     if pm is not None:
         plugins = pm.list_plugins()
-        running = sum(1 for p in plugins if p.get("running", False))
+        running = sum(1 for p in plugins if p.get("status") == "running")
         checks["plugins"] = f"{running}/{len(plugins)} running"
     else:
         checks["plugins"] = "disabled"

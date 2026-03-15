@@ -108,7 +108,7 @@ async def self_test(request: Request):
         pm = getattr(request.app.state, "plugin_manager", None)
         if pm is not None:
             plugins = pm.list_plugins()
-            running = sum(1 for p in plugins if p.get("running", False))
+            running = sum(1 for p in plugins if p.get("status") == "running")
             return {
                 "total": len(plugins),
                 "running": running,

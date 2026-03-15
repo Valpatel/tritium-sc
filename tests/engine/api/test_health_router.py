@@ -57,8 +57,8 @@ def full_app():
     # Simulate plugin manager with 2 plugins, 1 running
     pm = MagicMock()
     pm.list_plugins.return_value = [
-        {"id": "edge_tracker", "running": True},
-        {"id": "camera_feeds", "running": False},
+        {"id": "edge_tracker", "status": "running"},
+        {"id": "camera_feeds", "status": "configured"},
     ]
     pm.health_check.return_value = {
         "edge_tracker": {"healthy": True, "targets": 42},

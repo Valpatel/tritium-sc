@@ -37,8 +37,8 @@ def full_app():
     app.state.demo_controller = SimpleNamespace(active=False)
     app.state.plugin_manager = SimpleNamespace(
         list_plugins=lambda: [
-            {"name": "a", "running": True},
-            {"name": "b", "running": True},
+            {"name": "a", "status": "running"},
+            {"name": "b", "status": "running"},
         ],
     )
     app.state.target_tracker = SimpleNamespace()
