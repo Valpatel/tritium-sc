@@ -50,6 +50,15 @@ class TestRLEndToEnd:
             source_diversity_score = random.choice([0.0, 0.4, 0.6, 0.8, 1.0])
             wifi_probe_correlation = random.uniform(0.0, 1.0) if random.random() > 0.5 else 0.0
 
+            # Wave 150 derived features
+            spatial = max(0.0, 1.0 - distance / 15.0) if distance < 15.0 else 0.0
+            temporal = max(0.0, 1.0 - time_gap / 10.0) if time_gap < 10.0 else 0.0
+            primary_confidence = random.uniform(0.3, 1.0)
+            secondary_confidence = random.uniform(0.1, primary_confidence)
+            source_pair = random.choice([0.1, 0.3, 0.7, 0.8, 0.9, 1.0])
+            # Wave 157 acoustic co-occurrence
+            acoustic_cooccurrence = random.uniform(0.0, 1.0) if random.random() > 0.6 else 0.0
+
             features = {
                 "distance": distance,
                 "rssi_delta": rssi_delta,
@@ -61,19 +70,31 @@ class TestRLEndToEnd:
                 "time_of_day_similarity": time_of_day_similarity,
                 "source_diversity_score": source_diversity_score,
                 "wifi_probe_correlation": wifi_probe_correlation,
+                "spatial": spatial,
+                "temporal": temporal,
+                "primary_confidence": primary_confidence,
+                "secondary_confidence": secondary_confidence,
+                "source_pair": source_pair,
+                "acoustic_cooccurrence": acoustic_cooccurrence,
             }
 
-            # Ground truth scoring (same as rl_training_generator)
+            # Ground truth scoring (same as rl_training_generator + Wave 157)
             score = (
-                0.30 * max(0.0, 1.0 - distance / 5.0)
-                + 0.15 * co_movement
-                + 0.10 * device_type_match
-                + 0.10 * signal_pattern
-                + 0.08 * max(0.0, 1.0 - time_gap / 5.0)
-                + 0.10 * co_movement_duration
-                + 0.05 * time_of_day_similarity
-                + 0.05 * source_diversity_score
-                + 0.07 * wifi_probe_correlation
+                0.25 * max(0.0, 1.0 - distance / 5.0)
+                + 0.10 * co_movement
+                + 0.08 * device_type_match
+                + 0.08 * signal_pattern
+                + 0.06 * max(0.0, 1.0 - time_gap / 5.0)
+                + 0.08 * co_movement_duration
+                + 0.04 * time_of_day_similarity
+                + 0.04 * source_diversity_score
+                + 0.05 * wifi_probe_correlation
+                + 0.08 * spatial
+                + 0.06 * temporal
+                + 0.04 * primary_confidence
+                + 0.02 * secondary_confidence
+                + 0.05 * source_pair
+                + 0.07 * acoustic_cooccurrence
             )
 
             is_correlated = score > 0.5
@@ -117,7 +138,19 @@ class TestRLEndToEnd:
         print(f"\nRL Training Results:")
         print(f"  Accuracy: {accuracy:.3f}")
         print(f"  Training count: {result['training_count']}")
-        print(f"  Features: {result.get('feature_names', [])}")
+        print(f"  Best params: {result.get('best_params', {})}")
+        # Feature importance analysis
+        importances = result.get("feature_importances", {})
+        if importances:
+            sorted_imp = sorted(importances.items(), key=lambda x: x[1], reverse=True)
+            print(f"  Feature importances (ranked):")
+            for fname, imp in sorted_imp:
+                bar = "#" * int(imp * 50)
+                print(f"    {fname:30s} {imp:.4f} {bar}")
+            # Identify low-importance features (<1%)
+            low_imp = [f for f, v in sorted_imp if v < 0.01]
+            if low_imp:
+                print(f"  Low importance (<1%): {low_imp}")
 
         # 5. Accuracy should be meaningfully above random (50%)
         # With structured synthetic data and 10 features, expect >55%
@@ -135,6 +168,12 @@ class TestRLEndToEnd:
             "time_of_day_similarity": 0.9,
             "source_diversity_score": 0.8,
             "wifi_probe_correlation": 0.6,
+            "spatial": 0.93,
+            "temporal": 0.9,
+            "primary_confidence": 0.85,
+            "secondary_confidence": 0.7,
+            "source_pair": 1.0,
+            "acoustic_cooccurrence": 0.6,
         }
 
         prob, conf = learner.predict(test_features)
@@ -182,6 +221,12 @@ class TestRLEndToEnd:
                 "time_of_day_similarity": random.uniform(0.0, 1.0),
                 "source_diversity_score": random.uniform(0.0, 1.0),
                 "wifi_probe_correlation": random.uniform(0.0, 1.0),
+                "spatial": random.uniform(0.0, 1.0),
+                "temporal": random.uniform(0.0, 1.0),
+                "primary_confidence": random.uniform(0.3, 1.0),
+                "secondary_confidence": random.uniform(0.1, 0.8),
+                "source_pair": random.choice([0.1, 0.3, 0.7, 0.8, 0.9, 1.0]),
+                "acoustic_cooccurrence": random.uniform(0.0, 1.0) if random.random() > 0.6 else 0.0,
             }
             outcome = "correct" if random.random() < 0.75 else "incorrect"
             store.log_correlation(
@@ -211,6 +256,12 @@ class TestRLEndToEnd:
                 "time_of_day_similarity": random.uniform(0.0, 1.0),
                 "source_diversity_score": random.uniform(0.0, 1.0),
                 "wifi_probe_correlation": random.uniform(0.0, 1.0),
+                "spatial": random.uniform(0.0, 1.0),
+                "temporal": random.uniform(0.0, 1.0),
+                "primary_confidence": random.uniform(0.3, 1.0),
+                "secondary_confidence": random.uniform(0.1, 0.8),
+                "source_pair": random.choice([0.1, 0.3, 0.7, 0.8, 0.9, 1.0]),
+                "acoustic_cooccurrence": random.uniform(0.0, 1.0) if random.random() > 0.6 else 0.0,
             }
             outcome = "correct" if random.random() < 0.75 else "incorrect"
             store.log_correlation(

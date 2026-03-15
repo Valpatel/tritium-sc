@@ -62,6 +62,31 @@ class TestExtractFeatures:
         assert "secondary_confidence" in features
         assert "source_pair" in features
         assert features["source_pair"] == 1.0  # ble+yolo = highest
+        # Wave 157: acoustic co-occurrence
+        assert "acoustic_cooccurrence" in features
+        assert features["acoustic_cooccurrence"] == 0.0  # No acoustic events
+
+    def test_acoustic_cooccurrence(self):
+        """Wave 157: verify acoustic co-occurrence boosts correlation."""
+        class FakeTarget:
+            def __init__(self, source, last_seen, acoustic_events=None):
+                self.position = (0.0, 0.0)
+                self.source = source
+                self.asset_type = "phone"
+                self.last_seen = last_seen
+                self.rssi = -50
+                self.acoustic_events = acoustic_events or []
+
+        # Target A has a voice event at t=100.5, target B last seen at t=101.0
+        a = FakeTarget("ble", 100.0, acoustic_events=[
+            {"timestamp": 100.5, "category": "voice"},
+        ])
+        b = FakeTarget("yolo", 101.0)
+
+        features = _extract_features(a, b)
+        assert features["acoustic_cooccurrence"] > 0.0
+        # Voice at 100.5, target B last_seen at 101.0 => delta=0.5 => score=0.9
+        assert features["acoustic_cooccurrence"] > 0.8
 
     def test_same_source(self):
         class FakeTarget:

@@ -44,6 +44,8 @@ FEATURE_NAMES = [
     "primary_confidence",
     "secondary_confidence",
     "source_pair",
+    # Wave 157 — acoustic co-occurrence for multi-modal fusion
+    "acoustic_cooccurrence",
 ]
 
 MODEL_PATH = "data/models/correlation_model.pkl"
@@ -67,6 +69,8 @@ class CorrelationLearner(BaseLearner):
         self._training_store = training_store
         self._feature_names = feature_names or list(FEATURE_NAMES)
         self._sklearn_available = _check_sklearn()
+        self._feature_importances: dict[str, float] = {}
+        self._best_params: dict[str, Any] = {}
 
         # Try to load existing model
         self.load()
@@ -80,6 +84,8 @@ class CorrelationLearner(BaseLearner):
         stats = self.get_stats()
         stats["sklearn_available"] = self._sklearn_available
         stats["feature_names"] = self._feature_names
+        stats["feature_importances"] = self._feature_importances
+        stats["best_params"] = self._best_params
         return stats
 
     def train(self) -> dict[str, Any]:
@@ -120,46 +126,91 @@ class CorrelationLearner(BaseLearner):
             # Wave 150: augment minority class (incorrect) with jittered copies
             X, y = self._augment_minority(X, y, target_ratio=0.4)
 
-            # Wave 150: switched from LogisticRegression (54.8%) to
-            # RandomForest which handles non-linear feature interactions
-            # and achieves >83% on cross-validation.
+            # Wave 157: GridSearchCV hyperparameter tuning over
+            # RandomForest to push beyond 81.7% accuracy.
             from sklearn.ensemble import RandomForestClassifier
-            from sklearn.model_selection import cross_val_score
+            from sklearn.model_selection import cross_val_score, GridSearchCV
             import numpy as np
 
             X_arr = np.array(X)
             y_arr = np.array(y)
 
-            model = RandomForestClassifier(
-                n_estimators=100,
-                max_depth=None,
+            # Hyperparameter grid — Wave 157 tuning
+            param_grid = {
+                "n_estimators": [50, 100, 200],
+                "max_depth": [5, 10, 15, None],
+                "min_samples_split": [2, 5, 10],
+            }
+
+            base_model = RandomForestClassifier(
                 class_weight="balanced",
                 random_state=42,
                 n_jobs=-1,
             )
 
-            # Cross-validation for accuracy estimate
-            if len(X) >= 20:
+            # Use GridSearchCV when enough data; fallback to simple CV
+            if len(X) >= 40:
+                cv_folds = min(5, len(X) // 4)
+                grid = GridSearchCV(
+                    base_model,
+                    param_grid,
+                    cv=cv_folds,
+                    scoring="accuracy",
+                    n_jobs=-1,
+                    refit=True,
+                )
+                grid.fit(X_arr, y_arr)
+                model = grid.best_estimator_
+                accuracy = float(grid.best_score_)
+                best_params = grid.best_params_
+                logger.info(
+                    "GridSearchCV best params: %s (cv_acc=%.3f)",
+                    best_params, accuracy,
+                )
+            elif len(X) >= 20:
+                # Not enough for grid search — use defaults with CV
+                model = RandomForestClassifier(
+                    n_estimators=100,
+                    max_depth=10,
+                    class_weight="balanced",
+                    random_state=42,
+                    n_jobs=-1,
+                )
                 cv_folds = min(5, len(X) // 4)
                 scores = cross_val_score(model, X_arr, y_arr, cv=cv_folds, scoring="accuracy")
                 accuracy = float(scores.mean())
+                model.fit(X_arr, y_arr)
+                best_params = {"n_estimators": 100, "max_depth": 10}
             else:
-                accuracy = 0.0  # Not enough data for CV
+                model = RandomForestClassifier(
+                    n_estimators=100,
+                    max_depth=10,
+                    class_weight="balanced",
+                    random_state=42,
+                    n_jobs=-1,
+                )
+                model.fit(X_arr, y_arr)
+                accuracy = 0.0
+                best_params = {"n_estimators": 100, "max_depth": 10}
 
-            # Train on full dataset
-            model.fit(X_arr, y_arr)
+            # Feature importance analysis — Wave 157
+            importances = dict(zip(self._feature_names, model.feature_importances_))
+            sorted_imp = sorted(importances.items(), key=lambda x: x[1], reverse=True)
+            logger.info("Feature importances (top 10): %s", sorted_imp[:10])
 
             self._model = model
             self._accuracy = accuracy
             self._training_count = len(X)
             self._last_trained = time.time()
+            self._feature_importances = importances
+            self._best_params = best_params
 
             # Save model
             self.save()
 
             logger.info(
-                "Correlation model trained: accuracy=%.3f, n=%d",
-                accuracy, len(X),
+                "Correlation model trained: accuracy=%.3f, n=%d, params=%s",
+                accuracy, len(X), best_params,
             )
 
             return {
@@ -167,6 +218,8 @@ class CorrelationLearner(BaseLearner):
                 "accuracy": accuracy,
                 "training_count": len(X),
                 "feature_names": self._feature_names,
+                "best_params": best_params,
+                "feature_importances": importances,
             }
 
         except Exception as exc:
@@ -286,12 +339,16 @@ class CorrelationLearner(BaseLearner):
         """Extend BaseLearner serialization with feature_names."""
         data = super()._serialize()
         data["feature_names"] = self._feature_names
+        data["feature_importances"] = self._feature_importances
+        data["best_params"] = self._best_params
         return data
 
     def _deserialize(self, data: dict[str, Any]) -> None:
         """Extend BaseLearner deserialization with feature_names."""
         super()._deserialize(data)
         self._feature_names = data.get("feature_names", self._feature_names)
+        self._feature_importances = data.get("feature_importances", {})
+        self._best_params = data.get("best_params", {})
 
 
 class LearnedStrategy:
@@ -502,6 +559,46 @@ def _extract_features(target_a: Any, target_b: Any) -> dict[str, float]:
     pair_key = frozenset({source_a or "unknown", source_b or "unknown"})
     features["source_pair"] = source_pair_map.get(pair_key, 0.3 if source_a != source_b else 0.1)
 
+    # --- Wave 157: acoustic co-occurrence ---
+    # If a voice/sound event was detected near a BLE/camera target at a similar
+    # time, it strengthens the correlation (person speaking near their phone).
+    # Uses acoustic_events attribute if present on targets.
+    features["acoustic_cooccurrence"] = 0.0
+    try:
+        acoustic_a = getattr(target_a, "acoustic_events", None) or []
+        acoustic_b = getattr(target_b, "acoustic_events", None) or []
+        if acoustic_a or acoustic_b:
+            # Check for temporal overlap of acoustic events
+            # Each event is a dict with "timestamp" and "category"
+            voice_categories = {"voice", "speech", "conversation"}
+            a_voice_times = [
+                float(e.get("timestamp", 0))
+                for e in acoustic_a
+                if e.get("category", "") in voice_categories
+            ]
+            b_voice_times = [
+                float(e.get("timestamp", 0))
+                for e in acoustic_b
+                if e.get("category", "") in voice_categories
+            ]
+            # Score: any voice event within 5s of the other target's last_seen
+            last_a_t = float(getattr(target_a, "last_seen", 0.0))
+            last_b_t = float(getattr(target_b, "last_seen", 0.0))
+            for vt in a_voice_times:
+                if abs(vt - last_b_t) < 5.0:
+                    features["acoustic_cooccurrence"] = max(
+                        features["acoustic_cooccurrence"],
+                        1.0 - abs(vt - last_b_t) / 5.0,
+                    )
+            for vt in b_voice_times:
+                if abs(vt - last_a_t) < 5.0:
+                    features["acoustic_cooccurrence"] = max(
+                        features["acoustic_cooccurrence"],
+                        1.0 - abs(vt - last_a_t) / 5.0,
+                    )
+    except (TypeError, ValueError, AttributeError):
+        pass
+
     return features
 
 
@@ -527,6 +624,8 @@ def _static_predict(features: dict[str, float]) -> tuple[float, float]:
         "primary_confidence": 0.12,
         "secondary_confidence": 0.06,
         "source_pair": 0.10,
+        # Wave 157
+        "acoustic_cooccurrence": 0.15,
     }
     bias = 0.5
 
