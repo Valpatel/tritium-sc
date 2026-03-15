@@ -278,6 +278,26 @@ function init() {
         showToast(data.message || data, data.type || 'info');
     });
 
+    // Geofence enter/exit push notifications — toast + notification bell
+    EventBus.on('notification:geofence', (data) => {
+        const dir = data.direction === 'enter' ? 'ENTERED' : 'EXITED';
+        const zone = data.zone_name || data.zone_id || '?';
+        const target = data.target_id || '?';
+        const severity = data.zone_type === 'restricted' ? 'alert' : 'info';
+        showToast(`GEOFENCE: ${target} ${dir} ${zone}`, severity);
+        // Push as a notification for the bell badge
+        EventBus.emit('notification:new', {
+            id: `gf_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            title: `GEOFENCE ${dir}`,
+            message: `${target} ${dir.toLowerCase()} zone "${zone}" (${data.zone_type || 'monitored'})`,
+            severity: data.zone_type === 'restricted' ? 'critical' : 'warning',
+            source: 'geofence',
+            entity_id: data.target_id,
+            timestamp: data.timestamp || (Date.now() / 1000),
+            read: false,
+        });
+    });
+
     // Initialize tactical map
     initMap();
 

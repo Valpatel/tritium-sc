@@ -87,6 +87,11 @@ const LAYER_CATEGORIES = [
                 { color: 'rgba(0,240,255,0.20)', shape: 'square', label: '2 sensors (redundant)' },
                 { color: 'rgba(252,238,10,0.30)', shape: 'square', label: '3+ sensors (strong)' },
             ]},
+            { id: 'trails', label: 'Target Movement Trails', description: 'Speed-colored movement trails for all active targets. Green = slow, Yellow = moderate, Red = fast. Fades with age.', color: '#05ffa1', source: 'Target Tracker', key: null, eventToggle: 'trails:toggle', legend: [
+                { color: '#05ffa1', shape: 'square', label: 'Slow (< 2 m/s, walking)' },
+                { color: '#fcee0a', shape: 'square', label: 'Moderate (2-8 m/s, jogging)' },
+                { color: '#ff2a6d', shape: 'square', label: 'Fast (> 8 m/s, vehicle)' },
+            ]},
         ],
     },
     {
@@ -275,6 +280,12 @@ export const LayersPanelDef = {
                 render();
                 return;
             }
+            // Event-based toggle (e.g. trails:toggle via EventBus)
+            if (layerDef.eventToggle) {
+                EventBus.emit(layerDef.eventToggle);
+                render();
+                return;
+            }
             // Standard toggle via mapActions
             const toggleName = 'toggle' + layerDef.id.charAt(0).toUpperCase() + layerDef.id.slice(1);
             if (typeof mapActions[toggleName] === 'function') {
@@ -355,9 +366,10 @@ export const LayersPanelDef = {
                     html += `<div class="layer-item${on ? ' active' : ''}${isGisChild ? ' gis-child' : ''}${isMeshSub ? ' mesh-sub' : ''}" `;
                     html += `data-layer-id="${_esc(layer.id)}" `;
                     html += `title="${_esc(layer.description)}">`;
-                    if (layer.key) {
+                    if (layer.key || layer.eventToggle) {
+                        const dataAttr = layer.key ? `data-key="${_esc(layer.key)}"` : `data-event-toggle="${_esc(layer.eventToggle)}"`;
                         html += `<label class="layer-toggle">`;
-                        html += `<input type="checkbox" ${on ? 'checked' : ''} data-key="${_esc(layer.key)}" />`;
+                        html += `<input type="checkbox" ${on ? 'checked' : ''} ${dataAttr} />`;
                         html += `<span class="layer-toggle-track"><span class="layer-toggle-thumb"></span></span>`;
                         html += `</label>`;
                     } else {
@@ -459,7 +471,13 @@ export const LayersPanelDef = {
             for (const cb of treeEl.querySelectorAll('input[type="checkbox"]')) {
                 cb.addEventListener('change', () => {
                     const key = cb.dataset.key;
-                    const layer = allRenderedLayers.find(l => l.key === key);
+                    const evToggle = cb.dataset.eventToggle;
+                    let layer;
+                    if (key) {
+                        layer = allRenderedLayers.find(l => l.key === key);
+                    } else if (evToggle) {
+                        layer = allRenderedLayers.find(l => l.eventToggle === evToggle);
+                    }
                     if (layer) toggleLayer(layer);
                 });
             }

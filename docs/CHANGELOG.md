@@ -14,6 +14,22 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-15 — Wave 119: Geofence Notifications, Target Trails, Sparkline Widget
+
+| Change | Verification |
+|--------|-------------|
+| Geofence enter/exit push notifications via WebSocket — amy_geofence:enter/exit events forwarded to all connected operators | Code change |
+| Geofence events show as toast notifications with zone name, target ID, and direction (enter/exit) | Code change |
+| Geofence events push to notification bell badge via notification:new EventBus event | Code change |
+| Restricted zone crossings shown as critical severity; monitored zones as warning | Code change |
+| Multi-target trail rendering: trails already render for ALL active targets simultaneously via TargetTrailManager | Code change |
+| Trails toggle added to Layers panel (TACTICAL OVERLAYS category) with speed-color legend | Code change |
+| Layers panel now supports eventToggle-based layer definitions (trails:toggle via EventBus) | Code change |
+| Target count trend sparkline widget added to Ops Dashboard — shows target count over last hour | Code change |
+| Sparkline samples every 10s, keeps 360 points (1 hour), renders on canvas with gradient fill and current-value dot | Code change |
+
+---
+
 ## 2026-03-15 — Wave 117: Security Audit + Session Timeout + Rate Limit Dashboard
 
 | Change | Verification |

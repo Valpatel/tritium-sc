@@ -49,6 +49,78 @@ async function _fetchDemoStatus() {
 let _refreshTimer = null;
 let _bodyEl = null;
 
+// Sparkline history: target count samples over the last hour (one per 10s)
+const SPARKLINE_MAX = 360; // 360 samples * 10s = 1 hour
+const _sparklineData = [];
+
+function _sampleSparkline() {
+    const units = TritiumStore.units;
+    const count = units ? units.size : 0;
+    _sparklineData.push(count);
+    if (_sparklineData.length > SPARKLINE_MAX) {
+        _sparklineData.shift();
+    }
+}
+
+function _renderSparkline(bodyEl) {
+    const canvas = bodyEl.querySelector('[data-bind="sparkline-canvas"]');
+    const label = bodyEl.querySelector('[data-bind="sparkline-label"]');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+
+    ctx.clearRect(0, 0, w, h);
+
+    if (_sparklineData.length < 2) {
+        if (label) label.textContent = 'Collecting...';
+        return;
+    }
+
+    const data = _sparklineData;
+    const max = Math.max(...data, 1);
+    const min = Math.min(...data, 0);
+    const range = Math.max(max - min, 1);
+    const current = data[data.length - 1];
+
+    if (label) label.textContent = `${current} targets (peak: ${max})`;
+
+    // Draw filled area
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    for (let i = 0; i < data.length; i++) {
+        const x = (i / (data.length - 1)) * w;
+        const y = h - ((data[i] - min) / range) * (h - 4) - 2;
+        if (i === 0) ctx.lineTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0, 240, 255, 0.08)';
+    ctx.fill();
+
+    // Draw line
+    ctx.beginPath();
+    for (let i = 0; i < data.length; i++) {
+        const x = (i / (data.length - 1)) * w;
+        const y = h - ((data[i] - min) / range) * (h - 4) - 2;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = '#00f0ff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Draw current value dot
+    const lastX = w;
+    const lastY = h - ((current - min) / range) * (h - 4) - 2;
+    ctx.beginPath();
+    ctx.arc(lastX - 1, lastY, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#00f0ff';
+    ctx.fill();
+}
+
 function _buildHTML() {
     return `
 <div class="ops-dash" style="display:flex;flex-direction:column;gap:8px;padding:8px;height:100%;overflow-y:auto;font-family:var(--font-mono,'JetBrains Mono',monospace);font-size:0.75rem;">
@@ -74,6 +146,15 @@ function _buildHTML() {
                 <div style="color:var(--text-dim,#888);font-size:0.6rem;">UNKNOWN</div>
             </div>
         </div>
+    </div>
+
+    <!-- Target Count Trend Sparkline -->
+    <div class="ops-section" style="border:1px solid rgba(0,240,255,0.2);border-radius:4px;padding:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div class="ops-section-title" style="color:var(--cyan,#00f0ff);font-size:0.65rem;text-transform:uppercase;letter-spacing:1px;">Target Count Trend (1h)</div>
+            <span data-bind="sparkline-label" style="font-size:0.6rem;color:var(--text-dim,#888);">--</span>
+        </div>
+        <canvas data-bind="sparkline-canvas" width="360" height="40" style="width:100%;height:40px;margin-top:4px;"></canvas>
     </div>
 
     <!-- Amy Status + Demo Mode -->
@@ -177,6 +258,9 @@ function _update(bodyEl) {
     _setText(bodyEl, 'target-friendly', friendly);
     _setText(bodyEl, 'target-hostile', hostile);
     _setText(bodyEl, 'target-unknown', unknown);
+
+    // Sparkline
+    _renderSparkline(bodyEl);
 
     // Amy
     const amyState = TritiumStore.amy?.state || 'idle';
@@ -313,6 +397,13 @@ export const OpsDashboardPanelDef = {
         unsubs.push(TritiumStore.on('game.phase', () => _update(bodyEl)));
         panel._opsDashUnsubs = unsubs;
 
+        // Sample sparkline immediately and every 10 seconds
+        _sampleSparkline();
+        panel._sparklineTimer = setInterval(() => {
+            _sampleSparkline();
+            _renderSparkline(bodyEl);
+        }, 10000);
+
         // Periodic async refresh for fleet/demo/missions
         _refreshTimer = setInterval(() => {
             _update(bodyEl);
@@ -320,11 +411,15 @@ export const OpsDashboardPanelDef = {
         }, 5000);
     },
 
-    unmount(bodyEl) {
+    unmount(bodyEl, panel) {
         _bodyEl = null;
         if (_refreshTimer) {
             clearInterval(_refreshTimer);
             _refreshTimer = null;
+        }
+        if (panel && panel._sparklineTimer) {
+            clearInterval(panel._sparklineTimer);
+            panel._sparklineTimer = null;
         }
     },
 };

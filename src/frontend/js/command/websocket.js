@@ -897,6 +897,48 @@ export class WebSocketManager {
                 break;
             }
 
+            case 'amy_geofence:enter':
+            case 'geofence:enter': {
+                const d = msg.data || msg;
+                TritiumStore.addAlert({
+                    type: 'geofence',
+                    message: `ENTER: ${d.target_id || '?'} entered ${d.zone_name || d.zone_id || '?'} (${d.zone_type || 'monitored'})`,
+                    source: 'geofence',
+                    severity: d.zone_type === 'restricted' ? 'critical' : 'warning',
+                    data: d,
+                });
+                EventBus.emit('geofence:enter', d);
+                EventBus.emit('notification:geofence', {
+                    direction: 'enter',
+                    target_id: d.target_id,
+                    zone_name: d.zone_name || d.zone_id,
+                    zone_type: d.zone_type || 'monitored',
+                    timestamp: d.timestamp,
+                });
+                break;
+            }
+
+            case 'amy_geofence:exit':
+            case 'geofence:exit': {
+                const d = msg.data || msg;
+                TritiumStore.addAlert({
+                    type: 'geofence',
+                    message: `EXIT: ${d.target_id || '?'} exited ${d.zone_name || d.zone_id || '?'}`,
+                    source: 'geofence',
+                    severity: 'info',
+                    data: d,
+                });
+                EventBus.emit('geofence:exit', d);
+                EventBus.emit('notification:geofence', {
+                    direction: 'exit',
+                    target_id: d.target_id,
+                    zone_name: d.zone_name || d.zone_id,
+                    zone_type: d.zone_type || 'monitored',
+                    timestamp: d.timestamp,
+                });
+                break;
+            }
+
             case 'formation_created':
             case 'amy_formation_created':
                 EventBus.emit('formation:created', msg.data || msg);
