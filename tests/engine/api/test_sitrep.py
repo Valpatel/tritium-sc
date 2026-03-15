@@ -83,6 +83,37 @@ class TestSitrepEndpoint:
         assert "offline" in f
 
 
+class TestThreatLevelHistory:
+    """Tests for GET /api/threat-level/history."""
+
+    def test_threat_level_history_returns_json(self, client):
+        """History endpoint returns valid JSON with expected structure."""
+        resp = client.get("/api/threat-level/history?hours=1")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "hours" in data
+        assert "count" in data
+        assert "current" in data
+        assert "history" in data
+        assert data["hours"] == 1.0
+        assert isinstance(data["history"], list)
+        assert data["current"]["level"] == "green"
+
+    def test_threat_level_history_default_hours(self, client):
+        """History endpoint defaults to 24 hours when no param provided."""
+        resp = client.get("/api/threat-level/history")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["hours"] == 24.0
+
+    def test_threat_level_history_rejects_invalid_hours(self, client):
+        """History endpoint rejects hours outside valid range."""
+        resp = client.get("/api/threat-level/history?hours=0")
+        assert resp.status_code == 422
+        resp = client.get("/api/threat-level/history?hours=25")
+        assert resp.status_code == 422
+
+
 class TestSitrepText:
     """Tests for GET /api/sitrep/text."""
 

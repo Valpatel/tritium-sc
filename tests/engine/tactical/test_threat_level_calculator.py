@@ -189,3 +189,114 @@ class TestThreatLevelCalculator:
         calc._calculate()
         expected = 2 * THREAT_FEED_MATCH_WEIGHT
         assert calc.current_score == expected
+
+    def test_history_recorded(self):
+        bus = FakeEventBus()
+        tracker = FakeTracker([FakeTarget(alliance="hostile")])
+        calc = ThreatLevelCalculator(bus, tracker)
+        calc._calculate()
+        calc._calculate()
+        history = calc.get_history(hours=1.0)
+        assert len(history) == 2
+        assert history[0]["level"] == "yellow"
+        assert history[0]["score"] == 10.0
+        assert "timestamp" in history[0]
+
+    def test_history_time_filter(self):
+        bus = FakeEventBus()
+        calc = ThreatLevelCalculator(bus)
+        # Add old entries by manipulating the history directly
+        old_ts = time.time() - 7200  # 2 hours ago
+        calc._history.append((old_ts, "yellow", 15.0))
+        calc._history.append((time.time(), "green", 0.0))
+        # Request only 1 hour of history
+        history = calc.get_history(hours=1.0)
+        assert len(history) == 1
+        assert history[0]["level"] == "green"
+
+    def test_history_max_24_hours(self):
+        bus = FakeEventBus()
+        calc = ThreatLevelCalculator(bus)
+        # Even if requesting 48 hours, max is clamped to 24
+        old_ts = time.time() - (25 * 3600)
+        calc._history.append((old_ts, "red", 60.0))
+        calc._history.append((time.time(), "green", 0.0))
+        history = calc.get_history(hours=48.0)
+        # Only the recent entry should be returned (25h old > 24h max)
+        assert len(history) == 1
+
+
+class TestThreatLevelSecurity:
+    """Security audit tests for threat level calculator.
+
+    Verifies that the threat level cannot be trivially manipulated
+    by flooding targets or exploiting edge cases.
+    """
+
+    def test_score_capped_at_100(self):
+        """Score is capped at 100 even with extreme hostile counts."""
+        bus = FakeEventBus()
+        targets = [FakeTarget(alliance="hostile") for _ in range(100)]
+        tracker = FakeTracker(targets)
+        calc = ThreatLevelCalculator(bus, tracker)
+        calc._calculate()
+        assert calc.current_score == 100.0  # Capped
+        assert calc.current_level == "black"
+
+    def test_only_valid_alliances_counted(self):
+        """Targets with non-hostile alliance do not contribute hostile score."""
+        bus = FakeEventBus()
+        targets = [
+            FakeTarget(alliance="friendly"),
+            FakeTarget(alliance="neutral"),
+            FakeTarget(alliance="unknown"),
+            FakeTarget(alliance=""),
+            FakeTarget(alliance=None),
+        ]
+        tracker = FakeTracker(targets)
+        calc = ThreatLevelCalculator(bus, tracker)
+        calc._calculate()
+        assert calc.current_score == 0.0
+        assert calc.current_level == "green"
+
+    def test_threat_feed_decay(self):
+        """Threat feed matches decay after 5 minutes."""
+        bus = FakeEventBus()
+        calc = ThreatLevelCalculator(bus)
+        calc._threat_feed_matches = 5
+        calc._threat_feed_match_time = time.monotonic() - 301  # 5+ min ago
+        calc._calculate()
+        # One match should have been decremented (decay)
+        assert calc._threat_feed_matches == 4
+
+    def test_tracker_exception_handled(self):
+        """Calculator handles tracker exceptions gracefully."""
+        bus = FakeEventBus()
+
+        class BrokenTracker:
+            def all_targets(self):
+                raise RuntimeError("Database error")
+
+        calc = ThreatLevelCalculator(bus, BrokenTracker())
+        calc._calculate()  # Should not raise
+        assert calc.current_level == "green"
+
+    def test_escalation_exception_handled(self):
+        """Calculator handles escalation exceptions gracefully."""
+        bus = FakeEventBus()
+
+        class BrokenEscalation:
+            def get_active_threats(self):
+                raise RuntimeError("Connection lost")
+
+        calc = ThreatLevelCalculator(bus, escalation=BrokenEscalation())
+        calc._calculate()
+        assert calc.current_level == "green"
+
+    def test_none_alliance_not_counted_as_hostile(self):
+        """A target with alliance=None must NOT be treated as hostile."""
+        bus = FakeEventBus()
+        tracker = FakeTracker([FakeTarget(alliance=None)])
+        calc = ThreatLevelCalculator(bus, tracker)
+        calc._calculate()
+        assert calc.current_score == 0.0

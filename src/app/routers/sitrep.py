@@ -369,3 +369,29 @@ async def get_threat_level(request: Request):
             return calc.get_status()
 
     return {"level": "green", "score": 0.0}
+
+
+@router.get("/threat-level/history")
+async def get_threat_level_history(
+    request: Request,
+    hours: float = Query(24.0, ge=0.1, le=24.0, description="Hours of history to return"),
+):
+    """Return threat level history as time-series data.
+
+    Returns timestamped threat level and score values for the requested
+    time window (default 24 hours, max 24 hours). Suitable for rendering
+    as a line chart in the analytics dashboard.
+    """
+    amy = getattr(request.app.state, "amy", None)
+    if amy is not None:
+        calc = getattr(amy, "threat_level_calculator", None)
+        if calc is not None:
+            history = calc.get_history(hours)
+            return {
+                "hours": hours,
+                "count": len(history),
+                "current": calc.get_status(),
+                "history": history,
+            }
+
+    return {"hours": hours, "count": 0, "current": {"level": "green", "score": 0.0}, "history": []}

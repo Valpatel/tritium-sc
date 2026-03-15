@@ -14,6 +14,16 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 105: Security Audit + Threat Level History
+
+| Change | Verification |
+|--------|-------------|
+| Threat level history — ThreatLevelCalculator now stores time-series data (24h ring buffer) | Unit Tested |
+| API: GET /api/threat-level/history?hours=24 — returns timestamped level+score history | Unit Tested |
+| Security audit: 6 new tests verifying threat calculator cannot be manipulated (score cap, alliance validation, exception handling, decay) | Unit Tested |
+| Verified Amy plugin structure is correct (Phase 4 — plugin owns lifecycle + EventBus) | Unit Tested |
+| Added 3 sitrep API tests for history endpoint (structure, default hours, validation) | Unit Tested |
+
 ## 2026-03-14 — Wave 104: Threat Level + GPX Export + Amy Phase 4
 
 | Change | Verification |

@@ -23,6 +23,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections import deque
 from typing import Any, Optional
 
 logger = logging.getLogger("threat-level-calc")
@@ -89,6 +90,10 @@ class ThreatLevelCalculator:
         self._threat_feed_matches: int = 0
         self._threat_feed_match_time: float = 0.0
         self._active_investigations: int = 0
+
+        # History — store (timestamp, level, score) tuples for up to 24h
+        # At 2s tick interval, 24h = 43200 entries (~1.5MB)
+        self._history: deque[tuple[float, str, float]] = deque(maxlen=43200)
 
         if tick_interval is not None:
             self.TICK_INTERVAL = tick_interval
@@ -229,6 +234,9 @@ class ThreatLevelCalculator:
         self.current_score = score
         self.current_level = level
 
+        # Record history entry
+        self._history.append((time.time(), level, round(score, 1)))
+
         # Publish on level change
         if level != self._last_published_level:
             self._last_published_level = level
@@ -256,6 +264,26 @@ class ThreatLevelCalculator:
             "level": self.current_level,
             "score": round(self.current_score, 1),
         }
+
+    def get_history(self, hours: float = 24.0) -> list[dict]:
+        """Return threat level history for the requested time window.
+
+        Args:
+            hours: Number of hours of history to return (max 24).
+
+        Returns:
+            List of dicts with timestamp, level, and score keys.
+        """
+        cutoff = time.time() - (min(hours, 24.0) * 3600)
+        result = []
+        for ts, level, score in self._history:
+            if ts >= cutoff:
+                result.append({
+                    "timestamp": round(ts, 1),
+                    "level": level,
+                    "score": score,
+                })
+        return result
 
     def set_tracker(self, tracker: Any) -> None:
         """Update the target tracker reference."""
