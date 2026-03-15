@@ -498,17 +498,19 @@ export class WebSocketManager {
             case 'game_kill':
             case 'amy_game_elimination':
             case 'amy_game_kill':
-                // Route through warHandle* for audio + visual + kill feed
+                // Route through warHandle* for audio + visual + kill feed.
+                // warHandleTargetEliminated (war.js) already calls warCombatAddEliminationEffect
+                // and warHudAddKillFeedEntry internally, so only use fallback when it is absent.
                 if (typeof window.warHandleTargetEliminated === 'function') {
                     window.warHandleTargetEliminated(msg.data || msg);
-                }
-                // Always add elimination effect + kill feed entry (warHandleTargetEliminated
-                // may not propagate to these when war.js is not loaded, e.g. Command Center)
-                if (typeof window.warCombatAddEliminationEffect === 'function') {
-                    window.warCombatAddEliminationEffect(msg.data || msg);
-                }
-                if (typeof window.warHudAddKillFeedEntry === 'function') {
-                    window.warHudAddKillFeedEntry(msg.data || msg);
+                } else {
+                    // Fallback when war.js is not loaded (e.g. Command Center without legacy canvas)
+                    if (typeof window.warCombatAddEliminationEffect === 'function') {
+                        window.warCombatAddEliminationEffect(msg.data || msg);
+                    }
+                    if (typeof window.warHudAddKillFeedEntry === 'function') {
+                        window.warHudAddKillFeedEntry(msg.data || msg);
+                    }
                 }
                 EventBus.emit('combat:elimination', msg.data || msg);
                 EventBus.emit('game:elimination', msg.data || msg);

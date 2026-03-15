@@ -21,7 +21,6 @@ Usage::
 from __future__ import annotations
 
 import logging
-import math
 import threading
 import time
 from dataclasses import dataclass, field
@@ -150,6 +149,9 @@ class DemoController:
         # appear on the map with lat/lng positions via /api/camera-feeds/
         self._register_demo_cameras()
 
+        # Bridge camera detections to TargetTracker with geo-positioned coords
+        self._start_camera_detection_bridge()
+
         # Fusion scenario — correlated multi-sensor targets
         self._fusion = FusionScenario(
             event_bus=self._event_bus,
@@ -217,6 +219,9 @@ class DemoController:
         if self._mesh_gen is not None:
             self._mesh_gen.stop()
             self._mesh_gen = None
+
+        # Stop camera detection bridge first
+        self._stop_camera_detection_bridge()
 
         for cam in self._camera_gens:
             cam.stop()
@@ -295,6 +300,81 @@ class DemoController:
             except (KeyError, Exception):
                 pass
         self._demo_camera_ids = []
+
+    # -- Camera detection -> TargetTracker bridge ----------------------------
+    # Subscribes to detection:camera EventBus events and converts normalized
+    # pixel coords to local ground coordinates near the camera's geo-position,
+    # then feeds them into TargetTracker so YOLO detections appear on the map.
+
+    def _start_camera_detection_bridge(self) -> None:
+        """Start a background thread bridging camera detections to targets."""
+        if self._target_tracker is None:
+            logger.debug("No target_tracker — skipping camera detection bridge")
+            return
+
+        # Build camera_id -> (lat, lng) lookup from demo camera positions
+        self._cam_geo_positions: dict[str, tuple[float, float]] = {}
+        for cam_info in self._DEMO_CAMERA_POSITIONS:
+            self._cam_geo_positions[cam_info["id"]] = (
+                cam_info["lat"], cam_info["lng"]
+            )
+
+        self._cam_det_running = True
+        self._cam_det_queue = self._event_bus.subscribe()
+        self._cam_det_thread = threading.Thread(
+            target=self._camera_detection_loop,
+            daemon=True,
+            name="demo-cam-det-bridge",
+        )
+        self._cam_det_thread.start()
+        logger.info("Camera detection bridge started for %d cameras",
+                     len(self._cam_geo_positions))
+
+    def _stop_camera_detection_bridge(self) -> None:
+        """Stop the camera detection bridge thread."""
+        self._cam_det_running = False
+        if self._cam_det_thread is not None:
+            self._cam_det_thread.join(timeout=2.0)
+            self._cam_det_thread = None
+        if hasattr(self, '_cam_det_queue'):
+            self._event_bus.unsubscribe(self._cam_det_queue)
+
+    def _camera_detection_loop(self) -> None:
+        """Process detection:camera events and create geo-located targets.
+
+        Uses TargetTracker.update_from_camera_detection() which converts
+        normalized pixel coords to game coordinates near the camera lat/lng.
+        """
+        import queue as _queue
+
+        while self._cam_det_running:
+            try:
+                msg = self._cam_det_queue.get(timeout=0.5)
+            except _queue.Empty:
+                continue
+
+            if msg.get("type") != "detection:camera":
+                continue
+
+            data = msg.get("data", {})
+            camera_id = data.get("camera_id", "")
+            detections = data.get("detections", [])
+
+            cam_geo = self._cam_geo_positions.get(camera_id)
+            if cam_geo is None:
+                continue
+
+            cam_lat, cam_lng = cam_geo
+
+            for det in detections:
+                try:
+                    self._target_tracker.update_from_camera_detection(
+                        detection=det,
+                        camera_lat=cam_lat,
+                        camera_lng=cam_lng,
+                    )
+                except Exception as e:
+                    logger.debug("Camera detection bridge error: %s", e)
 
     def get_scenario_info(self) -> dict:
         """Return fusion scenario description and live dossier state."""

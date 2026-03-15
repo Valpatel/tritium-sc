@@ -142,6 +142,7 @@ const _state = {
     showSwarmHull: false,      // swarm hull — off by default
     showSquadHulls: false,     // squad hulls — off by default (visual clutter)
     showHazardZones: false,    // hazard zones — off by default
+    showGeofenceZones: true,   // geofence monitoring zones — on by default (Loop 5)
     showHostileObjectives: false, // hostile objectives — off by default
     showCrowdDensity: true,    // crowd density heatmap (civil_unrest mode only)
     showCoverPoints: false,    // tactical cover positions (off by default — too noisy during battle)
@@ -466,6 +467,10 @@ function _createMap(mapDiv) {
 
         // Camera markers from camera-feeds plugin
         EventBus.on('cameras:changed', _onCamerasChanged);
+
+        // Camera click-to-place: when camera panel requests location picking,
+        // the next map click sends the coordinates back (Loop 8 drag-to-place)
+        EventBus.on('camera:pick-location', _onCameraPickLocation);
 
         // Fetch cameras immediately on map load so markers appear without
         // needing to open the camera-feeds panel first.
@@ -2363,7 +2368,7 @@ function _stopGeofencePulse() {
  */
 function _updateGeofenceZones() {
     if (!_state.map || !_state.initialized) return;
-    if (!_state.showHazardZones) {
+    if (!_state.showGeofenceZones) {
         _clearGeofenceZones();
         return;
     }
@@ -4051,6 +4056,22 @@ function _applyMarkerStyle(el, unit) {
             el.innerHTML = `<span style="display:inline-block;transform:rotate(-45deg)">${icon}</span>`;
         } else {
             el.textContent = icon;
+        }
+
+        // YOLO/camera-detected targets: orange outline ring to distinguish
+        // from simulation or BLE-detected targets (Loop 8 camera detection viz)
+        let yoloRing = el.querySelector('.unit-yolo-ring');
+        if (unitSource === 'yolo' && !dead) {
+            if (!yoloRing) {
+                yoloRing = document.createElement('div');
+                yoloRing.className = 'unit-yolo-ring';
+                yoloRing.style.cssText = 'position:absolute;inset:-4px;border-radius:50%;' +
+                    'border:2px dashed #ffa500;pointer-events:none;opacity:0.8;' +
+                    'box-shadow:0 0 6px #ffa50066,inset 0 0 4px #ffa50033;';
+                el.appendChild(yoloRing);
+            }
+        } else if (yoloRing) {
+            yoloRing.remove();
         }
 
         // Remove 3D-mode elements if switching
@@ -7021,6 +7042,7 @@ function _updateLayerHud() {
     if (_state.showSwarmHull) layers.push('SWARM');
     if (_state.showSquadHulls) layers.push('SQUAD');
     if (_state.showHazardZones) layers.push('HAZARD');
+    if (_state.showGeofenceZones) layers.push('GEOFENCE');
     if (_state.showHostileObjectives) layers.push('HOBJ');
     if (_state.showCrowdDensity) layers.push('CROWD');
     if (_state.showCoverPoints) layers.push('COVER');
@@ -8698,6 +8720,13 @@ export function toggleHazardZones() {
     console.log(`[MAP-ML] Hazard Zones ${_state.showHazardZones ? 'ON' : 'OFF'}`);
 }
 
+export function toggleGeofenceZones() {
+    _state.showGeofenceZones = !_state.showGeofenceZones;
+    if (!_state.showGeofenceZones) _clearGeofenceZones();
+    _updateLayerHud();
+    console.log(`[MAP-ML] Geofence Zones ${_state.showGeofenceZones ? 'ON' : 'OFF'}`);
+}
+
 export function toggleHostileObjectives() {
     _state.showHostileObjectives = !_state.showHostileObjectives;
     if (!_state.showHostileObjectives) _clearHostileObjectives();
@@ -9175,6 +9204,7 @@ export function getMapState() {
         showSwarmHull: _state.showSwarmHull,
         showSquadHulls: _state.showSquadHulls,
         showHazardZones: _state.showHazardZones,
+        showGeofenceZones: _state.showGeofenceZones,
         showHostileObjectives: _state.showHostileObjectives,
         showCrowdDensity: _state.showCrowdDensity,
         showCoverPoints: _state.showCoverPoints,
