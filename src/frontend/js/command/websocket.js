@@ -20,6 +20,8 @@ export class WebSocketManager {
         this._reconnectDelay = 1000;
         this._maxDelay = 16000;
         this._disconnectedBanner = null;
+        this._pingTimer = null;
+        this._PING_INTERVAL_MS = 25000; // send client ping every 25s (server expects pong within 90s)
     }
 
     /**
@@ -43,11 +45,15 @@ export class WebSocketManager {
                 // Sync full state on every connect (covers initial load and
                 // reconnects — events may have been missed during the gap).
                 this._refreshState();
+                // Start client-side keepalive pings to prevent server from
+                // closing us as stale (server expects pong within 90s).
+                this._startPingKeepalive();
             };
 
             this._ws.onclose = () => {
                 console.log('%c[WS] Disconnected', 'color: #ff2a6d;');
                 TritiumStore.set('connection.status', 'disconnected');
+                this._stopPingKeepalive();
                 this._showDisconnectedBanner();
                 EventBus.emit('ws:disconnected');
                 this._scheduleReconnect();
@@ -89,6 +95,7 @@ export class WebSocketManager {
     disconnect() {
         clearTimeout(this._reconnectTimer);
         this._reconnectTimer = null;
+        this._stopPingKeepalive();
         if (this._ws) {
             // Remove onclose to prevent auto-reconnect
             this._ws.onclose = null;
@@ -246,6 +253,32 @@ export class WebSocketManager {
         if (this._disconnectedBanner) {
             this._disconnectedBanner.remove();
             this._disconnectedBanner = null;
+        }
+    }
+
+    /**
+     * Start a client-side ping interval that sends {"type":"ping"} every 25s.
+     * The server records pong timestamps for each client; if a client misses
+     * 3 consecutive server pings (90s), the server closes the connection.
+     * This keepalive ensures the client sends traffic regularly so the server
+     * always sees recent activity and never considers the connection stale.
+     */
+    _startPingKeepalive() {
+        this._stopPingKeepalive();
+        this._pingTimer = setInterval(() => {
+            if (this._ws?.readyState === WebSocket.OPEN) {
+                this.send({ type: 'ping' });
+            }
+        }, this._PING_INTERVAL_MS);
+    }
+
+    /**
+     * Stop the client-side ping keepalive interval.
+     */
+    _stopPingKeepalive() {
+        if (this._pingTimer) {
+            clearInterval(this._pingTimer);
+            this._pingTimer = null;
         }
     }
 

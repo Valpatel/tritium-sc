@@ -302,7 +302,7 @@ class FusionScenario:
         for actor in self._actors:
             actor.path_index = 0.0
 
-        # Set up geofence zone if engine available
+        # Set up geofence zones if engine available
         if self._geofence is not None and not self._geofence_zone_added:
             from engine.tactical.geofence import GeoZone
             zone = GeoZone(
@@ -314,6 +314,18 @@ class FusionScenario:
                 alert_on_exit=True,
             )
             self._geofence.add_zone(zone)
+            # Add a monitored zone that covers the main patrol area —
+            # this one stays "MONITORING" (armed, no occupants) so the
+            # map pulse animation and badge are always visible in demo.
+            monitored_zone = GeoZone(
+                zone_id="demo-monitored-01",
+                name="Patrol Sector",
+                polygon=[(3.0, -2.0), (10.0, -2.0), (10.0, 5.0), (3.0, 5.0)],
+                zone_type="monitored",
+                alert_on_enter=True,
+                alert_on_exit=True,
+            )
+            self._geofence.add_zone(monitored_zone)
             self._geofence_zone_added = True
 
         self._thread = threading.Thread(
@@ -329,9 +341,10 @@ class FusionScenario:
             self._thread.join(timeout=self._interval + 1)
             self._thread = None
 
-        # Clean up geofence zone
+        # Clean up geofence zones
         if self._geofence is not None and self._geofence_zone_added:
             self._geofence.remove_zone("demo-restricted-01")
+            self._geofence.remove_zone("demo-monitored-01")
             self._geofence_zone_added = False
 
         logger.info("Fusion scenario stopped")

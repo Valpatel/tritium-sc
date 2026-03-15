@@ -38,10 +38,26 @@ def _get_demo_controller(request: Request):
     if event_bus is None:
         return None
 
+    # Try to find the camera_feeds plugin for map marker registration
+    camera_feeds_plugin = None
+    plugin_manager = getattr(request.app.state, "plugin_manager", None)
+    if plugin_manager is not None:
+        get_fn = getattr(plugin_manager, "get_plugin", None)
+        if get_fn is not None:
+            try:
+                camera_feeds_plugin = get_fn("tritium.camera-feeds")
+            except Exception:
+                pass
+    if camera_feeds_plugin is None:
+        camera_feeds_plugin = getattr(request.app.state, "camera_feeds_plugin", None)
+
     from engine.synthetic.demo_mode import DemoController
+    geofence_engine = getattr(request.app.state, "geofence_engine", None)
     controller = DemoController(
         event_bus=event_bus,
         target_tracker=target_tracker,
+        geofence_engine=geofence_engine,
+        camera_feeds_plugin=camera_feeds_plugin,
     )
     request.app.state.demo_controller = controller
     return controller

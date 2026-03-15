@@ -21,6 +21,8 @@ Usage::
 from __future__ import annotations
 
 import logging
+import math
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -34,6 +36,7 @@ from engine.synthetic.data_generators import (
 from engine.synthetic.fusion_scenario import FusionScenario
 from engine.synthetic.reid_demo_generator import ReIDDemoGenerator
 from engine.synthetic.rl_training_generator import RLTrainingGenerator
+from engine.synthetic.robot_demo_generator import RobotDemoGenerator
 
 if TYPE_CHECKING:
     from engine.comms.event_bus import EventBus
@@ -60,11 +63,20 @@ class DemoController:
     targets for correlator fusion demonstration.
     """
 
+    # Demo camera positions — placed around the same neighborhood as other generators
+    _DEMO_CAMERA_POSITIONS = [
+        {"id": "demo-cam-01", "name": "North Gate", "lat": 37.7755, "lng": -122.4185,
+         "heading": 180, "scene_type": "street_cam"},
+        {"id": "demo-cam-02", "name": "South Lot", "lat": 37.7742, "lng": -122.4200,
+         "heading": 45, "scene_type": "bird_eye"},
+    ]
+
     def __init__(
         self,
         event_bus: EventBus,
         target_tracker: TargetTracker | None = None,
         geofence_engine: GeofenceEngine | None = None,
+        camera_feeds_plugin=None,
         ble_device_count: int = 5,
         mesh_node_count: int = 3,
         camera_count: int = 2,
@@ -72,12 +84,14 @@ class DemoController:
         self._event_bus = event_bus
         self._target_tracker = target_tracker
         self._geofence_engine = geofence_engine
+        self._camera_feeds_plugin = camera_feeds_plugin
         self._ble_device_count = ble_device_count
         self._mesh_node_count = mesh_node_count
         self._camera_count = camera_count
 
         self._active = False
         self._started_at: float | None = None
+        self._demo_camera_ids: list[str] = []  # track registered demo camera IDs
 
         self._ble_gen: BLEScanGenerator | None = None
         self._mesh_gen: MeshtasticNodeGenerator | None = None
@@ -86,6 +100,11 @@ class DemoController:
         self._rl_training: RLTrainingGenerator | None = None
         self._trilat_demo: TrilaterationDemoGenerator | None = None
         self._reid_demo: ReIDDemoGenerator | None = None
+        self._robot_demo: RobotDemoGenerator | None = None
+
+        # Camera detection -> target tracker bridge
+        self._cam_det_thread: threading.Thread | None = None
+        self._cam_det_running = False
 
     @property
     def active(self) -> bool:
@@ -118,13 +137,18 @@ class DemoController:
         # Camera detections
         self._camera_gens = []
         for i in range(self._camera_count):
+            cam_id = f"demo-cam-{i + 1:02d}"
             cam = CameraDetectionGenerator(
                 interval=1.0,
-                camera_id=f"demo-cam-{i + 1:02d}",
+                camera_id=cam_id,
                 max_objects=4,
             )
             cam.start(self._event_bus)
             self._camera_gens.append(cam)
+
+        # Register demo cameras with the camera_feeds plugin so they
+        # appear on the map with lat/lng positions via /api/camera-feeds/
+        self._register_demo_cameras()
 
         # Fusion scenario — correlated multi-sensor targets
         self._fusion = FusionScenario(
@@ -159,6 +183,11 @@ class DemoController:
         # live positions from 3 RSSI readings per target.
         self._trilat_demo = TrilaterationDemoGenerator(interval=3.0)
         self._trilat_demo.start(self._event_bus)
+
+        # Robot demo — 3 synthetic robots (rover, drone, scout) patrolling
+        # waypoint routes. Updates TargetTracker so they appear on the map.
+        self._robot_demo = RobotDemoGenerator(interval=5.0)
+        self._robot_demo.start(self._event_bus, self._target_tracker)
 
         self._active = True
         self._event_bus.publish("demo:started", {
@@ -209,9 +238,63 @@ class DemoController:
             self._trilat_demo.stop()
             self._trilat_demo = None
 
+        if self._robot_demo is not None:
+            self._robot_demo.stop()
+            self._robot_demo = None
+
+        # Remove demo cameras from camera_feeds plugin
+        self._unregister_demo_cameras()
+
         self._active = False
         self._event_bus.publish("demo:stopped", {})
         logger.info("Demo mode stopped")
+
+    def _register_demo_cameras(self) -> None:
+        """Register synthetic demo cameras with the camera_feeds plugin.
+
+        This ensures GET /api/camera-feeds/ returns cameras with lat/lng
+        so the map can render camera markers and FOV cones.
+        """
+        if self._camera_feeds_plugin is None:
+            return
+
+        from plugins.camera_feeds.sources import CameraSourceConfig
+
+        for cam_info in self._DEMO_CAMERA_POSITIONS:
+            cam_id = cam_info["id"]
+            try:
+                config = CameraSourceConfig(
+                    source_id=cam_id,
+                    source_type="synthetic",
+                    name=cam_info.get("name", cam_id),
+                    width=640,
+                    height=480,
+                    fps=5,
+                    extra={
+                        "lat": cam_info["lat"],
+                        "lng": cam_info["lng"],
+                        "heading": cam_info.get("heading", 0),
+                        "scene_type": cam_info.get("scene_type", "bird_eye"),
+                    },
+                )
+                self._camera_feeds_plugin.register_source(config)
+                self._demo_camera_ids.append(cam_id)
+                logger.info("Registered demo camera: %s at (%.4f, %.4f)",
+                            cam_id, cam_info["lat"], cam_info["lng"])
+            except (ValueError, Exception) as e:
+                logger.debug("Could not register demo camera %s: %s", cam_id, e)
+
+    def _unregister_demo_cameras(self) -> None:
+        """Remove demo cameras from the camera_feeds plugin on stop."""
+        if self._camera_feeds_plugin is None:
+            return
+
+        for cam_id in self._demo_camera_ids:
+            try:
+                self._camera_feeds_plugin.remove_source(cam_id)
+            except (KeyError, Exception):
+                pass
+        self._demo_camera_ids = []
 
     def get_scenario_info(self) -> dict:
         """Return fusion scenario description and live dossier state."""
@@ -305,6 +388,19 @@ class DemoController:
                     "nodes": 3,
                     "interval": 3.0,
                 },
+            })
+
+        if self._robot_demo is not None:
+            robot_stats = self._robot_demo.get_stats()
+            generators.append({
+                "name": "RobotDemoGenerator",
+                "running": self._robot_demo.running,
+                "tick_count": self._robot_demo.tick_count,
+                "config": {
+                    "robots": 3,
+                    "interval": 5.0,
+                },
+                "robots": robot_stats.get("robots", []),
             })
 
         uptime = None

@@ -340,6 +340,56 @@ class TargetTracker:
                 )
         self.history.record(tid, (cx, cy))
 
+    def update_from_camera_detection(
+        self,
+        detection: dict,
+        camera_lat: float,
+        camera_lng: float,
+    ) -> None:
+        """Update or create a target from a camera detection, positioned near the camera.
+
+        Converts normalized pixel coordinates (0-1) into game coordinates
+        offset from the camera's lat/lng, so detections appear on the
+        tactical map near their source camera.
+
+        Args:
+            detection: Dict with keys: label/class_name, confidence, bbox.
+            camera_lat: Camera latitude.
+            camera_lng: Camera longitude.
+        """
+        from .geo import latlng_to_local
+
+        label = detection.get("label") or detection.get("class_name", "unknown")
+        confidence = detection.get("confidence", 0.5)
+        if confidence < 0.4:
+            return
+
+        # Get camera position in game coordinates
+        cam_x, cam_y, _ = latlng_to_local(camera_lat, camera_lng)
+
+        # Compute a small offset from the camera based on pixel position.
+        # Normalized bbox center: (0,0)=top-left, (1,1)=bottom-right.
+        bbox = detection.get("bbox", {})
+        if isinstance(bbox, dict):
+            px = bbox.get("x", 0.5)
+            py = bbox.get("y", 0.5)
+        else:
+            px, py = 0.5, 0.5
+
+        # Map pixel position to a scatter area around the camera (up to 30m)
+        offset_x = (px - 0.5) * 60.0  # -30m to +30m
+        offset_y = (0.5 - py) * 30.0   # higher in frame = further away
+
+        game_x = cam_x + offset_x
+        game_y = cam_y + offset_y
+
+        self.update_from_detection({
+            "class_name": label,
+            "confidence": confidence,
+            "center_x": game_x,
+            "center_y": game_y,
+        })
+
     # BLE sightings have longer stale timeout — devices can be stationary
     BLE_STALE_TIMEOUT = 120.0
 

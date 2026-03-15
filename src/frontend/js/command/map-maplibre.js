@@ -467,6 +467,14 @@ function _createMap(mapDiv) {
         // Camera markers from camera-feeds plugin
         EventBus.on('cameras:changed', _onCamerasChanged);
 
+        // Fetch cameras immediately on map load so markers appear without
+        // needing to open the camera-feeds panel first.
+        _fetchCamerasForMap();
+
+        // Re-fetch cameras periodically (demo mode may register new cameras)
+        // Also triggered when demo mode starts via the demo:started event
+        setInterval(_fetchCamerasForMap, 15000);
+
         // Apply the initial mode (default: observe) so visual state matches
         setMapMode(_state.currentMode || 'observe');
 
@@ -2504,7 +2512,7 @@ function _renderGeofenceZones() {
                 source: GEOFENCE_LABEL_SOURCE,
                 layout: {
                     'text-field': ['get', 'label'],
-                    'text-font': ['Open Sans Bold'],
+                    'text-font': ['Open Sans Semibold'],
                     'text-size': 11,
                     'text-anchor': 'center',
                     'text-allow-overlap': true,
@@ -2534,7 +2542,7 @@ function _renderGeofenceZones() {
                 source: GEOFENCE_ALERT_SOURCE,
                 layout: {
                     'text-field': ['get', 'badge_text'],
-                    'text-font': ['Open Sans Bold'],
+                    'text-font': ['Open Sans Semibold'],
                     'text-size': 13,
                     'text-anchor': 'top',
                     'text-offset': [0, 1.2],
@@ -8940,6 +8948,24 @@ function _buildFovConePolygon(lng, lat, heading, fovAngle, rangeMeters) {
     return coords;
 }
 
+/**
+ * Fetch cameras from the REST API and emit cameras:changed so the map
+ * renders camera markers.  Called on map load and when demo starts.
+ */
+async function _fetchCamerasForMap() {
+    try {
+        const resp = await fetch('/api/camera-feeds/');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const cameras = Array.isArray(data) ? data : (data.cameras || data.feeds || []);
+        if (cameras.length > 0) {
+            _onCamerasChanged({ cameras });
+        }
+    } catch (_) {
+        // Non-fatal — cameras just won't show on map
+    }
+}
+
 function _onCamerasChanged(data) {
     if (!_state.map || !data || !data.cameras) return;
     const cameras = data.cameras.filter(c => c.lat != null && c.lng != null);
@@ -9013,7 +9039,7 @@ function _onCamerasChanged(data) {
                 'text-size': 11,
                 'text-offset': [0, 1.4],
                 'text-anchor': 'top',
-                'text-font': ['Open Sans Bold'],
+                'text-font': ['Open Sans Semibold'],
             },
             paint: {
                 'text-color': '#00f0ff',
