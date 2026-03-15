@@ -14,6 +14,26 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-15 — Wave 148: LPR Panel + ReID Cross-Camera Panel
+
+| Change | Verification |
+|--------|-------------|
+| LPR frontend panel — watchlist CRUD UI, live plate feed visualization | Code review |
+| ReID cross-camera tracking panel — re-identification matches UI with confidence scores | Code review |
+
+---
+
+## 2026-03-15 — Wave 147: Target Trail Export GPX/KML + Security Hardening
+
+| Change | Verification |
+|--------|-------------|
+| GPX/KML trail export endpoints — /api/targets/{id}/trail/export with format=gpx or format=kml | Code review |
+| Trail Export panel — frontend UI for downloading target movement trails | Code review |
+| Douglas-Peucker trail simplification for efficient export of large datasets | Code review |
+| Security audit — auth guards, input validation, query bounds hardened across 11 plugins | Code review |
+
+---
+
 ## 2026-03-15 — Wave 146: RTSP Timeout Fix + Convoy Visualization + First-Seen Notifications
 
 | Change | Verification |
