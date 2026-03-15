@@ -93,6 +93,11 @@ import { DwellMonitorPanelDef } from './panels/dwell-monitor.js';
 import { FederationPanelDef } from './panels/federation.js';
 import { LprPanelDef } from './panels/lpr.js';
 import { ReIDMatchesPanelDef } from './panels/reid-matches.js';
+import { EdgeDiagnosticsPanelDef } from './panels/edge-diagnostics.js';
+import { FusionDashboardPanelDef } from './panels/fusion-dashboard.js';
+import { OperatorActivityPanelDef } from './panels/operator-activity.js';
+import { SwarmCoordinationPanelDef } from './panels/swarm-coordination.js';
+import { TrainingDashboardPanelDef } from './panels/training-dashboard.js';
 import { PredictionEllipseManager } from './prediction-ellipses.js';
 import { initScreenshotHotkey } from './panels/map-screenshot.js';
 import { MissionModal, initMissionModal } from './mission-modal.js';
@@ -653,6 +658,11 @@ function initPanelSystem(container) {
     panelManager.register(FederationPanelDef);
     panelManager.register(LprPanelDef);
     panelManager.register(ReIDMatchesPanelDef);
+    panelManager.register(EdgeDiagnosticsPanelDef);
+    panelManager.register(FusionDashboardPanelDef);
+    panelManager.register(OperatorActivityPanelDef);
+    panelManager.register(SwarmCoordinationPanelDef);
+    panelManager.register(TrainingDashboardPanelDef);
 
     // Start prediction confidence ellipses on the map
     const predictionEllipses = new PredictionEllipseManager();

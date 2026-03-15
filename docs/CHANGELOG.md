@@ -14,6 +14,18 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-15 — Wave 140: Orphan Panel Registration + Ops Dashboard Uptime Widget
+
+| Change | Verification |
+|--------|-------------|
+| Converted 5 orphan panel files to PanelDef pattern: edge-diagnostics, fusion-dashboard, operator-activity, swarm-coordination, training-dashboard | JS parse verified, 93/93 JS tests pass |
+| Registered all 5 panels in main.js — now accessible from panel menu | Syntax checked |
+| Added System Uptime widget to Ops Dashboard — server uptime, start time, total targets processed, total events logged | ASGITransport test verified (200 OK) |
+| Extended /api/health with started_at, targets_processed, events_logged fields | 27/27 health router tests pass |
+| Edge HAL discovery: hal_acoustic (integrated), hal_voice (gap: no SC integration), hal_camera (gap: no simulator mode) | Code review |
+
+---
+
 ## 2026-03-15 — Wave 138: Security Audit + LPR Panel + ReID Matches Panel
 
 | Change | Verification |

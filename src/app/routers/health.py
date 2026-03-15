@@ -176,11 +176,48 @@ async def health_check(request: Request):
     # RL training data metrics
     rl_metrics = _rl_training_metrics()
 
+    # Counters for ops dashboard
+    targets_processed = 0
+    events_logged = 0
+    try:
+        tracker = getattr(request.app.state, "target_tracker", None)
+        if tracker is None:
+            amy = getattr(request.app.state, "amy", None)
+            if amy is not None:
+                tracker = getattr(amy, "target_tracker", None)
+        if tracker is not None:
+            targets_processed = getattr(tracker, "total_targets_seen", 0)
+            if targets_processed == 0:
+                # fallback: current target count
+                try:
+                    targets_processed = len(tracker.get_all())
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    try:
+        amy = getattr(request.app.state, "amy", None)
+        if amy is not None:
+            sensorium = getattr(amy, "sensorium", None)
+            if sensorium is not None:
+                events_logged = getattr(sensorium, "event_count", 0)
+                if callable(events_logged):
+                    events_logged = events_logged
+    except Exception:
+        pass
+
+    import datetime as _dt
+    started_at_iso = _dt.datetime.fromtimestamp(_start_time).isoformat()
+
     return {
         "status": "healthy" if all_healthy else "degraded",
         "version": "0.1.0",
         "system": "TRITIUM-SC",
         "uptime_seconds": round(uptime_seconds, 1),
+        "started_at": started_at_iso,
+        "targets_processed": targets_processed,
+        "events_logged": events_logged,
         "subsystems": subsystems,
         "plugins": plugins,
         "plugin_discovery": discovery,

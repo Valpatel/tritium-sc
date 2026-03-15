@@ -6,14 +6,8 @@
 // Displays operator actions: logins, target updates, investigations,
 // cursor movements. Polls /api/operator-activity for recent entries.
 
-import { EventBus } from '../events.js';
-
 const POLL_INTERVAL_MS = 5000;
 const MAX_ENTRIES = 50;
-
-let _container = null;
-let _pollTimer = null;
-let _entries = [];
 
 const ROLE_COLORS = {
     admin: '#fcee0a',
@@ -40,58 +34,69 @@ function _renderEntry(entry) {
     const detail = entry.detail || '';
     const username = entry.username || 'unknown';
 
-    return `<div class="op-activity-entry" style="border-left: 3px solid ${color}; padding: 4px 8px; margin: 2px 0;">
-        <span style="color: #555; font-size: 11px;">${time}</span>
-        <span style="color: ${color}; font-weight: bold; margin: 0 4px;">${username}</span>
-        <span style="color: #aaa;">${action}</span>
-        ${detail ? `<div style="color: #777; font-size: 11px; padding-left: 8px;">${detail}</div>` : ''}
+    return `<div style="border-left:3px solid ${color};padding:4px 8px;margin:2px 0;">
+        <span style="color:#555;font-size:11px;">${time}</span>
+        <span style="color:${color};font-weight:bold;margin:0 4px;">${username}</span>
+        <span style="color:#aaa;">${action}</span>
+        ${detail ? `<div style="color:#777;font-size:11px;padding-left:8px;">${detail}</div>` : ''}
     </div>`;
 }
 
-function _render() {
-    if (!_container) return;
-    if (_entries.length === 0) {
-        _container.innerHTML = '<div style="color: #555; padding: 20px; text-align: center;">No operator activity yet</div>';
-        return;
-    }
-    _container.innerHTML = _entries.map(_renderEntry).join('');
-}
+export const OperatorActivityPanelDef = {
+    id: 'operator-activity',
+    title: 'OPERATOR ACTIVITY',
+    defaultPosition: { x: 280, y: 100 },
+    defaultSize: { w: 360, h: 400 },
 
-async function _poll() {
-    try {
-        const resp = await fetch('/api/operator-activity?limit=50');
-        if (!resp.ok) return;
-        const data = await resp.json();
-        _entries = data.activities || [];
-        _render();
-    } catch (e) {
-        // silent
-    }
-}
+    create(panel) {
+        const el = document.createElement('div');
+        el.innerHTML = `
+            <div style="padding:8px;">
+                <div style="display:flex;gap:4px;margin-bottom:8px;">
+                    <button class="panel-action-btn panel-action-btn-primary" data-action="refresh" style="font-size:0.42rem">REFRESH</button>
+                </div>
+                <div data-bind="entries" style="overflow-y:auto;max-height:320px;">
+                    <div style="color:#555;padding:20px;text-align:center;">Loading operator activity...</div>
+                </div>
+            </div>
+        `;
+        return el;
+    },
 
-export function initOperatorActivityPanel(container) {
-    _container = container;
-    _container.innerHTML = '<div style="color: #555; padding: 20px; text-align: center;">Loading operator activity...</div>';
+    mount(bodyEl, panel) {
+        const entriesDiv = bodyEl.querySelector('[data-bind="entries"]');
+        let entries = [];
 
-    // Initial fetch
-    _poll();
+        async function poll() {
+            try {
+                const resp = await fetch('/api/operator-activity?limit=50');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                entries = data.activities || [];
+                render();
+            } catch (e) { /* silent */ }
+        }
 
-    // Poll for updates
-    _pollTimer = setInterval(_poll, POLL_INTERVAL_MS);
+        function render() {
+            if (entries.length === 0) {
+                entriesDiv.innerHTML = '<div style="color:#555;padding:20px;text-align:center;">No operator activity yet</div>';
+                return;
+            }
+            entriesDiv.innerHTML = entries.map(_renderEntry).join('');
+        }
 
-    // Listen for real-time cursor events
-    EventBus.on('operator:cursor', (cursor) => {
-        // Could add cursor movement to activity feed if desired
-    });
+        bodyEl.addEventListener('click', (e) => {
+            if (e.target.dataset?.action === 'refresh') poll();
+        });
 
-    return { destroy };
-}
+        poll();
+        panel._opActivityTimer = setInterval(poll, POLL_INTERVAL_MS);
+    },
 
-export function destroy() {
-    if (_pollTimer) {
-        clearInterval(_pollTimer);
-        _pollTimer = null;
-    }
-    _container = null;
-    _entries = [];
-}
+    unmount(bodyEl, panel) {
+        if (panel._opActivityTimer) {
+            clearInterval(panel._opActivityTimer);
+            panel._opActivityTimer = null;
+        }
+    },
+};

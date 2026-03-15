@@ -222,6 +222,29 @@ function _buildHTML() {
         </div>
     </div>
 
+    <!-- System Uptime -->
+    <div class="ops-section" style="border:1px solid rgba(0,240,255,0.2);border-radius:4px;padding:8px;">
+        <div class="ops-section-title" style="color:var(--cyan,#00f0ff);font-size:0.65rem;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">System Uptime</div>
+        <div style="display:flex;gap:12px;justify-content:space-around;">
+            <div style="text-align:center;">
+                <div data-bind="uptime-duration" style="font-size:1.2rem;color:var(--green,#05ffa1);font-weight:700;">--</div>
+                <div style="color:var(--text-dim,#888);font-size:0.6rem;">UPTIME</div>
+            </div>
+            <div style="text-align:center;">
+                <div data-bind="uptime-started" style="font-size:0.75rem;color:var(--cyan,#00f0ff);">--</div>
+                <div style="color:var(--text-dim,#888);font-size:0.6rem;">STARTED</div>
+            </div>
+            <div style="text-align:center;">
+                <div data-bind="uptime-targets-processed" style="font-size:1.2rem;color:var(--yellow,#fcee0a);font-weight:700;">--</div>
+                <div style="color:var(--text-dim,#888);font-size:0.6rem;">TARGETS</div>
+            </div>
+            <div style="text-align:center;">
+                <div data-bind="uptime-events-logged" style="font-size:1.2rem;color:var(--magenta,#ff2a6d);font-weight:700;">--</div>
+                <div style="color:var(--text-dim,#888);font-size:0.6rem;">EVENTS</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Connection + Game State -->
     <div style="display:flex;gap:8px;">
         <div class="ops-section" style="border:1px solid rgba(0,240,255,0.2);border-radius:4px;padding:8px;flex:1;">
@@ -348,6 +371,28 @@ async function _updateAsync(bodyEl) {
             ).join('');
         }
     }
+
+    // System uptime (from /api/health)
+    try {
+        const healthResp = await fetch('/api/health');
+        if (healthResp.ok && bodyEl.isConnected) {
+            const health = await healthResp.json();
+            const uptimeSec = health.uptime_seconds || 0;
+            _setText(bodyEl, 'uptime-duration', _formatUptime(uptimeSec));
+            _setText(bodyEl, 'uptime-started', health.started_at ? new Date(health.started_at).toLocaleTimeString() : '--');
+            _setText(bodyEl, 'uptime-targets-processed', health.targets_processed ?? '--');
+            _setText(bodyEl, 'uptime-events-logged', health.events_logged ?? '--');
+        }
+    } catch { /* silent */ }
+}
+
+function _formatUptime(totalSeconds) {
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${mins}m`;
+    return `${mins}m`;
 }
 
 function _setText(root, bind, value) {
@@ -359,7 +404,7 @@ export const OpsDashboardPanelDef = {
     id: 'ops-dashboard',
     title: 'OPS DASHBOARD',
     defaultPosition: { x: null, y: null },
-    defaultSize: { w: 400, h: 520 },
+    defaultSize: { w: 400, h: 600 },
 
     create(panel) {
         const el = document.createElement('div');

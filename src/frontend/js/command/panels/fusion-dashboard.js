@@ -6,213 +6,173 @@
 // Shows BLE+camera fusions/hour, strategy performance, operator accuracy,
 // active correlations, and strategy weight visualization.
 
-export function createFusionDashboard() {
-    const panel = document.createElement('div');
-    panel.className = 'panel fusion-dashboard';
-    panel.innerHTML = `
-        <div class="panel-header">
-            <h3>Fusion Pipeline Health</h3>
-            <div class="panel-controls">
-                <button class="btn-refresh" title="Refresh metrics">REFRESH</button>
-            </div>
-        </div>
-        <div class="fusion-content">
-            <div class="fusion-overview">
-                <div class="stat-card">
-                    <span class="stat-label">Fusions/Hour</span>
-                    <span class="stat-value fusion-hourly-rate">--</span>
+export const FusionDashboardPanelDef = {
+    id: 'fusion-dashboard',
+    title: 'FUSION PIPELINE',
+    defaultPosition: { x: 240, y: 60 },
+    defaultSize: { w: 460, h: 520 },
+
+    create(panel) {
+        const el = document.createElement('div');
+        el.className = 'fusion-dashboard';
+        el.innerHTML = `
+            <div style="padding:8px;">
+                <div style="display:flex;gap:4px;margin-bottom:8px;">
+                    <button class="panel-action-btn panel-action-btn-primary" data-action="refresh" style="font-size:0.42rem">REFRESH</button>
                 </div>
-                <div class="stat-card">
-                    <span class="stat-label">Active Correlations</span>
-                    <span class="stat-value fusion-active">--</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">Total Fusions</span>
-                    <span class="stat-value fusion-total">--</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">Confirmation Rate</span>
-                    <span class="stat-value fusion-confirm-rate">--</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">Pending Feedback</span>
-                    <span class="stat-value fusion-pending">--</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">Window Fusions</span>
-                    <span class="stat-value fusion-window">--</span>
-                </div>
-            </div>
-
-            <div class="fusion-section">
-                <h4>Source Pair Fusions</h4>
-                <div class="source-pairs-chart"></div>
-            </div>
-
-            <div class="fusion-section">
-                <h4>Strategy Performance</h4>
-                <div class="strategy-table-wrap">
-                    <table class="strategy-table">
-                        <thead>
-                            <tr>
-                                <th>Strategy</th>
-                                <th>Evaluations</th>
-                                <th>Contributed</th>
-                                <th>Accuracy</th>
-                                <th>Avg Score</th>
-                                <th>Weight</th>
-                            </tr>
-                        </thead>
-                        <tbody class="strategy-tbody"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="fusion-section">
-                <h4>Weight Recommendations</h4>
-                <div class="weight-bars"></div>
-            </div>
-        </div>
-    `;
-
-    let refreshTimer = null;
-
-    async function refresh() {
-        try {
-            const [statusRes, weightsRes] = await Promise.all([
-                fetch('/api/fusion/status'),
-                fetch('/api/fusion/weights'),
-            ]);
-            const status = await statusRes.json();
-            const weights = await weightsRes.json();
-
-            // Overview stats
-            _setText(panel, '.fusion-hourly-rate', _fmt(status.hourly_rate, 1));
-            _setText(panel, '.fusion-active', status.active_correlations ?? '--');
-            _setText(panel, '.fusion-total', status.total_fusions ?? 0);
-            _setText(panel, '.fusion-confirm-rate',
-                status.confirmation_rate != null
-                    ? (status.confirmation_rate * 100).toFixed(1) + '%' : '--');
-            _setText(panel, '.fusion-pending', status.total_pending_feedback ?? 0);
-            _setText(panel, '.fusion-window', status.window_fusions ?? 0);
-
-            // Source pairs chart
-            const pairsEl = panel.querySelector('.source-pairs-chart');
-            if (pairsEl && status.source_pairs) {
-                _renderPairs(pairsEl, status.source_pairs);
-            }
-
-            // Strategy table
-            const tbody = panel.querySelector('.strategy-tbody');
-            if (tbody && status.strategies) {
-                _renderStrategies(tbody, status.strategies,
-                    weights.current_weights || {});
-            }
-
-            // Weight recommendations
-            const weightBars = panel.querySelector('.weight-bars');
-            if (weightBars && weights.recommendations) {
-                _renderWeights(weightBars, weights.recommendations,
-                    weights.current_weights || {});
-            }
-        } catch (err) {
-            console.warn('Fusion dashboard refresh error:', err);
-        }
-    }
-
-    function _setText(root, sel, val) {
-        const el = root.querySelector(sel);
-        if (el) el.textContent = val;
-    }
-
-    function _fmt(n, dec) {
-        if (n == null) return '--';
-        return Number(n).toFixed(dec);
-    }
-
-    function _renderPairs(container, pairs) {
-        const entries = Object.entries(pairs);
-        if (!entries.length) {
-            container.innerHTML = '<div class="empty-state">No fusions recorded</div>';
-            return;
-        }
-        const maxCount = Math.max(...entries.map(e => e[1]));
-        container.innerHTML = entries.map(([pair, count]) => {
-            const pct = maxCount > 0 ? (count / maxCount * 100) : 0;
-            return `
-                <div class="pair-bar">
-                    <span class="pair-label">${pair}</span>
-                    <div class="bar-track">
-                        <div class="bar-fill" style="width:${pct}%"></div>
+                <div class="fusion-overview" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;">
+                    <div class="stat-card" style="background:#0e0e14;border:1px solid #1a1a2e;padding:6px;text-align:center;">
+                        <div style="font-size:10px;color:#666;text-transform:uppercase;">Fusions/Hour</div>
+                        <div data-bind="hourly-rate" style="font-size:16px;color:#05ffa1;margin-top:2px;">--</div>
                     </div>
-                    <span class="pair-count">${count}</span>
-                </div>`;
-        }).join('');
-    }
-
-    function _renderStrategies(tbody, strategies, currentWeights) {
-        if (!strategies.length) {
-            tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No strategy data</td></tr>';
-            return;
-        }
-        tbody.innerHTML = strategies.map(s => {
-            const accClass = s.accuracy >= 0.8 ? 'good' :
-                s.accuracy >= 0.5 ? 'warn' : 'bad';
-            const weight = currentWeights[s.name];
-            return `
-                <tr>
-                    <td class="strategy-name">${s.name}</td>
-                    <td>${s.evaluations}</td>
-                    <td>${s.contributed}</td>
-                    <td class="accuracy ${accClass}">${(s.accuracy * 100).toFixed(1)}%</td>
-                    <td>${s.avg_score.toFixed(3)}</td>
-                    <td>${weight != null ? weight.toFixed(2) : '--'}</td>
-                </tr>`;
-        }).join('');
-    }
-
-    function _renderWeights(container, recommendations, current) {
-        const entries = Object.entries(recommendations);
-        if (!entries.length) {
-            container.innerHTML = '<div class="empty-state">Need more feedback for recommendations</div>';
-            return;
-        }
-        container.innerHTML = entries.map(([name, weight]) => {
-            const curW = current[name];
-            const delta = curW != null ? weight - curW : 0;
-            const deltaClass = delta > 0.02 ? 'increase' : delta < -0.02 ? 'decrease' : '';
-            const deltaStr = delta !== 0 ? (delta > 0 ? '+' : '') + delta.toFixed(3) : '';
-            return `
-                <div class="weight-row">
-                    <span class="weight-name">${name}</span>
-                    <div class="bar-track">
-                        <div class="bar-fill recommended" style="width:${weight * 100}%"></div>
-                        ${curW != null ? `<div class="bar-marker" style="left:${curW * 100}%" title="current: ${curW.toFixed(2)}"></div>` : ''}
+                    <div class="stat-card" style="background:#0e0e14;border:1px solid #1a1a2e;padding:6px;text-align:center;">
+                        <div style="font-size:10px;color:#666;text-transform:uppercase;">Active</div>
+                        <div data-bind="active" style="font-size:16px;color:#00f0ff;margin-top:2px;">--</div>
                     </div>
-                    <span class="weight-value">${(weight * 100).toFixed(1)}%</span>
-                    <span class="weight-delta ${deltaClass}">${deltaStr}</span>
-                </div>`;
-        }).join('');
-    }
+                    <div class="stat-card" style="background:#0e0e14;border:1px solid #1a1a2e;padding:6px;text-align:center;">
+                        <div style="font-size:10px;color:#666;text-transform:uppercase;">Total</div>
+                        <div data-bind="total" style="font-size:16px;color:#05ffa1;margin-top:2px;">--</div>
+                    </div>
+                    <div class="stat-card" style="background:#0e0e14;border:1px solid #1a1a2e;padding:6px;text-align:center;">
+                        <div style="font-size:10px;color:#666;text-transform:uppercase;">Confirm Rate</div>
+                        <div data-bind="confirm-rate" style="font-size:16px;color:#05ffa1;margin-top:2px;">--</div>
+                    </div>
+                    <div class="stat-card" style="background:#0e0e14;border:1px solid #1a1a2e;padding:6px;text-align:center;">
+                        <div style="font-size:10px;color:#666;text-transform:uppercase;">Pending</div>
+                        <div data-bind="pending" style="font-size:16px;color:#fcee0a;margin-top:2px;">--</div>
+                    </div>
+                    <div class="stat-card" style="background:#0e0e14;border:1px solid #1a1a2e;padding:6px;text-align:center;">
+                        <div style="font-size:10px;color:#666;text-transform:uppercase;">Window</div>
+                        <div data-bind="window" style="font-size:16px;color:#05ffa1;margin-top:2px;">--</div>
+                    </div>
+                </div>
+                <div style="margin-bottom:8px;">
+                    <div style="color:#ff2a6d;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Source Pair Fusions</div>
+                    <div data-bind="pairs" style="font-size:11px;"></div>
+                </div>
+                <div style="margin-bottom:8px;">
+                    <div style="color:#ff2a6d;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Strategy Performance</div>
+                    <div data-bind="strategies" style="font-size:11px;overflow-x:auto;"></div>
+                </div>
+                <div>
+                    <div style="color:#ff2a6d;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Weight Recommendations</div>
+                    <div data-bind="weights" style="font-size:11px;"></div>
+                </div>
+            </div>
+        `;
+        return el;
+    },
 
-    // Setup
-    const refreshBtn = panel.querySelector('.btn-refresh');
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', refresh);
-    }
+    mount(bodyEl, panel) {
+        async function refresh() {
+            try {
+                const [statusRes, weightsRes] = await Promise.all([
+                    fetch('/api/fusion/status'),
+                    fetch('/api/fusion/weights'),
+                ]);
+                const status = await statusRes.json();
+                const weights = await weightsRes.json();
 
-    // Auto-refresh every 10s
-    refresh();
-    refreshTimer = setInterval(refresh, 10000);
+                _set(bodyEl, 'hourly-rate', _fmt(status.hourly_rate, 1));
+                _set(bodyEl, 'active', status.active_correlations ?? '--');
+                _set(bodyEl, 'total', status.total_fusions ?? 0);
+                _set(bodyEl, 'confirm-rate',
+                    status.confirmation_rate != null
+                        ? (status.confirmation_rate * 100).toFixed(1) + '%' : '--');
+                _set(bodyEl, 'pending', status.total_pending_feedback ?? 0);
+                _set(bodyEl, 'window', status.window_fusions ?? 0);
 
-    // Cleanup on remove
-    const observer = new MutationObserver(() => {
-        if (!panel.isConnected) {
-            clearInterval(refreshTimer);
-            observer.disconnect();
+                const pairsEl = bodyEl.querySelector('[data-bind="pairs"]');
+                if (pairsEl && status.source_pairs) _renderPairs(pairsEl, status.source_pairs);
+
+                const stratEl = bodyEl.querySelector('[data-bind="strategies"]');
+                if (stratEl && status.strategies) _renderStrategies(stratEl, status.strategies, weights.current_weights || {});
+
+                const weightEl = bodyEl.querySelector('[data-bind="weights"]');
+                if (weightEl && weights.recommendations) _renderWeights(weightEl, weights.recommendations, weights.current_weights || {});
+            } catch (err) {
+                console.warn('Fusion dashboard refresh error:', err);
+            }
         }
+
+        bodyEl.addEventListener('click', (e) => {
+            if (e.target.dataset?.action === 'refresh') refresh();
+        });
+
+        refresh();
+        panel._fusionTimer = setInterval(refresh, 10000);
+    },
+
+    unmount(bodyEl, panel) {
+        if (panel._fusionTimer) {
+            clearInterval(panel._fusionTimer);
+            panel._fusionTimer = null;
+        }
+    },
+};
+
+function _set(root, bind, val) {
+    const el = root.querySelector(`[data-bind="${bind}"]`);
+    if (el) el.textContent = String(val);
+}
+
+function _fmt(n, dec) {
+    if (n == null) return '--';
+    return Number(n).toFixed(dec);
+}
+
+function _renderPairs(container, pairs) {
+    const entries = Object.entries(pairs);
+    if (!entries.length) { container.innerHTML = '<div style="color:#555">No fusions recorded</div>'; return; }
+    const maxCount = Math.max(...entries.map(e => e[1]));
+    container.innerHTML = entries.map(([pair, count]) => {
+        const pct = maxCount > 0 ? (count / maxCount * 100) : 0;
+        return `<div style="display:flex;align-items:center;gap:6px;margin:2px 0;">
+            <span style="color:#888;min-width:100px;font-size:11px;">${pair}</span>
+            <div style="flex:1;height:8px;background:#12121a;border-radius:2px;overflow:hidden;">
+                <div style="width:${pct}%;height:100%;background:#00f0ff;border-radius:2px;"></div>
+            </div>
+            <span style="color:#aaa;font-size:11px;min-width:30px;text-align:right;">${count}</span>
+        </div>`;
+    }).join('');
+}
+
+function _renderStrategies(container, strategies, currentWeights) {
+    if (!strategies.length) { container.innerHTML = '<div style="color:#555">No strategy data</div>'; return; }
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr>';
+    html += '<th style="text-align:left;color:#888;padding:2px 4px;">Strategy</th>';
+    html += '<th style="text-align:right;color:#888;padding:2px 4px;">Evals</th>';
+    html += '<th style="text-align:right;color:#888;padding:2px 4px;">Accuracy</th>';
+    html += '<th style="text-align:right;color:#888;padding:2px 4px;">Weight</th>';
+    html += '</tr></thead><tbody>';
+    strategies.forEach(s => {
+        const accColor = s.accuracy >= 0.8 ? '#05ffa1' : s.accuracy >= 0.5 ? '#fcee0a' : '#ff2a6d';
+        const weight = currentWeights[s.name];
+        html += `<tr><td style="color:#ccc;padding:2px 4px;">${s.name}</td>
+            <td style="text-align:right;color:#aaa;padding:2px 4px;">${s.evaluations}</td>
+            <td style="text-align:right;color:${accColor};padding:2px 4px;">${(s.accuracy * 100).toFixed(1)}%</td>
+            <td style="text-align:right;color:#aaa;padding:2px 4px;">${weight != null ? weight.toFixed(2) : '--'}</td></tr>`;
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
 
-    return panel;
+function _renderWeights(container, recommendations, current) {
+    const entries = Object.entries(recommendations);
+    if (!entries.length) { container.innerHTML = '<div style="color:#555">Need more feedback</div>'; return; }
+    container.innerHTML = entries.map(([name, weight]) => {
+        const curW = current[name];
+        const delta = curW != null ? weight - curW : 0;
+        const deltaStr = delta !== 0 ? (delta > 0 ? '+' : '') + delta.toFixed(3) : '';
+        const deltaColor = delta > 0.02 ? '#05ffa1' : delta < -0.02 ? '#ff2a6d' : '#888';
+        return `<div style="display:flex;align-items:center;gap:6px;margin:2px 0;">
+            <span style="color:#888;min-width:100px;font-size:11px;">${name}</span>
+            <div style="flex:1;height:8px;background:#12121a;border-radius:2px;overflow:hidden;position:relative;">
+                <div style="width:${weight * 100}%;height:100%;background:#05ffa1;border-radius:2px;"></div>
+                ${curW != null ? `<div style="position:absolute;top:0;left:${curW * 100}%;width:2px;height:100%;background:#fff;"></div>` : ''}
+            </div>
+            <span style="color:#aaa;font-size:11px;min-width:40px;text-align:right;">${(weight * 100).toFixed(1)}%</span>
+            <span style="color:${deltaColor};font-size:10px;min-width:40px;">${deltaStr}</span>
+        </div>`;
+    }).join('');
 }
