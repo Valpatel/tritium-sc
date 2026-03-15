@@ -2259,12 +2259,71 @@ const GEOFENCE_ZONES_FILL   = 'geofence-zones-fill';
 const GEOFENCE_ZONES_STROKE = 'geofence-zones-stroke';
 const GEOFENCE_ZONES_LABEL  = 'geofence-zones-label';
 const GEOFENCE_LABEL_SOURCE = 'geofence-label-source';
+const GEOFENCE_ALERT_SOURCE = 'geofence-alert-source';
+const GEOFENCE_ALERT_BADGE  = 'geofence-alert-badge';
 
 const GEOFENCE_ZONE_COLORS = {
     restricted: { fill: 'rgba(255,42,109,0.35)', stroke: '#ff2a6d' },
     monitored:  { fill: 'rgba(0,240,255,0.28)',  stroke: '#00f0ff' },
     safe:       { fill: 'rgba(5,255,161,0.25)',   stroke: '#05ffa1' },
 };
+
+// Geofence zone pulse animation state
+let _geofencePulseRAF = null;
+let _geofenceHasActiveZones = false;
+
+/**
+ * Animate pulse effect on geofence zones that have occupants.
+ * Oscillates fill-opacity and line-width for active zones using a sine wave.
+ */
+function _geofencePulseLoop() {
+    if (!_state.map || !_state.initialized || !_geofenceHasActiveZones) {
+        _geofencePulseRAF = null;
+        return;
+    }
+    const t = Date.now() / 1000;
+    // Sine wave: oscillate between 0.25 and 0.75 for fill, 2 and 5 for stroke
+    const sin = Math.sin(t * 2.5); // ~0.4Hz pulse
+    const fillOpacity = 0.5 + 0.25 * sin;    // 0.25 .. 0.75
+    const lineWidth   = 3.5 + 1.5 * sin;     // 2 .. 5
+    const strokeOpacity = 0.7 + 0.3 * sin;   // 0.4 .. 1.0
+
+    try {
+        if (_state.map.getLayer(GEOFENCE_ZONES_FILL)) {
+            _state.map.setPaintProperty(GEOFENCE_ZONES_FILL, 'fill-opacity', [
+                'case', ['get', 'is_active'], fillOpacity, 0.6
+            ]);
+        }
+        if (_state.map.getLayer(GEOFENCE_ZONES_STROKE)) {
+            _state.map.setPaintProperty(GEOFENCE_ZONES_STROKE, 'line-width', [
+                'case', ['get', 'is_active'], lineWidth, 3
+            ]);
+            _state.map.setPaintProperty(GEOFENCE_ZONES_STROKE, 'line-opacity', [
+                'case', ['get', 'is_active'], strokeOpacity, 1.0
+            ]);
+        }
+        // Pulse the alert badge opacity
+        if (_state.map.getLayer(GEOFENCE_ALERT_BADGE)) {
+            const badgeOpacity = 0.7 + 0.3 * sin;
+            _state.map.setPaintProperty(GEOFENCE_ALERT_BADGE, 'text-opacity', badgeOpacity);
+        }
+    } catch (_e) { /* layer may have been removed */ }
+
+    _geofencePulseRAF = requestAnimationFrame(_geofencePulseLoop);
+}
+
+function _startGeofencePulse() {
+    if (!_geofencePulseRAF) {
+        _geofencePulseRAF = requestAnimationFrame(_geofencePulseLoop);
+    }
+}
+
+function _stopGeofencePulse() {
+    if (_geofencePulseRAF) {
+        cancelAnimationFrame(_geofencePulseRAF);
+        _geofencePulseRAF = null;
+    }
+}
 
 /**
  * Fetch geofence zones + occupancy and render on the MapLibre map.
@@ -2315,6 +2374,8 @@ function _renderGeofenceZones() {
 
     const features = [];
     const labelFeatures = [];
+    const alertFeatures = [];
+    let hasAnyActive = false;
 
     for (const zone of zones) {
         const pts = zone.polygon;
@@ -2330,6 +2391,9 @@ function _renderGeofenceZones() {
         // Close the ring
         if (ring.length > 0) ring.push(ring[0]);
 
+        const occ = occupancy[zone.zone_id] || 0;
+        const isActive = occ > 0;
+
         features.push({
             type: 'Feature',
             geometry: { type: 'Polygon', coordinates: [ring] },
@@ -2337,6 +2401,7 @@ function _renderGeofenceZones() {
                 zone_id: zone.zone_id,
                 fill_color: colors.fill,
                 stroke_color: colors.stroke,
+                is_active: isActive,
             },
         });
 
@@ -2344,8 +2409,7 @@ function _renderGeofenceZones() {
         const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
         const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
         const ll = _gameToLngLat(cx, cy);
-        const occ = occupancy[zone.zone_id] || 0;
-        const label = occ > 0
+        const label = isActive
             ? `${zone.name.toUpperCase()}\n${occ} INSIDE`
             : zone.name.toUpperCase();
 
@@ -2358,6 +2422,19 @@ function _renderGeofenceZones() {
                 zone_type: zone.zone_type.toUpperCase(),
             },
         });
+
+        // Alert badge for active zones
+        if (isActive) {
+            hasAnyActive = true;
+            alertFeatures.push({
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [ll[0], ll[1]] },
+                properties: {
+                    badge_text: '\u26A0 ALERT',
+                    badge_color: zone.zone_type === 'restricted' ? '#ff2a6d' : '#fcee0a',
+                },
+            });
+        }
     }
 
     const geojson = { type: 'FeatureCollection', features };
@@ -2415,17 +2492,71 @@ function _renderGeofenceZones() {
         // Symbol layer can fail if fonts unavailable — fill/stroke still render
         console.warn('[MAP-ML] Geofence label layer failed:', _labelErr.message);
     }
+
+    // Alert badge layer — warning icon at centroid of active zones
+    const alertGeojson = { type: 'FeatureCollection', features: alertFeatures };
+    try {
+        if (_state.map.getSource(GEOFENCE_ALERT_SOURCE)) {
+            _state.map.getSource(GEOFENCE_ALERT_SOURCE).setData(alertGeojson);
+        } else {
+            _state.map.addSource(GEOFENCE_ALERT_SOURCE, { type: 'geojson', data: alertGeojson });
+            _state.map.addLayer({
+                id: GEOFENCE_ALERT_BADGE,
+                type: 'symbol',
+                source: GEOFENCE_ALERT_SOURCE,
+                layout: {
+                    'text-field': ['get', 'badge_text'],
+                    'text-font': ['Open Sans Bold'],
+                    'text-size': 13,
+                    'text-anchor': 'top',
+                    'text-offset': [0, 1.2],
+                    'text-allow-overlap': true,
+                },
+                paint: {
+                    'text-color': ['get', 'badge_color'],
+                    'text-halo-color': 'rgba(10,10,20,0.9)',
+                    'text-halo-width': 2,
+                },
+            });
+        }
+    } catch (_alertErr) {
+        console.warn('[MAP-ML] Geofence alert badge layer failed:', _alertErr.message);
+    }
+
+    // Manage pulse animation based on active zone state
+    _geofenceHasActiveZones = hasAnyActive;
+    if (hasAnyActive) {
+        _startGeofencePulse();
+    } else {
+        _stopGeofencePulse();
+        // Reset paint properties to defaults when no zones are active
+        try {
+            if (_state.map.getLayer(GEOFENCE_ZONES_FILL)) {
+                _state.map.setPaintProperty(GEOFENCE_ZONES_FILL, 'fill-opacity', 0.6);
+            }
+            if (_state.map.getLayer(GEOFENCE_ZONES_STROKE)) {
+                _state.map.setPaintProperty(GEOFENCE_ZONES_STROKE, 'line-width', 3);
+                _state.map.setPaintProperty(GEOFENCE_ZONES_STROKE, 'line-opacity', 1.0);
+            }
+        } catch (_e) { /* ok */ }
+    }
 }
 
 function _clearGeofenceZones() {
+    _stopGeofencePulse();
+    _geofenceHasActiveZones = false;
     try {
         if (_state.map) {
+            if (_state.map.getLayer(GEOFENCE_ALERT_BADGE))
+                _state.map.removeLayer(GEOFENCE_ALERT_BADGE);
             if (_state.map.getLayer(GEOFENCE_ZONES_LABEL))
                 _state.map.removeLayer(GEOFENCE_ZONES_LABEL);
             if (_state.map.getLayer(GEOFENCE_ZONES_FILL))
                 _state.map.removeLayer(GEOFENCE_ZONES_FILL);
             if (_state.map.getLayer(GEOFENCE_ZONES_STROKE))
                 _state.map.removeLayer(GEOFENCE_ZONES_STROKE);
+            if (_state.map.getSource(GEOFENCE_ALERT_SOURCE))
+                _state.map.removeSource(GEOFENCE_ALERT_SOURCE);
             if (_state.map.getSource(GEOFENCE_ZONES_SOURCE))
                 _state.map.removeSource(GEOFENCE_ZONES_SOURCE);
             if (_state.map.getSource(GEOFENCE_LABEL_SOURCE))
