@@ -276,6 +276,27 @@ export const DossiersPanelDef = {
                     </div>
 
                     <div class="dossier-section">
+                        <div class="dossier-section-title">BEHAVIORAL PROFILE</div>
+                        <div class="dossier-behavioral-profile" data-bind="dossier-behavioral">
+                            <div class="dossier-dim">Loading behavioral profile...</div>
+                        </div>
+                    </div>
+
+                    <div class="dossier-section">
+                        <div class="dossier-section-title">LOCATION SUMMARY</div>
+                        <div class="dossier-location-summary" data-bind="dossier-location">
+                            <div class="dossier-dim">Loading location data...</div>
+                        </div>
+                    </div>
+
+                    <div class="dossier-section">
+                        <div class="dossier-section-title">CORRELATIONS</div>
+                        <div class="dossier-correlations" data-bind="dossier-correlations">
+                            <div class="dossier-dim">Loading correlations...</div>
+                        </div>
+                    </div>
+
+                    <div class="dossier-section">
                         <div class="dossier-section-title">SIGNALS (${signals.length})</div>
                         <div class="dossier-signal-timeline">${signalHtml}</div>
                     </div>
@@ -406,6 +427,24 @@ export const DossiersPanelDef = {
             const signalChart = container.querySelector('[data-bind="dossier-signal-chart"]');
             if (signalChart) {
                 _fetchAndDrawSignalHistory(signalChart, dossierId);
+            }
+
+            // Behavioral profile
+            const behavioralEl = container.querySelector('[data-bind="dossier-behavioral"]');
+            if (behavioralEl) {
+                _fetchAndRenderBehavioral(behavioralEl, dossierId);
+            }
+
+            // Location summary
+            const locationEl = container.querySelector('[data-bind="dossier-location"]');
+            if (locationEl) {
+                _fetchAndRenderLocation(locationEl, dossierId);
+            }
+
+            // Correlations
+            const correlationsEl = container.querySelector('[data-bind="dossier-correlations"]');
+            if (correlationsEl) {
+                _fetchAndRenderCorrelations(correlationsEl, dossier);
             }
 
             // Stop keyboard propagation on inputs
@@ -657,6 +696,259 @@ export const DossiersPanelDef = {
             }
 
             ctx.textAlign = 'start';
+        }
+
+        // ---------------------------------------------------------------
+        // Behavioral profile
+        // ---------------------------------------------------------------
+
+        async function _fetchAndRenderBehavioral(el, dossierId) {
+            try {
+                const resp = await fetch(`/api/dossiers/${encodeURIComponent(dossierId)}/behavioral-profile`);
+                if (!resp.ok) { el.innerHTML = '<div class="dossier-dim">Behavioral data unavailable</div>'; return; }
+                const p = await resp.json();
+                _renderBehavioralProfile(el, p);
+            } catch (_) {
+                el.innerHTML = '<div class="dossier-dim">Failed to load behavioral profile</div>';
+            }
+        }
+
+        function _renderBehavioralProfile(el, profile) {
+            const pattern = profile.movement_pattern || 'unknown';
+            const patternColors = {
+                stationary: '#05ffa1', mobile: '#00f0ff', erratic: '#ff2a6d',
+                patrol: '#fcee0a', unknown: '#888',
+            };
+            const patternColor = patternColors[pattern] || '#888';
+
+            const avgSpeed = (profile.average_speed || 0).toFixed(1);
+            const maxSpeed = (profile.max_speed || 0).toFixed(1);
+            const signalCount = profile.signal_count || 0;
+            const activeDuration = profile.active_duration_s || 0;
+            const durationStr = activeDuration > 3600
+                ? `${(activeDuration / 3600).toFixed(1)}h`
+                : activeDuration > 60 ? `${Math.round(activeDuration / 60)}m` : `${activeDuration}s`;
+
+            // Source breakdown chips
+            const srcBreakdown = profile.source_breakdown || {};
+            const srcChips = Object.entries(srcBreakdown).map(([src, count]) => {
+                const icon = SOURCE_ICONS[src] || '\u{1F4CB}';
+                return `<span class="dossier-src-chip">${icon} ${_esc(src)}: ${count}</span>`;
+            }).join('') || '<span class="dossier-dim">No sources</span>';
+
+            // RSSI stats
+            const rssi = profile.rssi_stats || {};
+            const rssiHtml = (rssi.min != null && rssi.max != null)
+                ? `<div class="dossier-rssi-stats mono">
+                    <span>Min: <span style="color:#ff2a6d">${rssi.min} dBm</span></span>
+                    <span>Avg: <span style="color:#fcee0a">${(rssi.mean || rssi.avg || 0).toFixed(0)} dBm</span></span>
+                    <span>Max: <span style="color:#05ffa1">${rssi.max} dBm</span></span>
+                   </div>`
+                : '';
+
+            // Activity hours bar chart (24 bins)
+            const hours = profile.activity_hours || [];
+            let activityBarsHtml = '';
+            if (hours.length > 0) {
+                // hours is an array of {hour, count} or just counts
+                const hourCounts = new Array(24).fill(0);
+                for (const h of hours) {
+                    if (typeof h === 'object' && h.hour != null) {
+                        hourCounts[h.hour] = h.count || 0;
+                    } else if (typeof h === 'number') {
+                        // index-based
+                        const idx = hours.indexOf(h);
+                        if (idx < 24) hourCounts[idx] = h;
+                    }
+                }
+                const maxCount = Math.max(...hourCounts, 1);
+                const bars = hourCounts.map((c, i) => {
+                    const pct = (c / maxCount) * 100;
+                    const label = i % 6 === 0 ? `${String(i).padStart(2, '0')}` : '';
+                    return `<div class="dossier-hour-bar-col" title="${i}:00 — ${c} signals">
+                        <div class="dossier-hour-bar" style="height:${pct}%"></div>
+                        <span class="dossier-hour-label">${label}</span>
+                    </div>`;
+                }).join('');
+                activityBarsHtml = `
+                    <div class="dossier-activity-label">Activity by Hour</div>
+                    <div class="dossier-activity-hours">${bars}</div>`;
+            }
+
+            el.innerHTML = `
+                <div class="dossier-behavioral-grid">
+                    <div class="dossier-behavior-badge" style="color:${patternColor};border-color:${patternColor}">
+                        ${_esc(pattern).toUpperCase()}
+                    </div>
+                    <div class="dossier-behavior-stats mono">
+                        <span>Avg: ${avgSpeed} m/s</span>
+                        <span>Max: ${maxSpeed} m/s</span>
+                        <span>Signals: ${signalCount}</span>
+                        <span>Active: ${durationStr}</span>
+                    </div>
+                </div>
+                ${rssiHtml}
+                <div class="dossier-src-breakdown">${srcChips}</div>
+                ${activityBarsHtml}
+            `;
+        }
+
+        // ---------------------------------------------------------------
+        // Location summary
+        // ---------------------------------------------------------------
+
+        async function _fetchAndRenderLocation(el, dossierId) {
+            try {
+                const resp = await fetch(`/api/dossiers/${encodeURIComponent(dossierId)}/location-summary`);
+                if (!resp.ok) { el.innerHTML = '<div class="dossier-dim">Location data unavailable</div>'; return; }
+                const data = await resp.json();
+                _renderLocationSummary(el, data);
+            } catch (_) {
+                el.innerHTML = '<div class="dossier-dim">Failed to load location data</div>';
+            }
+        }
+
+        function _renderLocationSummary(el, data) {
+            const zones = data.zones_visited || [];
+            const distance = data.total_distance || 0;
+            const posCount = data.position_count || 0;
+
+            let distStr;
+            if (distance >= 1000) {
+                distStr = `${(distance / 1000).toFixed(2)} km`;
+            } else {
+                distStr = `${distance.toFixed(1)} m`;
+            }
+
+            const zonesHtml = zones.length > 0
+                ? zones.map(z => {
+                    const name = _esc(z.name || z.zone_id || 'Unknown zone');
+                    const timeInZone = z.duration_s || z.time_spent_s || 0;
+                    const timeStr = timeInZone > 3600
+                        ? `${(timeInZone / 3600).toFixed(1)}h`
+                        : timeInZone > 60 ? `${Math.round(timeInZone / 60)}m` : `${timeInZone}s`;
+                    const entries = z.entry_count || z.visits || 0;
+                    return `<div class="dossier-zone-row">
+                        <span class="dossier-zone-name">${name}</span>
+                        <span class="dossier-zone-meta mono">${entries > 0 ? entries + ' visits' : ''} ${timeStr}</span>
+                    </div>`;
+                }).join('')
+                : '<div class="dossier-dim">No zone data</div>';
+
+            el.innerHTML = `
+                <div class="dossier-location-stats mono">
+                    <span>Distance: <span style="color:#00f0ff">${distStr}</span></span>
+                    <span>Positions: <span style="color:#00f0ff">${posCount}</span></span>
+                </div>
+                <div class="dossier-zones-list">${zonesHtml}</div>
+            `;
+        }
+
+        // ---------------------------------------------------------------
+        // Correlations
+        // ---------------------------------------------------------------
+
+        async function _fetchAndRenderCorrelations(el, dossier) {
+            try {
+                // Get identifiers from dossier to find related target IDs
+                const identifiers = dossier.identifiers || {};
+                const dossierId = dossier.dossier_id || '';
+
+                // Fetch correlations from the correlations API
+                const resp = await fetch('/api/correlations');
+                if (!resp.ok) {
+                    // Fall back to showing identifiers as correlation indicators
+                    _renderCorrelationsFallback(el, identifiers, dossierId);
+                    return;
+                }
+                const data = await resp.json();
+                const allCorrelations = data.correlations || [];
+
+                // Filter for correlations involving any of this dossier's identifiers
+                const myIds = new Set();
+                // Add MAC-based target IDs
+                if (identifiers.mac) {
+                    const cleanMac = identifiers.mac.replace(/:/g, '');
+                    myIds.add(`ble_${cleanMac}`);
+                    myIds.add(`ble_${cleanMac.toLowerCase()}`);
+                    myIds.add(`ble_${cleanMac.toUpperCase()}`);
+                }
+                // Add any target_ids from dossier
+                if (dossier.target_ids) {
+                    for (const tid of dossier.target_ids) myIds.add(tid);
+                }
+                if (dossier.primary_target_id) myIds.add(dossier.primary_target_id);
+
+                const relevant = allCorrelations.filter(c =>
+                    myIds.has(c.primary_id) || myIds.has(c.secondary_id) ||
+                    myIds.has(c.target_a) || myIds.has(c.target_b)
+                );
+
+                _renderCorrelations(el, relevant, identifiers, dossierId, myIds);
+            } catch (_) {
+                _renderCorrelationsFallback(el, dossier.identifiers || {}, dossier.dossier_id || '');
+            }
+        }
+
+        function _renderCorrelations(el, correlations, identifiers, dossierId, myIds) {
+            if (correlations.length === 0 && Object.keys(identifiers).length === 0) {
+                el.innerHTML = '<div class="dossier-dim">No correlations found</div>';
+                return;
+            }
+
+            // Build correlation cards
+            let corrHtml = '';
+            if (correlations.length > 0) {
+                corrHtml = correlations.slice(0, 20).map(c => {
+                    const primaryId = c.primary_id || c.target_a || '';
+                    const secondaryId = c.secondary_id || c.target_b || '';
+                    const otherId = myIds.has(primaryId) ? secondaryId : primaryId;
+                    const confidence = Math.round((c.confidence || c.score || 0) * 100);
+                    const method = c.method || c.correlation_type || 'unknown';
+                    const confColor = confidence > 70 ? '#05ffa1' : confidence > 40 ? '#fcee0a' : '#ff2a6d';
+
+                    return `<div class="dossier-corr-card">
+                        <span class="dossier-corr-id mono">${_esc(otherId)}</span>
+                        <span class="dossier-corr-method">${_esc(method)}</span>
+                        <span class="dossier-corr-conf mono" style="color:${confColor}">${confidence}%</span>
+                    </div>`;
+                }).join('');
+            }
+
+            // Show fused identifiers as implicit correlations
+            const idEntries = Object.entries(identifiers);
+            const idHtml = idEntries.length > 0
+                ? `<div class="dossier-corr-ids-header">Fused Identifiers</div>` +
+                  idEntries.map(([k, v]) =>
+                    `<div class="dossier-corr-fused-row">
+                        <span class="dossier-corr-fused-type">${_esc(k)}</span>
+                        <span class="dossier-corr-fused-val mono">${_esc(String(v))}</span>
+                    </div>`
+                  ).join('')
+                : '';
+
+            el.innerHTML = `
+                ${corrHtml ? `<div class="dossier-corr-list">${corrHtml}</div>` : ''}
+                ${idHtml}
+                ${!corrHtml && !idHtml ? '<div class="dossier-dim">No correlations found</div>' : ''}
+            `;
+        }
+
+        function _renderCorrelationsFallback(el, identifiers, dossierId) {
+            const entries = Object.entries(identifiers);
+            if (entries.length === 0) {
+                el.innerHTML = '<div class="dossier-dim">No correlation data available</div>';
+                return;
+            }
+            el.innerHTML = `
+                <div class="dossier-corr-ids-header">Fused Identifiers</div>
+                ${entries.map(([k, v]) =>
+                    `<div class="dossier-corr-fused-row">
+                        <span class="dossier-corr-fused-type">${_esc(k)}</span>
+                        <span class="dossier-corr-fused-val mono">${_esc(String(v))}</span>
+                    </div>`
+                ).join('')}
+            `;
         }
 
         // ---------------------------------------------------------------
@@ -1287,6 +1579,200 @@ style.textContent = `
 
 .dossier-merge-btn:hover {
     background: rgba(255, 42, 109, 0.2);
+}
+
+/* Behavioral profile */
+.dossier-behavioral-grid {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.dossier-behavior-badge {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border: 1px solid;
+    border-radius: 2px;
+    letter-spacing: 0.08em;
+}
+
+.dossier-behavior-stats {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 0.55rem;
+    color: rgba(224, 224, 224, 0.6);
+}
+
+.dossier-rssi-stats {
+    display: flex;
+    gap: 12px;
+    font-size: 0.55rem;
+    color: rgba(224, 224, 224, 0.5);
+    margin-top: 4px;
+}
+
+.dossier-src-breakdown {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.dossier-src-chip {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.5rem;
+    padding: 1px 5px;
+    background: rgba(0, 240, 255, 0.06);
+    border: 1px solid rgba(0, 240, 255, 0.15);
+    border-radius: 2px;
+    color: rgba(224, 224, 224, 0.6);
+}
+
+.dossier-activity-label {
+    font-size: 0.5rem;
+    color: rgba(224, 224, 224, 0.4);
+    margin-top: 6px;
+    margin-bottom: 2px;
+}
+
+.dossier-activity-hours {
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    height: 36px;
+    background: rgba(0, 240, 255, 0.03);
+    border: 1px solid rgba(0, 240, 255, 0.08);
+    border-radius: 2px;
+    padding: 2px 1px 12px;
+    position: relative;
+}
+
+.dossier-hour-bar-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    justify-content: flex-end;
+    position: relative;
+}
+
+.dossier-hour-bar {
+    width: 100%;
+    background: rgba(0, 240, 255, 0.5);
+    border-radius: 1px 1px 0 0;
+    min-height: 0;
+    transition: height 0.2s ease;
+}
+
+.dossier-hour-label {
+    position: absolute;
+    bottom: -11px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 6px;
+    color: rgba(224, 224, 224, 0.3);
+}
+
+/* Location summary */
+.dossier-location-stats {
+    display: flex;
+    gap: 16px;
+    font-size: 0.55rem;
+    color: rgba(224, 224, 224, 0.5);
+    margin-bottom: 4px;
+}
+
+.dossier-zones-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.dossier-zone-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 6px;
+    font-size: 0.6rem;
+    background: rgba(0, 240, 255, 0.03);
+    border-left: 2px solid rgba(0, 240, 255, 0.2);
+    border-radius: 0 2px 2px 0;
+}
+
+.dossier-zone-name {
+    color: #e0e0e0;
+    flex: 1;
+}
+
+.dossier-zone-meta {
+    color: rgba(224, 224, 224, 0.4);
+    font-size: 0.5rem;
+}
+
+/* Correlations */
+.dossier-corr-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 6px;
+}
+
+.dossier-corr-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    background: rgba(5, 255, 161, 0.04);
+    border: 1px solid rgba(5, 255, 161, 0.12);
+    border-radius: 2px;
+}
+
+.dossier-corr-id {
+    flex: 1;
+    font-size: 0.55rem;
+    color: #e0e0e0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dossier-corr-method {
+    font-size: 0.5rem;
+    color: rgba(0, 240, 255, 0.6);
+}
+
+.dossier-corr-conf {
+    font-size: 0.55rem;
+    font-weight: 700;
+}
+
+.dossier-corr-ids-header {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.5rem;
+    color: rgba(0, 240, 255, 0.5);
+    margin-bottom: 3px;
+    letter-spacing: 0.05em;
+}
+
+.dossier-corr-fused-row {
+    display: flex;
+    gap: 8px;
+    padding: 2px 6px;
+    font-size: 0.55rem;
+}
+
+.dossier-corr-fused-type {
+    color: rgba(0, 240, 255, 0.6);
+    min-width: 40px;
+}
+
+.dossier-corr-fused-val {
+    color: #e0e0e0;
+    word-break: break-all;
 }
 
 /* Scrollbar styling for detail pane */
