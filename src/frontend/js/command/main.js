@@ -85,6 +85,7 @@ import { initTargetFilter, matchesFilter, getTargetFilters } from './target-filt
 import { initCommandPalette, openCommandPalette } from './command-palette.js';
 import { createTacticalBanner } from './tactical-banner.js';
 import { createMapQuickToggles } from './map-quick-toggles.js';
+import { TargetTrailManager } from './target-trails.js';
 
 // Make available on window for console debugging
 window.TritiumStore = TritiumStore;
@@ -269,6 +270,10 @@ function init() {
 
     // Initialize tactical map
     initMap();
+
+    // Target trail manager (speed-colored movement trails on map)
+    const trailManager = new TargetTrailManager();
+    trailManager.start();
 
     // Check URL for shared map view
     checkShareHash();

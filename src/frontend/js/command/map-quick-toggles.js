@@ -61,6 +61,14 @@ const QUICK_TOGGLES = [
         stateKey: 'showMesh',
         toggleFn: 'toggleMesh',
     },
+    {
+        id: 'trails',
+        icon: 'TRL',
+        title: 'Toggle target movement trails',
+        stateKey: null,  // Custom toggle via EventBus
+        toggleFn: null,
+        eventToggle: 'trails:toggle',
+    },
 ];
 
 /**
@@ -84,6 +92,12 @@ export function createMapQuickToggles(tacticalArea) {
 
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
+            // Custom event-based toggle (e.g., trails)
+            if (toggle.eventToggle) {
+                btn.classList.toggle('active');
+                EventBus.emit(toggle.eventToggle);
+                return;
+            }
             if (!mapActions) return;
             const fn = mapActions[toggle.toggleFn];
             if (typeof fn === 'function') {
@@ -102,6 +116,7 @@ export function createMapQuickToggles(tacticalArea) {
         if (!mapActions || !mapActions.getMapState) return;
         const state = mapActions.getMapState();
         for (const toggle of QUICK_TOGGLES) {
+            if (toggle.eventToggle) continue; // event toggles manage their own state
             const btn = buttons.get(toggle.id);
             if (!btn) continue;
             const isOn = !!state[toggle.stateKey];
