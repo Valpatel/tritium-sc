@@ -90,9 +90,78 @@ async def get_events(count: int = 50):
 
 @router.get("/stats")
 async def get_stats():
-    """Get acoustic event statistics."""
+    """Get acoustic event statistics.
+
+    Returns stats compatible with the acoustic panel's expected format:
+    events_classified, active_targets, high_severity_count, localizations,
+    ml_available, plus the raw event_counts and event_types.
+    """
+    event_counts = _classifier.get_event_counts()
+    total = len(_classifier.get_recent_events(10000))
+    high_types = {"gunshot", "explosion", "glass_break"}
+    high_count = sum(event_counts.get(t, 0) for t in high_types)
     return {
-        "event_counts": _classifier.get_event_counts(),
+        "event_counts": event_counts,
         "event_types": [e.value for e in AcousticEventType],
-        "total_events": len(_classifier.get_recent_events(10000)),
+        "total_events": total,
+        # Fields expected by acoustic-intelligence.js panel
+        "events_classified": total,
+        "active_targets": 0,
+        "high_severity_count": high_count,
+        "localizations": 0,
+        "ml_available": False,
     }
+
+
+@router.get("/timeline")
+async def get_timeline(count: int = 50):
+    """Get acoustic events formatted as a timeline for the panel.
+
+    Wraps /events data with colour hints and location stubs so the
+    acoustic-intelligence.js panel can render without changes.
+    """
+    events = _classifier.get_recent_events(count)
+    high_types = {"gunshot", "explosion", "glass_break"}
+    medium_types = {"siren", "alarm", "vehicle"}
+
+    timeline = []
+    for e in events:
+        evt_type = e.event_type.value if hasattr(e.event_type, "value") else str(e.event_type)
+        if evt_type in high_types:
+            color = "#ff2a6d"
+        elif evt_type in medium_types:
+            color = "#fcee0a"
+        else:
+            color = "#00f0ff"
+        timeline.append({
+            "event_type": evt_type,
+            "confidence": e.confidence,
+            "timestamp": e.timestamp,
+            "duration_ms": e.duration_ms,
+            "peak_frequency_hz": e.peak_frequency_hz,
+            "device_id": e.device_id,
+            "color": color,
+            "model_version": "",
+            "location": None,
+        })
+    return {"events": timeline}
+
+
+@router.get("/localizations")
+async def get_localizations(count: int = 30):
+    """Get acoustic source localizations.
+
+    Multi-sensor triangulated localizations require 2+ acoustic sensors
+    reporting the same event.  Returns an empty list when no localization
+    data is available (single-sensor deployments).
+    """
+    # Localizations require multi-sensor correlation which is not yet
+    # implemented in the single-classifier pipeline.  Return the empty
+    # structure the panel expects so the UI renders gracefully.
+    return {"localizations": []}
+
+
+@router.get("/counts")
+async def get_counts():
+    """Get per-event-type counts for the acoustic panel bar chart."""
+    return {"counts": _classifier.get_event_counts()}

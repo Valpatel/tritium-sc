@@ -102,6 +102,31 @@ def _check_watchlist(plate_text: str) -> dict | None:
 # --- Endpoints ---
 
 
+@router.get("/")
+async def get_lpr_root():
+    """Root LPR endpoint returning basic stats for the panel.
+
+    The LPR panel calls ``GET /api/lpr/`` to populate its stats bar.
+    Returns a ``stats`` dict with total_detections, unique_plates,
+    watchlist_hits, and watchlist_size.
+    """
+    with _detections_lock:
+        total = len(_detections)
+        plates = set(d["plate_normalized"] for d in _detections)
+        watchlist_hits = sum(1 for d in _detections if d["watchlist_hit"])
+    with _watchlist_lock:
+        wl_size = len(_watchlist)
+    return {
+        "status": "ok",
+        "stats": {
+            "total_detections": total,
+            "unique_plates": len(plates),
+            "watchlist_hits": watchlist_hits,
+            "watchlist_size": wl_size,
+        },
+    }
+
+
 @router.post("/detect", response_model=PlateDetectionResponse)
 async def detect_plate(request: PlateDetectionRequest, _user: dict = Depends(require_auth)):
     """Submit a plate detection from the LPR pipeline.

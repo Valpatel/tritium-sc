@@ -13,8 +13,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request, Body
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Body
 from loguru import logger
+
+from app.auth import require_auth
 
 router = APIRouter(prefix="/api/dossiers", tags=["dossiers"])
 
@@ -174,7 +176,7 @@ async def get_dossier(request: Request, dossier_id: str):
 
 
 @router.post("/{dossier_id}/merge/{other_id}")
-async def merge_dossiers_path(request: Request, dossier_id: str, other_id: str):
+async def merge_dossiers_path(request: Request, dossier_id: str, other_id: str, _user: dict = Depends(require_auth)):
     """Merge another dossier into this one (path-based)."""
     mgr = _get_manager(request)
     if mgr is not None:
@@ -195,6 +197,7 @@ async def merge_dossiers_body(
     request: Request,
     primary_id: str = Body(..., embed=True),
     secondary_id: str = Body(..., embed=True),
+    _user: dict = Depends(require_auth),
 ):
     """Merge secondary dossier into primary (body-based, legacy)."""
     mgr = _get_manager(request)
@@ -321,6 +324,7 @@ async def add_tag(
     request: Request,
     dossier_id: str,
     tag: str = Body(..., embed=True),
+    _user: dict = Depends(require_auth),
 ):
     """Add a tag to a dossier."""
     mgr = _get_manager(request)
@@ -351,13 +355,14 @@ async def add_tag_legacy(
     request: Request,
     dossier_id: str,
     tag: str = Body(..., embed=True),
+    _user: dict = Depends(require_auth),
 ):
     """Add a tag to a dossier (legacy /tags endpoint)."""
     return await add_tag(request, dossier_id, tag)
 
 
 @router.delete("/{dossier_id}/tags/{tag}")
-async def remove_tag(request: Request, dossier_id: str, tag: str):
+async def remove_tag(request: Request, dossier_id: str, tag: str, _user: dict = Depends(require_auth)):
     """Remove a tag from a dossier."""
     store = _get_store()
     if store is None:
@@ -380,6 +385,7 @@ async def add_note(
     request: Request,
     dossier_id: str,
     note: str = Body(..., embed=True),
+    _user: dict = Depends(require_auth),
 ):
     """Add a note to a dossier."""
     mgr = _get_manager(request)
@@ -409,6 +415,7 @@ async def add_note_legacy(
     request: Request,
     dossier_id: str,
     note: str = Body(..., embed=True),
+    _user: dict = Depends(require_auth),
 ):
     """Add a note to a dossier (legacy /notes endpoint)."""
     return await add_note(request, dossier_id, note)

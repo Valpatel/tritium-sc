@@ -13,8 +13,10 @@ Endpoints:
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+
+from app.auth import require_auth
 
 from engine.tactical.patrol import PatrolManager
 
@@ -43,10 +45,10 @@ def set_manager(manager: PatrolManager) -> None:
 # ------------------------------------------------------------------
 
 class CreateRouteRequest(BaseModel):
-    name: str
-    waypoints: list[list[float]]  # [[x1,y1], [x2,y2], ...]
+    name: str = Field(..., min_length=1, max_length=200)
+    waypoints: list[list[float]] = Field(..., max_length=5000)  # [[x1,y1], ...]
     loop: bool = True
-    speed: float = 1.0
+    speed: float = Field(1.0, gt=0, le=100.0)
 
 
 class RouteResponse(BaseModel):
@@ -80,7 +82,7 @@ class PatrolAssignmentResponse(BaseModel):
 # ------------------------------------------------------------------
 
 @router.post("/routes", response_model=RouteResponse, status_code=201)
-async def create_route(request: CreateRouteRequest):
+async def create_route(request: CreateRouteRequest, _user: dict = Depends(require_auth)):
     """Create a new patrol route."""
     if len(request.waypoints) < 2:
         raise HTTPException(
@@ -125,7 +127,7 @@ async def get_route(route_id: str):
 
 
 @router.delete("/routes/{route_id}")
-async def delete_route(route_id: str):
+async def delete_route(route_id: str, _user: dict = Depends(require_auth)):
     """Delete a patrol route (and unassign any assets on it)."""
     manager = get_manager()
     if not manager.remove_route(route_id):
@@ -138,7 +140,7 @@ async def delete_route(route_id: str):
 # ------------------------------------------------------------------
 
 @router.post("/assign", response_model=PatrolAssignmentResponse)
-async def assign_asset(request: AssignRequest):
+async def assign_asset(request: AssignRequest, _user: dict = Depends(require_auth)):
     """Assign an asset to patrol a route."""
     manager = get_manager()
     if not manager.assign_asset(request.route_id, request.asset_id):
@@ -150,7 +152,7 @@ async def assign_asset(request: AssignRequest):
 
 
 @router.post("/unassign")
-async def unassign_asset(request: UnassignRequest):
+async def unassign_asset(request: UnassignRequest, _user: dict = Depends(require_auth)):
     """Stop an asset's patrol."""
     manager = get_manager()
     if not manager.unassign_asset(request.asset_id):

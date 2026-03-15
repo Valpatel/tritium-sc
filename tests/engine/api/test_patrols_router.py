@@ -78,7 +78,7 @@ class TestRouteEndpoints:
             "waypoints": [[0, 0], [1, 1]],
             "speed": -1.0,
         })
-        assert resp.status_code == 400
+        assert resp.status_code in (400, 422)  # 422 from Pydantic Field validation
 
     def test_create_route_bad_waypoint_shape(self):
         client, _ = _make_client()

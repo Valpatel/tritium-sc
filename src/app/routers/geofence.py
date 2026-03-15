@@ -16,8 +16,10 @@ import html
 import re
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
+
+from app.auth import require_auth
 
 from engine.tactical.geofence import GeoZone, GeofenceEngine
 
@@ -111,7 +113,7 @@ async def list_zones():
 
 
 @router.post("/zones", response_model=GeoZoneResponse, status_code=201)
-async def create_zone(request: CreateGeoZoneRequest):
+async def create_zone(request: CreateGeoZoneRequest, _user: dict = Depends(require_auth)):
     """Create a new geofence zone."""
     if len(request.polygon) < 3:
         raise HTTPException(status_code=400, detail="Polygon must have at least 3 vertices")
@@ -142,7 +144,7 @@ async def create_zone(request: CreateGeoZoneRequest):
 
 
 @router.delete("/zones/{zone_id}")
-async def delete_zone(zone_id: str):
+async def delete_zone(zone_id: str, _user: dict = Depends(require_auth)):
     """Delete a geofence zone."""
     engine = get_engine()
     if not engine.remove_zone(zone_id):

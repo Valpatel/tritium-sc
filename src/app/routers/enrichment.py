@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
+
+from app.auth import require_auth
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +93,7 @@ async def get_enrichments(request: Request, target_id: str):
 
 
 @router.post("/{target_id}/enrich")
-async def force_enrich(request: Request, target_id: str):
+async def force_enrich(request: Request, target_id: str, _user: dict = Depends(require_auth)):
     """Force re-enrichment of a target, bypassing cache."""
     pipeline = _get_pipeline(request)
     if pipeline is None:
