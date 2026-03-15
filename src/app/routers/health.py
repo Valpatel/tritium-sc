@@ -117,6 +117,39 @@ def _plugin_discovery_report(request: Request) -> dict[str, Any]:
     return report
 
 
+def _rl_training_metrics() -> dict[str, Any]:
+    """Collect RL training data metrics from TrainingStore and CorrelationLearner."""
+    metrics: dict[str, Any] = {}
+
+    # Training store stats
+    try:
+        from engine.intelligence.training_store import get_training_store
+        store = get_training_store()
+        stats = store.get_stats()
+        metrics["correlation_decisions"] = stats.get("correlation", {}).get("total", 0)
+        metrics["correlation_confirmed"] = stats.get("correlation", {}).get("confirmed", 0)
+        metrics["classification_decisions"] = stats.get("classification", {}).get("total", 0)
+        metrics["classification_corrected"] = stats.get("classification", {}).get("corrected", 0)
+        metrics["feedback_entries"] = stats.get("feedback", {}).get("total", 0)
+        metrics["feedback_accuracy"] = stats.get("feedback", {}).get("accuracy", 0.0)
+    except Exception:
+        metrics["store"] = "unavailable"
+
+    # Learner model status
+    try:
+        from engine.intelligence.correlation_learner import get_correlation_learner
+        learner = get_correlation_learner()
+        learner_stats = learner.get_status()
+        metrics["model_trained"] = learner_stats.get("trained", False)
+        metrics["model_accuracy"] = learner_stats.get("accuracy", 0.0)
+        metrics["model_training_count"] = learner_stats.get("training_count", 0)
+        metrics["last_retrain"] = learner_stats.get("last_trained", None)
+    except Exception:
+        metrics["model"] = "unavailable"
+
+    return metrics
+
+
 @router.get("/api/health")
 async def health_check(request: Request):
     """Comprehensive health check endpoint.
@@ -140,6 +173,9 @@ async def health_check(request: Request):
     # Plugin auto-discovery report (boot-time scan results)
     discovery = _plugin_discovery_report(request)
 
+    # RL training data metrics
+    rl_metrics = _rl_training_metrics()
+
     return {
         "status": "healthy" if all_healthy else "degraded",
         "version": "0.1.0",
@@ -148,6 +184,7 @@ async def health_check(request: Request):
         "subsystems": subsystems,
         "plugins": plugins,
         "plugin_discovery": discovery,
+        "rl_training": rl_metrics,
         "test_baselines": {
             "tritium_lib": 1822,
             "tritium_sc_pytest": 7800,

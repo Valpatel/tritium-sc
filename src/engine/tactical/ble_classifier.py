@@ -27,6 +27,22 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("ble-classifier")
 
+# Lazy import to avoid circular deps — training_store is optional
+_training_store_cache = None
+
+
+def _get_training_store():
+    """Lazily import and return the singleton TrainingStore (or None)."""
+    global _training_store_cache
+    if _training_store_cache is not None:
+        return _training_store_cache
+    try:
+        from engine.intelligence.training_store import get_training_store
+        _training_store_cache = get_training_store()
+        return _training_store_cache
+    except Exception:
+        return None
+
 # Classification levels
 CLASSIFICATION_LEVELS = ["known", "unknown", "new", "suspicious"]
 
@@ -137,6 +153,9 @@ class BLEClassifier:
         elif level == "suspicious" and not is_known:
             self._publish_alert(classification, is_first_time=False)
 
+        # Log classification decision to training store for RL pipeline
+        self._log_classification(classification)
+
         return classification
 
     def add_known(self, mac: str) -> None:
@@ -179,6 +198,37 @@ class BLEClassifier:
             self._seen_macs.clear()
 
     # -- Internal --------------------------------------------------------------
+
+    def _log_classification(self, classification: BLEClassification) -> None:
+        """Log a BLE classification decision to the training store."""
+        store = _get_training_store()
+        if store is None:
+            return
+
+        try:
+            features = {
+                "rssi": classification.rssi,
+                "seen_count": classification.seen_count,
+                "name_length": len(classification.name),
+                "has_name": 1.0 if classification.name else 0.0,
+            }
+            # Map BLE classification level to a predicted alliance
+            alliance_map = {
+                "known": "friendly",
+                "unknown": "unknown",
+                "new": "unknown",
+                "suspicious": "hostile",
+            }
+            store.log_classification(
+                target_id=f"ble_{classification.mac}",
+                features=features,
+                predicted_type="ble_device",
+                confidence=1.0 if classification.level == "known" else 0.5,
+                predicted_alliance=alliance_map.get(classification.level, "unknown"),
+                source="ble_classifier",
+            )
+        except Exception as exc:
+            logger.debug("Training store log failed (non-fatal): %s", exc)
 
     def _publish_alert(self, classification: BLEClassification, is_first_time: bool) -> None:
         """Publish BLE alert to EventBus."""

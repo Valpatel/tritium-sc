@@ -41,6 +41,22 @@ from .correlation_strategies import (
 from .dossier import DossierStore, TargetDossier
 from .target_tracker import TargetTracker, TrackedTarget
 
+# Lazy import to avoid circular deps — training_store is optional
+_training_store_cache = None
+
+
+def _get_training_store():
+    """Lazily import and return the singleton TrainingStore (or None)."""
+    global _training_store_cache
+    if _training_store_cache is not None:
+        return _training_store_cache
+    try:
+        from engine.intelligence.training_store import get_training_store
+        _training_store_cache = get_training_store()
+        return _training_store_cache
+    except Exception:
+        return None
+
 logger = logging.getLogger("correlator")
 
 # Map tracker asset_type values to graph node table names.
@@ -208,6 +224,12 @@ class TargetCorrelator:
                 scores = self._evaluate_pair(primary, secondary)
                 weighted_confidence = self._weighted_score(scores)
 
+                # Log every evaluated pair to training store (positive or negative)
+                self._log_correlation_decision(
+                    primary, secondary, scores, weighted_confidence,
+                    correlated=weighted_confidence >= self.confidence_threshold,
+                )
+
                 if weighted_confidence < self.confidence_threshold:
                     continue
 
@@ -267,6 +289,49 @@ class TargetCorrelator:
             self._correlations.extend(new_correlations)
 
         return new_correlations
+
+    def _log_correlation_decision(
+        self,
+        primary: TrackedTarget,
+        secondary: TrackedTarget,
+        scores: list[StrategyScore],
+        weighted_confidence: float,
+        correlated: bool,
+    ) -> None:
+        """Log a correlation decision to the training store for RL training.
+
+        Logs both positive (correlated) and negative (not correlated) decisions
+        so the learner has balanced training data.
+        """
+        store = _get_training_store()
+        if store is None:
+            return
+
+        try:
+            # Build feature dict from strategy scores
+            features: dict[str, float] = {}
+            for s in scores:
+                features[s.strategy_name] = s.score
+
+            # Add raw target features for richer training signal
+            features["primary_confidence"] = primary.position_confidence
+            features["secondary_confidence"] = secondary.position_confidence
+            features["source_pair"] = hash(
+                frozenset((primary.source, secondary.source))
+            ) % 1000 / 1000.0  # Normalized hash for categorical encoding
+
+            decision = "merge" if correlated else "unrelated"
+
+            store.log_correlation(
+                target_a_id=primary.target_id,
+                target_b_id=secondary.target_id,
+                features=features,
+                score=weighted_confidence,
+                decision=decision,
+                source="correlator",
+            )
+        except Exception as exc:
+            logger.debug("Training store log failed (non-fatal): %s", exc)
 
     def _evaluate_pair(
         self, target_a: TrackedTarget, target_b: TrackedTarget

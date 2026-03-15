@@ -14,6 +14,16 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 110: RL Training Data Pipeline Wiring
+
+| Change | Verification |
+|--------|-------------|
+| Correlator logs every correlation decision (positive and negative) to TrainingStore with strategy scores and target features | 2 unit tests |
+| BLE classifier logs every classification decision to TrainingStore with device features, predicted type, and confidence | 2 unit tests |
+| Health endpoint /api/health now includes rl_training metrics: correlation/classification counts, feedback accuracy, model status, last retrain timestamp | 2 unit tests |
+| Playwright visual test: dark theme, map presence, menu bar, JS error check, content verification | @pytest.mark.visual |
+| RL pipeline e2e test already passing: synthetic data creation, model train/save/load round-trip, prediction quality verification | 10 unit tests |
+
 ## 2026-03-14 — Wave 108: Proximity Alerts + Mesh Chat Bridge + Investigation Auto-Close
 
 | Change | Verification |
