@@ -14,6 +14,19 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-15 — Wave 126: RL Feature Expansion + WiFi Probe Correlation Strategy
+
+| Change | Verification |
+|--------|-------------|
+| CorrelationLearner FEATURE_NAMES expanded from 6 to 10 features | Import verified, 12 tests passing |
+| _extract_features() now computes co_movement_duration, time_of_day_similarity, source_diversity_score, wifi_probe_correlation using tritium-lib feature_engineering | Import verified |
+| WiFiProbeStrategy: new 6th correlation strategy — BLE+WiFi probe temporal matching with same_observer bonus and RSSI similarity | Import verified, 65 strategy tests passing |
+| DEFAULT_WEIGHTS rebalanced for 6 strategies (was 5): spatial 0.30, wifi_probe 0.15, temporal 0.15, signal_pattern 0.14, dossier 0.13, learned 0.13 | Import verified |
+| _static_predict() weights updated for 10-feature model | Import verified |
+| RL training generator produces all 10 features in synthetic correlation decisions | Syntax verified |
+
+---
+
 ## 2026-03-15 — Wave 123: Prediction Ellipses + Federation Site Status Panel
 
 | Change | Verification |

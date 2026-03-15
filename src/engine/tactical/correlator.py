@@ -37,6 +37,7 @@ from .correlation_strategies import (
     SpatialStrategy,
     StrategyScore,
     TemporalStrategy,
+    WiFiProbeStrategy,
 )
 from .dossier import DossierStore, TargetDossier
 from .target_tracker import TargetTracker, TrackedTarget
@@ -92,13 +93,15 @@ class CorrelationRecord:
     dossier_uuid: str = ""
 
 
-# Default strategy weights — spatial dominates, others contribute
+# Default strategy weights — spatial dominates, others contribute.
+# Wave 126: added wifi_probe strategy, rebalanced weights.
 DEFAULT_WEIGHTS: dict[str, float] = {
-    "spatial": 0.35,
-    "temporal": 0.18,
-    "signal_pattern": 0.17,
-    "dossier": 0.15,
-    "learned": 0.15,
+    "spatial": 0.30,
+    "temporal": 0.15,
+    "signal_pattern": 0.14,
+    "dossier": 0.13,
+    "learned": 0.13,
+    "wifi_probe": 0.15,
 }
 
 
@@ -159,12 +162,13 @@ class TargetCorrelator:
         self._thread: threading.Thread | None = None
 
     def _default_strategies(self) -> list[CorrelationStrategy]:
-        """Create the default set of correlation strategies (5 total)."""
+        """Create the default set of correlation strategies (6 total)."""
         strategies: list[CorrelationStrategy] = [
             SpatialStrategy(radius=self.radius),
             TemporalStrategy(history=self.tracker.history),
             SignalPatternStrategy(),
             DossierStrategy(dossier_store=self.dossier_store),
+            WiFiProbeStrategy(),
         ]
 
         # Add learned strategy if CorrelationLearner is available

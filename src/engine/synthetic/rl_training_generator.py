@@ -150,6 +150,12 @@ class RLTrainingGenerator:
         time_gap = random.uniform(0.0, 10.0)
         signal_pattern = max(0.0, 1.0 - distance / 20.0 + random.gauss(0, 0.1))
 
+        # Wave 126: new features for richer training signal
+        co_movement_duration = random.uniform(0.0, 1.0) if co_movement > 0.3 else random.uniform(0.0, 0.3)
+        time_of_day_similarity = random.uniform(0.5, 1.0)  # Synthetic targets often same session
+        source_diversity_score = random.choice([0.0, 0.4, 0.6, 0.8, 1.0])
+        wifi_probe_correlation = random.uniform(0.0, 1.0) if random.random() > 0.5 else 0.0
+
         features = {
             "distance": distance,
             "rssi_delta": rssi_delta,
@@ -157,6 +163,10 @@ class RLTrainingGenerator:
             "device_type_match": device_type_match,
             "time_gap": time_gap,
             "signal_pattern": signal_pattern,
+            "co_movement_duration": co_movement_duration,
+            "time_of_day_similarity": time_of_day_similarity,
+            "source_diversity_score": source_diversity_score,
+            "wifi_probe_correlation": wifi_probe_correlation,
             "spatial": max(0.0, 1.0 - distance / 10.0),
             "temporal": co_movement * 0.8,
             "primary_confidence": random.uniform(0.3, 0.95),
@@ -164,13 +174,17 @@ class RLTrainingGenerator:
             "source_pair": random.random(),
         }
 
-        # Score based on features (ground truth simulation)
+        # Score based on features (ground truth simulation) — updated for 10 features
         score = (
-            0.4 * max(0.0, 1.0 - distance / 5.0)
-            + 0.2 * co_movement
-            + 0.15 * device_type_match
-            + 0.15 * signal_pattern
-            + 0.1 * max(0.0, 1.0 - time_gap / 5.0)
+            0.30 * max(0.0, 1.0 - distance / 5.0)
+            + 0.15 * co_movement
+            + 0.10 * device_type_match
+            + 0.10 * signal_pattern
+            + 0.08 * max(0.0, 1.0 - time_gap / 5.0)
+            + 0.10 * co_movement_duration
+            + 0.05 * time_of_day_similarity
+            + 0.05 * source_diversity_score
+            + 0.07 * wifi_probe_correlation
         )
 
         # Decision: merge if score > 0.5, else unrelated

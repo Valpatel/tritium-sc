@@ -24,7 +24,8 @@ from tritium_lib.intelligence.base_learner import BaseLearner
 
 logger = logging.getLogger("correlation_learner")
 
-# Feature names must match what the correlator logs to TrainingStore
+# Feature names must match what the correlator logs to TrainingStore.
+# Wave 126: expanded from 6 to 10 features to improve 50.5% accuracy.
 FEATURE_NAMES = [
     "distance",
     "rssi_delta",
@@ -32,6 +33,11 @@ FEATURE_NAMES = [
     "device_type_match",
     "time_gap",
     "signal_pattern",
+    # New features (Wave 126) — richer signals for correlation
+    "co_movement_duration",
+    "time_of_day_similarity",
+    "source_diversity_score",
+    "wifi_probe_correlation",
 ]
 
 MODEL_PATH = "data/models/correlation_model.pkl"
@@ -290,6 +296,9 @@ def _extract_features(target_a: Any, target_b: Any) -> dict[str, float]:
 
     Works with TrackedTarget objects or any object with position,
     rssi, source, asset_type, and last_seen attributes.
+
+    Wave 126: expanded from 6 to 10 features using tritium-lib
+    feature_engineering functions for richer correlation signals.
     """
     import math
 
@@ -313,18 +322,22 @@ def _extract_features(target_a: Any, target_b: Any) -> dict[str, float]:
     # Co-movement (placeholder — requires history analysis)
     features["co_movement"] = 0.0
 
-    # Device type match
+    # Device type match — now uses tritium-lib semantic matching
     type_a = getattr(target_a, "asset_type", "unknown")
     type_b = getattr(target_b, "asset_type", "unknown")
-    # Cross-sensor type match is valuable (BLE phone + camera person)
     source_a = getattr(target_a, "source", "")
     source_b = getattr(target_b, "source", "")
-    if source_a != source_b:
-        features["device_type_match"] = 1.0
-    elif type_a == type_b and type_a != "unknown":
-        features["device_type_match"] = 0.5
-    else:
-        features["device_type_match"] = 0.0
+    try:
+        from tritium_lib.intelligence.feature_engineering import device_type_match as _dtm
+        features["device_type_match"] = _dtm(type_a, type_b, source_a, source_b)
+    except ImportError:
+        # Fallback to simple logic
+        if source_a != source_b:
+            features["device_type_match"] = 1.0
+        elif type_a == type_b and type_a != "unknown":
+            features["device_type_match"] = 0.5
+        else:
+            features["device_type_match"] = 0.0
 
     # Time gap
     try:
@@ -344,6 +357,66 @@ def _extract_features(target_a: Any, target_b: Any) -> dict[str, float]:
     except (TypeError, ValueError):
         features["signal_pattern"] = 0.0
 
+    # --- New features (Wave 126) ---
+
+    # Co-movement duration — uses position history if available
+    features["co_movement_duration"] = 0.0
+    try:
+        from tritium_lib.intelligence.feature_engineering import co_movement_score as _cms
+        history_a = getattr(target_a, "trail", None)
+        history_b = getattr(target_b, "trail", None)
+        if history_a and history_b:
+            features["co_movement_duration"] = _cms(history_a, history_b)
+    except (ImportError, Exception):
+        pass
+
+    # Time-of-day similarity
+    try:
+        from tritium_lib.intelligence.feature_engineering import time_similarity as _ts
+        last_a_ts = float(getattr(target_a, "last_seen", 0.0))
+        last_b_ts = float(getattr(target_b, "last_seen", 0.0))
+        features["time_of_day_similarity"] = _ts(last_a_ts, last_b_ts)
+    except (ImportError, Exception):
+        features["time_of_day_similarity"] = 0.0
+
+    # Source diversity score
+    try:
+        from tritium_lib.intelligence.feature_engineering import source_diversity as _sd
+        sources_a = [source_a] if source_a else []
+        sources_b = [source_b] if source_b else []
+        # Check for multi-source targets (composite targets have multiple sources)
+        extra_sources_a = getattr(target_a, "sources", [])
+        extra_sources_b = getattr(target_b, "sources", [])
+        if extra_sources_a:
+            sources_a = list(extra_sources_a)
+        if extra_sources_b:
+            sources_b = list(extra_sources_b)
+        features["source_diversity_score"] = _sd(sources_a, sources_b)
+    except (ImportError, Exception):
+        features["source_diversity_score"] = 0.0
+
+    # WiFi probe correlation — temporal match between BLE and WiFi probe
+    features["wifi_probe_correlation"] = 0.0
+    try:
+        from tritium_lib.intelligence.feature_engineering import (
+            wifi_probe_temporal_correlation as _wptc,
+        )
+        # Check if either target is a WiFi probe and the other is BLE
+        is_wifi_probe = source_a == "wifi_probe" or source_b == "wifi_probe"
+        is_ble = source_a == "ble" or source_b == "ble"
+        if is_wifi_probe and is_ble:
+            last_a_ts = float(getattr(target_a, "last_seen", 0.0))
+            last_b_ts = float(getattr(target_b, "last_seen", 0.0))
+            # Check if same observer (same edge node reported both)
+            observer_a = getattr(target_a, "observer_id", "")
+            observer_b = getattr(target_b, "observer_id", "")
+            same_obs = bool(observer_a and observer_a == observer_b)
+            features["wifi_probe_correlation"] = _wptc(
+                last_a_ts, last_b_ts, same_observer=same_obs
+            )
+    except (ImportError, Exception):
+        pass
+
     return features
 
 
@@ -352,12 +425,17 @@ def _static_predict(features: dict[str, float]) -> tuple[float, float]:
     import math
 
     weights = {
-        "distance": -0.30,
-        "rssi_delta": -0.10,
-        "co_movement": 0.25,
-        "device_type_match": 0.15,
-        "time_gap": -0.10,
-        "signal_pattern": 0.20,
+        "distance": -0.25,
+        "rssi_delta": -0.08,
+        "co_movement": 0.18,
+        "device_type_match": 0.12,
+        "time_gap": -0.08,
+        "signal_pattern": 0.15,
+        # New features (Wave 126)
+        "co_movement_duration": 0.12,
+        "time_of_day_similarity": 0.06,
+        "source_diversity_score": 0.08,
+        "wifi_probe_correlation": 0.14,
     }
     bias = 0.5
 

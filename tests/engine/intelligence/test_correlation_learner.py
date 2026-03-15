@@ -68,7 +68,7 @@ class TestExtractFeatures:
         a = FakeTarget()
         b = FakeTarget()
         features = _extract_features(a, b)
-        assert features["device_type_match"] == 0.5  # Same type, same source
+        assert features["device_type_match"] == 0.3  # Same type, same source (semantic match)
 
 
 class TestCorrelationLearner:

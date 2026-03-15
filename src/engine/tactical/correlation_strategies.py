@@ -284,6 +284,83 @@ class SignalPatternStrategy(CorrelationStrategy):
         )
 
 
+class WiFiProbeStrategy(CorrelationStrategy):
+    """WiFi probe request correlation with BLE detections.
+
+    When a BLE device and a WiFi probe request are seen at the same time
+    from the same observer (edge node), they are very likely the same
+    physical device. A phone's WiFi radio sends probe requests while its
+    BLE radio advertises — both originate from the same hardware.
+
+    This strategy strengthens correlation for BLE+WiFi probe pairs seen
+    within a tight time window, especially from the same edge observer.
+    """
+
+    def __init__(self, *, max_window: float = 10.0) -> None:
+        """
+        Args:
+            max_window: Maximum time difference (seconds) between
+                BLE and WiFi probe detections to score positively.
+        """
+        self.max_window = max_window
+
+    @property
+    def name(self) -> str:
+        return "wifi_probe"
+
+    def evaluate(
+        self,
+        target_a: TrackedTarget,
+        target_b: TrackedTarget,
+    ) -> StrategyScore:
+        # Only evaluate BLE + WiFi probe pairs
+        sources = frozenset((target_a.source, target_b.source))
+        if sources != frozenset(("ble", "wifi_probe")):
+            return StrategyScore(
+                strategy_name=self.name,
+                score=0.0,
+                detail="not a BLE+wifi_probe pair",
+            )
+
+        # Temporal proximity
+        time_diff = abs(target_a.last_seen - target_b.last_seen)
+        if time_diff > self.max_window:
+            return StrategyScore(
+                strategy_name=self.name,
+                score=0.0,
+                detail=f"time diff {time_diff:.1f}s exceeds window {self.max_window}s",
+            )
+
+        # Base score from temporal proximity
+        score = 1.0 - (time_diff / self.max_window)
+
+        # Same observer bonus: much stronger signal if same edge node saw both
+        observer_a = getattr(target_a, "observer_id", "")
+        observer_b = getattr(target_b, "observer_id", "")
+        same_observer = bool(observer_a and observer_a == observer_b)
+        if same_observer:
+            score = min(1.0, score * 1.3)
+
+        # RSSI similarity bonus: if both have similar RSSI, likely same device
+        rssi_a = getattr(target_a, "rssi", None)
+        rssi_b = getattr(target_b, "rssi", None)
+        if rssi_a is not None and rssi_b is not None:
+            rssi_diff = abs(float(rssi_a) - float(rssi_b))
+            if rssi_diff < 15:
+                score = min(1.0, score * 1.1)
+
+        detail = (
+            f"BLE+wifi_probe dt={time_diff:.1f}s"
+            f"{' same_observer' if same_observer else ''}"
+        )
+
+        return StrategyScore(
+            strategy_name=self.name,
+            score=min(1.0, max(0.0, score)),
+            detail=detail,
+        )
+
+
 class DossierStrategy(CorrelationStrategy):
     """Check DossierStore for known prior associations.
 
