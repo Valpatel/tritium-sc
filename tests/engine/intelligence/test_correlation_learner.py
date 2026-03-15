@@ -55,6 +55,13 @@ class TestExtractFeatures:
         assert abs(features["distance"] - 5.0) < 0.01
         assert features["device_type_match"] == 1.0  # Cross-sensor
         assert features["time_gap"] == 1.0
+        # Wave 150: verify new features are present
+        assert "spatial" in features
+        assert "temporal" in features
+        assert "primary_confidence" in features
+        assert "secondary_confidence" in features
+        assert "source_pair" in features
+        assert features["source_pair"] == 1.0  # ble+yolo = highest
 
     def test_same_source(self):
         class FakeTarget:
