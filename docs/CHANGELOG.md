@@ -14,6 +14,20 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 86: Cross-Camera ReID, Mission-Target Binding, Threat Narration
+
+| Change | Verification |
+|--------|-------------|
+| `plugins/yolo_detector/cross_camera_reid.py` — CrossCameraReID service bridges HandoffTracker + ReIDStore + DossierStore for automatic cross-camera target re-identification. When similarity > 0.7, merges into same dossier | Unit tested |
+| Wired CrossCameraReID into YOLO detector plugin start() lifecycle with handoff tracker callback | Consumer tested |
+| `src/engine/tactical/mission_target_binder.py` — MissionTargetBinder auto-assigns targets detected in a mission's geofence zone. Supports circle and polygon geofences, manual bind/unbind, periodic checks | Unit tested (10 tests) |
+| `src/app/routers/missions.py` — Added GET/POST/DELETE endpoints for mission-target bindings at `/api/missions/{id}/targets` | Unit tested |
+| `src/frontend/js/command/panels/missions.js` — Mission detail view now shows "TARGETS IN ZONE" section with live-fetched bound targets | Consumer tested |
+| `src/amy/brain/instinct.py` — Added detailed threat assessment narration: Amy now explains WHY a target is suspicious (signal strength, classification, zone, co-location, dwell time, behavioral anomaly) | Unit tested (8 tests) |
+| Threat narration publishes `threat_narration` event to EventBus for downstream consumption | Consumer tested |
+
+---
+
 ## 2026-03-14 — Wave 84: Maintenance — Learner Consolidation, Readiness, Unified Events
 
 | Change | Verification |

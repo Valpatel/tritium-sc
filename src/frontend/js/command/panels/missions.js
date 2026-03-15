@@ -198,6 +198,10 @@ export const MissionsPanelDef = {
                 ${objHtml}
                 ${assetList ? `<div style="margin-top:6px"><div class="mono" style="font-size:0.45rem;margin-bottom:2px">ASSIGNED ASSETS</div>${assetList}</div>` : ''}
                 ${tagList ? `<div style="margin-top:4px">${tagList}</div>` : ''}
+                <div class="mission-targets-section" data-bind="mission-targets" style="margin-top:6px">
+                    <div class="mono" style="font-size:0.45rem;margin-bottom:2px;color:#00f0ff">TARGETS IN ZONE</div>
+                    <div class="mission-targets-list" style="font-size:0.4rem;opacity:0.7">Loading...</div>
+                </div>
                 <div style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap">
                     ${!['completed','aborted','failed'].includes(mission.status) ? `
                         ${mission.status !== 'active' ? `<button class="panel-action-btn panel-action-btn-primary" data-lifecycle="start" style="font-size:0.4rem">START</button>` : ''}
@@ -211,6 +215,29 @@ export const MissionsPanelDef = {
                 </div>
             `;
             showView('detail');
+
+            // Load mission-bound targets
+            loadMissionTargets(mission.mission_id);
+        }
+
+        async function loadMissionTargets(missionId) {
+            const section = detailEl.querySelector('.mission-targets-list');
+            if (!section) return;
+            try {
+                const resp = await fetch(`/api/missions/${missionId}/targets`);
+                if (!resp.ok) { section.textContent = 'N/A'; return; }
+                const data = await resp.json();
+                const targets = data.targets || [];
+                if (targets.length === 0) {
+                    section.innerHTML = '<span style="opacity:0.5">No targets in zone</span>';
+                } else {
+                    section.innerHTML = targets.map(t =>
+                        `<span class="mono" style="font-size:0.4rem;background:#0e0e14;padding:1px 4px;border-radius:2px;border:1px solid #00f0ff33;margin:1px">${_esc(t)}</span>`
+                    ).join(' ');
+                }
+            } catch {
+                section.textContent = 'Error loading targets';
+            }
         }
 
         function resetForm() {

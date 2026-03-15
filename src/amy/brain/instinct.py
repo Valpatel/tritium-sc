@@ -154,6 +154,8 @@ class InstinctLayer:
         """When threat_level reaches high on a dossier, auto-create investigation.
 
         Also dispatches nearest asset to the threat position.
+        Narrates a detailed threat assessment explaining WHY the target
+        was escalated — signal strength, classification, zone, co-location.
         """
         target_id = data.get("target_id", "")
         new_level = data.get("new_level", "")
@@ -194,17 +196,18 @@ class InstinctLayer:
                     })
                     self._response_count += 1
 
-        # Narrate the escalation in inner monologue
-        tracker = getattr(commander, "target_tracker", None)
-        if tracker is not None:
-            target = tracker.get_target(target_id)
-            target_name = target.name if target else target_id[:8]
-            commander.sensorium.push(
-                "thought",
-                f"Threat escalated: {target_name} classified as {new_level}. "
-                f"Heightening surveillance.",
-                importance=0.7,
-            )
+        # Build detailed threat assessment narration
+        narration = self._build_threat_narration(target_id, new_level, data)
+        commander.sensorium.push(
+            "thought",
+            narration,
+            importance=0.8,
+        )
+        commander.event_bus.publish("threat_narration", {
+            "target_id": target_id,
+            "level": new_level,
+            "narration": narration,
+        })
 
     def _on_geofence_enter(self, data: dict) -> None:
         """When a target enters a restricted zone, dispatch nearest camera/asset.
@@ -373,6 +376,114 @@ class InstinctLayer:
         })
 
         self._response_count += 1
+
+    # ------------------------------------------------------------------
+    # Threat narration
+    # ------------------------------------------------------------------
+
+    def _build_threat_narration(
+        self,
+        target_id: str,
+        threat_level: str,
+        data: dict,
+    ) -> str:
+        """Build a detailed threat assessment narration.
+
+        Amy explains WHY a target was escalated, citing specific evidence:
+        signal strength, device classification, zone entry, co-location
+        with other devices, behavioral anomalies.
+
+        This gives operators transparency into the AI's threat reasoning.
+        """
+        commander = self._commander
+        reasons: list[str] = []
+
+        # Get target info from tracker
+        target_name = target_id[:8]
+        target_source = ""
+        target_rssi = None
+        target_alliance = ""
+
+        tracker = getattr(commander, "target_tracker", None)
+        if tracker is not None:
+            target = tracker.get_target(target_id)
+            if target is not None:
+                target_name = getattr(target, "name", target_id[:8])
+                target_source = getattr(target, "source", "")
+                target_alliance = getattr(target, "alliance", "")
+                # Try to get RSSI from target metadata
+                meta = getattr(target, "metadata", {}) or {}
+                if isinstance(meta, dict):
+                    target_rssi = meta.get("rssi")
+
+        # Reason: signal strength
+        rssi = data.get("rssi", target_rssi)
+        if rssi is not None and isinstance(rssi, (int, float)):
+            if rssi > -40:
+                reasons.append(f"very strong signal ({rssi}dBm, within ~2m)")
+            elif rssi > -60:
+                reasons.append(f"strong signal ({rssi}dBm, within ~10m)")
+            elif rssi > -80:
+                reasons.append(f"moderate signal ({rssi}dBm)")
+
+        # Reason: device classification
+        classification = data.get("classification", "")
+        if classification == "unknown":
+            reasons.append("unknown device type (not in any known device list)")
+        elif classification == "suspicious":
+            reasons.append("device flagged as suspicious by BLE classifier")
+        elif classification:
+            reasons.append(f"classified as {classification}")
+        elif target_source and "ble" in target_source:
+            reasons.append("unclassified BLE device")
+
+        # Reason: zone entry
+        zone_name = data.get("zone_name", "")
+        zone_type = data.get("zone_type", "")
+        if zone_name:
+            if zone_type == "restricted":
+                reasons.append(f"entered restricted zone '{zone_name}'")
+            elif zone_type:
+                reasons.append(f"detected in {zone_type} zone '{zone_name}'")
+
+        # Reason: co-location check
+        co_located = data.get("co_located_devices", [])
+        if co_located:
+            known_count = sum(1 for d in co_located if d.get("known", False))
+            unknown_count = len(co_located) - known_count
+            if unknown_count > 0 and known_count == 0:
+                reasons.append(f"co-located with {unknown_count} unknown device(s) and no known devices")
+            elif unknown_count > 0:
+                reasons.append(f"co-located with {unknown_count} unknown and {known_count} known device(s)")
+        elif data.get("alone", False):
+            reasons.append("no known devices co-located nearby")
+
+        # Reason: behavioral anomaly
+        anomaly = data.get("anomaly", "")
+        if anomaly:
+            reasons.append(f"behavioral anomaly: {anomaly}")
+
+        # Reason: dwell time
+        dwell_s = data.get("dwell_seconds")
+        if dwell_s is not None and isinstance(dwell_s, (int, float)) and dwell_s > 0:
+            if dwell_s > 3600:
+                reasons.append(f"dwelling for {dwell_s / 3600:.1f} hours")
+            elif dwell_s > 300:
+                reasons.append(f"dwelling for {dwell_s / 60:.0f} minutes")
+
+        # Reason: first seen (new device)
+        if data.get("first_seen_recently", False):
+            reasons.append("first detected recently (new to this area)")
+
+        # Build the narration
+        if not reasons:
+            reasons.append("multiple indicators exceeded threat threshold")
+
+        reasons_text = "; ".join(reasons)
+        return (
+            f"Target {target_name} is suspicious because: {reasons_text}. "
+            f"Escalating threat level to {threat_level}. Heightening surveillance."
+        )
 
     # ------------------------------------------------------------------
     # Helpers

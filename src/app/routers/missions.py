@@ -367,3 +367,50 @@ async def complete_objective(mission_id: str, objective_id: str):
     if not m.complete_objective(objective_id):
         raise HTTPException(status_code=404, detail="Objective not found")
     return m.to_dict()
+
+
+@router.get("/{mission_id}/targets")
+async def get_mission_targets(mission_id: str):
+    """Get targets bound to this mission (inside geofence zone).
+
+    Returns a list of target IDs detected within the mission's
+    geofence zone. Targets are auto-bound by the MissionTargetBinder
+    when they are inside an active mission's area of operations.
+    """
+    _get_mission(mission_id)  # Validate mission exists
+    try:
+        from engine.tactical.mission_target_binder import _binder
+        if _binder is not None:
+            targets = _binder.get_mission_targets(mission_id)
+            return {"mission_id": mission_id, "targets": targets, "count": len(targets)}
+    except (ImportError, AttributeError):
+        pass
+    return {"mission_id": mission_id, "targets": [], "count": 0}
+
+
+@router.post("/{mission_id}/targets/{target_id}")
+async def bind_target_to_mission(mission_id: str, target_id: str):
+    """Manually bind a target to a mission."""
+    _get_mission(mission_id)  # Validate mission exists
+    try:
+        from engine.tactical.mission_target_binder import _binder
+        if _binder is not None:
+            was_new = _binder.bind_target_manually(mission_id, target_id)
+            return {"bound": True, "was_new": was_new, "target_id": target_id}
+    except (ImportError, AttributeError):
+        pass
+    raise HTTPException(status_code=503, detail="MissionTargetBinder not available")
+
+
+@router.delete("/{mission_id}/targets/{target_id}")
+async def unbind_target_from_mission(mission_id: str, target_id: str):
+    """Remove a target binding from a mission."""
+    _get_mission(mission_id)  # Validate mission exists
+    try:
+        from engine.tactical.mission_target_binder import _binder
+        if _binder is not None:
+            removed = _binder.unbind_target(mission_id, target_id)
+            return {"unbound": removed, "target_id": target_id}
+    except (ImportError, AttributeError):
+        pass
+    raise HTTPException(status_code=503, detail="MissionTargetBinder not available")

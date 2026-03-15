@@ -25,6 +25,7 @@ from engine.plugins.base import PluginContext, PluginInterface
 
 from .detector import YOLODetector, FrameResult
 from .reid_integration import ReIDIntegration
+from .cross_camera_reid import CrossCameraReID
 
 log = logging.getLogger("yolo-detector")
 
@@ -65,6 +66,9 @@ class YOLODetectorPlugin(PluginInterface):
 
         # ReID integration (created on start if ReIDStore available)
         self._reid: Optional[ReIDIntegration] = None
+
+        # Cross-camera ReID (created on start alongside ReID)
+        self._cross_camera_reid: Optional[CrossCameraReID] = None
 
     # -- PluginInterface identity ------------------------------------------
 
@@ -127,6 +131,29 @@ class YOLODetectorPlugin(PluginInterface):
             reid_store = ReIDStore(":memory:")
             self._reid = ReIDIntegration(reid_store)
             self._logger.info("ReID integration enabled (in-memory store)")
+
+            # Wire up cross-camera ReID with handoff tracker
+            try:
+                from engine.tactical.target_handoff import get_handoff_tracker
+                dossier_store = None
+                try:
+                    from tritium_lib.store import DossierStore
+                    dossier_store = DossierStore(":memory:")
+                except Exception:
+                    pass
+                self._cross_camera_reid = CrossCameraReID(
+                    reid_store=reid_store,
+                    dossier_store=dossier_store,
+                    event_bus=self._event_bus,
+                    threshold=0.70,
+                )
+                # Register as handoff callback
+                tracker = get_handoff_tracker(
+                    on_handoff=self._cross_camera_reid.on_handoff,
+                )
+                self._logger.info("Cross-camera ReID wired to handoff tracker")
+            except Exception as exc2:
+                self._logger.debug("Cross-camera ReID not available: %s", exc2)
         except Exception as exc:
             self._logger.debug("ReID integration not available: %s", exc)
             self._reid = None
@@ -214,6 +241,8 @@ class YOLODetectorPlugin(PluginInterface):
         s = self._detector.stats.to_dict()
         if self._reid is not None:
             s["reid"] = self._reid.stats
+        if self._cross_camera_reid is not None:
+            s["cross_camera_reid"] = self._cross_camera_reid.stats
         return s
 
     @property
