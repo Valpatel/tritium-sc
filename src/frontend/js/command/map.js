@@ -2626,6 +2626,27 @@ function _drawUnit(ctx, id, unit) {
     else if (type === 'rf_motion') iconType = 'rf_motion';
     else if (type === 'camera_detection' || type === 'detection') iconType = 'camera_detection';
 
+    // Staleness-based opacity: targets fade based on time since last_seen.
+    // Fresh targets (seen within last 30s) are fully opaque.
+    // After 30s, fade linearly from 1.0 to 0.3 over 5 minutes (300s).
+    // This gives operators a visual cue that a target's position is stale.
+    const STALE_FADE_START_S = 30;    // seconds before fade begins
+    const STALE_FADE_END_S = 300;     // seconds to reach minimum opacity
+    const STALE_MIN_ALPHA = 0.3;
+
+    let stalenessAlpha = 1.0;
+    const lastSeen = unit.last_seen || unit.lastSeen || unit.timestamp;
+    if (lastSeen) {
+        const lastSeenMs = typeof lastSeen === 'number'
+            ? (lastSeen > 1e12 ? lastSeen : lastSeen * 1000)  // handle s vs ms
+            : new Date(lastSeen).getTime();
+        const ageSec = (Date.now() - lastSeenMs) / 1000;
+        if (ageSec > STALE_FADE_START_S) {
+            const fadeProgress = Math.min(1.0, (ageSec - STALE_FADE_START_S) / (STALE_FADE_END_S - STALE_FADE_START_S));
+            stalenessAlpha = 1.0 - fadeProgress * (1.0 - STALE_MIN_ALPHA);
+        }
+    }
+
     // Universal confidence-based transparency: targets with decaying confidence
     // render faded/ghostly. High confidence = solid, low = transparent.
     // Pulsing animation when confidence is actively decaying.
@@ -2644,8 +2665,12 @@ function _drawUnit(ctx, id, unit) {
             const pulse = Math.sin(performance.now() / 1000 * pulseFreq * Math.PI * 2) * 0.15;
             confidenceAlpha = Math.max(0.1, confidenceAlpha + pulse);
         }
+    }
 
-        ctx.globalAlpha = confidenceAlpha;
+    // Combine staleness and confidence alpha — use the lower of the two
+    const combinedAlpha = Math.min(stalenessAlpha, confidenceAlpha);
+    if (combinedAlpha < 1.0) {
+        ctx.globalAlpha = combinedAlpha;
     }
 
     // Track previous confidence for decay detection
@@ -2677,8 +2702,8 @@ function _drawUnit(ctx, id, unit) {
         ctx.restore();
     }
 
-    // Reset alpha after confidence fade
-    if (confidence < 1.0) {
+    // Reset alpha after confidence/staleness fade
+    if (combinedAlpha < 1.0) {
         ctx.globalAlpha = 1.0;
     }
 

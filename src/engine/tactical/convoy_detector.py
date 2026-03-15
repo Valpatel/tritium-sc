@@ -38,6 +38,9 @@ from tritium_lib.models import (
     ConvoyFormation,
     ConvoySummary,
     ConvoyStatus,
+    ConvoyVisualization,
+    ConvoyFormationType,
+    LatLng,
 )
 
 logger = logging.getLogger(__name__)
@@ -287,6 +290,47 @@ class ConvoyDetector:
                 datetime.fromtimestamp(last_seen, tz=timezone.utc)
                 if isinstance(last_seen, (int, float)) else None
             ),
+        )
+
+    def to_visualization(self, convoy_data: dict, member_positions: list[dict] | None = None) -> ConvoyVisualization:
+        """Convert an internal convoy dict to a ConvoyVisualization for the frontend.
+
+        Parameters
+        ----------
+        convoy_data:
+            Raw convoy dict from get_active_convoys().
+        member_positions:
+            Optional list of {"target_id": str, "lat": float, "lng": float} dicts
+            for building the bounding polygon.
+        """
+        bbox_points: list[LatLng] = []
+        if member_positions:
+            for mp in member_positions:
+                lat = mp.get("lat", 0.0) or 0.0
+                lng = mp.get("lng", 0.0) or 0.0
+                if lat != 0.0 or lng != 0.0:
+                    bbox_points.append(LatLng(lat=lat, lng=lng))
+
+        # Determine formation type from heading variance
+        heading_var = convoy_data.get("heading_variance_deg", 0.0)
+        member_count = len(convoy_data.get("member_target_ids", []))
+        if heading_var < 5.0 and member_count >= 3:
+            formation = ConvoyFormationType.COLUMN
+        elif heading_var < 15.0:
+            formation = ConvoyFormationType.PARALLEL
+        else:
+            formation = ConvoyFormationType.CLUSTER
+
+        return ConvoyVisualization(
+            convoy_id=convoy_data.get("convoy_id", ""),
+            target_ids=convoy_data.get("member_target_ids", []),
+            heading_degrees=convoy_data.get("heading_avg_deg", 0.0),
+            speed_estimate=convoy_data.get("speed_avg_mps", 0.0),
+            formation_type=formation,
+            confidence=min(1.0, convoy_data.get("suspicious_score", 0.0)),
+            bounding_box=bbox_points,
+            label=f"Convoy ({member_count})",
+            color="#fcee0a",
         )
 
     # ------------------------------------------------------------------

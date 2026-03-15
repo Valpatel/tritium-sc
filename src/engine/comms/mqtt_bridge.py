@@ -231,6 +231,8 @@ class MQTTBridge:
                 (f"{prefix}/robots/+/command/ack", 1),
                 (f"{prefix}/sensors/+/events", 1),
                 (f"{prefix}/sensors/+/status", 1),
+                # Acoustic feature vectors from edge devices
+                (f"{prefix}/acoustic/+/features", 0),
                 # Edge device sightings (BLE/WiFi) — topic: tritium/{device_id}/sighting
                 ("tritium/+/sighting", 0),
             ]
@@ -309,6 +311,9 @@ class MQTTBridge:
                     self._on_device_status("robot", device_id, payload)
                 elif action == "command" and sub_action == "ack":
                     self._on_command_ack(device_id, payload)
+            elif category == "acoustic":
+                if action == "features":
+                    self._on_acoustic_features(device_id, msg.payload)
             elif category == "sensors":
                 if action == "events":
                     self._on_sensor_event(device_id, payload)
@@ -426,6 +431,50 @@ class MQTTBridge:
             "robot_id": robot_id,
             "text": thought_text,
         })
+
+    def _on_acoustic_features(self, device_id: str, raw_payload: bytes) -> None:
+        """Edge device published acoustic feature vector for ML classification.
+
+        Parses the compact MQTT payload using AcousticFeatureVector.from_mqtt_payload()
+        from tritium-lib and forwards to the EventBus for the acoustic classifier.
+        """
+        try:
+            from tritium_lib.models import AcousticFeatureVector
+
+            payload_str = raw_payload.decode("utf-8") if isinstance(raw_payload, bytes) else str(raw_payload)
+            fv = AcousticFeatureVector.from_mqtt_payload(payload_str)
+
+            # Forward parsed feature vector to EventBus for acoustic classifier
+            self._event_bus.publish("acoustic_features", {
+                "device_id": fv.device_id,
+                "timestamp": fv.timestamp,
+                "mfcc_coefficients": fv.mfcc_coefficients,
+                "energy": fv.energy,
+                "zero_crossing_rate": fv.zero_crossing_rate,
+                "spectral_centroid": fv.spectral_centroid,
+                "duration_ms": fv.duration_ms,
+                "sample_rate": fv.sample_rate,
+                "classification": fv.classification,
+                "confidence": fv.confidence,
+            })
+
+            # If edge already classified, forward as a sensor event too
+            if fv.classification:
+                self._event_bus.publish("mqtt_sensor_event", {
+                    "sensor_id": device_id,
+                    "event_type": "acoustic",
+                    "classification": fv.classification,
+                    "confidence": fv.confidence,
+                    "device_id": fv.device_id,
+                    "timestamp": fv.timestamp,
+                })
+
+            logger.debug(
+                "Acoustic features from %s: energy=%.3f cls=%s",
+                device_id, fv.energy, fv.classification or "pending",
+            )
+        except Exception as e:
+            logger.debug("Failed to parse acoustic features from %s: %s", device_id, e)
 
     def _on_sensor_event(self, sensor_id: str, payload: dict) -> None:
         """Sensor published event (motion, sound, etc)."""

@@ -1084,8 +1084,9 @@ def _get_convoy_detector(request: Request):
 async def get_convoys(request: Request):
     """Return active convoys with member positions for map visualization.
 
-    Each convoy includes a bounding box, center position, member count,
-    and suspicious score for color coding on the tactical map.
+    Each convoy includes a ConvoyVisualization-shaped response with
+    bounding polygon, heading, speed, formation type, and confidence
+    for rendering convoy overlays on the tactical map.
     """
     detector = _get_convoy_detector(request)
     if detector is None:
@@ -1094,7 +1095,7 @@ async def get_convoys(request: Request):
     convoys = detector.get_active_convoys()
     tracker = _get_tracker(request)
 
-    # Enrich each convoy with geo positions for map rendering
+    # Enrich each convoy with geo positions and produce ConvoyVisualization
     enriched = []
     for c in convoys:
         member_positions = []
@@ -1109,27 +1110,17 @@ async def get_convoys(request: Request):
                         "lng": td.get("lng", 0.0),
                     })
 
-        # Compute bounding box from member positions
-        bbox = None
-        if member_positions:
-            lats = [p["lat"] for p in member_positions if p["lat"]]
-            lngs = [p["lng"] for p in member_positions if p["lng"]]
-            if lats and lngs:
-                pad = 0.0001  # small padding around bbox
-                bbox = {
-                    "north": max(lats) + pad,
-                    "south": min(lats) - pad,
-                    "east": max(lngs) + pad,
-                    "west": min(lngs) - pad,
-                    "center_lat": sum(lats) / len(lats),
-                    "center_lng": sum(lngs) / len(lngs),
-                }
+        # Build ConvoyVisualization via the detector's conversion method
+        viz = detector.to_visualization(c, member_positions)
+        viz_dict = viz.to_dict()
 
-        enriched.append({
-            **c,
-            "member_positions": member_positions,
-            "bbox": bbox,
-        })
+        # Also include raw convoy data and member positions for backwards compat
+        viz_dict["member_positions"] = member_positions
+        viz_dict["suspicious_score"] = c.get("suspicious_score", 0.0)
+        viz_dict["status"] = c.get("status", "active")
+        viz_dict["duration_s"] = c.get("duration_s", 0.0)
+
+        enriched.append(viz_dict)
 
     return {
         "convoys": enriched,
