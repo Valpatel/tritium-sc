@@ -185,6 +185,10 @@ const _state = {
     patrolDrawMarkers: [],       // MapLibre Marker instances for numbered waypoints
     patrolDrawHudEl: null,       // DOM element for drawing status HUD
     patrolDrawMouseLngLat: null, // current mouse position for rubber-band line
+    geofenceDrawMode: false,     // true when drawing a geofence polygon
+    geofenceDrawVertices: [],    // [[x,y], ...] game coords accumulated during drawing
+    geofenceDrawMarkers: [],     // MapLibre Marker instances for vertices
+    geofenceDrawMouseLngLat: null, // current mouse position for rubber-band line
     aimMode: false,         // true when setting aim direction
     aimUnitId: null,        // unit ID for aim mode
 
@@ -428,6 +432,7 @@ function _createMap(mapDiv) {
         EventBus.on('unit:patrol-mode', _onPatrolModeEnter);
         EventBus.on('unit:aim-mode', _onAimModeEnter);
         EventBus.on('patrol:drawRoute', _onPatrolDrawRouteStart);
+        EventBus.on('geofence:drawZone', _onGeofenceDrawStart);
         EventBus.on('map:drawFinish', _onDrawFinishML);
         EventBus.on('map:drawCancel', _onDrawCancelML);
         EventBus.on('tak:center-on-client', (data) => {
@@ -1358,6 +1363,12 @@ function _clearSetupGhost() {
  * Handle mousemove on the map — update ghost preview in setup mode.
  */
 function _onMapMouseMove(e) {
+    // Geofence draw mode: update rubber-band line to mouse cursor
+    if (_state.geofenceDrawMode && _state.geofenceDrawVertices.length > 0) {
+        _state.geofenceDrawMouseLngLat = [e.lngLat.lng, e.lngLat.lat];
+        _updateGeofenceDrawPreview();
+    }
+
     // Patrol draw mode: update rubber-band line to mouse cursor
     if (_state.patrolDrawMode && _state.patrolDrawWaypoints.length > 0) {
         _state.patrolDrawMouseLngLat = [e.lngLat.lng, e.lngLat.lat];
@@ -2240,9 +2251,9 @@ const GEOFENCE_ZONES_LABEL  = 'geofence-zones-label';
 const GEOFENCE_LABEL_SOURCE = 'geofence-label-source';
 
 const GEOFENCE_ZONE_COLORS = {
-    restricted: { fill: 'rgba(255,42,109,0.15)', stroke: '#ff2a6d' },
-    monitored:  { fill: 'rgba(0,240,255,0.12)',  stroke: '#00f0ff' },
-    safe:       { fill: 'rgba(5,255,161,0.10)',   stroke: '#05ffa1' },
+    restricted: { fill: 'rgba(255,42,109,0.35)', stroke: '#ff2a6d' },
+    monitored:  { fill: 'rgba(0,240,255,0.28)',  stroke: '#00f0ff' },
+    safe:       { fill: 'rgba(5,255,161,0.25)',   stroke: '#05ffa1' },
 };
 
 /**
@@ -2359,7 +2370,7 @@ function _renderGeofenceZones() {
             source: GEOFENCE_ZONES_SOURCE,
             paint: {
                 'line-color': ['get', 'stroke_color'],
-                'line-width': 2,
+                'line-width': 3,
                 'line-dasharray': [6, 4],
             },
         });
@@ -7074,6 +7085,256 @@ const PATROL_DRAW_LINE   = 'patrol-draw-line';
 const PATROL_DRAW_RUBBER = 'patrol-draw-rubber';
 const PATROL_DRAW_DOTS   = 'patrol-draw-dots';
 
+// ============================================================
+// Geofence Polygon Drawing Mode (MapLibre)
+// ============================================================
+
+const GEOFENCE_DRAW_SOURCE = 'geofence-draw-source';
+const GEOFENCE_DRAW_LINE   = 'geofence-draw-line';
+const GEOFENCE_DRAW_FILL   = 'geofence-draw-fill';
+
+function _onGeofenceDrawStart() {
+    if (_state.geofenceDrawMode) _geofenceDrawCleanup();
+
+    _state.geofenceDrawMode = true;
+    _state.geofenceDrawVertices = [];
+    _state.geofenceDrawMarkers = [];
+    _state.geofenceDrawMouseLngLat = null;
+
+    if (_state.container) _state.container.style.cursor = 'crosshair';
+    if (_state.map) _state.map.doubleClickZoom.disable();
+
+    // Init GeoJSON source/layers for preview
+    _initGeofenceDrawLayers();
+
+    EventBus.emit('toast:show', {
+        message: 'Click to place vertices. Double-click or Enter to finish. Escape to cancel.',
+        type: 'info',
+    });
+    console.log('[MAP-ML] Geofence draw mode started');
+}
+
+function _geofenceDrawAddVertex(gamePos, lngLat) {
+    const idx = _state.geofenceDrawVertices.length + 1;
+    _state.geofenceDrawVertices.push([gamePos.x, gamePos.y]);
+
+    // Place numbered DOM marker
+    const el = document.createElement('div');
+    el.className = 'geofence-draw-vertex-marker';
+    el.style.cssText = `
+        width: 20px; height: 20px;
+        border-radius: 50%;
+        background: #00f0ff;
+        border: 2px solid #003344;
+        color: #0a0a0f;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        box-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+    `;
+    el.textContent = String(idx);
+
+    const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+        .setLngLat(lngLat)
+        .addTo(_state.map);
+    _state.geofenceDrawMarkers.push(marker);
+
+    _updateGeofenceDrawPreview();
+}
+
+function _updateGeofenceDrawPreview() {
+    if (!_state.map || !_state.map.getSource(GEOFENCE_DRAW_SOURCE)) return;
+
+    const verts = _state.geofenceDrawVertices;
+    const coords = verts.map(v => _gameToLngLat(v[0], v[1]));
+
+    // Build polygon outline (close the ring if 3+ vertices)
+    const lineCoords = [...coords];
+    if (_state.geofenceDrawMouseLngLat && coords.length > 0) {
+        lineCoords.push(_state.geofenceDrawMouseLngLat);
+    }
+    // Close back to first vertex for polygon preview
+    if (lineCoords.length >= 3) {
+        lineCoords.push(lineCoords[0]);
+    }
+
+    const features = [];
+    if (lineCoords.length >= 2) {
+        features.push({
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: lineCoords },
+            properties: {},
+        });
+    }
+    // Show semi-transparent fill for 3+ vertices
+    if (lineCoords.length >= 4) { // 3 vertices + closing = 4 coords
+        features.push({
+            type: 'Feature',
+            geometry: { type: 'Polygon', coordinates: [lineCoords] },
+            properties: {},
+        });
+    }
+
+    _state.map.getSource(GEOFENCE_DRAW_SOURCE).setData({
+        type: 'FeatureCollection',
+        features,
+    });
+}
+
+function _initGeofenceDrawLayers() {
+    if (!_state.map) return;
+
+    if (!_state.map.getSource(GEOFENCE_DRAW_SOURCE)) {
+        _state.map.addSource(GEOFENCE_DRAW_SOURCE, {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] },
+        });
+        _state.map.addLayer({
+            id: GEOFENCE_DRAW_FILL,
+            type: 'fill',
+            source: GEOFENCE_DRAW_SOURCE,
+            filter: ['==', '$type', 'Polygon'],
+            paint: {
+                'fill-color': 'rgba(0, 240, 255, 0.15)',
+                'fill-opacity': 1,
+            },
+        });
+        _state.map.addLayer({
+            id: GEOFENCE_DRAW_LINE,
+            type: 'line',
+            source: GEOFENCE_DRAW_SOURCE,
+            filter: ['==', '$type', 'LineString'],
+            paint: {
+                'line-color': '#00f0ff',
+                'line-width': 2,
+                'line-dasharray': [4, 3],
+            },
+        });
+    }
+}
+
+function _geofenceDrawFinish() {
+    const verts = _state.geofenceDrawVertices;
+    _state.geofenceDrawMode = false;
+    _state.geofenceDrawMouseLngLat = null;
+
+    if (_state.container) _state.container.style.cursor = '';
+    if (_state.map) _state.map.doubleClickZoom.enable();
+
+    _geofenceDrawCleanup();
+
+    if (verts.length >= 3) {
+        // Show the prompt dialog from map.js's _showGeofencePrompt equivalent
+        _showGeofencePromptML(verts);
+    } else {
+        EventBus.emit('toast:show', { message: 'Need at least 3 vertices for a geofence zone', type: 'alert' });
+    }
+}
+
+function _geofenceDrawCancel() {
+    _state.geofenceDrawMode = false;
+    _state.geofenceDrawMouseLngLat = null;
+
+    if (_state.container) _state.container.style.cursor = '';
+    if (_state.map) _state.map.doubleClickZoom.enable();
+
+    _geofenceDrawCleanup();
+
+    EventBus.emit('toast:show', { message: 'Geofence drawing cancelled', type: 'info' });
+    console.log('[MAP-ML] Geofence draw cancelled');
+}
+
+function _geofenceDrawCleanup() {
+    // Remove vertex markers
+    for (const m of _state.geofenceDrawMarkers) m.remove();
+    _state.geofenceDrawMarkers = [];
+    _state.geofenceDrawVertices = [];
+
+    // Clear preview layers
+    try {
+        if (_state.map) {
+            if (_state.map.getLayer(GEOFENCE_DRAW_LINE)) _state.map.removeLayer(GEOFENCE_DRAW_LINE);
+            if (_state.map.getLayer(GEOFENCE_DRAW_FILL)) _state.map.removeLayer(GEOFENCE_DRAW_FILL);
+            if (_state.map.getSource(GEOFENCE_DRAW_SOURCE)) _state.map.removeSource(GEOFENCE_DRAW_SOURCE);
+        }
+    } catch (_) {}
+}
+
+/**
+ * Show a cyberpunk-styled prompt for geofence zone name and type (MapLibre version).
+ */
+function _showGeofencePromptML(polygon) {
+    const existing = document.getElementById('geofence-prompt-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'geofence-prompt-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center';
+
+    overlay.innerHTML = `
+        <div style="background:#12121a;border:1px solid #00f0ff;border-radius:8px;padding:16px 20px;min-width:280px;max-width:360px;box-shadow:0 0 30px rgba(0,240,255,0.2)">
+            <div style="color:#00f0ff;font-size:0.65rem;font-weight:bold;margin-bottom:10px;text-transform:uppercase;letter-spacing:2px">New Geofence Zone</div>
+            <input id="geofence-prompt-name" type="text" placeholder="e.g. Perimeter Alpha"
+                   style="width:100%;box-sizing:border-box;background:#0a0a0f;border:1px solid #333;color:#e0e0e0;padding:6px 8px;border-radius:4px;margin-bottom:10px;font-size:0.55rem">
+            <div style="display:flex;gap:6px;margin-bottom:12px">
+                <button class="geofence-type-btn" data-type="monitored"
+                        style="flex:1;padding:5px;border:1px solid #00f0ff;background:rgba(0,240,255,0.1);color:#00f0ff;border-radius:4px;cursor:pointer;font-size:0.45rem;font-weight:bold">MONITORED</button>
+                <button class="geofence-type-btn" data-type="restricted"
+                        style="flex:1;padding:5px;border:1px solid #ff2a6d;background:transparent;color:#ff2a6d;border-radius:4px;cursor:pointer;font-size:0.45rem;font-weight:bold">RESTRICTED</button>
+                <button class="geofence-type-btn" data-type="safe"
+                        style="flex:1;padding:5px;border:1px solid #05ffa1;background:transparent;color:#05ffa1;border-radius:4px;cursor:pointer;font-size:0.45rem;font-weight:bold">SAFE</button>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+                <button id="geofence-prompt-cancel" style="padding:5px 12px;background:transparent;border:1px solid #555;color:#aaa;border-radius:4px;cursor:pointer;font-size:0.45rem">CANCEL</button>
+                <button id="geofence-prompt-save" style="padding:5px 12px;background:#00f0ff;border:none;color:#0a0a0f;border-radius:4px;cursor:pointer;font-weight:bold;font-size:0.45rem">SAVE ZONE</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const nameInput = overlay.querySelector('#geofence-prompt-name');
+    const typeBtns = overlay.querySelectorAll('.geofence-type-btn');
+    const saveBtn = overlay.querySelector('#geofence-prompt-save');
+    const cancelBtn = overlay.querySelector('#geofence-prompt-cancel');
+    let selectedType = 'monitored';
+
+    nameInput.focus();
+
+    typeBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            selectedType = btn.dataset.type;
+            typeBtns.forEach(b => b.style.background = 'transparent');
+            const colorMap = { monitored: 'rgba(0,240,255,0.1)', restricted: 'rgba(255,42,109,0.1)', safe: 'rgba(5,255,161,0.1)' };
+            btn.style.background = colorMap[selectedType] || 'transparent';
+        });
+    });
+
+    saveBtn.addEventListener('click', () => {
+        const name = nameInput.value.trim() || `Zone ${Date.now() % 10000}`;
+        overlay.remove();
+        EventBus.emit('geofence:zoneDrawn', { polygon, zone_type: selectedType, name });
+        // Trigger re-fetch to show the new zone
+        setTimeout(() => {
+            _state._lastGeofenceFetch = 0;
+            _updateGeofenceZones();
+        }, 500);
+    });
+
+    cancelBtn.addEventListener('click', () => {
+        overlay.remove();
+    });
+
+    nameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') saveBtn.click();
+        if (e.key === 'Escape') cancelBtn.click();
+    });
+}
+
 /**
  * Enter patrol route drawing mode.
  * Emitted by patrol panel "DRAW ROUTE" button or toolbar button.
@@ -7512,6 +7773,11 @@ function _patrolDrawCleanup() {
  * Handle double-click on map: finish patrol draw if active.
  */
 function _onMapDblClick(e) {
+    if (_state.geofenceDrawMode && _state.geofenceDrawVertices.length >= 3) {
+        e.preventDefault();
+        _geofenceDrawFinish();
+        return;
+    }
     if (_state.patrolDrawMode && _state.patrolDrawWaypoints.length >= 2) {
         e.preventDefault();
         _patrolDrawFinish();
@@ -7523,6 +7789,10 @@ function _onMapDblClick(e) {
  * Handle map:drawFinish event (Enter key) in MapLibre context.
  */
 function _onDrawFinishML() {
+    if (_state.geofenceDrawMode) {
+        _geofenceDrawFinish();
+        return;
+    }
     if (_state.patrolDrawMode) {
         _patrolDrawFinish();
     }
@@ -7532,6 +7802,10 @@ function _onDrawFinishML() {
  * Handle map:drawCancel event (Escape key) in MapLibre context.
  */
 function _onDrawCancelML() {
+    if (_state.geofenceDrawMode) {
+        _geofenceDrawCancel();
+        return;
+    }
     if (_state.patrolDrawMode) {
         _patrolDrawCancel();
     }
@@ -7654,6 +7928,13 @@ function _onMapClick(e) {
             _state.patrolWaypoints = [];
             if (_state.container) _state.container.style.cursor = '';
         }
+        return;
+    }
+
+    // Geofence draw mode: add vertex to polygon
+    if (_state.geofenceDrawMode) {
+        const game = _lngLatToGame(e.lngLat.lng, e.lngLat.lat);
+        _geofenceDrawAddVertex(game, [e.lngLat.lng, e.lngLat.lat]);
         return;
     }
 
