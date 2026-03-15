@@ -172,11 +172,32 @@ class TargetTracker:
         self._targets: dict[str, TrackedTarget] = {}
         self._lock = threading.Lock()
         self._detection_counter: int = 0
+        self._event_bus = event_bus
+        self._geofence_engine = None  # Set via set_geofence_engine()
         self.history = TargetHistory()
         self.reappearance_monitor = TargetReappearanceMonitor(
             event_bus=event_bus,
             min_absence_seconds=60.0,
         )
+
+    def set_geofence_engine(self, engine) -> None:
+        """Wire geofence engine for automatic zone checks on position updates."""
+        self._geofence_engine = engine
+
+    def _check_geofence(self, target_id: str, game_x: float, game_y: float) -> None:
+        """Check if a target's position triggers geofence enter/exit events.
+
+        Converts game coordinates (meters from geo center) to lat/lng
+        for comparison against geofence zone polygons.
+        """
+        if not self._geofence_engine:
+            return
+        try:
+            from .geo import local_to_latlng_2d
+            lat, lng = local_to_latlng_2d(game_x, game_y)
+            self._geofence_engine.check(target_id, (lat, lng))
+        except Exception:
+            pass  # Don't let geofence errors break target tracking
 
     def _check_velocity(self, target: TrackedTarget, new_pos: tuple[float, float]) -> None:
         """Check if position change implies impossible velocity (teleportation).
@@ -250,6 +271,7 @@ class TargetTracker:
                     confirming_sources={"simulation"},
                 )
         self.history.record(tid, position)
+        self._check_geofence(tid, position[0], position[1])
 
     def update_from_detection(self, detection: dict) -> None:
         """Update or create a tracked target from a YOLO detection.
@@ -407,6 +429,7 @@ class TargetTracker:
         # Only record position if we have a meaningful location
         if pos_source != "unknown":
             self.history.record(tid, position)
+            self._check_geofence(tid, position[0], position[1])
 
     # RF motion targets have shorter stale timeout — transient detections
     RF_MOTION_STALE_TIMEOUT = 30.0

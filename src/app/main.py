@@ -1087,7 +1087,13 @@ async def lifespan(app: FastAPI):
         _geofence_eng = _GeofenceEngine(event_bus=_geo_bus)
         _set_geofence_engine(_geofence_eng)
         app.state.geofence_engine = _geofence_eng
-        logger.info("GeofenceEngine wired to EventBus")
+        # Wire to target tracker so position updates trigger zone checks
+        _tracker = amy_instance.target_tracker if amy_instance else None
+        if _tracker:
+            _tracker.set_geofence_engine(_geofence_eng)
+            logger.info("GeofenceEngine wired to TargetTracker + EventBus")
+        else:
+            logger.info("GeofenceEngine wired to EventBus (no tracker yet)")
     except Exception as e:
         logger.warning(f"GeofenceEngine wiring failed: {e}")
 
