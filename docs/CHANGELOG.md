@@ -14,6 +14,17 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-15 — Wave 129: RL Model Reset + Vehicle Tracking + ESC-50 Tests
+
+| Change | Verification |
+|--------|-------------|
+| Deleted old 6-feature correlation_model.pkl — forces fresh retrain with 10-feature extractor | Verified: file deleted, 10 features confirmed |
+| Vehicle tracking: VehicleBehavior + VehicleTrackingManager — speed/heading from consecutive YOLO frames, suspicious scoring | 21 tests passing |
+| ESC-50 acoustic tests: real WAV file feature extraction, MFCC KNN classification, 10 categories tested | 12 tests passing |
+| Visual verification: 35 targets in demo mode, dossier store functional, RL training data generating | Visual verified |
+
+---
+
 ## 2026-03-15 — Wave 128: Security Audit + OWASP Pass
 
 | Change | Verification |
