@@ -1523,15 +1523,21 @@ function _updatePatrolRoutes() {
 
 // ============================================================
 // Dispatch arrow layer (dashed cyan lines, fade after 3s)
+// Also: persistent dispatch lines for robots actively en route.
 // ============================================================
+
+// Animated dash offset counter for robot dispatch lines
+let _dispatchDashPhase = 0;
 
 function _buildDispatchArrowsGeoJSON() {
     const now = Date.now();
     const cutoff = now - DISPATCH_ARROW_LIFETIME;
-    // Prune expired arrows
+    // Prune expired temporary arrows
     _state.dispatchArrows = _state.dispatchArrows.filter(a => a.time > cutoff);
 
     const features = [];
+
+    // 1) Temporary flash arrows (3s fade)
     for (const arrow of _state.dispatchArrows) {
         const fromLL = _gameToLngLat(arrow.fromX, arrow.fromY);
         const toLL = _gameToLngLat(arrow.toX, arrow.toY);
@@ -1543,24 +1549,56 @@ function _buildDispatchArrowsGeoJSON() {
                 type: 'LineString',
                 coordinates: [fromLL, toLL],
             },
-            properties: { opacity },
+            properties: { opacity, lineType: 'flash' },
         });
     }
+
+    // 2) Persistent dispatch lines for robots actively moving to a target
+    const units = TritiumStore.units;
+    units.forEach((unit, id) => {
+        if (unit.alliance !== 'friendly') return;
+        const uType = (unit.type || '').toLowerCase();
+        const isRobot = uType.includes('rover') || uType.includes('drone') || uType.includes('scout') || uType.includes('robot');
+        if (!isRobot) return;
+        // Check if the unit has a dispatch target and is actively moving
+        const dt = unit.dispatch_target || unit.dispatchTarget;
+        if (!dt) return;
+        const fsmState = (unit.fsmState || unit.fsm_state || '').toLowerCase();
+        const isMoving = fsmState === 'moving' || fsmState === 'dispatched' || fsmState === 'pursuing' || fsmState === 'navigating';
+        if (!isMoving && !dt) return;
+        const pos = unit.position;
+        if (!pos) return;
+        const fromLL = _gameToLngLat(pos.x || 0, pos.y || 0);
+        const toLL = _gameToLngLat(dt.x || 0, dt.y || 0);
+        features.push({
+            type: 'Feature',
+            geometry: {
+                type: 'LineString',
+                coordinates: [fromLL, toLL],
+            },
+            properties: { opacity: 0.8, lineType: 'active-dispatch' },
+        });
+    });
+
     return { type: 'FeatureCollection', features };
 }
 
 function _updateDispatchArrows() {
     if (!_state.map || !_state.initialized) return;
 
+    // Advance animated dash phase for marching-ant effect
+    _dispatchDashPhase = (_dispatchDashPhase + 0.3) % 100;
+
     const geojson = _buildDispatchArrowsGeoJSON();
 
     if (_state.map.getSource(DISPATCH_ARROWS_SOURCE)) {
-        // Skip setData() if features unchanged (dispatch arrows fade, so
-        // check count + coordinate hash; opacity changes need updates)
-        const hash = _hashGeoJSONFeatures(geojson);
-        if (hash === _state._lastDispatchHash) return;
-        _state._lastDispatchHash = hash;
+        // Dispatch arrows change every tick (fade + robot position), always update
         _state.map.getSource(DISPATCH_ARROWS_SOURCE).setData(geojson);
+        // Animate dash offset for marching-ant effect
+        if (_state.map.getLayer(DISPATCH_ARROWS_LINE)) {
+            _state.map.setPaintProperty(DISPATCH_ARROWS_LINE, 'line-dasharray',
+                [4, 4]);
+        }
     } else {
         _state.map.addSource(DISPATCH_ARROWS_SOURCE, {
             type: 'geojson',
@@ -3433,9 +3471,19 @@ function _createUnitMarker(id, unit, lngLat) {
             const fsm = u.fsmState ? ` <span style="color:var(--text-ghost)">${_escFx(u.fsmState)}</span>` : '';
             const kills = u.kills ? ` <span style="color:var(--amber)">${u.kills} kills</span>` : '';
             const ammo = (u.ammoCount != null && u.ammoMax) ? ` <span style="color:#aaa">${u.ammoCount}/${u.ammoMax}</span>` : '';
+            // Robot-specific tooltip extras: battery, speed, current task
+            const uType = (u.type || '').toLowerCase();
+            const isRobot = uType.includes('rover') || uType.includes('drone') || uType.includes('scout') || uType.includes('robot');
+            let robotInfo = '';
+            if (isRobot) {
+                const bat = u.battery != null ? Math.round(u.battery) + '%' : '--';
+                const spd = u.speed != null ? u.speed.toFixed(1) + ' m/s' : '';
+                robotInfo = `<div style="color:var(--cyan);font-size:0.5rem">BAT: ${bat}${spd ? '  SPD: ' + spd : ''}</div>`;
+            }
             tooltip.innerHTML = `<div style="color:${ALLIANCE_COLORS[u.alliance] || 'var(--cyan)'};font-weight:bold">${_escFx(u.name || id)}</div>` +
                 `<div>${_escFx(u.type || '?')}${fsm}</div>` +
-                `<div>HP: <span style="color:${hpColor}">${hpPct}%</span>${kills}${ammo}</div>`;
+                `<div>HP: <span style="color:${hpColor}">${hpPct}%</span>${kills}${ammo}</div>` +
+                robotInfo;
             tooltip.style.display = 'block';
         }
     });
@@ -3724,13 +3772,22 @@ function _applyMarkerStyle(el, unit) {
     } else {
         // ----- 2D mode: NATO APP-6 style symbology -----
         // hostile = red diamond (rotated 45deg), friendly = blue/green circle, unknown = yellow square
-        const size = alliance === 'hostile' ? 22 : 26;
+        // robots (rover/drone/scout) = larger hexagonal marker for visual distinction
+        const isRobotType = type.includes('rover') || type.includes('drone') || type.includes('scout') || type.includes('robot');
+        const size = isRobotType ? 30 : (alliance === 'hostile' ? 22 : 26);
         const pulse = (_state.showSelectionFx && alliance === 'hostile' && !dead) ? 'animation: hostile-pulse 1.5s ease-in-out infinite;' : '';
         const selGlow = selected && _state.showSelectionFx;
 
-        // NATO shape: hostile=diamond, friendly=circle, unknown/neutral=square
-        let borderRadius, markerTransform;
-        if (alliance === 'hostile') {
+        // NATO shape: hostile=diamond, friendly=circle, unknown/neutral=square, robot=hexagon
+        let borderRadius, markerTransform, clipPath;
+        clipPath = '';
+        if (isRobotType) {
+            // Hexagonal marker: use clip-path on a pseudo-element approach
+            // Since clip-path clips borders too, use rounded hex (12-sided approximation)
+            borderRadius = '4px';
+            markerTransform = '';
+            clipPath = 'clip-path: polygon(50% 0%, 85% 10%, 100% 35%, 100% 65%, 85% 90%, 50% 100%, 15% 90%, 0% 65%, 0% 35%, 15% 10%);';
+        } else if (alliance === 'hostile') {
             borderRadius = '3px';
             markerTransform = 'rotate(45deg)';
         } else if (alliance === 'friendly') {
@@ -3745,21 +3802,23 @@ function _applyMarkerStyle(el, unit) {
 
         el.style.cssText = `
             width: ${size}px; height: ${size}px;
-            border-radius: ${borderRadius};
-            background: ${dead ? '#33333366' : `radial-gradient(circle, ${color}55, ${color}22)`};
-            border: 1.5px solid ${color};
+            border-radius: ${isRobotType ? '0' : borderRadius};
+            ${clipPath}
+            background: ${dead ? '#33333366' : (isRobotType ? `linear-gradient(135deg, ${color}99, ${color}22 50%, ${color}99)` : `radial-gradient(circle, ${color}55, ${color}22)`)};
+            ${isRobotType ? '' : `border: 1.5px solid ${color};`}
             display: flex; align-items: center; justify-content: center;
             font-family: 'JetBrains Mono', monospace;
-            font-size: ${alliance === 'hostile' ? '10px' : '11px'}; font-weight: bold;
+            font-size: ${isRobotType ? '13px' : (alliance === 'hostile' ? '10px' : '11px')}; font-weight: bold;
             color: ${color};
             cursor: pointer;
             opacity: ${opacity};
             transition: transform 0.15s, box-shadow 0.15s;
-            box-shadow: 0 0 ${selGlow ? '14' : '5'}px ${color}${selGlow ? '' : '44'};
+            box-shadow: 0 0 ${selGlow ? (isRobotType ? '20' : '14') : (isRobotType ? '12' : '5')}px ${color}${selGlow ? '' : (isRobotType ? '88' : '44')};
             ${markerTransform ? `transform: ${markerTransform};` : ''}
             ${pulse}
             position: relative;
-            text-shadow: 0 0 4px ${color};
+            text-shadow: 0 0 ${isRobotType ? '6' : '4'}px ${color};
+            ${isRobotType ? `filter: drop-shadow(0 0 3px ${color});` : ''}
         `;
         // For diamond (hostile), counter-rotate the icon letter so it stays upright
         if (alliance === 'hostile') {

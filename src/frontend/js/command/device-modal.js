@@ -126,6 +126,17 @@ function _updateStatValues(container, values) {
 }
 
 // ============================================================
+// Robot helpers
+// ============================================================
+
+function _robotPatrolInfo(device) {
+    const wps = device.waypoints;
+    if (!Array.isArray(wps) || wps.length === 0) return '';
+    const loop = device.loopWaypoints ? 'LOOP' : 'ONE-WAY';
+    return `${wps.length} waypoints (${loop})`;
+}
+
+// ============================================================
 // Built-in Device Controls
 // ============================================================
 
@@ -136,17 +147,25 @@ const RoverControl = {
     render(device) {
         const hpPct = _pct(device.health, device.maxHealth);
         const hpColor = _healthColor(hpPct);
+        const fsmState = device.fsmState || device.fsm_state || 'idle';
+        const dispatchTarget = device.dispatch_target || device.dispatchTarget;
+        const patrolInfo = _robotPatrolInfo(device);
+        const lastCmd = device.last_command || device.lastCommand || '--';
         return `
             <div class="dc-stats">
                 <div class="dc-stat-row"><span class="dc-label">NAME</span><span class="dc-value">${_esc(device.name)}</span></div>
                 <div class="dc-stat-row"><span class="dc-label">TYPE</span><span class="dc-value">${_esc(device.type || 'rover')}</span></div>
                 <div class="dc-stat-row"><span class="dc-label">STATUS</span><span class="dc-value dc-status-${device.status || 'idle'}">${(device.status || 'idle').toUpperCase()}</span></div>
+                <div class="dc-stat-row"><span class="dc-label">TASK</span><span class="dc-value" style="color:var(--cyan)">${_esc(fsmState.toUpperCase())}</span></div>
                 <div class="dc-stat-row"><span class="dc-label">POSITION</span><span class="dc-value">(${(device.position?.x || 0).toFixed(1)}, ${(device.position?.y || 0).toFixed(1)})</span></div>
                 <div class="dc-stat-row"><span class="dc-label">HEADING</span><span class="dc-value">${Math.round(device.heading || 0)}&deg;</span></div>
                 <div class="dc-stat-row"><span class="dc-label">SPEED</span><span class="dc-value">${(device.speed || 0).toFixed(1)} m/s</span></div>
                 <div class="dc-stat-row"><span class="dc-label">BATTERY</span><span class="dc-value">${_batteryStr(device.battery)}</span></div>
                 <div class="dc-stat-row"><span class="dc-label">HEALTH</span><span class="dc-value" style="color:${hpColor}">${Math.round(device.health || 0)}/${device.maxHealth || 0}</span></div>
                 <div class="dc-health-bar"><div class="dc-health-fill" style="width:${hpPct}%;background:${hpColor}"></div></div>
+                ${dispatchTarget ? `<div class="dc-stat-row"><span class="dc-label">DEST</span><span class="dc-value" style="color:var(--green)">(${(dispatchTarget.x || 0).toFixed(1)}, ${(dispatchTarget.y || 0).toFixed(1)})</span></div>` : ''}
+                ${patrolInfo ? `<div class="dc-stat-row"><span class="dc-label">PATROL</span><span class="dc-value" style="color:var(--amber)">${_esc(patrolInfo)}</span></div>` : ''}
+                <div class="dc-stat-row"><span class="dc-label">LAST CMD</span><span class="dc-value" style="color:var(--text-ghost);font-size:0.45rem">${_esc(String(lastCmd))}</span></div>
             </div>
             <div class="dc-actions">
                 <div class="dc-section-label">MOVEMENT</div>
@@ -256,13 +275,18 @@ const RoverControl = {
     update(container, device) {
         const hpPct = _pct(device.health, device.maxHealth);
         const hpColor = _healthColor(hpPct);
+        const fsmState = device.fsmState || device.fsm_state || 'idle';
+        const lastCmd = device.last_command || device.lastCommand || '--';
         _updateStatValues(container, {
             'STATUS': (device.status || 'idle').toUpperCase(),
+            'TASK': fsmState.toUpperCase(),
             'POSITION': `(${(device.position?.x || 0).toFixed(1)}, ${(device.position?.y || 0).toFixed(1)})`,
             'HEADING': Math.round(device.heading || 0) + '\u00B0',
             'SPEED': (device.speed || 0).toFixed(1) + ' m/s',
             'BATTERY': _batteryStr(device.battery),
             'HEALTH': `${Math.round(device.health || 0)}/${device.maxHealth || 0}`,
+            'PATROL': _robotPatrolInfo(device) || '--',
+            'LAST CMD': String(lastCmd),
             _hpPct: hpPct,
             _hpColor: hpColor,
         });
@@ -280,16 +304,24 @@ const DroneControl = {
     render(device) {
         const hpPct = _pct(device.health, device.maxHealth);
         const hpColor = _healthColor(hpPct);
+        const fsmState = device.fsmState || device.fsm_state || 'idle';
+        const dispatchTarget = device.dispatch_target || device.dispatchTarget;
+        const patrolInfo = _robotPatrolInfo(device);
+        const lastCmd = device.last_command || device.lastCommand || '--';
         return `
             <div class="dc-stats">
                 <div class="dc-stat-row"><span class="dc-label">NAME</span><span class="dc-value">${_esc(device.name)}</span></div>
                 <div class="dc-stat-row"><span class="dc-label">TYPE</span><span class="dc-value">${_esc(device.type || 'drone')}</span></div>
                 <div class="dc-stat-row"><span class="dc-label">STATUS</span><span class="dc-value">${(device.status || 'idle').toUpperCase()}</span></div>
+                <div class="dc-stat-row"><span class="dc-label">TASK</span><span class="dc-value" style="color:var(--cyan)">${_esc(fsmState.toUpperCase())}</span></div>
                 <div class="dc-stat-row"><span class="dc-label">ALTITUDE</span><span class="dc-value">${(device.altitude || 0).toFixed(1)}m</span></div>
                 <div class="dc-stat-row"><span class="dc-label">POSITION</span><span class="dc-value">(${(device.position?.x || 0).toFixed(1)}, ${(device.position?.y || 0).toFixed(1)})</span></div>
                 <div class="dc-stat-row"><span class="dc-label">BATTERY</span><span class="dc-value">${_batteryStr(device.battery)}</span></div>
                 <div class="dc-stat-row"><span class="dc-label">HEALTH</span><span class="dc-value" style="color:${hpColor}">${Math.round(device.health || 0)}/${device.maxHealth || 0}</span></div>
                 <div class="dc-health-bar"><div class="dc-health-fill" style="width:${hpPct}%;background:${hpColor}"></div></div>
+                ${dispatchTarget ? `<div class="dc-stat-row"><span class="dc-label">DEST</span><span class="dc-value" style="color:var(--green)">(${(dispatchTarget.x || 0).toFixed(1)}, ${(dispatchTarget.y || 0).toFixed(1)})</span></div>` : ''}
+                ${patrolInfo ? `<div class="dc-stat-row"><span class="dc-label">PATROL</span><span class="dc-value" style="color:var(--amber)">${_esc(patrolInfo)}</span></div>` : ''}
+                <div class="dc-stat-row"><span class="dc-label">LAST CMD</span><span class="dc-value" style="color:var(--text-ghost);font-size:0.45rem">${_esc(String(lastCmd))}</span></div>
             </div>
             <div class="dc-actions">
                 <div class="dc-btn-row">
