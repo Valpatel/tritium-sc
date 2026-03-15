@@ -2470,7 +2470,7 @@ function _renderGeofenceZones() {
             },
         });
 
-        // Alert badge for active zones
+        // Alert/monitoring badge at zone centroid
         if (isActive) {
             hasAnyActive = true;
             alertFeatures.push({
@@ -2479,6 +2479,15 @@ function _renderGeofenceZones() {
                 properties: {
                     badge_text: '\u26A0 ALERT',
                     badge_color: zone.zone_type === 'restricted' ? '#ff2a6d' : '#fcee0a',
+                },
+            });
+        } else if (isMonitoring) {
+            alertFeatures.push({
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [ll[0], ll[1]] },
+                properties: {
+                    badge_text: '\u25C9 ACTIVE',
+                    badge_color: '#05ffa1',
                 },
             });
         }

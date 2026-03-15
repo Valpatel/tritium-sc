@@ -186,10 +186,17 @@ console.log('\n--- Menu items with unit selected ---');
 (function testMenuItemsWithSelectedUnit() {
     const items = ContextMenu.getMenuItems('rover-01');
     const labels = items.map(i => i.label);
+    assert(labels.includes('INVESTIGATE'), 'Selected unit menu has INVESTIGATE');
     assert(labels.includes('DISPATCH HERE'), 'Selected unit menu has DISPATCH HERE');
     assert(labels.includes('SUGGEST TO AMY'), 'Selected unit menu has SUGGEST TO AMY');
     assert(labels.includes('SET WAYPOINT'), 'Selected unit menu has SET WAYPOINT');
     assert(labels.includes('CANCEL'), 'Selected unit menu has CANCEL');
+})();
+
+(function testInvestigateItemHasCorrectAction() {
+    const items = ContextMenu.getMenuItems('rover-01');
+    const investigate = items.find(i => i.label === 'INVESTIGATE');
+    assert(investigate && investigate.action === 'investigate_target', 'INVESTIGATE has action "investigate_target"');
 })();
 
 (function testDispatchItemHasCorrectAction() {
@@ -747,12 +754,12 @@ console.log('\n--- getMenuItems falsy/edge values ---');
 
 (function testMenuItemCountWithUnit() {
     const items = ContextMenu.getMenuItems('rover-01');
-    assert(items.length === 5, 'Selected unit menu has exactly 5 items, got ' + items.length);
+    assert(items.length === 6, 'Selected unit menu has exactly 6 items, got ' + items.length);
 })();
 
 (function testMenuItemCountNoUnit() {
     const items = ContextMenu.getMenuItems(null);
-    assert(items.length === 8, 'No-selection menu has exactly 8 items, got ' + items.length);
+    assert(items.length === 10, 'No-selection menu has exactly 10 items, got ' + items.length);
 })();
 
 (function testCancelIsAlwaysLast() {
@@ -1018,8 +1025,8 @@ console.log('\n--- DOM element details ---');
     const items = el.querySelectorAll('.map-context-item');
     if (items.length > 0) {
         const first = items[0];
-        assert(first.textContent.includes('DISPATCH HERE'), 'First item textContent includes label');
-        assert(first.textContent.startsWith('>'), 'First item textContent starts with icon');
+        assert(first.textContent.includes('INVESTIGATE'), 'First item textContent includes label');
+        assert(first.textContent.startsWith('I'), 'First item textContent starts with icon');
     }
 })();
 
@@ -1028,7 +1035,7 @@ console.log('\n--- DOM element details ---');
     const el = ContextMenu.createMenuElement(container, 'rover-01', { x: 50, y: 100 }, 400, 300);
     const items = el.querySelectorAll('.map-context-item');
     if (items.length > 0) {
-        assert(items[0].dataset.action === 'dispatch', 'First item has data-action="dispatch"');
+        assert(items[0].dataset.action === 'investigate_target', 'First item has data-action="investigate_target"');
         assert(items[items.length - 1].dataset.action === 'cancel', 'Last item has data-action="cancel"');
     }
 })();

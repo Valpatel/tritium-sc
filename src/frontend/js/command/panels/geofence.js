@@ -85,14 +85,23 @@ export const GeofencePanelDef = {
                 if (z.alert_on_exit) flags.push('EXIT');
                 const hasAlerts = z.alert_on_enter || z.alert_on_exit;
                 const occupancy = zoneOccupancy[z.zone_id] || 0;
-                const occupancyLabel = occupancy > 0
-                    ? `<span style="color:${color};font-weight:600;font-size:0.42rem;margin-left:4px">${occupancy} inside</span>`
-                    : '';
-                const pulseClass = hasAlerts ? ' zone-alert-active' : '';
+                const isTriggered = hasAlerts && occupancy > 0;
+                const isMonitoring = hasAlerts && occupancy === 0;
+
+                // Status badge: ALERT (magenta, pulsing) when triggered, MONITORING (green) when armed
+                let statusBadge = '';
+                if (isTriggered) {
+                    statusBadge = `<span class="geofence-status-badge geofence-status-alert">${occupancy} INSIDE</span>`;
+                } else if (isMonitoring) {
+                    statusBadge = `<span class="geofence-status-badge geofence-status-monitoring">MONITORING</span>`;
+                }
+
+                const pulseClass = isTriggered ? ' zone-alert-triggered' : hasAlerts ? ' zone-alert-active' : '';
+                const dotPulseClass = isTriggered ? ' zone-dot-pulse-alert' : hasAlerts ? ' zone-dot-pulse' : '';
                 return `<li class="panel-list-item zone-item${pulseClass}" data-zone-id="${_esc(z.zone_id)}" role="option">
-                    <span class="panel-dot${hasAlerts ? ' zone-dot-pulse' : ''}" style="background:${color}"></span>
+                    <span class="panel-dot${dotPulseClass}" style="background:${isTriggered ? '#ff2a6d' : color}"></span>
                     <span class="zone-item-info" style="flex:1;min-width:0">
-                        <span class="zone-item-name">${_esc(z.name)}${occupancyLabel}</span>
+                        <span class="zone-item-name">${_esc(z.name)}${statusBadge}</span>
                         <span class="mono" style="font-size:0.42rem;color:var(--text-ghost)">${_esc(z.zone_type)} | ${vertices} pts | ${flags.join('+') || 'no alerts'}</span>
                     </span>
                     <button class="panel-btn zone-delete-btn" data-action="delete-zone" data-zone-id="${_esc(z.zone_id)}" title="Delete zone">&times;</button>

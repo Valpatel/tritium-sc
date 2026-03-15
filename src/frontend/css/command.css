@@ -1732,21 +1732,76 @@ body.v2 {
     line-height: 1.4;
 }
 
-/* Zone alert pulse animation — active alert indicator */
+/* Zone alert pulse animation — monitoring indicator (green/cyan slow pulse) */
 .zone-dot-pulse {
-    animation: zoneDotPulse 1.5s ease-in-out infinite;
+    animation: zoneDotPulse 2s ease-in-out infinite;
 }
 @keyframes zoneDotPulse {
     0%, 100% { box-shadow: 0 0 2px currentColor; opacity: 1; }
-    50% { box-shadow: 0 0 8px currentColor, 0 0 16px currentColor; opacity: 0.7; }
+    50% { box-shadow: 0 0 6px #05ffa1, 0 0 12px #05ffa1; opacity: 0.7; }
 }
+
+/* Zone alert pulse — triggered (magenta fast pulse) */
+.zone-dot-pulse-alert {
+    animation: zoneDotPulseAlert 0.8s ease-in-out infinite;
+}
+@keyframes zoneDotPulseAlert {
+    0%, 100% { box-shadow: 0 0 2px #ff2a6d; opacity: 1; }
+    50% { box-shadow: 0 0 10px #ff2a6d, 0 0 20px #ff2a6d; opacity: 0.6; }
+}
+
+/* Zone list item — monitoring state (subtle green left border pulse) */
 .zone-alert-active {
     border-left: 2px solid transparent;
-    animation: zoneAlertBorder 2s ease-in-out infinite;
+    animation: zoneAlertBorder 2.5s ease-in-out infinite;
 }
 @keyframes zoneAlertBorder {
     0%, 100% { border-left-color: transparent; }
-    50% { border-left-color: var(--cyan); }
+    50% { border-left-color: #05ffa1; }
+}
+
+/* Zone list item — triggered state (magenta left border, faster pulse) */
+.zone-alert-triggered {
+    border-left: 2px solid #ff2a6d;
+    animation: zoneTriggeredBorder 1s ease-in-out infinite;
+    background: rgba(255, 42, 109, 0.08);
+}
+@keyframes zoneTriggeredBorder {
+    0%, 100% { border-left-color: #ff2a6d; background: rgba(255, 42, 109, 0.08); }
+    50% { border-left-color: #ff2a6d; background: rgba(255, 42, 109, 0.18); }
+}
+
+/* Geofence status badge — inline indicator next to zone name */
+.geofence-status-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.38rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+.geofence-status-monitoring {
+    color: #05ffa1;
+    border: 1px solid rgba(5, 255, 161, 0.5);
+    background: rgba(5, 255, 161, 0.1);
+    animation: statusBadgePulseGreen 2.5s ease-in-out infinite;
+}
+@keyframes statusBadgePulseGreen {
+    0%, 100% { border-color: rgba(5, 255, 161, 0.3); background: rgba(5, 255, 161, 0.06); }
+    50% { border-color: rgba(5, 255, 161, 0.7); background: rgba(5, 255, 161, 0.15); }
+}
+.geofence-status-alert {
+    color: #ff2a6d;
+    border: 1px solid rgba(255, 42, 109, 0.6);
+    background: rgba(255, 42, 109, 0.15);
+    animation: statusBadgePulseRed 0.8s ease-in-out infinite;
+}
+@keyframes statusBadgePulseRed {
+    0%, 100% { border-color: rgba(255, 42, 109, 0.4); background: rgba(255, 42, 109, 0.1); }
+    50% { border-color: rgba(255, 42, 109, 0.9); background: rgba(255, 42, 109, 0.25); }
 }
 
 /* Tag buttons for target classification */

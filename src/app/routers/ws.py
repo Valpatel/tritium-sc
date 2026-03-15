@@ -797,6 +797,22 @@ def start_amy_event_bridge(amy_commander, loop: asyncio.AbstractEventLoop):
                         }),
                         loop,
                     )
+                elif event_type == "detection:camera":
+                    # Camera YOLO detection events — broadcast each detection
+                    # individually as "detection" so camera-feeds panel updates
+                    camera_id = data.get("camera_id", "")
+                    dets = data.get("detections", [])
+                    for det in dets:
+                        det_data = {
+                            "camera_id": camera_id,
+                            "class_name": det.get("label") or det.get("class_name", "unknown"),
+                            "confidence": det.get("confidence", 0),
+                            "timestamp": datetime.now(tz=None).isoformat(),
+                            "bbox": det.get("bbox"),
+                        }
+                        asyncio.run_coroutine_threadsafe(
+                            broadcast_detection(det_data), loop
+                        )
                 elif event_type.startswith("system:"):
                     # System-wide events (threat level, etc.) — convert : to _
                     ws_type = event_type.replace(":", "_")
@@ -955,6 +971,22 @@ def start_headless_event_bridge(event_bus, loop: asyncio.AbstractEventLoop,
                     asyncio.run_coroutine_threadsafe(
                         broadcast_amy_event(event_type, data), loop
                     )
+                elif event_type == "detection:camera":
+                    # Camera YOLO detection events — broadcast each detection
+                    # individually as "detection" so camera-feeds panel updates
+                    camera_id = data.get("camera_id", "")
+                    dets = data.get("detections", [])
+                    for det in dets:
+                        det_data = {
+                            "camera_id": camera_id,
+                            "class_name": det.get("label") or det.get("class_name", "unknown"),
+                            "confidence": det.get("confidence", 0),
+                            "timestamp": datetime.now(tz=None).isoformat(),
+                            "bbox": det.get("bbox"),
+                        }
+                        asyncio.run_coroutine_threadsafe(
+                            broadcast_detection(det_data), loop
+                        )
                 elif event_type.startswith("fleet."):
                     ws_type = event_type.replace(".", "_")
                     asyncio.run_coroutine_threadsafe(

@@ -6,7 +6,7 @@
  *
  * Provides a context menu for the tactical map. Menu items change
  * depending on whether a unit is selected:
- *   - Unit selected: DISPATCH HERE, SUGGEST TO AMY, SET WAYPOINT, CANCEL
+ *   - Unit selected: INVESTIGATE, DISPATCH HERE, SUGGEST TO AMY, SET WAYPOINT, CANCEL
  *   - No unit: DROP MARKER, SUGGEST TO AMY: INVESTIGATE, CANCEL
  *
  * "Suggest to Amy" posts an operator suggestion to /api/amy/command.
@@ -41,6 +41,7 @@ let _outsideHandler = null; // Click-outside dismiss handler
 function getMenuItems(selectedUnitId) {
     const items = [];
     if (selectedUnitId) {
+        items.push({ label: 'INVESTIGATE',     action: 'investigate_target',  icon: 'I' });
         items.push({ label: 'DISPATCH HERE',  action: 'dispatch',          icon: '>' });
         items.push({ label: 'SUGGEST TO AMY', action: 'suggest_dispatch',  icon: '?' });
         items.push({ label: 'SET WAYPOINT',   action: 'waypoint',          icon: '+' });
@@ -318,6 +319,16 @@ function handleAction(action, gamePos, selectedUnitId) {
             });
             break;
         }
+
+        case 'investigate_target':
+            if (selectedUnitId) {
+                // Open dossiers panel and load this target's dossier
+                EventBus.emit('panel:request-open', { id: 'dossiers' });
+                setTimeout(() => {
+                    EventBus.emit('dossier:load-target', { target_id: selectedUnitId });
+                }, 200);
+            }
+            break;
 
         case 'pin':
             if (selectedUnitId) {

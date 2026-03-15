@@ -220,19 +220,65 @@ export const CameraFeedsPanelDef = {
             EventBus.emit('camera:pick-location', { active: true });
         }
 
+        // -- Edit existing camera position (click map to reposition) --
+        let editingCamId = null;
+
         function onLocationPicked(data) {
-            if (!pickingLocation || !data) return;
-            pickingLocation = false;
-            if (pickMapBtn) {
-                pickMapBtn.textContent = 'PICK LOCATION FROM MAP';
-                pickMapBtn.style.color = '#00f0ff';
-                pickMapBtn.style.borderColor = '#00f0ff33';
+            if (!data) return;
+
+            // Route to add-modal picker if active
+            if (pickingLocation) {
+                pickingLocation = false;
+                if (pickMapBtn) {
+                    pickMapBtn.textContent = 'PICK LOCATION FROM MAP';
+                    pickMapBtn.style.color = '#00f0ff';
+                    pickMapBtn.style.borderColor = '#00f0ff33';
+                }
+                const latInput = addForm ? addForm.querySelector('[name="lat"]') : null;
+                const lngInput = addForm ? addForm.querySelector('[name="lng"]') : null;
+                if (latInput && data.lat != null) latInput.value = data.lat.toFixed(6);
+                if (lngInput && data.lng != null) lngInput.value = data.lng.toFixed(6);
+                return;
             }
-            // Fill in the lat/lng form fields
-            const latInput = addForm ? addForm.querySelector('[name="lat"]') : null;
-            const lngInput = addForm ? addForm.querySelector('[name="lng"]') : null;
-            if (latInput && data.lat != null) latInput.value = data.lat.toFixed(6);
-            if (lngInput && data.lng != null) lngInput.value = data.lng.toFixed(6);
+
+            // Route to existing camera position edit if active
+            if (editingCamId) {
+                const camId = editingCamId;
+                editingCamId = null;
+
+                // Reset button style
+                const btn = bodyEl.querySelector(`.cf-set-pos-btn[data-cam-id="${camId}"]`);
+                if (btn) {
+                    btn.textContent = 'SET POS';
+                    btn.style.color = '#00f0ff';
+                    btn.style.borderColor = '#00f0ff33';
+                }
+
+                // PATCH the position to the backend
+                fetch(`/api/camera-feeds/sources/${encodeURIComponent(camId)}/position`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lat: data.lat, lng: data.lng }),
+                }).then(resp => {
+                    if (resp.ok) {
+                        // Refresh cameras to update map markers and card display
+                        fetchCameras();
+                    }
+                }).catch(() => {});
+                return;
+            }
+        }
+
+        function startEditingPosition(camId) {
+            editingCamId = camId;
+            // Highlight the button
+            const btn = bodyEl.querySelector(`.cf-set-pos-btn[data-cam-id="${camId}"]`);
+            if (btn) {
+                btn.textContent = 'CLICK MAP...';
+                btn.style.color = '#fcee0a';
+                btn.style.borderColor = '#fcee0a';
+            }
+            EventBus.emit('camera:pick-location', { active: true });
         }
 
         if (pickMapBtn) pickMapBtn.addEventListener('click', startPickingLocation);
@@ -272,6 +318,10 @@ export const CameraFeedsPanelDef = {
                 }
 
                 const streamUrl = cam.stream_url || `/api/camera-feeds/sources/${cam.id}/mjpeg`;
+                const hasPos = cam.lat != null && cam.lng != null;
+                const posLabel = hasPos
+                    ? `${Number(cam.lat).toFixed(4)}, ${Number(cam.lng).toFixed(4)}`
+                    : 'No position';
 
                 return `
                     <div class="cf-card" data-camera-id="${_esc(cam.id)}" data-status="${_esc(status)}">
@@ -286,6 +336,14 @@ export const CameraFeedsPanelDef = {
                             }
                         </div>
                         ${detectionHtml}
+                        <div class="cf-card-footer" style="display:flex;align-items:center;gap:4px;padding:2px 6px;font-size:10px;">
+                            <span class="mono" style="color:${hasPos ? '#05ffa1' : '#888'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${posLabel}</span>
+                            <button class="cf-set-pos-btn" data-cam-id="${_esc(cam.id)}" title="Click map to set camera position" style="
+                                font-family:'JetBrains Mono',monospace;font-size:9px;padding:1px 5px;
+                                background:transparent;border:1px solid #00f0ff33;color:#00f0ff;
+                                cursor:pointer;border-radius:2px;white-space:nowrap;
+                            ">SET POS</button>
+                        </div>
                     </div>`;
             }).join('');
 
@@ -299,11 +357,20 @@ export const CameraFeedsPanelDef = {
                 }
             });
 
-            // Click to expand
+            // Click to expand (on card, but not on the SET POS button)
             gridEl.querySelectorAll('.cf-card').forEach(card => {
-                card.addEventListener('click', () => {
+                card.addEventListener('click', (e) => {
+                    if (e.target.closest('.cf-set-pos-btn')) return;
                     const camId = card.dataset.cameraId;
                     showOverlay(camId);
+                });
+            });
+
+            // SET POS buttons — click map to set/update camera position
+            gridEl.querySelectorAll('.cf-set-pos-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    startEditingPosition(btn.dataset.camId);
                 });
             });
         }
@@ -345,7 +412,18 @@ export const CameraFeedsPanelDef = {
                     return;
                 }
                 const data = await resp.json();
-                cameras = Array.isArray(data) ? data : (data.cameras || data.feeds || []);
+                const newCams = Array.isArray(data) ? data : (data.cameras || data.feeds || []);
+                // Preserve latest_detection from previous state (server returns null)
+                const detMap = {};
+                for (const c of cameras) {
+                    if (c.latest_detection) detMap[c.id] = c.latest_detection;
+                }
+                for (const c of newCams) {
+                    if (!c.latest_detection && detMap[c.id]) {
+                        c.latest_detection = detMap[c.id];
+                    }
+                }
+                cameras = newCams;
                 renderGrid();
                 // Notify map layer about camera positions
                 EventBus.emit('cameras:changed', { cameras });
@@ -382,17 +460,41 @@ export const CameraFeedsPanelDef = {
             if (overlayImg) overlayImg.src = '';
         });
 
-        // Listen for detection events from EventBus
+        // Listen for detection events from EventBus — update inline without full re-render
         function onDetection(evt) {
             if (!evt || !evt.camera_id) return;
             const cam = cameras.find(c => c.id === evt.camera_id);
-            if (cam) {
-                cam.latest_detection = {
-                    class_name: evt.class_name || evt.label,
-                    confidence: evt.confidence,
-                    timestamp: evt.timestamp || new Date().toISOString(),
-                };
-                renderGrid();
+            if (!cam) return;
+
+            cam.latest_detection = {
+                class_name: evt.class_name || evt.label,
+                confidence: evt.confidence,
+                timestamp: evt.timestamp || new Date().toISOString(),
+            };
+
+            // Update just the detection display on the specific card
+            const card = gridEl ? gridEl.querySelector(`.cf-card[data-camera-id="${cam.id}"]`) : null;
+            if (card) {
+                let detEl = card.querySelector('.cf-card-detection');
+                const det = cam.latest_detection;
+                const conf = det.confidence != null ? `${Math.round(det.confidence * 100)}%` : '';
+                const html = `
+                    <span class="cf-det-class">${_esc(det.class_name || '')}</span>
+                    ${conf ? `<span class="cf-det-conf">${conf}</span>` : ''}
+                    ${det.timestamp ? `<span class="cf-det-time">${_timeAgo(det.timestamp)}</span>` : ''}
+                `;
+                if (!detEl) {
+                    detEl = document.createElement('div');
+                    detEl.className = 'cf-card-detection';
+                    // Insert before the footer
+                    const footer = card.querySelector('.cf-card-footer');
+                    if (footer) {
+                        card.insertBefore(detEl, footer);
+                    } else {
+                        card.appendChild(detEl);
+                    }
+                }
+                detEl.innerHTML = html;
             }
         }
         EventBus.on('detection', onDetection);
