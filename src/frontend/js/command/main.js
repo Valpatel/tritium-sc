@@ -746,10 +746,8 @@ function initPanelSystem(container) {
         panelManager.open('minimap');
     }
 
-    // Setup wizard — auto-open on first launch (no config stored)
-    if (SetupWizardPanelDef.shouldAutoOpen && SetupWizardPanelDef.shouldAutoOpen()) {
-        panelManager.open('setup-wizard');
-    }
+    // Setup wizard — available from HELP menu, not auto-opened.
+    // Was blocking the map on first load with no obvious close mechanism.
 
     // Auto-start demo mode if configured
     if (ConfigStore.get('demo.autoStart', false)) {
