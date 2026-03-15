@@ -10,6 +10,7 @@
 //   initCommandPalette(panelManager, mapActions);
 
 import { EventBus } from './events.js';
+import { _esc } from './panel-utils.js';
 
 let _overlay = null;
 let _input = null;
@@ -330,9 +331,3 @@ function _buildCommands(panelManager, mapActions) {
     return cmds;
 }
 
-function _esc(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = String(text);
-    return div.innerHTML;
-}

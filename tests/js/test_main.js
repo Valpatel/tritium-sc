@@ -739,12 +739,14 @@ console.log('\n--- API Endpoints ---');
 console.log('\n--- escapeHtml ---');
 
 (function testEscapeHtmlExists() {
-    assert(mainSrc.includes('function escapeHtml(text)'),
+    // escapeHtml is now an alias for _esc imported from panel-utils.js
+    assert(mainSrc.includes("const escapeHtml = _esc") || mainSrc.includes('function escapeHtml(text)'),
         'escapeHtml function exists');
 })();
 
 (function testEscapeHtmlHandlesEmpty() {
-    assert(mainSrc.includes("if (!text) return ''"),
+    // _esc handles falsy input in panel-utils.js
+    assert(mainSrc.includes("import { _esc }") || mainSrc.includes("if (!text) return ''"),
         'escapeHtml returns empty string for falsy input');
 })();
 

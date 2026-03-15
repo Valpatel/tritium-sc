@@ -16,6 +16,8 @@
  * Exports: DeviceModalManager, DeviceControlRegistry, DeviceAPI
  */
 
+import { _esc } from './panel-utils.js';
+
 // ============================================================
 // Device API -- sends commands to backend
 // ============================================================
@@ -70,16 +72,6 @@ const DeviceAPI = {
         });
     },
 };
-
-// ============================================================
-// Helper: escape HTML
-// ============================================================
-
-function _esc(s) {
-    if (typeof s !== 'string') return String(s || '');
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}
 
 function _pct(val, max) {
     if (!max || max <= 0) return 0;

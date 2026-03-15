@@ -10,6 +10,7 @@
  */
 
 import { EventBus } from '../events.js';
+import { _esc } from '../panel-utils.js';
 
 let _container = null;
 let _bookmarks = [];
@@ -84,7 +85,7 @@ function _renderList() {
     list.innerHTML = _bookmarks.map(bm => `
         <div class="bookmark-item" data-id="${bm.id}">
             <div class="bookmark-info" title="Click to fly to this position">
-                <span class="bookmark-name">${_escapeHtml(bm.name)}</span>
+                <span class="bookmark-name">${_esc(bm.name)}</span>
                 <span class="bookmark-coords">${bm.lat.toFixed(5)}, ${bm.lng.toFixed(5)} z${bm.zoom.toFixed(1)}</span>
             </div>
             <button class="bookmark-delete" data-id="${bm.id}" title="Delete">&times;</button>
@@ -121,12 +122,6 @@ function _renderList() {
             }
         });
     });
-}
-
-function _escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
 }
 
 /**

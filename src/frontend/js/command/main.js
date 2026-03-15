@@ -7,6 +7,7 @@
 //
 // Include via: <script type="module" src="/static/js/command/main.js"></script>
 
+import { _esc } from './panel-utils.js';
 import { TritiumStore } from './store.js';
 import { EventBus } from './events.js';
 import { WebSocketManager } from './websocket.js';
@@ -402,7 +403,7 @@ function init() {
                 document.body.appendChild(indicator);
             }
             indicator.innerHTML =
-                `<span class="wasd-label mono">CONTROLLING: ${escapeHtml(name)}</span>` +
+                `<span class="wasd-label mono">CONTROLLING: ${_esc(name)}</span>` +
                 `<span class="wasd-hint mono">WASD move // ESC release</span>`;
             indicator.hidden = false;
         } else if (indicator) {
@@ -1000,11 +1001,11 @@ function showToast(message, type = 'info') {
     toast.className = `toast toast-${type}`;
     toast.innerHTML = `
         <div class="toast-header">
-            <span class="toast-label mono">${escapeHtml(type.toUpperCase())}</span>
+            <span class="toast-label mono">${_esc(type.toUpperCase())}</span>
             <span class="toast-time mono">${new Date().toLocaleTimeString().substr(0, 5)}</span>
             <button class="toast-close" aria-label="Dismiss">&times;</button>
         </div>
-        <div class="toast-body">${escapeHtml(message)}</div>
+        <div class="toast-body">${_esc(message)}</div>
     `;
 
     toast.querySelector('.toast-close')?.addEventListener('click', () => {
@@ -1321,8 +1322,8 @@ function appendChatMessage(sender, text, type) {
     const msg = document.createElement('div');
     msg.className = `chat-msg chat-msg-${type}`;
     msg.innerHTML =
-        `<div class="chat-msg-header"><span class="chat-msg-sender mono">${escapeHtml(sender)}</span><span class="chat-msg-time mono">${timeStr}</span></div>` +
-        `<div class="chat-msg-text">${escapeHtml(text)}</div>`;
+        `<div class="chat-msg-header"><span class="chat-msg-sender mono">${_esc(sender)}</span><span class="chat-msg-time mono">${timeStr}</span></div>` +
+        `<div class="chat-msg-text">${_esc(text)}</div>`;
     messages.appendChild(msg);
     messages.scrollTop = messages.scrollHeight;
 }
@@ -1390,9 +1391,9 @@ function renderUnitList() {
         }[alliance] || 'var(--text-dim)';
         const icon = { rover: 'R', drone: 'D', turret: 'T', person: 'P', hostile_kid: 'H' }[u.type] || '?';
         const hp = u.health !== undefined && u.maxHealth ? `${Math.round(u.health)}/${u.maxHealth}` : '';
-        return `<li class="unit-list-item" data-unit-id="${escapeHtml(u.id)}" role="option">
+        return `<li class="unit-list-item" data-unit-id="${_esc(u.id)}" role="option">
             <span class="unit-icon-mini" style="color:${allianceColor}">${icon}</span>
-            <span class="unit-item-name">${escapeHtml(u.name || u.id)}</span>
+            <span class="unit-item-name">${_esc(u.name || u.id)}</span>
             <span class="unit-item-hp mono" style="font-size:0.55rem;color:var(--text-dim)">${hp}</span>
         </li>`;
     }).join('');
@@ -1420,7 +1421,7 @@ function renderAlertFeed(alerts) {
                     a.type === 'warning' ? 'alert-warning' : 'alert-info';
         const time = a.time ? new Date(a.time).toLocaleTimeString().substr(0, 5) : '';
         return `<li class="alert-item ${cls}">
-            <span class="alert-text">${escapeHtml(a.message)}</span>
+            <span class="alert-text">${_esc(a.message)}</span>
             <span class="alert-time mono">${time}</span>
         </li>`;
     }).join('');
@@ -1867,18 +1868,8 @@ let _activeMapModule = null;
 // Module-scoped reference so keyboard handlers can call through the proxy
 let _mapActions = null;
 
-// ---------------------------------------------------------------------------
-// Utility
-// ---------------------------------------------------------------------------
-
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = String(text);
-    return div.innerHTML;
-}
-
 // Export for use by other modules
+const escapeHtml = _esc;
 export { showToast, showBanner, selectUnit, dispatchUnit, escapeHtml, ws, panelManager, layoutManager, appendChatMessage, getChatHistory, toggleChat };
 
 // ---------------------------------------------------------------------------

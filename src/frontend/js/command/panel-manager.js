@@ -12,6 +12,7 @@
 //   pm.open('amy');
 
 import { EventBus } from './events.js';
+import { _esc } from './panel-utils.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -686,13 +687,3 @@ export class PanelManager {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Utility
-// ---------------------------------------------------------------------------
-
-function _esc(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = String(text);
-    return div.innerHTML;
-}
