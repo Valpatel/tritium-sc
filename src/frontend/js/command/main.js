@@ -701,6 +701,7 @@ function initPanelSystem(container) {
             toggleCoverPoints: () => (_activeMapModule ? _activeMapModule.toggleCoverPoints() : toggleCoverPoints()),
             toggleUnitSignals: () => (_activeMapModule ? _activeMapModule.toggleUnitSignals() : toggleUnitSignals()),
             toggleHostileIntel: () => (_activeMapModule ? _activeMapModule.toggleHostileIntel() : toggleHostileIntel()),
+            togglePredictionCones: () => (_activeMapModule ? _activeMapModule.togglePredictionCones() : togglePredictionCones()),
             centerOnAction: () => (_activeMapModule ? _activeMapModule.centerOnAction() : centerOnAction()),
             resetCamera: () => (_activeMapModule ? _activeMapModule.resetCamera() : resetCamera()),
             zoomIn: () => (_activeMapModule ? _activeMapModule.zoomIn() : zoomIn()),

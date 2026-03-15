@@ -177,6 +177,9 @@ const _state = {
     patrolUnitId: null,
     patrolWaypoints: [],  // [{x, y}, ...] in world coords
 
+    // Prediction cones toggle
+    showPredictionCones: false,
+
     // RF motion data (from rfMotion:update events)
     rfMotionPairs: [],     // active motion pairs with positions
     rfMotionZones: [],     // occupied zones
@@ -561,6 +564,9 @@ function _draw() {
 
     // Layer 5.02: Correlation lines (thin lines between fused targets)
     _drawCorrelationLines(ctx);
+
+    // Layer 5.03: Prediction confidence cones (expanding uncertainty)
+    _drawPredictionCones(ctx);
 
     // Layer 5.05: Squad formation lines (thin lines connecting squad members)
     _drawSquadLines(ctx);
@@ -1836,6 +1842,128 @@ function _drawCorrelationLines(ctx) {
         ctx.textAlign = 'left'; // reset
     }
 
+    ctx.restore();
+}
+
+// ============================================================
+// Layer 5.03: Prediction confidence cones
+// ============================================================
+
+/**
+ * Draw expanding uncertainty cones for target predicted future positions.
+ * Uses velocity (heading + speed) from unit data to project future positions
+ * at 1s, 3s, 5s, 10s intervals. The cone widens over time to represent
+ * growing positional uncertainty.
+ */
+const PREDICTION_STEPS = [
+    { dt: 1, alpha: 0.25 },
+    { dt: 3, alpha: 0.18 },
+    { dt: 5, alpha: 0.12 },
+    { dt: 10, alpha: 0.07 },
+];
+const PREDICTION_BASE_SPREAD = 0.15; // radians spread per second of prediction
+const PREDICTION_CONE_LENGTH = 1.0;  // meters per unit speed per second
+
+function _drawPredictionCones(ctx) {
+    const units = TritiumStore.units;
+    if (!units || units.size === 0) return;
+
+    const selectedId = TritiumStore.get('map.selectedUnitId');
+    const showAll = _state.showPredictionCones;
+    if (!showAll && !selectedId) return;
+
+    ctx.save();
+
+    for (const [id, unit] of units) {
+        // Only show for selected unit unless showAll is enabled
+        if (!showAll && id !== selectedId) continue;
+
+        const pos = unit.position;
+        if (!pos || pos.x === undefined || pos.y === undefined) continue;
+
+        // Need heading and some indication of movement (speed or velocity)
+        const heading = unit.heading;
+        if (heading === undefined || heading === null) continue;
+
+        // Estimate speed from unit data or default
+        const speed = unit.speed || unit.velocity || 0;
+        if (speed < 0.1) continue; // skip stationary units
+
+        const alliance = (unit.alliance || 'unknown').toLowerCase();
+        const color = ALLIANCE_COLORS[alliance] || ALLIANCE_COLORS.unknown;
+
+        // Convert heading to radians (heading is degrees, 0=north, CW)
+        const headingRad = (90 - heading) * Math.PI / 180;
+
+        for (const step of PREDICTION_STEPS) {
+            const dist = speed * step.dt * PREDICTION_CONE_LENGTH;
+            const spread = PREDICTION_BASE_SPREAD * step.dt;
+
+            // Predicted center position
+            const predX = pos.x + Math.cos(headingRad) * dist;
+            const predY = pos.y + Math.sin(headingRad) * dist;
+
+            // Cone edges (left and right of heading)
+            const leftAngle = headingRad + spread;
+            const rightAngle = headingRad - spread;
+            const leftX = pos.x + Math.cos(leftAngle) * dist;
+            const leftY = pos.y + Math.sin(leftAngle) * dist;
+            const rightX = pos.x + Math.cos(rightAngle) * dist;
+            const rightY = pos.y + Math.sin(rightAngle) * dist;
+
+            // Convert to screen coordinates
+            const spOrigin = worldToScreen(pos.x, pos.y);
+            const spLeft = worldToScreen(leftX, leftY);
+            const spRight = worldToScreen(rightX, rightY);
+            const spCenter = worldToScreen(predX, predY);
+
+            // Draw filled cone
+            ctx.beginPath();
+            ctx.moveTo(spOrigin.x, spOrigin.y);
+            ctx.lineTo(spLeft.x, spLeft.y);
+            // Arc at the far end
+            ctx.lineTo(spCenter.x, spCenter.y);
+            ctx.lineTo(spRight.x, spRight.y);
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.globalAlpha = step.alpha;
+            ctx.fill();
+
+            // Draw cone outline
+            ctx.beginPath();
+            ctx.moveTo(spOrigin.x, spOrigin.y);
+            ctx.lineTo(spLeft.x, spLeft.y);
+            ctx.lineTo(spCenter.x, spCenter.y);
+            ctx.lineTo(spRight.x, spRight.y);
+            ctx.closePath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 0.5;
+            ctx.globalAlpha = step.alpha * 1.5;
+            ctx.stroke();
+
+            // Draw predicted position dot
+            ctx.beginPath();
+            ctx.arc(spCenter.x, spCenter.y, 2, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.globalAlpha = step.alpha * 2;
+            ctx.fill();
+        }
+
+        // Draw time labels at furthest prediction
+        const lastStep = PREDICTION_STEPS[PREDICTION_STEPS.length - 1];
+        const lastDist = speed * lastStep.dt * PREDICTION_CONE_LENGTH;
+        const lastPredX = pos.x + Math.cos(headingRad) * lastDist;
+        const lastPredY = pos.y + Math.sin(headingRad) * lastDist;
+        const spLast = worldToScreen(lastPredX, lastPredY);
+
+        ctx.globalAlpha = 0.4;
+        ctx.font = '8px monospace';
+        ctx.fillStyle = color;
+        ctx.textAlign = 'center';
+        ctx.fillText(`+${lastStep.dt}s`, spLast.x, spLast.y - 6);
+    }
+
+    ctx.globalAlpha = 1.0;
     ctx.restore();
 }
 
@@ -4405,6 +4533,14 @@ export function toggleThoughts() {
     console.log(`[MAP] Thought bubbles ${_state.showThoughts ? 'ON' : 'OFF'}`);
 }
 
+/**
+ * Toggle prediction confidence cones on/off.
+ */
+export function togglePredictionCones() {
+    _state.showPredictionCones = !_state.showPredictionCones;
+    console.log(`[MAP] Prediction cones ${_state.showPredictionCones ? 'ON' : 'OFF'}`);
+}
+
 export function getMapState() {
     return {
         showSatellite: _state.showSatellite,
@@ -4415,6 +4551,7 @@ export function getMapState() {
         fogEnabled: _state.fogEnabled,
         showMesh: _state.showMesh,
         showThoughts: _state.showThoughts,
+        showPredictionCones: _state.showPredictionCones,
     };
 }
 

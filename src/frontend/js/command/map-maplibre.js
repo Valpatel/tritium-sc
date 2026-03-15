@@ -113,6 +113,7 @@ const _state = {
     showModels3d: true,        // Three.js 3D unit models
     showFog: false,            // fog of war
     showMesh: true,            // mesh radio overlay
+    showPredictionCones: false, // target prediction uncertainty cones
     showPatrolRoutes: true,    // patrol route lines for friendly units
 
     // Layer visibility — combat FX (debug toggles)
@@ -7117,6 +7118,11 @@ export function toggleMesh() {
     console.log(`[MAP-ML] Mesh network ${_state.showMesh ? 'ON' : 'OFF'}`);
 }
 
+export function togglePredictionCones() {
+    _state.showPredictionCones = !_state.showPredictionCones;
+    console.log(`[MAP-ML] Prediction cones ${_state.showPredictionCones ? 'ON' : 'OFF'}`);
+}
+
 export function togglePatrolRoutes() {
     _state.showPatrolRoutes = !_state.showPatrolRoutes;
     if (_state.map) {
@@ -7435,6 +7441,7 @@ export function getMapState() {
         showWaterways: _state.showWaterways,
         showParks: _state.showParks,
         showMesh: _state.showMesh,
+        showPredictionCones: _state.showPredictionCones,
         showPatrolRoutes: _state.showPatrolRoutes,
         showThoughts: _state.showThoughts,
         showTracers: _state.showTracers,
