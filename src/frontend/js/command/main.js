@@ -67,6 +67,7 @@ import { AmyConversationPanelDef } from './panels/amy-conversation.js';
 import { ExportSchedulerPanelDef } from './panels/export-scheduler.js';
 import { OpsDashboardPanelDef } from './panels/ops-dashboard.js';
 import { DossierGroupsPanelDef } from './panels/dossier-groups.js';
+import { DossierTimelinePanelDef } from './panels/dossier-timeline.js';
 import { SetupWizardPanelDef, ConfigStore } from './panels/setup-wizard.js';
 import { ActivityFeedPanelDef } from './panels/activity-feed.js';
 import { MqttInspectorPanelDef } from './panels/mqtt-inspector.js';
@@ -624,6 +625,7 @@ function initPanelSystem(container) {
     panelManager.register(ExportSchedulerPanelDef);
     panelManager.register(OpsDashboardPanelDef);
     panelManager.register(DossierGroupsPanelDef);
+    panelManager.register(DossierTimelinePanelDef);
     panelManager.register(SetupWizardPanelDef);
     panelManager.register(ActivityFeedPanelDef);
     panelManager.register(MqttInspectorPanelDef);

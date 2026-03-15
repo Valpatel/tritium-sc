@@ -32,6 +32,7 @@ from engine.synthetic.data_generators import (
     TrilaterationDemoGenerator,
 )
 from engine.synthetic.fusion_scenario import FusionScenario
+from engine.synthetic.reid_demo_generator import ReIDDemoGenerator
 from engine.synthetic.rl_training_generator import RLTrainingGenerator
 
 if TYPE_CHECKING:
@@ -84,6 +85,7 @@ class DemoController:
         self._fusion: FusionScenario | None = None
         self._rl_training: RLTrainingGenerator | None = None
         self._trilat_demo: TrilaterationDemoGenerator | None = None
+        self._reid_demo: ReIDDemoGenerator | None = None
 
     @property
     def active(self) -> bool:
@@ -143,6 +145,15 @@ class DemoController:
         )
         self._rl_training.start()
 
+        # ReID cross-camera matching demo — simulates persons moving between
+        # camera FOVs with similar embeddings for cross-camera identity matching.
+        self._reid_demo = ReIDDemoGenerator(
+            interval=2.0,
+            event_bus=self._event_bus,
+            num_persons=2,
+        )
+        self._reid_demo.start()
+
         # Multi-node trilateration demo — 3 fixed nodes + 3 moving BLE targets.
         # Feeds fleet.ble_presence events so the trilateration engine computes
         # live positions from 3 RSSI readings per target.
@@ -189,6 +200,10 @@ class DemoController:
         if self._rl_training is not None:
             self._rl_training.stop()
             self._rl_training = None
+
+        if self._reid_demo is not None:
+            self._reid_demo.stop()
+            self._reid_demo = None
 
         if self._trilat_demo is not None:
             self._trilat_demo.stop()
@@ -265,6 +280,20 @@ class DemoController:
                     "interval": 3.0,
                 },
                 "training_store": rl_stats.get("training_store"),
+            })
+
+        if self._reid_demo is not None:
+            reid_stats = self._reid_demo.get_stats()
+            generators.append({
+                "name": "ReIDDemoGenerator",
+                "running": self._reid_demo.running,
+                "tick_count": self._reid_demo.tick_count,
+                "matches_found": self._reid_demo.matches_found,
+                "config": {
+                    "num_persons": 2,
+                    "interval": 2.0,
+                },
+                "reid_store": reid_stats.get("reid_store"),
             })
 
         if self._trilat_demo is not None:
