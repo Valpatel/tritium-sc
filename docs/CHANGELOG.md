@@ -14,6 +14,18 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-15 — Wave 131: Target Groups, Annotation Persistence, Kalman Filter
+
+| Change | Verification |
+|--------|-------------|
+| /api/target-groups CRUD — create named groups of targets, persist in SQLite, add/remove targets | 9 tests passing |
+| Annotations persisted to SQLite instead of in-memory dict — survive server restarts | 9 tests passing |
+| GeoJSON import/export for annotations (/api/annotations/export/geojson, /api/annotations/import/geojson) | Unit Tested |
+| Kalman filter predictor (engine/tactical/kalman_predictor.py) — tracks position + velocity + acceleration | 12 tests passing |
+| Kalman filter accounts for acceleration/turning, better predictions for vehicles at intersections | Unit Tested |
+
+---
+
 ## 2026-03-15 — Wave 129: RL Model Reset + Vehicle Tracking + ESC-50 Tests
 
 | Change | Verification |
