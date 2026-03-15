@@ -18,7 +18,9 @@ from __future__ import annotations
 import time
 from typing import Any, Optional
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
+
+from app.auth import require_auth
 
 router = APIRouter(tags=["events"])
 
@@ -214,6 +216,7 @@ async def unified_event_feed(
     limit: int = Query(100, ge=1, le=1000),
     since: Optional[float] = Query(None, description="Unix timestamp filter"),
     source: Optional[str] = Query(None, description="Filter by source: tactical, notification, audit, amy"),
+    user: dict = Depends(require_auth),
 ):
     """Unified event feed — all event sources merged chronologically.
 
@@ -246,6 +249,20 @@ async def unified_event_feed(
 
     # Apply limit
     all_events = all_events[:limit]
+
+    # Redact sensitive fields from audit entries (IPs, raw actor strings)
+    _REDACT_KEYS = {"ip_address", "client_ip", "remote_addr"}
+    for ev in all_events:
+        data = ev.get("data")
+        if isinstance(data, dict):
+            for key in _REDACT_KEYS:
+                if key in data:
+                    data[key] = "REDACTED"
+            meta = data.get("metadata")
+            if isinstance(meta, dict):
+                for key in _REDACT_KEYS:
+                    if key in meta:
+                        meta[key] = "REDACTED"
 
     # Count by source
     source_counts: dict[str, int] = {}

@@ -7,9 +7,10 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
 from app.audit_middleware import get_audit_store
+from app.auth import require_auth
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
 
@@ -22,6 +23,7 @@ async def list_audit_entries(
     resource: Optional[str] = Query(None),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
+    user: dict = Depends(require_auth),
 ):
     """Query audit log entries with optional filters."""
     store = get_audit_store()
@@ -43,7 +45,7 @@ async def list_audit_entries(
 
 
 @router.get("/stats")
-async def audit_stats():
+async def audit_stats(user: dict = Depends(require_auth)):
     """Get aggregate audit log statistics."""
     store = get_audit_store()
     if store is None:
