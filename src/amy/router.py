@@ -15,14 +15,21 @@ import re
 import time
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
+
+from app.auth import require_auth
 
 if TYPE_CHECKING:
     from .commander import Commander
 
-router = APIRouter(prefix="/api/amy", tags=["amy"])
+# All /api/amy/* endpoints require authentication when auth_enabled=True
+router = APIRouter(
+    prefix="/api/amy",
+    tags=["amy"],
+    dependencies=[Depends(require_auth)],
+)
 
 
 def _get_amy(request: Request) -> "Commander | None":

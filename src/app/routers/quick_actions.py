@@ -14,12 +14,50 @@ from __future__ import annotations
 
 import time
 import uuid
+from collections import defaultdict
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app.auth import require_auth
+
 router = APIRouter(prefix="/api/quick-actions", tags=["quick-actions"])
+
+
+# ---------------------------------------------------------------------------
+# Per-operator rate limiting for quick actions (max 10/min per operator)
+# ---------------------------------------------------------------------------
+
+_QUICK_ACTION_RATE_LIMIT = 10  # max actions per window
+_QUICK_ACTION_WINDOW = 60  # seconds
+
+
+class _OperatorRateTracker:
+    """Sliding window counter per operator for quick actions."""
+
+    __slots__ = ("_windows",)
+
+    def __init__(self) -> None:
+        # operator_id -> (window_start, count)
+        self._windows: dict[str, tuple[float, int]] = {}
+
+    def check_and_increment(self, operator_id: str) -> tuple[bool, int]:
+        """Check if operator is within rate limit. Returns (allowed, remaining)."""
+        now = time.monotonic()
+        entry = self._windows.get(operator_id)
+        if entry is None or (now - entry[0]) > _QUICK_ACTION_WINDOW:
+            self._windows[operator_id] = (now, 1)
+            return True, _QUICK_ACTION_RATE_LIMIT - 1
+        window_start, count = entry
+        new_count = count + 1
+        self._windows[operator_id] = (window_start, new_count)
+        if new_count > _QUICK_ACTION_RATE_LIMIT:
+            return False, 0
+        return True, _QUICK_ACTION_RATE_LIMIT - new_count
+
+
+_rate_tracker = _OperatorRateTracker()
 
 
 class QuickActionRequest(BaseModel):
@@ -52,12 +90,26 @@ def _log_action(action: dict) -> None:
 
 
 @router.post("", response_model=QuickActionResponse)
-async def execute_quick_action(request: Request, body: QuickActionRequest):
+async def execute_quick_action(
+    request: Request,
+    body: QuickActionRequest,
+    user: dict = Depends(require_auth),
+):
     """Execute a quick tactical action on a target.
 
+    Requires authentication. Rate limited to 10 actions/min per operator.
     Dispatches to the appropriate subsystem based on action_type.
     All actions are logged for audit trail.
     """
+    # Per-operator rate limiting
+    operator_id = user.get("sub", "unknown")
+    allowed, remaining = _rate_tracker.check_and_increment(operator_id)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded: max {_QUICK_ACTION_RATE_LIMIT} quick actions per minute",
+        )
+
     action_id = str(uuid.uuid4())
     now = time.time()
 
@@ -83,11 +135,12 @@ async def execute_quick_action(request: Request, body: QuickActionRequest):
     else:
         raise HTTPException(status_code=400, detail=f"Unknown action_type: {body.action_type}")
 
-    # Log the action
+    # Log the action (with operator attribution)
     _log_action({
         "action_id": action_id,
         "action_type": body.action_type,
         "target_id": body.target_id,
+        "operator": operator_id,
         "params": body.params,
         "notes": body.notes,
         "timestamp": now,
@@ -111,8 +164,8 @@ async def execute_quick_action(request: Request, body: QuickActionRequest):
 
 
 @router.get("/log")
-async def get_action_log(limit: int = 50):
-    """Get recent quick actions."""
+async def get_action_log(limit: int = 50, user: dict = Depends(require_auth)):
+    """Get recent quick actions. Requires authentication."""
     return {
         "actions": list(reversed(_action_log[-limit:])),
         "total": len(_action_log),

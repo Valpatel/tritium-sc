@@ -6,16 +6,20 @@
 PluginManager scans plugins/ for top-level *.py files. This file
 re-exports AmyCommanderPlugin so it's discoverable without modifying
 the plugin manager's scan logic.
+
+Uses importlib to load from the plugins/amy/ subdirectory directly,
+avoiding namespace collision with src/amy/ (the Amy commander source).
 """
 from __future__ import annotations
 
-import sys
+import importlib.util
 from pathlib import Path
 
-_plugins_dir = str(Path(__file__).resolve().parent)
-if _plugins_dir not in sys.path:
-    sys.path.insert(0, _plugins_dir)
+_plugin_path = Path(__file__).resolve().parent / "amy" / "plugin.py"
+_spec = importlib.util.spec_from_file_location("plugins_amy_plugin", str(_plugin_path))
+_mod = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_mod)
 
-from amy.plugin import AmyCommanderPlugin  # noqa: E402, F401
+AmyCommanderPlugin = _mod.AmyCommanderPlugin
 
 __all__ = ["AmyCommanderPlugin"]

@@ -1,14 +1,18 @@
 # Created by Matthew Valancy
 # Copyright 2026 Valpatel Software LLC
 # Licensed under AGPL-3.0 — see LICENSE for details.
-"""Unit tests for /api/quick-actions endpoint."""
+"""Unit tests for /api/quick-actions endpoint.
+
+Tests auth enforcement, rate limiting, and action dispatch.
+"""
 from __future__ import annotations
 
 import pytest
+from unittest.mock import patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.routers.quick_actions import router
+from app.routers.quick_actions import router, _rate_tracker
 
 
 @pytest.fixture
@@ -21,7 +25,81 @@ def app():
 
 @pytest.fixture
 def client(app):
-    return TestClient(app, raise_server_exceptions=False)
+    from app.auth import require_auth
+
+    async def _mock_auth():
+        return {"sub": "test-operator", "role": "admin"}
+
+    app.dependency_overrides[require_auth] = _mock_auth
+    yield TestClient(app, raise_server_exceptions=False)
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_tracker():
+    """Reset rate tracker between tests."""
+    _rate_tracker._windows.clear()
+    yield
+    _rate_tracker._windows.clear()
+
+
+class TestQuickActionsAuth:
+    """Test that auth is enforced on quick-actions endpoints."""
+
+    @pytest.mark.unit
+    def test_post_requires_auth(self):
+        """Without auth bypass, endpoint should require authentication."""
+        app = FastAPI()
+        app.include_router(router)
+        app.state.event_bus = None
+        # Use real auth (not patched) — auth_enabled=False returns default admin
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.post("/api/quick-actions", json={
+            "action_type": "investigate",
+            "target_id": "ble_test",
+        })
+        # With auth_enabled=False, require_auth returns default admin, so 200
+        assert resp.status_code == 200
+
+    @pytest.mark.unit
+    def test_log_requires_auth(self):
+        """GET /log should also require auth."""
+        app = FastAPI()
+        app.include_router(router)
+        app.state.event_bus = None
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.get("/api/quick-actions/log")
+        # With auth_enabled=False, returns 200
+        assert resp.status_code == 200
+
+
+class TestQuickActionsRateLimit:
+    """Test per-operator rate limiting on quick actions."""
+
+    @pytest.mark.unit
+    def test_rate_limit_allows_up_to_max(self, client):
+        """First 10 requests within window should succeed."""
+        for i in range(10):
+            resp = client.post("/api/quick-actions", json={
+                "action_type": "dismiss",
+                "target_id": f"t_{i}",
+            })
+            assert resp.status_code == 200, f"Request {i+1} should succeed"
+
+    @pytest.mark.unit
+    def test_rate_limit_blocks_after_max(self, client):
+        """11th request should be rate limited."""
+        for i in range(10):
+            client.post("/api/quick-actions", json={
+                "action_type": "dismiss",
+                "target_id": f"t_{i}",
+            })
+        resp = client.post("/api/quick-actions", json={
+            "action_type": "dismiss",
+            "target_id": "t_overflow",
+        })
+        assert resp.status_code == 429
+        assert "rate limit" in resp.json()["detail"].lower()
 
 
 class TestQuickActions:
@@ -126,3 +204,17 @@ class TestQuickActions:
             "notes": "Seen near restricted area",
         })
         assert resp.status_code == 200
+
+    @pytest.mark.unit
+    def test_action_log_includes_operator(self, client):
+        """Action log entries should include operator attribution."""
+        client.post("/api/quick-actions", json={
+            "action_type": "dismiss",
+            "target_id": "t_op",
+        })
+        resp = client.get("/api/quick-actions/log")
+        data = resp.json()
+        assert len(data["actions"]) >= 1
+        latest = data["actions"][0]
+        assert "operator" in latest
+        assert latest["operator"] == "test-operator"

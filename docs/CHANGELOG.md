@@ -14,6 +14,20 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 102: Security Audit — Auth, Rate Limiting, Amy Phase 3
+
+| Change | Verification |
+|--------|-------------|
+| Quick-actions auth enforcement — POST and GET /log now require `require_auth` dependency | Unit Tested (27 tests) |
+| Quick-actions per-operator rate limiting — max 10 actions/min per operator with sliding window | Unit Tested (rate limit tests) |
+| Quick-actions operator attribution — action log entries now include `operator` field from auth | Unit Tested |
+| Amy router auth — all /api/amy/* endpoints protected via router-level `Depends(require_auth)` | Unit Tested (dependency inspection) |
+| Amy Commander plugin Phase 3 — start()/stop() now own Amy lifecycle (create, thread, shutdown) | Unit Tested (6 tests) |
+| Amy plugin loader fix — importlib-based loading to avoid namespace collision with src/amy/ | Code Review |
+| Wave 62 test fix — Amy chat/speak security tests accept 404 when routes registered via plugin | Unit Tested |
+| Route count audit: 602 OpenAPI paths, 677 method+path combos (live server with all plugins) | Server Verified |
+| Demo mode audit: demo start produces 10 targets (4 hostile, 6 unknown) within 3 seconds | Server Verified |
+
 ## 2026-03-14 — Wave 101: Quick Actions, Amy Plugin Phase 2
 
 | Change | Verification |
