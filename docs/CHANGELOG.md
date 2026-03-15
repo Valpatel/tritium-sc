@@ -14,6 +14,16 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-15 — Wave 174: Combat Sim Verification and Fixes (Loop 4)
+
+| Change | Verification |
+|--------|-------------|
+| Kill feed visibility — elimination feed renders above map during combat | Visual (Playwright screenshots) |
+| Game HUD auto-open on countdown/active state | Visual (Playwright screenshots) |
+| Hostile marker clarity — improved visual distinction for hostile targets | Visual (Playwright screenshots) |
+
+---
+
 ## 2026-03-15 — Wave 165: Quality + Maintenance
 
 | Change | Verification |

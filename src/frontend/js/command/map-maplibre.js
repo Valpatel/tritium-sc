@@ -4205,7 +4205,8 @@ function _applyMarkerStyle(el, unit) {
     const firedEntry = _state.recentlyFired[unit.id];
     const inCombat = firedEntry && (performance.now() - firedEntry.time) < 3000;
     const firedTime = firedEntry ? Math.round(firedEntry.time / 100) : 0;  // 100ms granularity for re-fire detection
-    const styleHash = `${alliance}|${type}|${hpRatio.toFixed(2)}|${dead}|${selected}|${has3D}|${modelsVisible}|${_state.showLabels}|${_state.showHealthBars}|${_state.showSelectionFx}|${moraleState}|${unitSource}|${unit.name || ''}|${inCombat}|${firedTime}`;
+    const gamePhaseCurrent = (typeof TritiumStore !== 'undefined') ? (TritiumStore.get('game.phase') || 'idle') : 'idle';
+    const styleHash = `${alliance}|${type}|${hpRatio.toFixed(2)}|${dead}|${selected}|${has3D}|${modelsVisible}|${_state.showLabels}|${_state.showHealthBars}|${_state.showSelectionFx}|${moraleState}|${unitSource}|${unit.name || ''}|${inCombat}|${firedTime}|${gamePhaseCurrent}`;
     if (el._lastStyleHash === styleHash) return;
     el._lastStyleHash = styleHash;
 
@@ -4371,7 +4372,9 @@ function _applyMarkerStyle(el, unit) {
         // hostile = red diamond (rotated 45deg), friendly = blue/green circle, unknown = yellow square
         // robots (rover/drone/scout) = larger hexagonal marker for visual distinction
         const isRobotType = type.includes('rover') || type.includes('drone') || type.includes('scout') || type.includes('robot');
-        const size = isRobotType ? 30 : (alliance === 'hostile' ? 22 : 26);
+        const combatActive = (typeof TritiumStore !== 'undefined') && (TritiumStore.get('game.phase') === 'active' || TritiumStore.get('game.phase') === 'countdown');
+        const hostileSize = combatActive ? 28 : 22;
+        const size = isRobotType ? 30 : (alliance === 'hostile' ? hostileSize : 26);
         const pulse = (_state.showSelectionFx && alliance === 'hostile' && !dead) ? 'animation: hostile-pulse 1.5s ease-in-out infinite;' : '';
         const selGlow = selected && _state.showSelectionFx;
 
@@ -7929,12 +7932,34 @@ function _showGeofencePromptML(polygon) {
         });
     });
 
-    saveBtn.addEventListener('click', () => {
+    saveBtn.addEventListener('click', async () => {
         const name = nameInput.value.trim() || `Zone ${Date.now() % 10000}`;
         overlay.remove();
+        // Save zone directly to backend API (geofence panel may not be open)
+        try {
+            const resp = await fetch('/api/geofence/zones', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    polygon,
+                    zone_type: selectedType,
+                    alert_on_enter: true,
+                    alert_on_exit: true,
+                }),
+            });
+            if (resp.ok) {
+                EventBus.emit('toast:show', { message: `Zone "${name}" created`, type: 'info' });
+            } else {
+                EventBus.emit('toast:show', { message: 'Failed to create zone', type: 'alert' });
+            }
+        } catch (_) {
+            EventBus.emit('toast:show', { message: 'Failed to create zone', type: 'alert' });
+        }
+        // Still emit event so geofence panel refreshes if open
         EventBus.emit('geofence:zoneDrawn', { polygon, zone_type: selectedType, name });
         EventBus.emit('geofence:drawEnd', {});
-        // Trigger re-fetch to show the new zone
+        // Trigger re-fetch to show the new zone on map
         setTimeout(() => {
             _state._lastGeofenceFetch = 0;
             _updateGeofenceZones();

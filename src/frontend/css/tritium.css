@@ -3019,27 +3019,31 @@ button:disabled:hover {
 .war-elimination-feed,
 .war-kill-feed {
     position: absolute;
-    bottom: 270px;
+    top: 80px;
     right: 12px;
-    width: 280px;
+    width: 300px;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 4px;
     pointer-events: none;
     z-index: 150;
+    max-height: 40vh;
+    overflow: hidden;
 }
 .war-elimination-entry,
 .war-kill-entry {
-    background: rgba(10, 10, 20, 0.85);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 4px 8px;
+    background: rgba(10, 10, 20, 0.92);
+    border: 1px solid rgba(255, 42, 109, 0.25);
+    border-left: 3px solid #ff2a6d;
+    padding: 5px 10px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     display: flex;
     align-items: center;
     gap: 6px;
     animation: war-elimination-in 0.25s ease-out;
     border-radius: 2px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 .war-elimination-arrow,
 .war-kill-arrow {

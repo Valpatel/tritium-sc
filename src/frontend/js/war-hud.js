@@ -117,6 +117,10 @@ function warHudUpdateGameState(data) {
     if (_hudState.gameState === 'countdown' && !_hudState.countdownStarted) {
         _hudState.countdownStarted = true;
         warHudShowCountdown(Math.ceil(data.countdown || 5));
+        // Auto-open the game HUD panel so combat info is visible
+        if (typeof window.panelManager !== 'undefined' && window.panelManager && typeof window.panelManager.open === 'function') {
+            window.panelManager.open('game');
+        }
     }
     if (_hudState.gameState !== 'countdown') {
         _hudState.countdownStarted = false;
