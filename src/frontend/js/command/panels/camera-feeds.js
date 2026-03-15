@@ -357,6 +357,27 @@ export const CameraFeedsPanelDef = {
         EventBus.on('detection', onDetection);
         panel._unsubs.push(() => EventBus.off('detection', onDetection));
 
+        // Listen for camera:selected from map click — open the overlay for that camera
+        function onCameraSelected(evt) {
+            if (!evt || !evt.id) return;
+            // If cameras not loaded yet, wait and retry
+            if (cameras.length === 0) {
+                fetchCameras().then(() => {
+                    const camId = evt.id;
+                    if (cameras.find(c => c.id === camId)) {
+                        showOverlay(camId);
+                    }
+                });
+            } else {
+                const camId = evt.id;
+                if (cameras.find(c => c.id === camId)) {
+                    showOverlay(camId);
+                }
+            }
+        }
+        EventBus.on('camera:selected', onCameraSelected);
+        panel._unsubs.push(() => EventBus.off('camera:selected', onCameraSelected));
+
         // Initial fetch
         fetchCameras();
     },

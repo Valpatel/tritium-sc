@@ -8702,8 +8702,36 @@ export function centerOnAction() {
 // Shows camera icons on the tactical map for cameras that have lat/lng.
 
 const CAMERA_SOURCE_ID = 'tritium-camera-markers';
+const CAMERA_FOV_SOURCE_ID = 'tritium-camera-fov';
 const CAMERA_LAYER_CIRCLE = 'tritium-camera-circle';
 const CAMERA_LAYER_LABEL = 'tritium-camera-label';
+const CAMERA_LAYER_FOV = 'tritium-camera-fov-fill';
+const CAMERA_LAYER_FOV_LINE = 'tritium-camera-fov-line';
+
+/**
+ * Build a GeoJSON polygon for a camera FOV cone (sector shape).
+ * heading: degrees clockwise from north, fovAngle: total FOV in degrees,
+ * rangeMeterss: how far the cone extends from the camera.
+ */
+function _buildFovConePolygon(lng, lat, heading, fovAngle, rangeMeters) {
+    const steps = 24;
+    const halfFov = fovAngle / 2;
+    const startBearing = heading - halfFov;
+    const endBearing = heading + halfFov;
+    const coords = [[lng, lat]]; // start at camera position
+
+    for (let i = 0; i <= steps; i++) {
+        const bearing = startBearing + (endBearing - startBearing) * (i / steps);
+        const bearingRad = (bearing * Math.PI) / 180;
+        // Approximate: 1 degree lat ~ 111320m, 1 degree lng ~ 111320 * cos(lat)
+        const latRad = (lat * Math.PI) / 180;
+        const dLat = (rangeMeters * Math.cos(bearingRad)) / 111320;
+        const dLng = (rangeMeters * Math.sin(bearingRad)) / (111320 * Math.cos(latRad));
+        coords.push([lng + dLng, lat + dLat]);
+    }
+    coords.push([lng, lat]); // close the polygon
+    return coords;
+}
 
 function _onCamerasChanged(data) {
     if (!_state.map || !data || !data.cameras) return;
@@ -8723,6 +8751,26 @@ function _onCamerasChanged(data) {
             },
         })),
     };
+
+    // Build FOV cone polygons for cameras that have heading info
+    const fovFeatures = cameras.map(c => {
+        const heading = c.heading != null ? c.heading : 0;
+        const fovAngle = c.fov_angle || c.coverage_cone_angle || 60; // default 60 deg
+        const rangeM = c.fov_range || c.coverage_radius_meters || 30; // default 30m
+        const coords = _buildFovConePolygon(c.lng, c.lat, heading, fovAngle, rangeM);
+        return {
+            type: 'Feature',
+            properties: {
+                id: c.id || c.source_id || '',
+                status: c.status || 'offline',
+            },
+            geometry: {
+                type: 'Polygon',
+                coordinates: [coords],
+            },
+        };
+    });
+    const fovGeojson = { type: 'FeatureCollection', features: fovFeatures };
 
     if (_state.map.getSource(CAMERA_SOURCE_ID)) {
         _state.map.getSource(CAMERA_SOURCE_ID).setData(geojson);
@@ -8773,7 +8821,11 @@ function _onCamerasChanged(data) {
                 const props = e.features[0].properties;
                 const coords = e.features[0].geometry.coordinates;
                 _state.map.flyTo({ center: coords, zoom: 19, duration: 600 });
-                EventBus.emit('camera:selected', { id: props.id, name: props.name });
+                // Open the camera-feeds panel and focus on this camera
+                EventBus.emit('panel:request-open', { id: 'camera-feeds' });
+                setTimeout(() => {
+                    EventBus.emit('camera:selected', { id: props.id, name: props.name });
+                }, 200);
             }
         });
 
@@ -8784,6 +8836,47 @@ function _onCamerasChanged(data) {
         _state.map.on('mouseleave', CAMERA_LAYER_CIRCLE, () => {
             _state.map.getCanvas().style.cursor = '';
         });
+    }
+
+    // FOV cone layer
+    if (_state.map.getSource(CAMERA_FOV_SOURCE_ID)) {
+        _state.map.getSource(CAMERA_FOV_SOURCE_ID).setData(fovGeojson);
+    } else {
+        _state.map.addSource(CAMERA_FOV_SOURCE_ID, { type: 'geojson', data: fovGeojson });
+
+        // Semi-transparent fill for FOV cone
+        _state.map.addLayer({
+            id: CAMERA_LAYER_FOV,
+            type: 'fill',
+            source: CAMERA_FOV_SOURCE_ID,
+            paint: {
+                'fill-color': [
+                    'match', ['get', 'status'],
+                    'streaming', 'rgba(5, 255, 161, 0.12)',
+                    'connecting', 'rgba(252, 238, 10, 0.10)',
+                    'rgba(255, 42, 109, 0.08)',
+                ],
+                'fill-opacity': 0.7,
+            },
+        }, CAMERA_LAYER_CIRCLE); // insert below the circle layer
+
+        // Outline for FOV cone
+        _state.map.addLayer({
+            id: CAMERA_LAYER_FOV_LINE,
+            type: 'line',
+            source: CAMERA_FOV_SOURCE_ID,
+            paint: {
+                'line-color': [
+                    'match', ['get', 'status'],
+                    'streaming', '#05ffa1',
+                    'connecting', '#fcee0a',
+                    '#ff2a6d',
+                ],
+                'line-width': 1,
+                'line-opacity': 0.5,
+                'line-dasharray': [4, 3],
+            },
+        }, CAMERA_LAYER_CIRCLE); // insert below the circle layer
     }
 }
 
