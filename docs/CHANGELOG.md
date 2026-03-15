@@ -14,6 +14,15 @@ Changes tracked with verification status. All changes on `dev` branch.
 
 ---
 
+## 2026-03-14 — Wave 111: Capacity Benchmarks, WS Stress Tests, Demo RL Training
+
+| Change | Verification |
+|--------|-------------|
+| Target capacity benchmark: TargetTracker at 100/1K/5K/10K targets — update throughput 248K ops/s, get_all 1ms at 10K, summary 2.8ms at 10K, to_dict batch 4.2ms/1000 | 13 unit tests passing |
+| WebSocket stress test: 10/50/100 concurrent connections, broadcast delivery, connection cleanup verification | 5 tests (requires running server) |
+| Demo mode RL training generator: synthetic correlation decisions, BLE classifications, operator feedback at 3s interval; 5 min demo generates 100+ training examples exceeding retrain threshold | Integration tested |
+| RLTrainingGenerator integrated into DemoController with status reporting | Import tested |
+
 ## 2026-03-14 — Wave 110: RL Training Data Pipeline Wiring
 
 | Change | Verification |
