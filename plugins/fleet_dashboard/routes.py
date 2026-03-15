@@ -36,6 +36,13 @@ class ConfigTemplateRequest(BaseModel):
     settings: dict = Field(default_factory=dict)
 
 
+class DeviceStateRequest(BaseModel):
+    """Request body for POST /api/fleet/devices/{device_id}/state."""
+    state: str
+    reason: str = ""
+    operator: str = "api"
+
+
 class ApplyTemplateRequest(BaseModel):
     """Request body for POST /api/fleet/templates/{template_id}/apply."""
     target_group: str
@@ -64,6 +71,46 @@ def create_router(plugin: FleetDashboardPlugin) -> APIRouter:
     async def get_summary():
         """Fleet summary: online/offline/stale counts, avg battery, totals."""
         return plugin.get_summary()
+
+    @router.get("/health-summary")
+    async def get_health_summary():
+        """Aggregate fleet health: total devices, online/offline/stale counts,
+        average battery, average sighting rate, sensor health summary,
+        and lifecycle state distribution."""
+        return plugin.get_health_summary()
+
+    # -- Device lifecycle routes -------------------------------------------
+
+    @router.get("/devices/{device_id}/lifecycle")
+    async def get_device_lifecycle(device_id: str):
+        """Get lifecycle state for a specific device."""
+        lc = plugin.get_device_lifecycle(device_id)
+        if lc is None:
+            return {"device_id": device_id, "state": "active", "history": []}
+        return lc
+
+    @router.post("/devices/{device_id}/state")
+    async def set_device_state(device_id: str, request: DeviceStateRequest):
+        """Transition a device to a new lifecycle state.
+
+        Valid states: provisioning, active, maintenance, retired, error.
+        Transitions are validated against allowed state machine rules.
+        """
+        result = plugin.set_device_state(
+            device_id=device_id,
+            new_state=request.state,
+            reason=request.reason,
+            operator=request.operator,
+        )
+        if result.get("error"):
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+
+    @router.get("/lifecycle")
+    async def get_all_lifecycle():
+        """Get lifecycle states for all tracked devices."""
+        states = plugin.get_all_lifecycle_states()
+        return {"devices": states, "count": len(states)}
 
     @router.get("/devices/{device_id}/sparkline")
     async def get_device_sparkline(device_id: str):

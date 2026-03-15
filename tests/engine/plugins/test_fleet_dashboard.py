@@ -242,3 +242,153 @@ class TestFleetDashboardRoutes:
         assert "/api/fleet/devices" in paths
         assert "/api/fleet/devices/{device_id}" in paths
         assert "/api/fleet/summary" in paths
+        assert "/api/fleet/health-summary" in paths
+        assert "/api/fleet/lifecycle" in paths
+        assert "/api/fleet/devices/{device_id}/state" in paths
+        assert "/api/fleet/devices/{device_id}/lifecycle" in paths
+
+
+@pytest.mark.unit
+class TestFleetHealthSummary:
+    """Verify fleet health summary aggregation."""
+
+    def test_empty_fleet_health(self):
+        from plugins.fleet_dashboard.plugin import FleetDashboardPlugin
+        plugin = FleetDashboardPlugin()
+        health = plugin.get_health_summary()
+        assert health["total_devices"] == 0
+        assert health["online"] == 0
+        assert health["avg_battery_pct"] is None
+        assert health["sensor_health"]["ble"] == 0
+
+    def test_health_with_devices(self):
+        from plugins.fleet_dashboard.plugin import FleetDashboardPlugin
+        plugin = FleetDashboardPlugin()
+        plugin._on_heartbeat({
+            "device_id": "node-1",
+            "battery_pct": 80,
+            "ble_count": 10,
+            "wifi_count": 5,
+        })
+        plugin._on_heartbeat({
+            "device_id": "node-2",
+            "battery_pct": 60,
+            "ble_count": 0,
+            "wifi_count": 3,
+        })
+        health = plugin.get_health_summary()
+        assert health["total_devices"] == 2
+        assert health["online"] == 2
+        assert health["avg_battery_pct"] == 70.0
+        assert health["total_ble_sightings"] == 10
+        assert health["total_wifi_sightings"] == 8
+        assert health["sensor_health"]["ble"] == 1  # Only node-1 has BLE
+        assert health["sensor_health"]["wifi"] == 2  # Both have WiFi
+
+    def test_health_low_battery_count(self):
+        from plugins.fleet_dashboard.plugin import FleetDashboardPlugin
+        plugin = FleetDashboardPlugin()
+        plugin._on_heartbeat({"device_id": "low-bat", "battery_pct": 15})
+        plugin._on_heartbeat({"device_id": "ok-bat", "battery_pct": 80})
+        health = plugin.get_health_summary()
+        assert health["low_battery_count"] == 1
+
+    def test_health_lifecycle_counts(self):
+        from plugins.fleet_dashboard.plugin import FleetDashboardPlugin
+        plugin = FleetDashboardPlugin()
+        plugin._on_heartbeat({"device_id": "node-1"})
+        plugin._on_heartbeat({"device_id": "node-2"})
+        plugin.set_device_state("node-1", "active")
+        # Must go provisioning -> active -> maintenance
+        plugin.set_device_state("node-2", "active")
+        plugin.set_device_state("node-2", "maintenance", reason="firmware update")
+        health = plugin.get_health_summary()
+        # node-1 set to active via lifecycle, node-2 set to maintenance
+        assert health["lifecycle"]["active"] >= 1
+        assert health["lifecycle"]["maintenance"] == 1
+
+
+@pytest.mark.unit
+class TestDeviceLifecycle:
+    """Verify device lifecycle state management."""
+
+    def test_set_device_state(self):
+        from plugins.fleet_dashboard.plugin import FleetDashboardPlugin
+        plugin = FleetDashboardPlugin()
+        result = plugin.set_device_state("dev-1", "active")
+        assert result["state"] == "active"
+        assert result["device_id"] == "dev-1"
+
+    def test_valid_transition(self):
+        from plugins.fleet_dashboard.plugin import FleetDashboardPlugin
+        plugin = FleetDashboardPlugin()
+        plugin.set_device_state("dev-1", "active")
+        result = plugin.set_device_state("dev-1", "maintenance", reason="scheduled")
+        assert result["state"] == "maintenance"
+        assert result["transition_count"] == 2  # provisioning->active, active->maintenance
+
+    def test_invalid_transition(self):
+        from plugins.fleet_dashboard.plugin import FleetDashboardPlugin
+        plugin = FleetDashboardPlugin()
+        plugin.set_device_state("dev-1", "active")
+        result = plugin.set_device_state("dev-1", "provisioning")
+        assert "error" in result
+
+    def test_invalid_state(self):
+        from plugins.fleet_dashboard.plugin import FleetDashboardPlugin
+        plugin = FleetDashboardPlugin()
+        result = plugin.set_device_state("dev-1", "bogus")
+        assert "error" in result
+
+    def test_lifecycle_history(self):
+        from plugins.fleet_dashboard.plugin import FleetDashboardPlugin
+        plugin = FleetDashboardPlugin()
+        plugin.set_device_state("dev-1", "active")
+        plugin.set_device_state("dev-1", "maintenance")
+        lc = plugin.get_device_lifecycle("dev-1")
+        assert len(lc["history"]) == 2
+        assert lc["history"][0]["from_state"] == "provisioning"
+        assert lc["history"][0]["to_state"] == "active"
+        assert lc["history"][1]["from_state"] == "active"
+        assert lc["history"][1]["to_state"] == "maintenance"
+
+    def test_get_all_lifecycle(self):
+        from plugins.fleet_dashboard.plugin import FleetDashboardPlugin
+        plugin = FleetDashboardPlugin()
+        plugin.set_device_state("dev-1", "active")
+        plugin.set_device_state("dev-2", "active")
+        states = plugin.get_all_lifecycle_states()
+        assert len(states) == 2
+
+    def test_heartbeat_with_lifecycle_state(self):
+        from plugins.fleet_dashboard.plugin import FleetDashboardPlugin
+        plugin = FleetDashboardPlugin()
+        plugin._on_heartbeat({
+            "device_id": "edge-01",
+            "lifecycle_state": "active",
+        })
+        lc = plugin.get_device_lifecycle("edge-01")
+        assert lc is not None
+        assert lc["state"] == "active"
+
+    def test_same_state_noop(self):
+        from plugins.fleet_dashboard.plugin import FleetDashboardPlugin
+        plugin = FleetDashboardPlugin()
+        plugin.set_device_state("dev-1", "active")
+        result = plugin.set_device_state("dev-1", "active")
+        assert result["state"] == "active"
+        assert result["transition_count"] == 1  # Only the initial transition
+
+    def test_error_to_maintenance(self):
+        from plugins.fleet_dashboard.plugin import FleetDashboardPlugin
+        plugin = FleetDashboardPlugin()
+        plugin.set_device_state("dev-1", "error")
+        result = plugin.set_device_state("dev-1", "maintenance")
+        assert result["state"] == "maintenance"
+
+    def test_retired_to_provisioning(self):
+        from plugins.fleet_dashboard.plugin import FleetDashboardPlugin
+        plugin = FleetDashboardPlugin()
+        plugin.set_device_state("dev-1", "retired")
+        result = plugin.set_device_state("dev-1", "provisioning")
+        assert result["state"] == "provisioning"

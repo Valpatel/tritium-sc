@@ -27,6 +27,16 @@ PRUNE_TIMEOUT_S = 300  # 5 minutes
 TARGET_HISTORY_MAXLEN = 60  # Keep 60 data points per device (1 per minute = 1 hour)
 ANALYTICS_HISTORY_MAXLEN = 1440  # 24h at 1-minute granularity
 
+# Device lifecycle states
+DEVICE_STATES = {"provisioning", "active", "maintenance", "retired", "error"}
+VALID_STATE_TRANSITIONS = {
+    "provisioning": {"active", "error", "retired"},
+    "active": {"maintenance", "retired", "error"},
+    "maintenance": {"active", "retired", "error"},
+    "retired": {"provisioning"},
+    "error": {"maintenance", "provisioning", "retired"},
+}
+
 
 class FleetDashboardPlugin(EventDrainPlugin):
     """Aggregated fleet device registry with dashboard API."""
@@ -47,6 +57,9 @@ class FleetDashboardPlugin(EventDrainPlugin):
         self._fleet_commands: list[dict] = []  # command history
         self._config_templates: dict[str, dict] = {}  # template_id -> template
         self._analytics_history: list[dict] = []  # periodic snapshots
+
+        # Device lifecycle tracking: device_id -> {state, since, history}
+        self._lifecycle: dict[str, dict] = {}
 
         # Initialize built-in templates
         self._init_builtin_templates()
@@ -602,6 +615,20 @@ class FleetDashboardPlugin(EventDrainPlugin):
             if lng is not None:
                 existing["lng"] = lng
 
+            # Track device lifecycle state from heartbeat
+            device_lifecycle_state = data.get("lifecycle_state")
+            if device_lifecycle_state and device_lifecycle_state in DEVICE_STATES:
+                existing["lifecycle_state"] = device_lifecycle_state
+                # Auto-initialize lifecycle tracking if not already set
+                if device_id not in self._lifecycle:
+                    self._lifecycle[device_id] = {
+                        "device_id": device_id,
+                        "state": device_lifecycle_state,
+                        "state_since": now,
+                        "transition_count": 0,
+                        "history": [],
+                    }
+
             # Store mesh peer data for topology visualization
             mesh_peers = data.get("mesh_peers", data.get("peers", []))
             if mesh_peers:
@@ -617,6 +644,156 @@ class FleetDashboardPlugin(EventDrainPlugin):
             # Trim to max length
             if len(history) > TARGET_HISTORY_MAXLEN:
                 self._target_history[device_id] = history[-TARGET_HISTORY_MAXLEN:]
+
+    # -- Fleet health summary ----------------------------------------------
+
+    def get_health_summary(self) -> dict:
+        """Aggregate fleet health: device counts, avg battery, avg sighting rate,
+        sensor health summary, and lifecycle state distribution."""
+        devices = self.get_devices()
+        now = time.time()
+
+        online = sum(1 for d in devices if d["status"] == "online")
+        stale = sum(1 for d in devices if d["status"] == "stale")
+        offline = sum(1 for d in devices if d["status"] == "offline")
+
+        # Battery stats
+        batteries = [d["battery"] for d in devices if d.get("battery") is not None]
+        avg_battery = round(sum(batteries) / len(batteries), 1) if batteries else None
+        low_battery_count = sum(1 for b in batteries if b < 20)
+
+        # Sighting rates
+        total_ble = sum(d.get("ble_count", 0) for d in devices)
+        total_wifi = sum(d.get("wifi_count", 0) for d in devices)
+        avg_sighting_rate = 0.0
+        active_rates: list[float] = []
+        with self._lock:
+            for did, history in self._target_history.items():
+                if len(history) >= 2:
+                    last = history[-1]
+                    prev = history[-2]
+                    dt = last["ts"] - prev["ts"]
+                    if dt > 0:
+                        rate = (last["count"] - prev["count"]) / (dt / 60.0)
+                        active_rates.append(rate)
+        if active_rates:
+            avg_sighting_rate = round(sum(active_rates) / len(active_rates), 2)
+
+        # Sensor health: count devices with each sensor type active
+        sensor_summary: dict[str, int] = {"ble": 0, "wifi": 0, "camera": 0, "mesh": 0}
+        for d in devices:
+            if d.get("ble_count", 0) > 0:
+                sensor_summary["ble"] += 1
+            if d.get("wifi_count", 0) > 0:
+                sensor_summary["wifi"] += 1
+            if d.get("mesh_peers"):
+                sensor_summary["mesh"] += 1
+
+        # Uptime stats
+        uptimes = [d.get("uptime", 0) or 0 for d in devices]
+        avg_uptime_s = round(sum(uptimes) / len(uptimes), 1) if uptimes else 0.0
+
+        # Lifecycle state distribution
+        lifecycle_counts = {s: 0 for s in DEVICE_STATES}
+        with self._lock:
+            for did in self._lifecycle:
+                state = self._lifecycle[did].get("state", "active")
+                if state in lifecycle_counts:
+                    lifecycle_counts[state] += 1
+            # Devices without explicit lifecycle are considered active
+            tracked_ids = set(self._lifecycle.keys())
+            for d in devices:
+                did = d.get("device_id", "")
+                if did and did not in tracked_ids:
+                    lifecycle_counts["active"] += 1
+
+        return {
+            "total_devices": len(devices),
+            "online": online,
+            "stale": stale,
+            "offline": offline,
+            "avg_battery_pct": avg_battery,
+            "low_battery_count": low_battery_count,
+            "avg_sighting_rate_per_min": avg_sighting_rate,
+            "total_ble_sightings": total_ble,
+            "total_wifi_sightings": total_wifi,
+            "sensor_health": sensor_summary,
+            "avg_uptime_s": avg_uptime_s,
+            "lifecycle": lifecycle_counts,
+            "timestamp": now,
+        }
+
+    # -- Device lifecycle management ----------------------------------------
+
+    def get_device_lifecycle(self, device_id: str) -> Optional[dict]:
+        """Return lifecycle status for a device."""
+        with self._lock:
+            lc = self._lifecycle.get(device_id)
+            if lc:
+                return dict(lc)
+        return None
+
+    def set_device_state(
+        self, device_id: str, new_state: str, reason: str = "", operator: str = "system"
+    ) -> dict:
+        """Transition a device to a new lifecycle state.
+
+        Returns the updated lifecycle record or error dict.
+        """
+        if new_state not in DEVICE_STATES:
+            return {"error": f"Invalid state: {new_state}", "valid_states": sorted(DEVICE_STATES)}
+
+        now = time.time()
+        with self._lock:
+            lc = self._lifecycle.get(device_id)
+            if lc is None:
+                # First time — initialize
+                lc = {
+                    "device_id": device_id,
+                    "state": "provisioning",
+                    "state_since": now,
+                    "transition_count": 0,
+                    "history": [],
+                }
+
+            current_state = lc["state"]
+            allowed = VALID_STATE_TRANSITIONS.get(current_state, set())
+            if new_state not in allowed and current_state != new_state:
+                return {
+                    "error": f"Cannot transition from '{current_state}' to '{new_state}'",
+                    "allowed_transitions": sorted(allowed),
+                }
+
+            if current_state == new_state:
+                return dict(lc)
+
+            # Record transition
+            event = {
+                "from_state": current_state,
+                "to_state": new_state,
+                "timestamp": now,
+                "reason": reason,
+                "operator": operator,
+            }
+            lc["history"].append(event)
+            # Keep last 50 transitions
+            if len(lc["history"]) > 50:
+                lc["history"] = lc["history"][-50:]
+
+            lc["state"] = new_state
+            lc["state_since"] = now
+            lc["transition_count"] = lc.get("transition_count", 0) + 1
+            self._lifecycle[device_id] = lc
+
+        self._logger.info(
+            "Device %s: %s -> %s (reason: %s)", device_id, current_state, new_state, reason
+        )
+        return dict(lc)
+
+    def get_all_lifecycle_states(self) -> dict[str, dict]:
+        """Return lifecycle state for all tracked devices."""
+        with self._lock:
+            return {did: dict(lc) for did, lc in self._lifecycle.items()}
 
     # -- HTTP routes -------------------------------------------------------
 
