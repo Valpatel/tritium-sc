@@ -103,6 +103,7 @@ from app.routers.unified_events import router as unified_events_router
 from app.routers.fusion_dashboard import router as fusion_dashboard_router
 from app.routers.collaboration import router as collaboration_router
 from app.routers.forensics import router as forensics_router
+from app.routers.sensor_health import router as sensor_health_router
 
 
 # ---------------------------------------------------------------------------
@@ -1252,6 +1253,7 @@ app.include_router(unified_events_router)
 app.include_router(fusion_dashboard_router)
 app.include_router(collaboration_router)
 app.include_router(forensics_router)
+app.include_router(sensor_health_router)
 
 # Static files
 frontend_path = Path(__file__).parent.parent / "frontend"

@@ -80,6 +80,7 @@ import { DeploymentPanelDef } from './panels/deployment.js';
 import { FloorPlanPanelDef } from './panels/floorplan.js';
 import { BuildingOccupancyPanelDef } from './panels/building-occupancy.js';
 import { AnalyticsDashboardPanelDef } from './panels/analytics-dashboard.js';
+import { SensorHealthPanelDef } from './panels/sensor-health.js';
 import { initScreenshotHotkey } from './panels/map-screenshot.js';
 import { MissionModal, initMissionModal } from './mission-modal.js';
 import { initTargetCounter } from './target-counter.js';
@@ -601,6 +602,7 @@ function initPanelSystem(container) {
     panelManager.register(FloorPlanPanelDef);
     panelManager.register(BuildingOccupancyPanelDef);
     panelManager.register(AnalyticsDashboardPanelDef);
+    panelManager.register(SensorHealthPanelDef);
 
     // Enhanced map screenshot hotkey (Ctrl+Shift+P)
     initScreenshotHotkey();

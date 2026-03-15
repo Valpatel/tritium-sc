@@ -5130,3 +5130,122 @@
     text-align: center;
     padding: 20px;
 }
+
+/* ========================================
+   Sensor Health Panel
+   ======================================== */
+.sh-inner { display: flex; flex-direction: column; height: 100%; gap: 6px; }
+.sh-summary {
+    display: flex; align-items: center; gap: 12px;
+    padding: 6px 8px; border-bottom: 1px solid rgba(0,240,255,0.15);
+}
+.sh-stat { text-align: center; min-width: 50px; }
+.sh-stat-value { font-size: 1.2rem; font-weight: 600; display: block; }
+.sh-stat-label { font-size: 0.6rem; color: rgba(255,255,255,0.4); text-transform: uppercase; }
+.sh-alert-bar {
+    background: rgba(255,42,109,0.15); border: 1px solid rgba(255,42,109,0.4);
+    border-radius: 4px; padding: 4px 8px; font-size: 0.7rem; color: #ff2a6d;
+    display: flex; align-items: center; gap: 6px; margin: 0 4px;
+}
+.sh-alert-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #ff2a6d; color: #0a0a0f; font-weight: bold; font-size: 0.65rem;
+    flex-shrink: 0;
+}
+.sh-grid-wrap { flex: 1; overflow-y: auto; padding: 4px; }
+.sh-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 6px;
+}
+.sh-card {
+    background: rgba(14,14,20,0.8); border: 1px solid rgba(0,240,255,0.15);
+    border-radius: 4px; padding: 8px; transition: border-color 0.3s;
+}
+.sh-card-green { border-left: 3px solid #05ffa1; }
+.sh-card-yellow { border-left: 3px solid #fcee0a; }
+.sh-card-red { border-left: 3px solid #ff2a6d; animation: sh-pulse 2s infinite; }
+@keyframes sh-pulse {
+    0%, 100% { background: rgba(14,14,20,0.8); }
+    50% { background: rgba(255,42,109,0.08); }
+}
+.sh-card-header {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+}
+.sh-health-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.sh-card-name { font-size: 0.75rem; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sh-card-type { font-size: 0.6rem; color: rgba(255,255,255,0.3); text-transform: uppercase; }
+.sh-card-sparkline { margin: 4px 0; }
+.sh-sparkline { display: block; width: 100%; }
+.sh-card-footer {
+    display: flex; align-items: center; gap: 8px; font-size: 0.65rem;
+    color: rgba(255,255,255,0.5);
+}
+.sh-card-rate { color: var(--cyan, #00f0ff); }
+.sh-battery { color: var(--green, #05ffa1); }
+.sh-card-seen { margin-left: auto; }
+
+/* ========================================
+   Target Confidence Visualization
+   ======================================== */
+@keyframes confidence-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+.confidence-decaying {
+    animation: confidence-pulse 1.5s ease-in-out infinite;
+}
+
+/* ========================================
+   Velocity Anomaly Modal
+   ======================================== */
+.vel-anomaly-modal {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.85); display: flex;
+    align-items: center; justify-content: center; z-index: 2000;
+}
+.vel-anomaly-content {
+    background: var(--void, #0a0a0f); border: 1px solid var(--cyan, #00f0ff);
+    border-radius: 4px; padding: 16px; max-width: 500px; width: 90%;
+}
+.vel-anomaly-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px; border-bottom: 1px solid rgba(0,240,255,0.2);
+    padding-bottom: 8px;
+}
+.vel-anomaly-header h3 { margin: 0; color: var(--yellow, #fcee0a); font-size: 0.9rem; }
+.vel-chart {
+    display: flex; align-items: flex-end; gap: 2px; height: 80px;
+    background: rgba(0,0,0,0.3); padding: 4px; border-radius: 4px;
+    margin-bottom: 8px;
+}
+.vel-bar {
+    flex: 1; min-width: 3px; border-radius: 2px 2px 0 0;
+    transition: height 0.2s;
+}
+.vel-bar-normal { background: var(--cyan, #00f0ff); }
+.vel-bar-anomaly { background: var(--yellow, #fcee0a); }
+.vel-info { font-size: 0.75rem; color: rgba(255,255,255,0.6); }
+
+/* ========================================
+   Sensor Coverage Overlap
+   ======================================== */
+.coverage-toggle-row {
+    display: flex; align-items: center; gap: 8px; padding: 4px 0;
+}
+.coverage-toggle-swatch {
+    width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+.coverage-legend {
+    display: flex; gap: 12px; font-size: 0.6rem; color: rgba(255,255,255,0.5);
+    margin-top: 4px;
+}
+.coverage-legend-item {
+    display: flex; align-items: center; gap: 4px;
+}
+.coverage-legend-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+}
