@@ -645,14 +645,15 @@ body.v2 {
    ======================================== */
 .cc-toasts {
     position: fixed;
-    top: 72px;          /* Below header (36px) + command bar (28px) + gap (8px) */
+    bottom: 12px;       /* Anchor to bottom-right so they don't overlap alerts panel */
     right: 12px;
     width: 300px;
     display: flex;
-    flex-direction: column;
+    flex-direction: column-reverse;  /* Newest at bottom, stack upward */
     gap: 6px;
     z-index: 150;       /* Above panels (z:100), below command bar (z:200) */
     pointer-events: none;
+    max-height: 40vh;   /* Don't let toasts fill entire screen */
 }
 
 /* Toast item */
