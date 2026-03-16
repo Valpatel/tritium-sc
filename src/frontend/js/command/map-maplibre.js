@@ -9024,6 +9024,42 @@ export function toggleAllLayers() {
     console.log(`[MAP-ML] All layers ${target ? 'ON' : 'OFF'}`);
 }
 
+/** Deterministic set all layers to visible or hidden (no toggle guessing). */
+export function setAllLayers(visible) {
+    // Reuse toggleAllLayers internals but force the direction
+    setLayers({ allMapLayers: visible });
+
+    const fxKeys = [
+        'showGrid', 'showMesh', 'showPatrolRoutes',
+        'showHealthBars', 'showSelectionFx', 'showWeaponRange',
+        'showSquadHulls', 'showSwarmHull', 'showHostileObjectives', 'showHostileIntel',
+        'showCoverPoints', 'showHazardZones', 'showUnitSignals', 'showCrowdDensity',
+        'showThoughts',
+        'showTracers', 'showExplosions', 'showParticles', 'showHitFlashes', 'showFloatingText',
+        'showKillFeed', 'showScreenFx', 'showBanners', 'showLayerHud',
+        'showFog', 'showTerrain',
+    ];
+    for (const k of fxKeys) _state[k] = visible;
+
+    if (_state.threeEffectsRoot) _state.threeEffectsRoot.visible = visible;
+    const feed = _state.container?.querySelector('.fx-kill-feed');
+    if (feed) feed.style.display = visible ? '' : 'none';
+    if (_state.layerHud) _state.layerHud.style.display = visible ? '' : 'none';
+
+    if (_state.map) {
+        const vis = visible ? 'visible' : 'none';
+        if (_state.map.getLayer('grid-minor')) {
+            try { _state.map.setLayoutProperty('grid-minor', 'visibility', vis); } catch (e) {}
+        }
+        if (_state.map.getLayer('grid-major')) {
+            try { _state.map.setLayoutProperty('grid-major', 'visibility', vis); } catch (e) {}
+        }
+    }
+
+    _updateLayerHud();
+    console.log(`[MAP-ML] setAllLayers(${visible})`);
+}
+
 export function toggleTracers() {
     _state.showTracers = !_state.showTracers;
     _updateLayerHud();

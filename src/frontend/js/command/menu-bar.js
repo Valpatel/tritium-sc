@@ -155,9 +155,11 @@ function _mapMenuItems(mapActions) {
     const s = () => mapActions.getMapState();
     return [
         // Layer browser opens the full panel with all 43 layers
-        { label: 'Layer Browser...', shortcut: 'L',
+        { label: 'Open Layers Window...', shortcut: 'L',
           action: () => EventBus.emit('panel:request-open', { id: 'layers' }) },
-        { label: 'Toggle All Layers', action: () => mapActions.toggleAllLayers() },
+        { separator: true },
+        { label: 'Show All Layers', action: () => mapActions.setAllLayers(true) },
+        { label: 'Hide All Layers', action: () => mapActions.setAllLayers(false) },
         { separator: true },
         // Quick toggles for most-used layers
         { label: 'Satellite', shortcut: 'I', checkable: true, checked: () => s().showSatellite, action: () => mapActions.toggleSatellite() },
@@ -273,7 +275,7 @@ export function createMenuBar(container, panelManager, layoutManager, mapActions
 
     const menus = [
         { label: 'FILE',   tip: 'Save and export workspace layouts', getItems: () => _fileMenuItems(layoutManager) },
-        { label: 'VIEW',   tip: 'Show or hide panels (Amy, Units, Alerts, etc.)', getItems: () => _viewMenuItems(panelManager) },
+        { label: 'WINDOWS', tip: 'Show or hide panels (Amy, Units, Alerts, etc.)', getItems: () => _viewMenuItems(panelManager) },
         { label: 'LAYOUT', tip: 'Switch between saved workspace layouts', getItems: () => _layoutMenuItems(layoutManager) },
         { label: 'MAP',    tip: 'Map layers, camera, and display settings', getItems: () => _mapMenuItems(mapActions) },
         { label: 'GAME',   tip: 'Start battles and manage game state', getItems: () => _gameMenuItems(mapActions) },

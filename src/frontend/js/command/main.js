@@ -11,7 +11,7 @@ import { _esc } from './panel-utils.js';
 import { TritiumStore } from './store.js';
 import { EventBus } from './events.js';
 import { WebSocketManager } from './websocket.js';
-import { initMap, destroyMap, toggleSatellite, toggleRoads, toggleGrid, toggleBuildings, toggleFog, toggleTerrain, toggleUnits, toggleLabels, toggleModels, toggleWaterways, toggleParks, toggleMesh, toggleMeshNodes, toggleMeshLinks, toggleMeshCoverage, toggleThoughts, toggleAllLayers, toggleTracers, toggleExplosions, toggleParticles, toggleHitFlashes, toggleFloatingText, toggleKillFeed, toggleScreenFx, toggleBanners, toggleLayerHud, toggleHealthBars, toggleSelectionFx, getMapState, centerOnAction, resetCamera, zoomIn, zoomOut, toggleTilt, setLayers, setMapMode, toggleSquadHulls, toggleAutoFollow, toggleGeoLayers, togglePatrolRoutes, toggleWeaponRange, toggleHeatmap, toggleSwarmHull, toggleHazardZones, toggleHostileObjectives, toggleCrowdDensity, toggleCoverPoints, toggleUnitSignals, toggleHostileIntel, togglePredictionCones, toggleCoverageOverlap, toggleGeofenceZones } from './map-maplibre.js';
+import { initMap, destroyMap, toggleSatellite, toggleRoads, toggleGrid, toggleBuildings, toggleFog, toggleTerrain, toggleUnits, toggleLabels, toggleModels, toggleWaterways, toggleParks, toggleMesh, toggleMeshNodes, toggleMeshLinks, toggleMeshCoverage, toggleThoughts, toggleAllLayers, setAllLayers, toggleTracers, toggleExplosions, toggleParticles, toggleHitFlashes, toggleFloatingText, toggleKillFeed, toggleScreenFx, toggleBanners, toggleLayerHud, toggleHealthBars, toggleSelectionFx, getMapState, centerOnAction, resetCamera, zoomIn, zoomOut, toggleTilt, setLayers, setMapMode, toggleSquadHulls, toggleAutoFollow, toggleGeoLayers, togglePatrolRoutes, toggleWeaponRange, toggleHeatmap, toggleSwarmHull, toggleHazardZones, toggleHostileObjectives, toggleCrowdDensity, toggleCoverPoints, toggleUnitSignals, toggleHostileIntel, togglePredictionCones, toggleCoverageOverlap, toggleGeofenceZones } from './map-maplibre.js';
 import { PanelManager } from './panel-manager.js';
 import { LayoutManager } from './layout-manager.js';
 import { createMenuBar, focusSaveInput } from './menu-bar.js';
@@ -927,6 +927,7 @@ function initPanelSystem(container) {
             toggleMeshCoverage: () => (_activeMapModule ? _activeMapModule.toggleMeshCoverage() : toggleMeshCoverage()),
             toggleThoughts: () => (_activeMapModule ? _activeMapModule.toggleThoughts() : toggleThoughts()),
             toggleAllLayers: () => (_activeMapModule ? _activeMapModule.toggleAllLayers() : toggleAllLayers()),
+            setAllLayers: (v) => (_activeMapModule ? _activeMapModule.setAllLayers(v) : setAllLayers(v)),
             toggleTracers: () => (_activeMapModule ? _activeMapModule.toggleTracers() : toggleTracers()),
             toggleExplosions: () => (_activeMapModule ? _activeMapModule.toggleExplosions() : toggleExplosions()),
             toggleParticles: () => (_activeMapModule ? _activeMapModule.toggleParticles() : toggleParticles()),

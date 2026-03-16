@@ -158,6 +158,10 @@ export const LayersPanelDef = {
         const el = document.createElement('div');
         el.className = 'layers-panel-inner';
         el.innerHTML = `
+            <div class="layers-global-controls" style="display:flex;gap:4px;padding:4px 8px;border-bottom:1px solid #00f0ff33;">
+                <button class="layers-btn-show-all" style="flex:1;background:#1a1a2e;color:#05ffa1;border:1px solid #05ffa133;padding:3px 8px;cursor:pointer;font-family:inherit;font-size:11px;" title="Show all map layers">SHOW ALL</button>
+                <button class="layers-btn-hide-all" style="flex:1;background:#1a1a2e;color:#ff2a6d;border:1px solid #ff2a6d33;padding:3px 8px;cursor:pointer;font-family:inherit;font-size:11px;" title="Hide all map layers">HIDE ALL</button>
+            </div>
             <div class="layers-search-bar">
                 <input type="text" class="layers-search" placeholder="Search layers..." data-bind="search" title="Type to filter layers by name, description, or data source" />
             </div>
@@ -177,6 +181,16 @@ export const LayersPanelDef = {
         EventBus.on('layers:set-map-actions', (actions) => { mapActions = actions; render(); });
         // Request map actions
         EventBus.emit('layers:request-map-actions');
+
+        // Global Show/Hide All buttons
+        const showAllBtn = bodyEl.querySelector('.layers-btn-show-all');
+        const hideAllBtn = bodyEl.querySelector('.layers-btn-hide-all');
+        if (showAllBtn) showAllBtn.addEventListener('click', () => {
+            if (mapActions && mapActions.setAllLayers) { mapActions.setAllLayers(true); render(); }
+        });
+        if (hideAllBtn) hideAllBtn.addEventListener('click', () => {
+            if (mapActions && mapActions.setAllLayers) { mapActions.setAllLayers(false); render(); }
+        });
 
         // Fetch GIS catalog for dynamic layer entries
         fetch('/api/geo/layers/catalog')
@@ -352,6 +366,10 @@ export const LayersPanelDef = {
                 html += `<span class="layer-cat-chevron">&#9660;</span>`;
                 html += `<span class="layer-cat-name">${_esc(cat.name)}</span>`;
                 html += `<span class="layer-cat-desc">${_esc(cat.description)}</span>`;
+                html += `<span class="layer-cat-actions" style="margin-left:auto;display:flex;gap:2px;">`;
+                html += `<button class="layer-cat-show-all" data-cat-action="show" data-cat-name="${_esc(cat.name)}" style="background:none;border:1px solid #05ffa133;color:#05ffa1;font-size:9px;padding:1px 4px;cursor:pointer;" title="Show all in ${_esc(cat.name)}">ALL</button>`;
+                html += `<button class="layer-cat-hide-all" data-cat-action="hide" data-cat-name="${_esc(cat.name)}" style="background:none;border:1px solid #ff2a6d33;color:#ff2a6d;font-size:9px;padding:1px 4px;cursor:pointer;" title="Hide all in ${_esc(cat.name)}">NONE</button>`;
+                html += `</span>`;
                 html += `</div>`;
                 html += `<div class="layer-cat-body">`;
 
@@ -507,10 +525,32 @@ export const LayersPanelDef = {
                 });
             }
 
-            // Bind category collapse/expand
+            // Bind category collapse/expand (only on chevron/name, not action buttons)
             for (const hdr of treeEl.querySelectorAll('.layer-cat-header')) {
-                hdr.addEventListener('click', () => {
+                hdr.addEventListener('click', (e) => {
+                    // Don't collapse when clicking ALL/NONE buttons
+                    if (e.target.closest('.layer-cat-actions')) return;
                     hdr.parentElement.classList.toggle('expanded');
+                });
+            }
+
+            // Bind per-category Show All / Hide All buttons
+            for (const btn of treeEl.querySelectorAll('.layer-cat-show-all, .layer-cat-hide-all')) {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const catName = btn.dataset.catName;
+                    const show = btn.dataset.catAction === 'show';
+                    // Find all layers in this category and toggle them
+                    const cat = LAYER_CATEGORIES.find(c => c.name === catName);
+                    if (!cat) return;
+                    for (const layer of cat.layers) {
+                        if (!layer.key) continue;
+                        const isOn = getState(layer.key);
+                        if ((show && !isOn) || (!show && isOn)) {
+                            toggleLayer(layer);
+                        }
+                    }
+                    render();
                 });
             }
         }
