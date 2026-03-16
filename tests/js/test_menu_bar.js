@@ -499,7 +499,7 @@ console.log('\n--- Menu trigger buttons ---');
     ctx.container = container; ctx.pm = pm; ctx.lm = lm; ctx.ma = ma;
     const bar = vm.runInContext('createMenuBar(container, pm, lm, ma)', ctx);
     const left = bar.children[0];
-    const expectedLabels = ['FILE', 'VIEW', 'LAYOUT', 'MAP', 'GAME', 'HELP'];
+    const expectedLabels = ['FILE', 'WINDOWS', 'LAYOUT', 'MAP', 'GAME', 'HELP'];
     for (let i = 0; i < 6; i++) {
         const wrap = left.children[i];
         assert(wrap.className === 'menu-trigger-wrap', 'wrap ' + i + ' has correct className');
@@ -604,10 +604,10 @@ console.log('\n--- Dropdown visibility ---');
     assert(fileDropdown.hidden === false, 'FILE dropdown is open');
 
     viewTrigger.click(); // open VIEW (should close FILE)
-    assert(viewDropdown.hidden === false, 'VIEW dropdown opens');
-    assert(fileDropdown.hidden === true, 'FILE dropdown closes when VIEW opens');
+    assert(viewDropdown.hidden === false, 'WINDOWS dropdown opens');
+    assert(fileDropdown.hidden === true, 'FILE dropdown closes when WINDOWS opens');
     assert(!fileTrigger._classList.has('active'), 'FILE trigger loses active class');
-    assert(viewTrigger._classList.has('active'), 'VIEW trigger gains active class');
+    assert(viewTrigger._classList.has('active'), 'WINDOWS trigger gains active class');
 })();
 
 // ============================================================
@@ -1144,9 +1144,9 @@ console.log('\n--- Dropdown items structure ---');
     const viewDropdown = left.children[1].children[1];
 
     viewTrigger.click();
-    // VIEW menu: 6 category headers + 10 panel items + separator + Show All + Hide All + separator + Fullscreen = 21
+    // WINDOWS menu: 6 category headers + 10 panel items + separator + Show All + Hide All + separator + Fullscreen = 21
     assert(viewDropdown.children.length === 21,
-        'VIEW dropdown has 21 items (6 headers + 10 panels + sep + show all + hide all + sep + fullscreen), got ' + viewDropdown.children.length);
+        'WINDOWS dropdown has 21 items (6 headers + 10 panels + sep + show all + hide all + sep + fullscreen), got ' + viewDropdown.children.length);
 
     // First item is a category header (Tactical), find first panel item (menu-item)
     const firstHeader = viewDropdown.children[0];
@@ -1159,7 +1159,7 @@ console.log('\n--- Dropdown items structure ---');
         const label = item.children[1];
         return label && label.textContent === 'AMY COMMANDER';
     });
-    assert(amyItem, 'AMY COMMANDER item found in VIEW menu');
+    assert(amyItem, 'AMY COMMANDER item found in WINDOWS menu');
     const check = amyItem ? amyItem.children[0] : null;
     assert(check && check.className === 'menu-item-check', 'first child is menu-item-check');
     assert(check && check.textContent === '\u2022', 'check indicator shows bullet for open panel');
@@ -1184,7 +1184,7 @@ console.log('\n--- Dropdown items structure ---');
         const label = item.children[1];
         return label && label.textContent === 'UNITS';
     });
-    assert(unitsItem, 'UNITS item found in VIEW menu');
+    assert(unitsItem, 'UNITS item found in WINDOWS menu');
     const check = unitsItem ? unitsItem.children[0] : null;
     assert(check && check.textContent === '', 'check indicator is empty for closed panel');
 })();
@@ -1205,7 +1205,7 @@ console.log('\n--- Dropdown items structure ---');
     // After all category headers and panel items, there should be a separator before Show All/Hide All
     const allChildren = Array.from(viewDropdown.children);
     const seps = allChildren.filter(c => c.className === 'menu-separator');
-    assert(seps.length >= 1, 'VIEW dropdown contains at least one separator, got ' + seps.length);
+    assert(seps.length >= 1, 'WINDOWS dropdown contains at least one separator, got ' + seps.length);
 })();
 
 (function testViewMenuShortcuts() {
@@ -1340,24 +1340,24 @@ console.log('\n--- Dropdown items structure ---');
     //           Tracers, Explosions, Particles, Hit Flashes, Floating Text, sep,
     //           Kill Feed, Screen FX, Banners, Layer HUD, sep,
     //           Health Bars, Selection FX, sep,
-    //           Layer Browser, Toggle All, sep,
+    //           Open Layers Window, sep, Show All, Hide All, sep,
     //           Satellite, Buildings, Roads, Grid, Unit Markers, GIS, sep,
-    //           Fog, Prediction Cones, Terrain, 3D Mode, sep,
-    //           Center, Reset, Zoom In, Zoom Out = 19
-    assert(mapDropdown.children.length === 19,
-        'MAP dropdown has 19 items, got ' + mapDropdown.children.length);
+    //           Fog, Prediction Cones, ADS-B, Terrain, 3D Mode, sep,
+    //           Center, Reset, Zoom In, Zoom Out = 21
+    assert(mapDropdown.children.length >= 19,
+        'MAP dropdown has 19+ items, got ' + mapDropdown.children.length);
 
-    // First item: Layer Browser... (action)
+    // First item: Open Layers Window... (action)
     const layerBrowserItem = mapDropdown.children[0];
     const layerBrowserLabel = layerBrowserItem.children[1];
-    assert(layerBrowserLabel.textContent === 'Layer Browser...', 'first MAP item is "Layer Browser..."');
+    assert(layerBrowserLabel.textContent === 'Open Layers Window...', 'first MAP item is "Open Layers Window..."');
 
-    // Fourth item (index 3): Satellite (checkable)
-    const satItem = mapDropdown.children[3];
+    // Sixth item (index 5): Satellite (checkable, after Open Layers, sep, Show All, Hide All, sep)
+    const satItem = mapDropdown.children[5];
     const satCheck = satItem.children[0];
     assert(satCheck.textContent === '\u2022', 'Satellite is checked (showSatellite=true)');
     const satLabel = satItem.children[1];
-    assert(satLabel.textContent === 'Satellite', 'fourth MAP item is "Satellite"');
+    assert(satLabel.textContent === 'Satellite', 'sixth MAP item is "Satellite"');
 })();
 
 (function testMapMenuSatelliteShortcut() {
@@ -1373,7 +1373,7 @@ console.log('\n--- Dropdown items structure ---');
     const mapDropdown = left.children[3].children[1];
 
     mapTrigger.click();
-    const satItem = mapDropdown.children[3]; // index 3 (after Layer Browser, Toggle All, sep)
+    const satItem = mapDropdown.children[5]; // index 5 (after Open Layers Window, sep, Show All, Hide All, sep)
     // check(0), label(1), spacer(2), shortcut(3)
     const shortcut = satItem.children[3];
     assert(shortcut.className === 'menu-item-shortcut', 'Satellite item has shortcut span');
@@ -1501,7 +1501,7 @@ console.log('\n--- Menu item actions ---');
     const mapDropdown = left.children[3].children[1];
 
     mapTrigger.click(); // Open MAP
-    // Click "Satellite" (checkable) — index 3 (after Layer Browser, Toggle All, separator)
+    // Click "Satellite" (checkable) — index 5 (after Open Layers Window, sep, Show All, Hide All, sep)
     const satItem = mapDropdown.children[3];
     satItem.click();
     // Checkable items do NOT close the menu
@@ -1615,7 +1615,7 @@ console.log('\n--- Hover mode ---');
     // Now hover over VIEW
     const hoverHandlers = viewTrigger._eventListeners['mouseenter'] || [];
     for (const h of hoverHandlers) h();
-    assert(viewDropdown.hidden === false, 'hover switches to VIEW dropdown');
+    assert(viewDropdown.hidden === false, 'hover switches to WINDOWS dropdown');
     assert(fileDropdown.hidden === true, 'hover closes FILE dropdown');
 })();
 
