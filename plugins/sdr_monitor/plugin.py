@@ -417,6 +417,7 @@ class SDRMonitorPlugin(PluginInterface):
         topics = [
             (self._mqtt_topic, self._on_rtl433_mqtt),
             ("tritium/+/sdr/+/devices", self._on_rtl433_mqtt),
+            ("tritium/+/sdr/+/ism", self._on_rtl433_mqtt),
             ("tritium/+/sdr/+/adsb", self._on_adsb_mqtt),
             ("tritium/+/sdr/+/spectrum", self._on_spectrum_mqtt),
         ]

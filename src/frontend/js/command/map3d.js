@@ -537,19 +537,12 @@ function _initMaterials() {
     });
 
     // Zone materials
-    _state.materials.zoneRestricted = new THREE.MeshBasicMaterial({
-        color: 0xff2a6d, transparent: true, opacity: 0.02,
-        side: THREE.DoubleSide, depthWrite: false,
-    });
-    _state.materials.zonePerimeter = new THREE.MeshBasicMaterial({
-        color: 0x00f0ff, transparent: true, opacity: 0.015,
-        side: THREE.DoubleSide, depthWrite: false,
-    });
+    // Zone fill discs removed — only border rings rendered for clean map
     _state.materials.zoneBorderRestricted = new THREE.LineBasicMaterial({
-        color: 0xff2a6d, transparent: true, opacity: 0.35,
+        color: 0xff2a6d, transparent: true, opacity: 0.25,
     });
     _state.materials.zoneBorderPerimeter = new THREE.LineDashedMaterial({
-        color: 0x00f0ff, transparent: true, opacity: 0.18,
+        color: 0x00f0ff, transparent: true, opacity: 0.12,
         dashSize: 0.5, gapSize: 0.3,
     });
 
@@ -1008,17 +1001,8 @@ function _updateZones() {
         const radius = (zone.properties && zone.properties.radius) || 10;
         const isRestricted = (zone.type || '').includes('restricted');
 
-        // Filled disc
-        const discGeo = new THREE.CircleGeometry(radius, 48);
-        const discMat = isRestricted
-            ? _state.materials.zoneRestricted
-            : _state.materials.zonePerimeter;
-        const disc = new THREE.Mesh(discGeo, discMat);
-        disc.rotation.x = -Math.PI / 2;
+        // Zone filled disc removed — border ring only for clean NATO-style map
         const tp = gameToThree(wx, wy);
-        disc.position.set(tp.x, 0.02, tp.z);
-        _state.scene.add(disc);
-        _state.zoneMeshes.push(disc);
 
         // Border ring
         const ringPts = [];

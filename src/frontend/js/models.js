@@ -550,19 +550,7 @@ function createSensorModel() {
     domeRing.position.y = 0.6;
     g.add(domeRing);
 
-    // Detection radius disc on ground
-    const detectionRadius = 6;
-    const discGeo = new THREE.RingGeometry(detectionRadius - 0.15, detectionRadius, 32);
-    const discMat = new THREE.MeshBasicMaterial({
-        color: MODEL_COLORS.cyan, transparent: true, opacity: 0.03,
-        side: THREE.DoubleSide, depthWrite: false,
-    });
-    const disc = new THREE.Mesh(discGeo, discMat);
-    disc.rotation.x = -Math.PI / 2;
-    disc.position.y = 0.02;
-    g.add(disc);
-
-    // Inner fill disc removed — ring-only for clean map display
+    // Detection radius ring removed — was cluttering map with stacked cyan circles
 
     g.userData.unitType = 'sensor';
     return g;
