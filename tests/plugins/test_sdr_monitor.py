@@ -128,7 +128,7 @@ class TestSDRMonitorPlugin:
         assert p.plugin_id == "tritium.sdr_monitor"
         assert "SDR" in p.name
         assert "rtl_433" in p.name
-        assert p.version == "1.0.0"
+        assert p.version == "2.0.0"
         assert "data_source" in p.capabilities
         assert "routes" in p.capabilities
         assert "background" in p.capabilities
@@ -256,7 +256,7 @@ class TestSDRMonitorPlugin:
         p = self._make_plugin()
         import json
         payload = json.dumps({"model": "Bresser-5in1", "id": 100, "freq": 868.3})
-        p._on_mqtt_message("rtl_433/events", payload)
+        p._on_rtl433_mqtt("rtl_433/events", payload)
         assert p._stats["messages_received"] == 1
         devices = p.get_devices()
         assert len(devices) == 1
@@ -264,7 +264,7 @@ class TestSDRMonitorPlugin:
 
     def test_mqtt_invalid_json(self):
         p = self._make_plugin()
-        p._on_mqtt_message("rtl_433/events", "not json")
+        p._on_rtl433_mqtt("rtl_433/events", "not json")
         assert p._stats["messages_received"] == 0
 
     def test_configure_with_settings(self):
@@ -342,9 +342,9 @@ class TestSDRMonitorRoutes:
         plugin._logger = MagicMock()
         router = create_router(plugin)
         paths = [r.path for r in router.routes]
-        assert "/api/sdr_monitor/devices" in paths
-        assert "/api/sdr_monitor/spectrum" in paths
-        assert "/api/sdr_monitor/stats" in paths
-        assert "/api/sdr_monitor/signals" in paths
-        assert "/api/sdr_monitor/health" in paths
-        assert "/api/sdr_monitor/ingest" in paths
+        assert "/api/sdr/devices" in paths
+        assert "/api/sdr/spectrum" in paths
+        assert "/api/sdr/stats" in paths
+        assert "/api/sdr/signals" in paths
+        assert "/api/sdr/health" in paths
+        assert "/api/sdr/ingest" in paths

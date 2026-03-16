@@ -4900,12 +4900,12 @@ function _build3DUnit(unitType, alliance, id) {
         _addGeneric3D(group, color, dark, ms);
     }
 
-    // Holographic ground ring
-    const ringR = t.includes('turret') || t.includes('tank') ? 16 : 12;
-    _addGroundRing3D(group, color, ms, ringR);
+    // Holographic ground ring — disabled (clutters the map when units cluster)
+    // const ringR = t.includes('turret') || t.includes('tank') ? 16 : 12;
+    // _addGroundRing3D(group, color, ms, ringR);
 
-    // Faint vertical light beam
-    _addBeam3D(group, color, ms);
+    // Faint vertical light beam — disabled (clutters the map when units cluster)
+    // _addBeam3D(group, color, ms);
 
     // Scale up for dramatic visibility at neighborhood zoom levels
     const S = UNIT_3D.SCALE;
