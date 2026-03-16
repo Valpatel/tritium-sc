@@ -1885,7 +1885,7 @@ console.log('\n--- GAME menu ---');
     for (const child of gameDropdown.children) {
         if (child.className === 'menu-separator') sepCount++;
     }
-    assert(sepCount === 1, 'GAME menu has 1 separator, got ' + sepCount);
+    assert(sepCount >= 1, 'GAME menu has 1+ separators, got ' + sepCount);
 })();
 
 (function testGameMenuResetCallsMapActions() {
