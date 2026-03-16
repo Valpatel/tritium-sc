@@ -350,6 +350,7 @@ function makeMockMapActions() {
         toggleWeaponRange() { state.showWeaponRange = !state.showWeaponRange; calls.push('toggleWeaponRange'); },
         toggleHeatmap() { state.showHeatmap = !state.showHeatmap; calls.push('toggleHeatmap'); },
         toggleAllLayers() { calls.push('toggleAllLayers'); },
+        setAllLayers(v) { calls.push('setAllLayers'); },
         centerOnAction() { calls.push('centerOnAction'); },
         resetCamera() { calls.push('resetCamera'); },
         zoomIn() { calls.push('zoomIn'); },
@@ -1413,7 +1414,7 @@ console.log('\n--- Dropdown items structure ---');
 
     mapTrigger.click();
     // Separators at indices 2, 9, 13
-    assert(mapDropdown.children[2].className === 'menu-separator', 'MAP has separator at index 2 (after Toggle All)');
+    assert(mapDropdown.children[1].className === 'menu-separator', 'MAP has separator at index 1 (after Open Layers Window)');
     assert(mapDropdown.children[9].className === 'menu-separator', 'MAP has separator at index 9 (after quick toggles)');
     assert(mapDropdown.children[14].className === 'menu-separator', 'MAP has separator at index 14 (after view)');
 })();
@@ -1984,12 +1985,12 @@ console.log('\n--- GAME menu ---');
 })();
 
 // ============================================================
-// MAP menu — Toggle All button
+// MAP menu — Show All / Hide All buttons
 // ============================================================
 
-console.log('\n--- MAP menu — Toggle All button ---');
+console.log('\n--- MAP menu — Show All / Hide All buttons ---');
 
-(function testToggleAllIsFirstItem() {
+(function testShowHideAllInMapMenu() {
     clearDocListeners(); clearEventBus();
     const container = createMockElement('div');
     const pm = makeMockPanelManager(defaultPanels);
@@ -2002,15 +2003,22 @@ console.log('\n--- MAP menu — Toggle All button ---');
     const mapDropdown = left.children[3].children[1];
 
     mapTrigger.click();
-    const item = mapDropdown.children[1];
-    assert(item && item.className === 'menu-item',
-        'Toggle All is second item in MAP menu (index 1)');
-    const label = item.children[1];
-    assert(label.textContent === 'Toggle All Layers',
-        'Second MAP item label is "Toggle All Layers", got "' + label.textContent + '"');
+    // After: Open Layers Window, sep, Show All, Hide All, sep
+    const showAllItem = mapDropdown.children[2];
+    const hideAllItem = mapDropdown.children[3];
+    assert(showAllItem && showAllItem.className === 'menu-item',
+        'Show All Layers is at index 2 in MAP menu');
+    assert(hideAllItem && hideAllItem.className === 'menu-item',
+        'Hide All Layers is at index 3 in MAP menu');
+    const showLabel = showAllItem.children[1];
+    const hideLabel = hideAllItem.children[1];
+    assert(showLabel.textContent === 'Show All Layers',
+        'Show All label text, got "' + showLabel.textContent + '"');
+    assert(hideLabel.textContent === 'Hide All Layers',
+        'Hide All label text, got "' + hideLabel.textContent + '"');
 })();
 
-(function testToggleAllCallsAction() {
+(function testShowAllCallsSetAllLayers() {
     clearDocListeners(); clearEventBus();
     const container = createMockElement('div');
     const pm = makeMockPanelManager(defaultPanels);
@@ -2024,12 +2032,12 @@ console.log('\n--- MAP menu — Toggle All button ---');
 
     mapTrigger.click();
     ma._calls.length = 0;
-    mapDropdown.children[1].click();
-    assert(ma._calls.includes('toggleAllLayers'),
-        'Clicking Toggle All Layers calls toggleAllLayers');
+    mapDropdown.children[2].click(); // Show All
+    assert(ma._calls.includes('setAllLayers'),
+        'Clicking Show All Layers calls setAllLayers');
 })();
 
-(function testToggleAllFollowedBySeparator() {
+(function testSeparatorAfterHideAll() {
     clearDocListeners(); clearEventBus();
     const container = createMockElement('div');
     const pm = makeMockPanelManager(defaultPanels);
@@ -2042,9 +2050,9 @@ console.log('\n--- MAP menu — Toggle All button ---');
     const mapDropdown = left.children[3].children[1];
 
     mapTrigger.click();
-    const sep = mapDropdown.children[2];
+    const sep = mapDropdown.children[4];
     assert(sep && sep.className === 'menu-separator',
-        'Separator follows Toggle All at index 2');
+        'Separator follows Hide All at index 4');
 })();
 
 // ============================================================

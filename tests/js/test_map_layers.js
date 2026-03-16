@@ -253,7 +253,7 @@ console.log('\n--- menu-bar.js menu items ---');
 // NOTE: FX toggles moved to Layers panel (Layer Browser).
 // MAP menu now has simplified quick toggles only.
 const menuLabels = [
-    'Layer Browser...', 'Toggle All Layers',
+    'Open Layers Window...', 'Show All Layers', 'Hide All Layers',
     'Satellite', 'Buildings', 'Roads', 'Grid', 'Unit Markers',
     'GIS Intelligence', 'Fog of War', 'Terrain',
     'Center on Action', 'Reset Camera', 'Zoom In', 'Zoom Out',
