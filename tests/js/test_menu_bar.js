@@ -1332,8 +1332,9 @@ console.log('\n--- Dropdown items structure ---');
     mapTrigger.click();
     // Separators at indices 2, 9, 13
     assert(mapDropdown.children[1].className === 'menu-separator', 'MAP has separator at index 1 (after Open Layers Window)');
-    assert(mapDropdown.children[9].className === 'menu-separator', 'MAP has separator at index 9 (after quick toggles)');
-    assert(mapDropdown.children[14].className === 'menu-separator', 'MAP has separator at index 14 (after view)');
+    // Indices shifted +2 due to Show All / Hide All additions
+    assert(mapDropdown.children[11].className === 'menu-separator', 'MAP has separator at index 11 (after quick toggles)');
+    assert(mapDropdown.children[16].className === 'menu-separator', 'MAP has separator at index 16 (after view)');
 })();
 
 (function testHelpMenuItems() {
@@ -1349,14 +1350,15 @@ console.log('\n--- Dropdown items structure ---');
     const helpDropdown = left.children[5].children[1];
 
     helpTrigger.click();
-    assert(helpDropdown.children.length === 2, 'HELP dropdown has 2 items, got ' + helpDropdown.children.length);
+    assert(helpDropdown.children.length >= 4, 'HELP dropdown has 4+ items (shortcuts, conductor, feedback, about), got ' + helpDropdown.children.length);
     const kbItem = helpDropdown.children[0];
     const kbLabel = kbItem.children[1];
     assert(kbLabel.textContent === 'Keyboard Shortcuts', 'first HELP item is "Keyboard Shortcuts"');
 
-    const aboutItem = helpDropdown.children[1];
-    const aboutLabel = aboutItem.children[1];
-    assert(aboutLabel.textContent === 'About TRITIUM-SC', 'second HELP item is "About TRITIUM-SC"');
+    // About is the last item in HELP menu
+    const aboutItem = helpDropdown.children[helpDropdown.children.length - 1];
+    const aboutLabel = aboutItem.children ? aboutItem.children[1] : null;
+    assert(aboutLabel && aboutLabel.textContent === 'About TRITIUM-SC', 'last HELP item is "About TRITIUM-SC"');
 })();
 
 (function testHelpMenuKeyboardShortcut() {
