@@ -278,46 +278,78 @@ async def get_dossier(
 
     The ``signal_limit`` parameter caps the number of signals returned
     (most recent first) to prevent multi-megabyte responses for dossiers
-    with thousands of accumulated signals.
+    with thousands of accumulated signals.  Signals are loaded with a
+    SQL LIMIT clause so large dossiers remain fast.
     """
-    mgr = _get_manager(request)
     store = _get_store()
-
-    if mgr is not None:
-        dossier = mgr.get_dossier(dossier_id)
-    elif store is not None:
-        dossier = store.get_dossier(dossier_id)
-    else:
+    if store is None:
         raise HTTPException(status_code=503, detail="Dossier store unavailable")
 
-    if dossier is None:
+    # Load dossier metadata (without signals) directly from the store
+    try:
+        row = store._conn.execute(
+            "SELECT * FROM dossiers WHERE dossier_id = ?", (dossier_id,)
+        ).fetchone()
+    except Exception:
+        raise HTTPException(status_code=503, detail="Dossier store unavailable")
+
+    if row is None:
         raise HTTPException(status_code=404, detail="Dossier not found")
 
-    # Cap signal payload to avoid multi-megabyte responses
-    signals = dossier.get("signals", [])
-    if len(signals) > signal_limit:
-        dossier["signals"] = signals[:signal_limit]
-        dossier["signal_truncated"] = True
-        dossier["signal_total"] = len(signals)
+    dossier = store._row_to_dossier(row)
+
+    # Load signals with SQL LIMIT to avoid loading 20K+ rows
+    try:
+        signal_rows = store._conn.execute(
+            """SELECT * FROM dossier_signals
+               WHERE dossier_id = ?
+               ORDER BY timestamp DESC
+               LIMIT ?""",
+            (dossier_id, signal_limit),
+        ).fetchall()
+        dossier["signals"] = [store._row_to_signal(s) for s in signal_rows]
+
+        # Get total signal count efficiently
+        count_row = store._conn.execute(
+            "SELECT COUNT(*) as cnt FROM dossier_signals WHERE dossier_id = ?",
+            (dossier_id,),
+        ).fetchone()
+        total = count_row["cnt"] if count_row else len(signal_rows)
+        if total > signal_limit:
+            dossier["signal_truncated"] = True
+            dossier["signal_total"] = total
+    except Exception:
+        dossier["signals"] = []
+
+    # Load enrichments (typically few)
+    try:
+        enrich_rows = store._conn.execute(
+            """SELECT * FROM dossier_enrichments
+               WHERE dossier_id = ?
+               ORDER BY timestamp DESC""",
+            (dossier_id,),
+        ).fetchall()
+        dossier["enrichments"] = [store._row_to_enrichment(e) for e in enrich_rows]
+    except Exception:
+        dossier["enrichments"] = []
 
     # Add position history from signals
-    if store is not None:
-        try:
-            rows = store._conn.execute(
-                """SELECT position_x, position_y, timestamp, source
-                   FROM dossier_signals
-                   WHERE dossier_id = ? AND position_x IS NOT NULL AND position_y IS NOT NULL
-                   ORDER BY timestamp DESC
-                   LIMIT 20""",
-                (dossier_id,),
-            ).fetchall()
-            dossier["position_history"] = [
-                {"x": r["position_x"], "y": r["position_y"],
-                 "timestamp": r["timestamp"], "source": r["source"]}
-                for r in rows
-            ]
-        except Exception:
-            dossier["position_history"] = []
+    try:
+        pos_rows = store._conn.execute(
+            """SELECT position_x, position_y, timestamp, source
+               FROM dossier_signals
+               WHERE dossier_id = ? AND position_x IS NOT NULL AND position_y IS NOT NULL
+               ORDER BY timestamp DESC
+               LIMIT 20""",
+            (dossier_id,),
+        ).fetchall()
+        dossier["position_history"] = [
+            {"x": r["position_x"], "y": r["position_y"],
+             "timestamp": r["timestamp"], "source": r["source"]}
+            for r in pos_rows
+        ]
+    except Exception:
+        dossier["position_history"] = []
 
     return dossier
 
