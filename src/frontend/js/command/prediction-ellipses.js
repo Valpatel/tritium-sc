@@ -36,17 +36,17 @@ const MAX_RADIUS_M = 80;             // Max radius for very uncertain positions
 const SPEED_COMPRESSION = 0.4;       // How much speed compresses the longitudinal axis (0-1)
 
 const ALLIANCE_FILL = {
-    friendly: 'rgba(5, 255, 161, 0.08)',
-    hostile:  'rgba(255, 42, 109, 0.12)',
-    neutral:  'rgba(0, 160, 255, 0.08)',
-    unknown:  'rgba(252, 238, 10, 0.08)',
+    friendly: 'rgba(5, 255, 161, 0.03)',
+    hostile:  'rgba(255, 42, 109, 0.04)',
+    neutral:  'rgba(0, 160, 255, 0.03)',
+    unknown:  'rgba(252, 238, 10, 0.03)',
 };
 
 const ALLIANCE_STROKE = {
-    friendly: 'rgba(5, 255, 161, 0.35)',
-    hostile:  'rgba(255, 42, 109, 0.45)',
-    neutral:  'rgba(0, 160, 255, 0.35)',
-    unknown:  'rgba(252, 238, 10, 0.35)',
+    friendly: 'rgba(5, 255, 161, 0.15)',
+    hostile:  'rgba(255, 42, 109, 0.20)',
+    neutral:  'rgba(0, 160, 255, 0.15)',
+    unknown:  'rgba(252, 238, 10, 0.15)',
 };
 
 /**
@@ -135,7 +135,7 @@ export class PredictionEllipseManager {
     constructor() {
         this._map = null;
         this._timer = null;
-        this._visible = true;
+        this._visible = false;
         this._layersAdded = false;
         // Trail data shared from TargetTrailManager via the store
         this._trailData = new Map(); // unitId -> [{ lng, lat, time }]

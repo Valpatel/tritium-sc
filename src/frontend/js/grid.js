@@ -829,7 +829,7 @@ function updateAssetMarkers(assets) {
             // Add patrol path visualization
             const pathMaterial = new THREE.LineBasicMaterial({
                 color: COLORS.cyan,
-                opacity: 0.3,
+                opacity: 0.05,
                 transparent: true,
             });
             // Simple circle for patrol visualization

@@ -538,11 +538,11 @@ function _initMaterials() {
 
     // Zone materials
     _state.materials.zoneRestricted = new THREE.MeshBasicMaterial({
-        color: 0xff2a6d, transparent: true, opacity: 0.08,
+        color: 0xff2a6d, transparent: true, opacity: 0.02,
         side: THREE.DoubleSide, depthWrite: false,
     });
     _state.materials.zonePerimeter = new THREE.MeshBasicMaterial({
-        color: 0x00f0ff, transparent: true, opacity: 0.04,
+        color: 0x00f0ff, transparent: true, opacity: 0.015,
         side: THREE.DoubleSide, depthWrite: false,
     });
     _state.materials.zoneBorderRestricted = new THREE.LineBasicMaterial({

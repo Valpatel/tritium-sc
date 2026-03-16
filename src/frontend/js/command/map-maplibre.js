@@ -104,7 +104,7 @@ const _state = {
     showParks: true,           // parks / green areas
     showTerrain: false,        // 3D terrain mesh (DEM)
     terrainExaggeration: 1.5,  // vertical exaggeration factor
-    showGeoLayers: true,       // GIS data overlays
+    showGeoLayers: false,      // GIS data overlays (off by default — too noisy)
 
     // Layer visibility — tactical
     showGrid: false,

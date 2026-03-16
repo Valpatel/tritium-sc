@@ -354,14 +354,14 @@ function _initMaterials() {
     war3d.materials.zoneRestricted = new THREE.MeshBasicMaterial({
         color: 0xff2a6d,
         transparent: true,
-        opacity: 0.08,
+        opacity: 0.02,
         side: THREE.DoubleSide,
         depthWrite: false,
     });
     war3d.materials.zonePerimeter = new THREE.MeshBasicMaterial({
         color: 0x00f0ff,
         transparent: true,
-        opacity: 0.04,
+        opacity: 0.015,
         side: THREE.DoubleSide,
         depthWrite: false,
     });
