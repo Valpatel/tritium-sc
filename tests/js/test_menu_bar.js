@@ -903,8 +903,12 @@ console.log('\n--- Click outside ---');
 // 10. EventBus panel:opened/panel:closed syncs button state
 // ============================================================
 
-console.log('\n--- EventBus panel sync ---');
+console.log('\n--- EventBus panel sync (panel buttons removed Wave 158 — skipped) ---');
 
+// All panel button sync tests skipped — buttons no longer exist in toolbar.
+// Panel state is managed via WINDOWS menu + PanelManager.
+
+/* SKIPPED:
 (function testPanelOpenedAddsActiveClass() {
     clearDocListeners(); clearEventBus();
     const container = createMockElement('div');
@@ -975,6 +979,7 @@ console.log('\n--- EventBus panel sync ---');
     }
     assert(!threw, 'panel:opened with unknown id does not throw');
 })();
+END SKIPPED */
 
 // ============================================================
 // 11. Menu items: checkable, shortcuts, separators, delete buttons
