@@ -49,8 +49,8 @@ def launch_browser(playwright, headless=True, width=1920, height=1080):
 
 
 def navigate(page, url="http://localhost:8000", wait=5):
-    """Navigate to URL and wait for load."""
-    page.goto(url, timeout=20000)
+    """Navigate to URL and wait for DOM ready (not full load — WebGL/CDN can be slow)."""
+    page.goto(url, timeout=30000, wait_until="domcontentloaded")
     time.sleep(wait)
     return UIResult(success=True, message=f"Navigated to {url}")
 
