@@ -626,28 +626,12 @@ console.log('\n--- Quick-access panel buttons ---');
     ctx.container = container; ctx.pm = pm; ctx.lm = lm; ctx.ma = ma;
     const bar = vm.runInContext('createMenuBar(container, pm, lm, ma)', ctx);
     const right = bar.children[1];
-    // 1 search input + 10 panel buttons + 1 save input = 12 children
-    assert(right.children.length === 12, 'right has 12 children (search + 10 panel buttons + save input), got ' + right.children.length);
+    // Right section has at least 1 child (search or save input — panel buttons removed in Wave 158)
+    assert(right.children.length >= 1, 'right has 1+ children, got ' + right.children.length);
 })();
 
-(function testPanelButtonLabels() {
-    clearDocListeners(); clearEventBus();
-    const container = createMockElement('div');
-    const pm = makeMockPanelManager(defaultPanels);
-    const lm = makeMockLayoutManager();
-    const ma = makeMockMapActions();
-    ctx.container = container; ctx.pm = pm; ctx.lm = lm; ctx.ma = ma;
-    const bar = vm.runInContext('createMenuBar(container, pm, lm, ma)', ctx);
-    const right = bar.children[1];
-    // _shortLabel takes first word of title and uppercases it
-    // children[0] is the search input, panel buttons start at index 1
-    const expected = ['AMY', 'UNITS', 'ALERTS', 'GAME', 'MESH', 'CAMERA', 'INTEL', 'TAK', 'RECORDINGS', 'ZONES'];
-    for (let i = 0; i < expected.length; i++) {
-        const btn = right.children[i + 1];
-        assert(btn.textContent === expected[i],
-            'panel button ' + i + ' text is "' + expected[i] + '", got "' + btn.textContent + '"');
-    }
-})();
+// Panel buttons removed from toolbar in Wave 158 (use WINDOWS menu instead).
+// Skipping testPanelButtonLabels — no longer applicable.
 
 (function testPanelButtonClassName() {
     clearDocListeners(); clearEventBus();
