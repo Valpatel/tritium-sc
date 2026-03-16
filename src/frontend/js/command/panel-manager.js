@@ -97,7 +97,11 @@ export class Panel {
 
     unmount() {
         if (this.def.unmount) {
-            this.def.unmount(this.bodyEl);
+            try {
+                this.def.unmount(this.bodyEl, this);
+            } catch (err) {
+                console.warn(`[Panel] unmount error for '${this.id}':`, err);
+            }
         }
         for (const unsub of this._unsubs) unsub();
         this._unsubs.length = 0;
@@ -425,8 +429,10 @@ export class PanelManager {
         const panel = this._panels.get(id);
         if (!panel) return;
 
-        panel.unmount();
-        panel.hide();
+        try { panel.unmount(); } catch (err) {
+            console.warn(`[PanelManager] unmount error for '${id}':`, err);
+        }
+        panel.hide();  // ALWAYS hide, even if unmount fails
         this.saveLayout();
         EventBus.emit('panel:closed', { id });
     }
