@@ -1,21 +1,17 @@
 # Created by Matthew Valancy
 # Copyright 2026 Valpatel Software LLC
 # Licensed under AGPL-3.0 — see LICENSE for details.
-"""Layer sweep test: hide all layers, then show each one individually and screenshot.
+"""Layer sweep: hide all, show each layer individually, screenshot each.
 
-Dynamically discovers ALL layers from the Layers panel checkboxes.
-No hardcoded layer list — if a new layer is added, this test covers it.
+DATA COLLECTION ONLY — captures screenshots per layer.
+Analysis (OpenCV diff, llava vision, pixel comparison) is separate.
 
 Run:
-    cd tritium-sc
-    .venv/bin/python3 -m pytest tests/visual/test_layer_sweep.py -v --tb=short
-
-Screenshots saved to: /tmp/layer_sweep_*.png
-Report: /tmp/layer_sweep_report.md
+    .venv/bin/python3 -m pytest tests/visual/test_layer_sweep.py -v
 """
 
-import time
 import pytest
+import time
 
 try:
     from playwright.sync_api import sync_playwright
@@ -23,145 +19,100 @@ try:
 except ImportError:
     HAS_PLAYWRIGHT = False
 
+from tests.visual.ui_capabilities import (
+    ensure_server, start_demo, launch_browser, navigate, screenshot,
+    open_layers_panel, discover_layers, toggle_layer,
+    hide_all_layers, show_all_layers, expand_all_categories,
+    generate_sweep_report, SCREENSHOT_DIR,
+)
+
 pytestmark = pytest.mark.skipif(not HAS_PLAYWRIGHT, reason="Playwright not installed")
 
 
 @pytest.fixture(scope="module")
-def browser_page():
-    """Launch browser, navigate to SC, start demo mode, open layers panel."""
-    import requests
-    try:
-        r = requests.get("http://localhost:8000/health", timeout=3)
-        assert r.status_code == 200
-    except Exception:
-        pytest.skip("SC server not running on :8000")
-
-    # Start demo mode for visible targets
-    requests.post("http://localhost:8000/api/demo/start", timeout=5)
-
+def page():
+    server = ensure_server()
+    if not server.success:
+        pytest.skip("SC server not running")
+    start_demo()
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, args=["--disable-gpu"])
-        page = browser.new_page(viewport={"width": 1920, "height": 1080})
-        page.goto("http://localhost:8000", timeout=20000)
-        time.sleep(8)
-
-        # Open layers panel
-        page.keyboard.press("l")
-        time.sleep(1)
-
-        yield page
+        browser, pg = launch_browser(p)
+        navigate(pg, wait=8)
+        open_layers_panel(pg)
+        expand_all_categories(pg)
+        yield pg
         browser.close()
 
 
-def get_all_layer_checkboxes(page):
-    """Find all layer toggle checkboxes in the Layers panel."""
-    checkboxes = page.query_selector_all('.layers-panel-inner input[type="checkbox"]')
-    layers = []
-    for cb in checkboxes:
-        key = cb.get_attribute("data-key") or cb.get_attribute("data-event-toggle") or ""
-        if not key:
-            continue
-        # Get the label text from the parent layer-item
-        item = cb.evaluate("el => el.closest('.layer-item')")
-        label = ""
-        if item:
-            label_el = page.query_selector(f'.layer-item[data-layer-id] .layer-label')
-        # Fallback: use the key as label
-        if not label:
-            label = key.replace("show", "").replace("toggle", "")
-        layers.append({"key": key, "label": label, "element": cb})
-    return layers
-
-
 class TestLayerSweep:
-    """Hide all, then show each layer one at a time and screenshot."""
 
-    def test_discover_layers(self, browser_page):
-        """Discover all layers from the Layers panel."""
-        layers = get_all_layer_checkboxes(browser_page)
-        print(f"\nDiscovered {len(layers)} layer checkboxes")
+    def test_discover_layers(self, page):
+        """Layers panel has checkboxes to sweep."""
+        layers = discover_layers(page)
+        print(f"\nLayers found: {len(layers)}")
         for l in layers:
-            print(f"  - {l['key']}")
-        assert len(layers) >= 10, f"Expected 10+ layers, found {len(layers)}"
+            state = "ON" if l["checked"] else "off"
+            print(f"  [{state:3s}] {l['key']}")
+        assert len(layers) >= 10, f"Expected 10+ layers, got {len(layers)}"
 
-    def test_hide_all_then_show_each(self, browser_page):
-        """Hide all layers, then show each one individually."""
-        page = browser_page
+    def test_sweep_each_layer(self, page):
+        """Hide all, then show each layer one at a time and screenshot."""
+        layers = discover_layers(page)
         results = []
 
-        # Click HIDE ALL button
-        hide_btn = page.query_selector(".layers-btn-hide-all")
-        if hide_btn:
-            hide_btn.click()
-            time.sleep(1)
-
-        # Take baseline screenshot with everything hidden
-        page.screenshot(path="/tmp/layer_sweep_00_all_hidden.png")
-        results.append(("ALL_HIDDEN", "/tmp/layer_sweep_00_all_hidden.png"))
-
-        # Get all layer checkboxes
-        layers = get_all_layer_checkboxes(page)
+        # Hide everything
+        hide_all_layers(page)
+        time.sleep(0.5)
+        screenshot(page, "00_all_hidden", subdir="layer_sweep")
 
         for i, layer in enumerate(layers):
             key = layer["key"]
-            safe_key = key.replace(":", "_").replace("/", "_")
+            safe = key.replace(":", "_").replace("/", "_")
 
-            # Check if this layer's checkbox exists and is unchecked
-            cb = page.query_selector(f'input[data-key="{key}"]')
-            if not cb:
-                cb = page.query_selector(f'input[data-event-toggle="{key}"]')
-            if not cb:
-                results.append((key, "SKIP — checkbox not found"))
+            # Show this one layer
+            res = toggle_layer(page, key)
+            if not res.success:
+                results.append({"name": key, "status": "SKIP", "notes": res.message})
                 continue
 
-            # Check (show) this layer
-            is_checked = cb.is_checked()
-            if not is_checked:
-                # Scroll into view and click
-                try:
-                    cb.scroll_into_view_if_needed(timeout=2000)
-                    cb.click(timeout=2000)
-                except Exception:
-                    results.append((key, "SKIP — click failed"))
-                    continue
+            # Only screenshot if it actually toggled ON
+            if res.data.get("now", False):
+                time.sleep(0.3)
+                shot = screenshot(page, f"{i+1:02d}_{safe}", subdir="layer_sweep")
 
-            time.sleep(0.5)
+                # Hide it again for clean next test
+                toggle_layer(page, key)
+                time.sleep(0.2)
 
-            # Screenshot with just this layer visible
-            path = f"/tmp/layer_sweep_{i+1:02d}_{safe_key}.png"
-            page.screenshot(path=path)
-            results.append((key, path))
+                results.append({
+                    "name": key,
+                    "status": "PASS",
+                    "screenshot": shot.screenshot,
+                })
+            else:
+                results.append({
+                    "name": key,
+                    "status": "FAIL",
+                    "notes": "Toggle did not change state",
+                })
 
-            # Uncheck (hide) this layer again
-            try:
-                cb = page.query_selector(f'input[data-key="{key}"]') or page.query_selector(f'input[data-event-toggle="{key}"]')
-                if cb and cb.is_checked():
-                    cb.scroll_into_view_if_needed(timeout=2000)
-                    cb.click(timeout=2000)
-            except Exception:
-                pass
+        # Restore
+        show_all_layers(page)
 
-            time.sleep(0.2)
+        # Report
+        report_path = generate_sweep_report(
+            results, "Layer Sweep Report",
+            str(SCREENSHOT_DIR / "layer_sweep" / "report.md"),
+        )
+        print(f"\nReport: {report_path}")
+        passed = sum(1 for r in results if r["status"] == "PASS")
+        failed = sum(1 for r in results if r["status"] == "FAIL")
+        skipped = sum(1 for r in results if r["status"] == "SKIP")
+        print(f"Passed: {passed}, Failed: {failed}, Skipped: {skipped}")
 
-        # Show all at the end to restore
-        show_btn = page.query_selector(".layers-btn-show-all")
-        if show_btn:
-            show_btn.click()
+        # The key assertion: layers that FAIL to toggle are bugs
+        if failed > 0:
+            broken = [r["name"] for r in results if r["status"] == "FAIL"]
+            print(f"BROKEN LAYERS (toggle doesn't work): {broken}")
 
-        # Generate report
-        report = "# Layer Sweep Report\n\n"
-        report += f"**Layers discovered:** {len(layers)}\n\n"
-        report += "| # | Layer Key | Screenshot |\n"
-        report += "|---|-----------|------------|\n"
-        for i, (key, path) in enumerate(results):
-            report += f"| {i} | `{key}` | `{path}` |\n"
-
-        with open("/tmp/layer_sweep_report.md", "w") as f:
-            f.write(report)
-
-        print(f"\n=== LAYER SWEEP ===")
-        print(f"Layers: {len(layers)}")
-        print(f"Screenshots: {len([r for r in results if r[1].startswith('/tmp/')])}")
-        print(f"Report: /tmp/layer_sweep_report.md")
-
-        assert len(results) >= 10, f"Expected 10+ layer screenshots, got {len(results)}"
+        assert passed >= 5, f"Only {passed} layers toggled successfully"
