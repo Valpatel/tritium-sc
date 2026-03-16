@@ -169,11 +169,12 @@ export const LayersPanelDef = {
         const el = document.createElement('div');
         el.className = 'layers-panel-inner';
         el.innerHTML = `
-            <div class="layers-global-controls" style="display:flex;gap:4px;padding:4px 8px;border-bottom:1px solid #00f0ff33;">
-                <button class="layers-btn-show-all" style="flex:1;background:#1a1a2e;color:#05ffa1;border:1px solid #05ffa133;padding:3px 8px;cursor:pointer;font-family:inherit;font-size:11px;" title="Show all map layers">SHOW ALL</button>
-                <button class="layers-btn-hide-all" style="flex:1;background:#1a1a2e;color:#ff2a6d;border:1px solid #ff2a6d33;padding:3px 8px;cursor:pointer;font-family:inherit;font-size:11px;" title="Hide all map layers">HIDE ALL</button>
-                <button class="layers-btn-expand-all" style="flex:1;background:#1a1a2e;color:#00f0ff;border:1px solid #00f0ff33;padding:3px 8px;cursor:pointer;font-family:inherit;font-size:11px;" title="Expand all categories">EXPAND</button>
-                <button class="layers-btn-collapse-all" style="flex:1;background:#1a1a2e;color:#fcee0a;border:1px solid #fcee0a33;padding:3px 8px;cursor:pointer;font-family:inherit;font-size:11px;" title="Collapse all categories">COLLAPSE</button>
+            <div class="layers-global-controls" style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-bottom:1px solid #00f0ff33;">
+                <span style="color:#00f0ff88;font-size:10px;margin-right:2px;">ALL</span>
+                <button class="layers-btn-show-all" style="flex:1;background:#1a1a2e;color:#05ffa1;border:1px solid #05ffa133;padding:3px 6px;cursor:pointer;font-family:inherit;font-size:10px;" title="Show all map layers">SHOW</button>
+                <button class="layers-btn-hide-all" style="flex:1;background:#1a1a2e;color:#ff2a6d;border:1px solid #ff2a6d33;padding:3px 6px;cursor:pointer;font-family:inherit;font-size:10px;" title="Hide all map layers">HIDE</button>
+                <button class="layers-btn-expand-all" style="flex:1;background:#1a1a2e;color:#00f0ff;border:1px solid #00f0ff33;padding:3px 6px;cursor:pointer;font-family:inherit;font-size:10px;" title="Expand all categories">EXPAND</button>
+                <button class="layers-btn-collapse-all" style="flex:1;background:#1a1a2e;color:#fcee0a;border:1px solid #fcee0a33;padding:3px 6px;cursor:pointer;font-family:inherit;font-size:10px;" title="Collapse all categories">COLLAPSE</button>
             </div>
             <div class="layers-search-bar">
                 <input type="text" class="layers-search" placeholder="Search layers..." data-bind="search" title="Type to filter layers by name, description, or data source" />
