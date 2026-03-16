@@ -657,8 +657,8 @@ console.log('\n--- Save input ---');
     ctx.container = container; ctx.pm = pm; ctx.lm = lm; ctx.ma = ma;
     const bar = vm.runInContext('createMenuBar(container, pm, lm, ma)', ctx);
     const right = bar.children[1];
-    const saveInput = right.children[11]; // last child
-    assert(saveInput.className === 'command-bar-save-input', 'save input has correct className');
+    const saveInput = right.children[right.children.length - 1]; // last child
+    assert(saveInput && saveInput.className === 'command-bar-save-input', 'save input has correct className');
 })();
 
 (function testSaveInputStartsHidden() {
@@ -670,7 +670,7 @@ console.log('\n--- Save input ---');
     ctx.container = container; ctx.pm = pm; ctx.lm = lm; ctx.ma = ma;
     const bar = vm.runInContext('createMenuBar(container, pm, lm, ma)', ctx);
     const right = bar.children[1];
-    const saveInput = right.children[11];
+    const saveInput = right.children[right.children.length - 1];
     assert(saveInput.hidden === true, 'save input starts hidden');
 })();
 
@@ -683,7 +683,7 @@ console.log('\n--- Save input ---');
     ctx.container = container; ctx.pm = pm; ctx.lm = lm; ctx.ma = ma;
     const bar = vm.runInContext('createMenuBar(container, pm, lm, ma)', ctx);
     const right = bar.children[1];
-    const saveInput = right.children[11];
+    const saveInput = right.children[right.children.length - 1];
     assert(saveInput.type === 'text', 'save input type is "text"');
 })();
 
@@ -696,7 +696,7 @@ console.log('\n--- Save input ---');
     ctx.container = container; ctx.pm = pm; ctx.lm = lm; ctx.ma = ma;
     const bar = vm.runInContext('createMenuBar(container, pm, lm, ma)', ctx);
     const right = bar.children[1];
-    const saveInput = right.children[11];
+    const saveInput = right.children[right.children.length - 1];
     assert(saveInput.placeholder === 'Layout name...', 'save input has correct placeholder');
 })();
 
@@ -709,7 +709,7 @@ console.log('\n--- Save input ---');
     ctx.container = container; ctx.pm = pm; ctx.lm = lm; ctx.ma = ma;
     const bar = vm.runInContext('createMenuBar(container, pm, lm, ma)', ctx);
     const right = bar.children[1];
-    const saveInput = right.children[11];
+    const saveInput = right.children[right.children.length - 1];
     assert(saveInput.maxLength === 24, 'save input maxLength is 24');
 })();
 
@@ -722,7 +722,7 @@ console.log('\n--- Save input ---');
     ctx.container = container; ctx.pm = pm; ctx.lm = lm; ctx.ma = ma;
     const bar = vm.runInContext('createMenuBar(container, pm, lm, ma)', ctx);
     const right = bar.children[1];
-    const saveInput = right.children[11];
+    const saveInput = right.children[right.children.length - 1];
     saveInput.hidden = false;
     saveInput.value = 'test-layout';
     // Simulate Enter keydown
@@ -744,7 +744,7 @@ console.log('\n--- Save input ---');
     ctx.container = container; ctx.pm = pm; ctx.lm = lm; ctx.ma = ma;
     const bar = vm.runInContext('createMenuBar(container, pm, lm, ma)', ctx);
     const right = bar.children[1];
-    const saveInput = right.children[11];
+    const saveInput = right.children[right.children.length - 1];
     saveInput.hidden = false;
     const handlers = saveInput._eventListeners['keydown'];
     if (handlers && handlers.length > 0) {
@@ -762,7 +762,7 @@ console.log('\n--- Save input ---');
     ctx.container = container; ctx.pm = pm; ctx.lm = lm; ctx.ma = ma;
     const bar = vm.runInContext('createMenuBar(container, pm, lm, ma)', ctx);
     const right = bar.children[1];
-    const saveInput = right.children[11];
+    const saveInput = right.children[right.children.length - 1];
     saveInput.hidden = false;
     saveInput.value = '   '; // whitespace only
     const handlers = saveInput._eventListeners['keydown'];
@@ -787,7 +787,7 @@ console.log('\n--- focusSaveInput ---');
     ctx.container = container; ctx.pm = pm; ctx.lm = lm; ctx.ma = ma;
     const bar = vm.runInContext('createMenuBar(container, pm, lm, ma)', ctx);
     const right = bar.children[1];
-    const saveInput = right.children[11];
+    const saveInput = right.children[right.children.length - 1];
     saveInput.value = 'old-value';
 
     ctx._bar = bar;
