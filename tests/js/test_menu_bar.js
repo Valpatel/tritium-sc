@@ -2019,9 +2019,9 @@ for (const tt of _fxToggleTests) {
         const mapDropdown = left.children[3].children[1];
 
         mapTrigger.click();
-        const item = mapDropdown.children[tt.index];
-        assert(item && item.className === 'menu-item',
-            tt.label + ' menu item exists at index ' + tt.index);
+        const found = findMenuItem(mapDropdown, tt.label);
+        assert(found, tt.label + ' menu item found by label');
+        const item = found.item;
 
         const label = item.children[1];
         assert(label.textContent === tt.label,
@@ -2041,8 +2041,9 @@ for (const tt of _fxToggleTests) {
         const mapDropdown = left.children[3].children[1];
 
         mapTrigger.click();
-        const item = mapDropdown.children[tt.index];
-        const check = item.children[0];
+        const found = findMenuItem(mapDropdown, tt.label);
+        const item = found ? found.item : null;
+        const check = item ? item.children[0] : null;
         assert(check.textContent === '\u2022',
             tt.label + ' is checked when ' + tt.stateKey + '=true');
     })();
@@ -2061,7 +2062,8 @@ for (const tt of _fxToggleTests) {
 
         mapTrigger.click();
         ma._calls.length = 0;
-        mapDropdown.children[tt.index].click();
+        const found = findMenuItem(mapDropdown, tt.label);
+        if (found) found.item.click();
         assert(ma._calls.includes(tt.action),
             'Clicking ' + tt.label + ' calls ' + tt.action);
     })();
