@@ -99,7 +99,7 @@ class TestEffectCatalog:
         assert "nerf_shot" in combat
         assert "explosion" in combat
 
-    def test_sim_engine.effects_exist(self):
+    def test_game_effects_exist(self):
         game = [n for n, (c, _, _, _) in _EFFECT_CATALOG.items() if c == "game"]
         assert "wave_start" in game
         assert "victory_fanfare" in game
