@@ -239,6 +239,18 @@ const sandbox = {
 
 const ctx = vm.createContext(sandbox);
 
+// Helper: find menu item by label text in a dropdown
+function findMenuItem(dropdown, label) {
+    for (let i = 0; i < dropdown.children.length; i++) {
+        const item = dropdown.children[i];
+        if (item.children && item.children[1] && item.children[1].textContent === label) {
+            return { item, index: i };
+        }
+    }
+    return null;
+}
+
+
 // Load events.js (EventBus)
 const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8');
 const eventsPlain = eventsCode
