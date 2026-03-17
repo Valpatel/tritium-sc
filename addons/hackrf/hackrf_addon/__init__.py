@@ -234,8 +234,23 @@ class HackRFAddon(SensorAddon):
         while self._registered:
             try:
                 # Periodically re-check device availability
+                was_available = self.device.is_available
                 if not self.device.get_info():
-                    await self.device.detect()
+                    info = await self.device.detect()
+                    if not was_available and info and info.get("connected"):
+                        import logging
+                        logging.getLogger("hackrf").info("HackRF reconnected!")
+                    elif was_available and (not info or not info.get("connected")):
+                        import logging
+                        logging.getLogger("hackrf").warning("HackRF disconnected — stopping operations")
+                        # Stop all running operations gracefully
+                        if self.spectrum.is_running:
+                            await self.spectrum.stop_sweep()
+                        if self.rtl433.is_running:
+                            await self.rtl433.stop_monitoring()
+                        if self.continuous_scanner.is_running:
+                            await self.continuous_scanner.stop()
+                        self.radio_lock.force_release()
 
                 # Persist signal peaks and ADS-B aircraft to data store
                 if self.data_store:
