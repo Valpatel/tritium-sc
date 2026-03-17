@@ -110,16 +110,35 @@ def create_router(device, spectrum, receiver, fm_decoder=None, tpms_decoder=None
         return await spectrum.stop_sweep()
 
     @router.get("/sweep/data")
-    async def sweep_data():
-        """Get latest sweep data points.
+    async def sweep_data(max_points: int = 600):
+        """Get latest sweep data, downsampled for display.
 
-        Returns the most recent sweep as a list of {freq_hz, power_dbm} points.
+        Args:
+            max_points: Maximum number of points to return (default 600 = canvas width).
+                       The backend aggregates bins to fit. Use 0 for all raw data.
         """
         data = spectrum.get_data()
+        status = spectrum.get_status()
+
+        # Downsample if too many points
+        if max_points > 0 and len(data) > max_points:
+            step = len(data) / max_points
+            downsampled = []
+            for i in range(max_points):
+                start_idx = int(i * step)
+                end_idx = int((i + 1) * step)
+                chunk = data[start_idx:end_idx]
+                if chunk:
+                    # Take the max power in each bin (peak-hold)
+                    best = max(chunk, key=lambda p: p.get("power_dbm", -100))
+                    downsampled.append(best)
+            data = downsampled
+
         return {
             "data": data,
             "count": len(data),
-            "status": spectrum.get_status(),
+            "raw_count": status.get("measurement_count", 0),
+            "status": status,
         }
 
     @router.get("/sweep/peaks")

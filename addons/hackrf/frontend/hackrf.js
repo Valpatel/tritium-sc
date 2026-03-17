@@ -8,8 +8,8 @@
 import { _esc } from '/static/js/command/panel-utils.js';
 
 const API = '/api/addons/hackrf';
-const REFRESH_MS = 3000;
-const SWEEP_REFRESH_MS = 500;
+const REFRESH_MS = 5000;          // Status poll (not spectrum)
+const SWEEP_REFRESH_MS = 250;     // Spectrum data poll (fast for smooth waterfall)
 
 // ── Tab definitions ────────────────────────────────────────────────
 const TABS = [
@@ -224,7 +224,7 @@ export const HackRFPanelDef = {
 
         async function fetchSweepData() {
             try {
-                const r = await fetch(API + '/sweep/data');
+                const r = await fetch(API + '/sweep/data?max_points=600');
                 if (r.ok) {
                     const d = await r.json();
                     // Transform API format {data: [{freq_hz, power_dbm}]} to canvas format {freqs, powers}
@@ -424,14 +424,15 @@ export const HackRFPanelDef = {
                     </div>
                 </div>
 
-                <div class="hrf-section-label">SPECTRUM DISPLAY</div>
-                <div class="hrf-spectrum-canvas-wrap">
-                    <canvas data-bind="spectrum-canvas" width="600" height="200"></canvas>
+                <div class="hrf-section-label">SPECTRUM DISPLAY <span class="hrf-spectrum-readout" data-bind="crosshair-readout" style="float:right;color:#b060ff;font-size:0.7rem"></span></div>
+                <div class="hrf-spectrum-canvas-wrap" style="position:relative;cursor:crosshair">
+                    <canvas data-bind="spectrum-canvas" width="600" height="200" style="display:block"></canvas>
+                    <canvas data-bind="crosshair-canvas" width="600" height="200" style="position:absolute;top:0;left:0;pointer-events:none"></canvas>
                 </div>
 
                 <div class="hrf-section-label">WATERFALL</div>
-                <div class="hrf-spectrum-canvas-wrap">
-                    <canvas data-bind="waterfall-canvas" width="600" height="150"></canvas>
+                <div class="hrf-spectrum-canvas-wrap" style="position:relative">
+                    <canvas data-bind="waterfall-canvas" width="600" height="150" style="display:block"></canvas>
                 </div>
 
                 <div class="hrf-section-label">PEAK SIGNALS</div>
@@ -456,45 +457,94 @@ export const HackRFPanelDef = {
             });
 
             const waterfallCanvas = body.querySelector('[data-bind="waterfall-canvas"]');
+            const crosshairCanvas = body.querySelector('[data-bind="crosshair-canvas"]');
+            const readout = body.querySelector('[data-bind="crosshair-readout"]');
 
-            // Update waterfall history with latest sweep data
+            // Interactive crosshair on spectrum canvas
+            const canvasWrap = canvas?.parentElement;
+            if (canvasWrap && crosshairCanvas) {
+                canvasWrap.addEventListener('mousemove', (e) => {
+                    const rect = canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    const w = canvas.width;
+                    const h = canvas.height;
+
+                    // Draw crosshair on overlay canvas
+                    const ctx = crosshairCanvas.getContext('2d');
+                    ctx.clearRect(0, 0, w, h);
+                    ctx.strokeStyle = 'rgba(176, 96, 255, 0.6)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Calculate frequency and power at cursor
+                    if (sweepData && sweepData.freqs && sweepData.freqs.length > 0) {
+                        const idx = Math.floor((x / w) * sweepData.freqs.length);
+                        const freq = sweepData.freqs[Math.min(idx, sweepData.freqs.length - 1)];
+                        const power = sweepData.powers[Math.min(idx, sweepData.powers.length - 1)];
+                        const freqMhz = (freq / 1e6).toFixed(2);
+                        const powerStr = power.toFixed(1);
+                        if (readout) readout.textContent = `${freqMhz} MHz | ${powerStr} dBm`;
+
+                        // Draw value label at cursor
+                        ctx.fillStyle = 'rgba(10,10,15,0.85)';
+                        ctx.fillRect(x + 8, y - 20, 110, 18);
+                        ctx.fillStyle = '#b060ff';
+                        ctx.font = '10px monospace';
+                        ctx.fillText(`${freqMhz} MHz ${powerStr}dB`, x + 12, y - 7);
+                    }
+                });
+                canvasWrap.addEventListener('mouseleave', () => {
+                    crosshairCanvas.getContext('2d').clearRect(0, 0, crosshairCanvas.width, crosshairCanvas.height);
+                    if (readout) readout.textContent = '';
+                });
+            }
+
+            // Initial draw
             if (sweepData && sweepData.powers && sweepData.powers.length > 0) {
                 waterfallHistory.unshift(sweepData.powers.slice());
                 if (waterfallHistory.length > WATERFALL_MAX_ROWS) {
                     waterfallHistory.length = WATERFALL_MAX_ROWS;
                 }
             }
-
-            // Draw spectrum
             _drawSpectrum(canvas, sweepData);
             _drawWaterfall(waterfallCanvas, waterfallHistory);
             _renderPeaks(peakList, sweepData);
         }
 
         function _drawSpectrum(canvas, data) {
+            if (!canvas) return;
             const ctx = canvas.getContext('2d');
+
+            // Scale canvas to container width for responsive layout
+            const container = canvas.parentElement;
+            if (container) {
+                const cw = container.clientWidth || 600;
+                if (canvas.width !== cw) { canvas.width = cw; }
+                // Also resize crosshair canvas
+                const crosshair = container.querySelector('[data-bind="crosshair-canvas"]');
+                if (crosshair && crosshair.width !== cw) crosshair.width = cw;
+            }
+
             const w = canvas.width;
             const h = canvas.height;
+            const MARGIN_LEFT = 40;  // Y-axis labels
+            const MARGIN_BOTTOM = 18;  // X-axis labels
+            const plotW = w - MARGIN_LEFT;
+            const plotH = h - MARGIN_BOTTOM;
 
             // Clear
             ctx.fillStyle = '#0a0a0f';
             ctx.fillRect(0, 0, w, h);
 
-            // Grid lines
-            ctx.strokeStyle = '#1a1a2e';
-            ctx.lineWidth = 1;
-            for (let y = 0; y < h; y += 40) {
-                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-            }
-            for (let x = 0; x < w; x += 60) {
-                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-            }
-
             if (data == null || data.freqs == null || data.freqs.length === 0) {
                 ctx.fillStyle = '#555';
-                ctx.font = '11px monospace';
+                ctx.font = '12px monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText('No sweep data -- start a sweep to visualize', w / 2, h / 2);
+                ctx.fillText('No sweep data — click START SWEEP or a preset', w / 2, h / 2);
                 return;
             }
 
@@ -503,36 +553,70 @@ export const HackRFPanelDef = {
             const n = freqs.length;
             if (n === 0) return;
 
-            // Find power range for scaling
-            let minP = -100, maxP = -20;
+            const freqMin = freqs[0];
+            const freqMax = freqs[n - 1];
+            let minP = -90, maxP = -10;
             for (let i = 0; i < n; i++) {
-                if (powers[i] < minP) minP = powers[i];
                 if (powers[i] > maxP) maxP = powers[i];
             }
-            if (maxP - minP < 10) { minP = maxP - 40; }
+            if (maxP < -60) maxP = -30;
+            const powerRange = maxP - minP;
 
-            const barW = Math.max(1, Math.floor(w / n));
+            // Grid + Y-axis labels (power in dBm)
+            ctx.strokeStyle = '#1a1a2e';
+            ctx.lineWidth = 1;
+            ctx.font = '9px monospace';
+            ctx.fillStyle = '#555';
+            ctx.textAlign = 'right';
+            for (let db = minP; db <= maxP; db += 10) {
+                const y = plotH - ((db - minP) / powerRange) * plotH;
+                ctx.beginPath(); ctx.moveTo(MARGIN_LEFT, y); ctx.lineTo(w, y); ctx.stroke();
+                ctx.fillText(db + '', MARGIN_LEFT - 3, y + 3);
+            }
 
+            // X-axis labels (frequency in MHz)
+            ctx.textAlign = 'center';
+            const freqSpan = (freqMax - freqMin) / 1e6;
+            const tickCount = Math.min(10, Math.max(3, Math.floor(plotW / 60)));
+            for (let i = 0; i <= tickCount; i++) {
+                const frac = i / tickCount;
+                const x = MARGIN_LEFT + frac * plotW;
+                const freq = freqMin + frac * (freqMax - freqMin);
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, plotH); ctx.stroke();
+                ctx.fillText((freq / 1e6).toFixed(freqSpan > 100 ? 0 : 1), x, h - 3);
+            }
+
+            // Spectrum fill (gradient bars)
+            const barW = Math.max(1, plotW / n);
             for (let i = 0; i < n; i++) {
-                const pNorm = Math.max(0, Math.min(1, (powers[i] - minP) / (maxP - minP)));
-                const barH = Math.max(1, pNorm * (h - 20));
-                const x = (i / n) * w;
+                const pNorm = Math.max(0, Math.min(1, (powers[i] - minP) / powerRange));
+                const barH = Math.max(1, pNorm * plotH);
+                const x = MARGIN_LEFT + (i / n) * plotW;
 
-                // Color: green (weak) -> yellow -> red (strong)
+                // Smooth gradient: dark blue → green → yellow → red
                 let r, g, b;
-                if (pNorm < 0.5) {
-                    r = Math.round(pNorm * 2 * 252);
-                    g = Math.round(5 + (1 - pNorm * 2) * 250);
-                    b = Math.round(pNorm * 2 * 10);
+                if (pNorm < 0.33) {
+                    const t = pNorm / 0.33;
+                    r = 0; g = Math.round(t * 200); b = Math.round(80 - t * 80);
+                } else if (pNorm < 0.66) {
+                    const t = (pNorm - 0.33) / 0.33;
+                    r = Math.round(t * 252); g = Math.round(200 + t * 38); b = 0;
                 } else {
-                    r = Math.round(255);
-                    g = Math.round((1 - (pNorm - 0.5) * 2) * 238);
-                    b = Math.round((pNorm - 0.5) * 2 * 109);
+                    const t = (pNorm - 0.66) / 0.34;
+                    r = 255; g = Math.round(238 - t * 196); b = Math.round(t * 109);
                 }
 
                 ctx.fillStyle = `rgb(${r},${g},${b})`;
-                ctx.fillRect(x, h - barH, barW + 0.5, barH);
+                ctx.fillRect(x, plotH - barH, barW + 0.5, barH);
             }
+
+            // Axis labels
+            ctx.fillStyle = '#666';
+            ctx.font = '9px monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText('dBm', 2, 10);
+            ctx.textAlign = 'right';
+            ctx.fillText('MHz', w - 2, h - 3);
 
             // Axis labels
             ctx.fillStyle = '#888';
