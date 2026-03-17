@@ -162,13 +162,22 @@ export const HackRFPanelDef = {
             const sweep = deviceStatus.sweep || {};
             const recv = deviceStatus.receiver || {};
 
-            if (sweepRunning || sweep.running) {
-                statusActivity.textContent = 'SWEEPING';
+            const lock = deviceStatus.radio_lock || {};
+
+            if (lock.locked && lock.owner) {
+                const ownerLabel = lock.owner.toUpperCase().replace('_', ' ');
+                statusActivity.textContent = ownerLabel;
                 statusActivity.className = 'hrf-status-activity sweep';
-                const freq = `${_fmtFreqShort((sweep.freq_start_mhz || 0) * 1e6)}-${_fmtFreqShort((sweep.freq_end_mhz || 0) * 1e6)}`;
-                const binStr = _fmtFreqShort(sweep.bin_width || 0);
-                statusDetail.textContent = `${freq} | bin ${binStr} | ${(sweep.sweep_count || 0).toLocaleString()} sweeps`;
-                statusStats.textContent = `${(sweep.measurement_count || 0).toLocaleString()} pts`;
+                const desc = lock.description || '';
+                if (lock.owner === 'sweep') {
+                    const freq = `${_fmtFreqShort((sweep.freq_start_mhz || 0) * 1e6)}-${_fmtFreqShort((sweep.freq_end_mhz || 0) * 1e6)}`;
+                    const binStr = _fmtFreqShort(sweep.bin_width || 0);
+                    statusDetail.textContent = `${freq} | bin ${binStr} | ${(sweep.sweep_count || 0).toLocaleString()} sweeps`;
+                    statusStats.textContent = `${(sweep.measurement_count || 0).toLocaleString()} pts`;
+                } else {
+                    statusDetail.textContent = desc;
+                    statusStats.textContent = `${lock.duration_s || 0}s`;
+                }
             } else if (recv.running) {
                 statusActivity.textContent = 'RECEIVING';
                 statusActivity.className = 'hrf-status-activity sweep';
