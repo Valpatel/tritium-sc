@@ -1135,6 +1135,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Addon routes failed (non-fatal): {e}")
 
+    # Server lifecycle routes (restart, status)
+    try:
+        from app.routers.server import router as server_router
+        app.include_router(server_router)
+    except Exception as e:
+        logger.warning(f"Server routes failed (non-fatal): {e}")
+
     # RL auto-retrain scheduler — retrains correlation model every 6h or
     # after 50 new feedback entries. Pushes results to Amy's sensorium.
     try:

@@ -54,9 +54,31 @@ if [ "$TLS_MODE" = true ]; then
     fi
 
     echo "TRITIUM-SC starting on https://localhost:$PORT (TLS)"
-    exec "$DIR/.venv/bin/uvicorn" app.main:app --host 0.0.0.0 --port "$PORT" \
-        --ssl-certfile "$CERT" --ssl-keyfile "$KEY"
+    while true; do
+        "$DIR/.venv/bin/uvicorn" app.main:app --host 0.0.0.0 --port "$PORT" \
+            --ssl-certfile "$CERT" --ssl-keyfile "$KEY"
+        EXIT_CODE=$?
+        if [ "$EXIT_CODE" -eq 42 ]; then
+            echo ""; echo "TRITIUM-SC restarting (requested by API)..."; echo ""
+            sleep 1
+        else
+            exit $EXIT_CODE
+        fi
+    done
 else
     echo "TRITIUM-SC starting on http://localhost:$PORT"
-    exec "$DIR/.venv/bin/uvicorn" app.main:app --host 0.0.0.0 --port "$PORT"
+    # Auto-restart loop: exit code 42 = restart requested (from API/UI)
+    while true; do
+        "$DIR/.venv/bin/uvicorn" app.main:app --host 0.0.0.0 --port "$PORT"
+        EXIT_CODE=$?
+        if [ "$EXIT_CODE" -eq 42 ]; then
+            echo ""
+            echo "TRITIUM-SC restarting (requested by API)..."
+            echo ""
+            sleep 1
+        else
+            echo "TRITIUM-SC exited with code $EXIT_CODE"
+            exit $EXIT_CODE
+        fi
+    done
 fi

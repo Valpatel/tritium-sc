@@ -450,6 +450,8 @@ export const AddonsManagerPanelDef = {
             <div class="addmgr-list" data-bind="list"></div>
             <div class="addmgr-footer">
                 <a data-action="discover">Scan for new addons</a>
+                <span style="margin:0 6px;color:#333;">|</span>
+                <a data-action="restart-server" style="color:#fcee0a88;">Restart Server</a>
             </div>
         `;
         return el;
@@ -605,6 +607,24 @@ export const AddonsManagerPanelDef = {
                 reloadBtn.disabled = false;
                 reloadBtn.textContent = 'RELOAD';
                 await fetchAddons();
+                return;
+            }
+
+            // Restart server (for route changes that need full restart)
+            if (e.target.closest('[data-action="restart-server"]')) {
+                if (!confirm('Restart the server? The page will reconnect automatically.')) return;
+                fetch('/api/server/restart', { method: 'POST' }).then(() => {
+                    EventBus.emit('toast:show', { message: 'Server restarting...', type: 'info' });
+                    let attempts = 0;
+                    const check = setInterval(async () => {
+                        attempts++;
+                        try {
+                            const r = await fetch('/api/server/status');
+                            if (r.ok) { clearInterval(check); location.reload(); }
+                        } catch (_) {}
+                        if (attempts > 30) { clearInterval(check); location.reload(); }
+                    }, 1000);
+                }).catch(() => EventBus.emit('toast:show', { message: 'Restart failed', type: 'alert' }));
                 return;
             }
 
