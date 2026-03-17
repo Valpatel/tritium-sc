@@ -4,8 +4,8 @@
 // Meshtastic Addon — Device Config panel
 // Shows current device info, connect via serial/TCP, port selection, capabilities
 
-import { EventBus } from '../../../src/frontend/js/command/events.js';
-import { _esc } from '../../../src/frontend/js/command/panel-utils.js';
+import { EventBus } from '/static/js/command/events.js';
+import { _esc } from '/static/js/command/panel-utils.js';
 
 const API_BASE = '/api/addons/meshtastic';
 

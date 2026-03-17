@@ -5,8 +5,8 @@
 // Displays all mesh nodes with sortable columns, battery color-coding
 // Click row to center map on that node
 
-import { EventBus } from '../../../src/frontend/js/command/events.js';
-import { _esc, _timeAgo } from '../../../src/frontend/js/command/panel-utils.js';
+import { EventBus } from '/static/js/command/events.js';
+import { _esc, _timeAgo } from '/static/js/command/panel-utils.js';
 
 const API_BASE = '/api/addons/meshtastic';
 const REFRESH_MS = 10000;

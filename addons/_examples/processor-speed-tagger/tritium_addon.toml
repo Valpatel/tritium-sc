@@ -1,0 +1,23 @@
+[addon]
+id = "processor-speed-tagger"
+name = "Speed Tagger"
+version = "1.0.0"
+description = "Tags targets with speed classification based on velocity"
+author = "Valpatel Software LLC"
+license = "AGPL-3.0"
+addon_api = ">=1.0, <2.0"
+
+[addon.category]
+window = "intelligence"
+tab_order = 80
+
+[dependencies]
+requires = []
+optional = []
+python_packages = []
+
+[permissions]
+
+[backend]
+module = "speed_tagger_addon"
+router_prefix = "/api/addons/processor-speed-tagger"

@@ -1,0 +1,36 @@
+[addon]
+id = "sensor-weather"
+name = "Weather Station"
+version = "1.0.0"
+description = "Fetches weather data from wttr.in and creates a weather station target"
+author = "Valpatel Software LLC"
+license = "AGPL-3.0"
+addon_api = ">=1.0, <2.0"
+
+[addon.category]
+window = "sensors"
+tab_order = 50
+icon = ""
+
+[dependencies]
+requires = []
+optional = []
+python_packages = []
+
+[permissions]
+network = true
+
+[backend]
+module = "weather_addon"
+router_prefix = "/api/addons/sensor-weather"
+
+[frontend]
+panels = [
+    { id = "weather-current", title = "WEATHER", file = "weather-panel.js", tab_order = 1 },
+]
+
+[config]
+latitude = { type = "float", default = 37.7749, description = "Station latitude" }
+longitude = { type = "float", default = -122.4194, description = "Station longitude" }
+location = { type = "string", default = "San Francisco", description = "Location name for wttr.in query" }
+poll_interval = { type = "int", default = 300, description = "Seconds between weather fetches" }

@@ -77,28 +77,48 @@ def create_router(connection, node_manager, message_bridge=None) -> APIRouter:
     async def connect(body: dict = None):
         """Connect to a Meshtastic device.
 
-        Body: { "transport": "serial"|"tcp"|"ble", "port": "/dev/ttyACM0" or "host:port" }
+        Body: {
+            "transport": "serial"|"tcp"|"ble",
+            "port": "/dev/ttyACM0" or "host:port",
+            "timeout": 30  (optional, seconds)
+        }
         """
         if not connection:
             return {"error": "connection_manager_not_available"}
         body = body or {}
         transport = body.get("transport", "serial")
         port = body.get("port", "")
+        timeout = float(body.get("timeout", 30))
 
         if transport == "serial":
-            await connection.connect_serial(port or "/dev/ttyACM0")
+            serial_port = port or "/dev/ttyACM0"
+            from pathlib import Path
+            if not Path(serial_port).exists():
+                return {
+                    "connected": False,
+                    "error": f"port_not_found",
+                    "message": f"Serial port {serial_port} does not exist. Is the device plugged in?",
+                }
+            await connection.connect_serial(serial_port, timeout=timeout)
         elif transport == "tcp":
             host = port or "localhost"
-            await connection.connect_tcp(host)
+            await connection.connect_tcp(host, timeout=timeout)
         else:
             return {"error": f"unsupported transport: {transport}"}
 
-        return {
+        result = {
             "connected": connection.is_connected,
             "transport": connection.transport_type,
             "port": connection.port,
             "device": connection.device_info,
         }
+        if not connection.is_connected:
+            result["error"] = "connection_failed"
+            result["message"] = (
+                f"Failed to connect via {transport} on {port or 'default'}. "
+                f"The device may be busy, unresponsive, or the port may be locked by another process."
+            )
+        return result
 
     @router.post("/disconnect")
     async def disconnect():

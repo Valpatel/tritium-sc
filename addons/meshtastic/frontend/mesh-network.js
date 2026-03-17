@@ -5,8 +5,8 @@
 // Shows connection status, transport, device info, quick stats
 // Fetches from /api/addons/meshtastic/status and /api/addons/meshtastic/nodes
 
-import { EventBus } from '../../../src/frontend/js/command/events.js';
-import { _esc } from '../../../src/frontend/js/command/panel-utils.js';
+import { EventBus } from '/static/js/command/events.js';
+import { _esc } from '/static/js/command/panel-utils.js';
 
 const API_BASE = '/api/addons/meshtastic';
 const REFRESH_MS = 5000;

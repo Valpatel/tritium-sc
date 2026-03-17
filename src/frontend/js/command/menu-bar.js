@@ -19,6 +19,9 @@ import { toggleAdsbOverlay, isAdsbOverlayActive } from './adsb-overlay.js';
 
 function _fileMenuItems(layoutManager) {
     return [
+        { label: 'Addons Manager...', action: () => EventBus.emit('panel:request-open', { id: 'addons-manager' }) },
+        { label: 'Settings...', action: () => EventBus.emit('panel:request-open', { id: 'setup-wizard' }) },
+        { separator: true },
         { label: 'Save Layout...', shortcut: 'Ctrl+Shift+S',
           action: (bar) => focusSaveInput(bar) },
         { label: 'Export Layout JSON',

@@ -1,0 +1,29 @@
+[addon]
+id = "bridge-webhook"
+name = "Webhook Bridge"
+version = "1.0.0"
+description = "POSTs target updates to a configurable webhook URL with batching"
+author = "Valpatel Software LLC"
+license = "AGPL-3.0"
+addon_api = ">=1.0, <2.0"
+
+[addon.category]
+window = "integration"
+tab_order = 90
+
+[dependencies]
+requires = []
+optional = []
+python_packages = []
+
+[permissions]
+network = true
+
+[backend]
+module = "webhook_addon"
+router_prefix = "/api/addons/bridge-webhook"
+
+[config]
+webhook_url = { type = "string", default = "", description = "URL to POST target updates to" }
+batch_interval = { type = "float", default = 5.0, description = "Max seconds between webhook POSTs" }
+include_position = { type = "bool", default = true, description = "Include lat/lng in webhook payload" }

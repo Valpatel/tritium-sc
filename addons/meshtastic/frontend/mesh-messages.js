@@ -5,8 +5,8 @@
 // Message input, scrolling log, sender/time/text display
 // Sends via POST /api/addons/meshtastic/send
 
-import { EventBus } from '../../../src/frontend/js/command/events.js';
-import { _esc } from '../../../src/frontend/js/command/panel-utils.js';
+import { EventBus } from '/static/js/command/events.js';
+import { _esc } from '/static/js/command/panel-utils.js';
 
 const API_BASE = '/api/addons/meshtastic';
 const MAX_MESSAGES = 200;
