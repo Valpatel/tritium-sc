@@ -64,11 +64,12 @@ class FakeConnection:
             reboot_count=3,
         )
         iface.getMetadata.return_value = metadata
+        iface.metadata = metadata  # Code reads cached attribute directly
 
-        # localConfig with lora sub-config
+        # localConfig with lora sub-config (use protobuf enum ints like real device)
         lora = SimpleNamespace(
-            region="US",
-            modem_preset="LONG_FAST",
+            region=1,          # 1 = US in Config.LoRaConfig.RegionCode
+            modem_preset=0,    # 0 = LONG_FAST in Config.LoRaConfig.ModemPreset
             tx_power=27,
         )
         iface.localConfig = SimpleNamespace(lora=lora)
@@ -469,9 +470,10 @@ class TestFirmwareInfo:
 
     def test_firmware_tools_check(self, connected_dm):
         with patch("shutil.which", return_value=None):
-            fw = asyncio.run(connected_dm.get_firmware_info())
-            assert fw.esptool_available is False
-            assert fw.meshtastic_cli_available is False
+            with patch("pathlib.Path.exists", return_value=False):
+                fw = asyncio.run(connected_dm.get_firmware_info())
+                assert fw.esptool_available is False
+                assert fw.meshtastic_cli_available is False
 
     def test_firmware_tools_available(self, connected_dm):
         def fake_which(name):
@@ -486,7 +488,7 @@ class TestFirmwareInfo:
         """If current version is not in our list, assume update available."""
         conn = FakeConnection(connected=True)
         # Set an unknown firmware version
-        conn.interface.getMetadata.return_value = SimpleNamespace(
+        metadata = SimpleNamespace(
             firmware_version="1.0.0.unknown",
             has_wifi=False,
             has_bluetooth=False,
@@ -494,6 +496,8 @@ class TestFirmwareInfo:
             role="CLIENT",
             reboot_count=0,
         )
+        conn.interface.getMetadata.return_value = metadata
+        conn.interface.metadata = metadata
         dm = DeviceManager(conn)
         fw = asyncio.run(dm.get_firmware_info())
         assert fw.update_available is True
