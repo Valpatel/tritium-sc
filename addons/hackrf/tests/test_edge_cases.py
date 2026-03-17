@@ -393,3 +393,28 @@ class TestContinuousScannerEdgeCases:
         assert summary.total_measurements == 0
         d = summary.to_dict()
         assert "total_scans" in d
+
+
+class TestParsingEdgeCases:
+    """CSV parsing edge cases from real hackrf_sweep output."""
+
+    def test_parse_float_frequency_values(self):
+        """hackrf_sweep outputs freq_low as integer but bin_width as float.
+        The parser must handle both: int('88000000') and int('454545.45')."""
+        from hackrf_addon.spectrum import SpectrumAnalyzer
+        sa = SpectrumAnalyzer()
+        # Real hackrf_sweep line with float bin_width
+        line = "2026-03-17, 00:10:57.688868, 88000000, 93000000, 454545.45, 44, -53.50, -53.46, -58.04"
+        result = sa._parse_sweep_line(line)
+        assert result is not None
+        assert len(result) > 0
+        assert result[0]["freq_hz"] >= 88000000
+
+    def test_parse_integer_frequency_values(self):
+        """Parser should also handle pure integer values."""
+        from hackrf_addon.spectrum import SpectrumAnalyzer
+        sa = SpectrumAnalyzer()
+        line = "2026-03-17, 00:10:57.000, 88000000, 93000000, 500000, 44, -50.00, -45.00"
+        result = sa._parse_sweep_line(line)
+        assert result is not None
+        assert len(result) == 2  # Two power values = two bins

@@ -543,14 +543,25 @@ def create_router(device, spectrum, receiver, fm_decoder=None, tpms_decoder=None
         """
         if continuous_scanner is None:
             return {"error": "Continuous scanner not available"}
-        return await continuous_scanner.start()
+        if radio_lock and not radio_lock.acquire("scanner", "Continuous 24/7 RF scan"):
+            return {
+                "success": False,
+                "error": f"Radio busy: {radio_lock.current_owner} ({radio_lock.current_description})",
+            }
+        result = await continuous_scanner.start()
+        if not result.get("success") and radio_lock:
+            radio_lock.release("scanner")
+        return result
 
     @router.post("/scanner/stop")
     async def scanner_stop():
         """Stop continuous scanning."""
         if continuous_scanner is None:
             return {"error": "Continuous scanner not available"}
-        return await continuous_scanner.stop()
+        result = await continuous_scanner.stop()
+        if radio_lock:
+            radio_lock.release("scanner")
+        return result
 
     @router.get("/scanner/summary")
     async def scanner_summary():

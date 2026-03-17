@@ -210,8 +210,8 @@ class SpectrumAnalyzer:
 
         try:
             # Skip date (parts[0]) and time (parts[1])
-            freq_low = int(parts[2].strip())
-            freq_high = int(parts[3].strip())
+            freq_low = int(float(parts[2].strip()))
+            freq_high = int(float(parts[3].strip()))
             bin_width = float(parts[4].strip())
             # parts[5] = num_samples (skip)
             power_values = parts[6:]

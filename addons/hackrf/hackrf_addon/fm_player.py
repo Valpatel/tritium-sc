@@ -351,9 +351,9 @@ class FMPlayer:
             if len(parts) < 7:
                 continue
             try:
-                hz_low = int(parts[2].strip())
-                hz_high = int(parts[3].strip())
-                hz_bin_width = int(parts[4].strip())
+                hz_low = int(float(parts[2].strip()))
+                hz_high = int(float(parts[3].strip()))
+                hz_bin_width = int(float(parts[4].strip()))
                 # Each subsequent field is power in dB for one bin
                 for i, db_str in enumerate(parts[6:]):
                     db_val = float(db_str.strip())

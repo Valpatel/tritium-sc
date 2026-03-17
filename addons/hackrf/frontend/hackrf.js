@@ -217,8 +217,19 @@ export const HackRFPanelDef = {
                         sweepRunning = true;  // Backend started a sweep we didn't know about
                     }
                     _updateStatusBar();
+                    _updateTabPulse();
                 }
             } catch (_) { /* network error */ }
+        }
+
+        function _updateTabPulse() {
+            // Highlight the tab whose mode is using the radio
+            const lock = deviceStatus.radio_lock || {};
+            const ownerToTab = { sweep: 'spectrum', rtl_433: 'devices', scanner: 'spectrum', receiver: 'radio', adsb: 'aircraft' };
+            const activeRadioTab = lock.locked ? ownerToTab[lock.owner] || null : null;
+            tabContainer.querySelectorAll('.hrf-tab').forEach(t => {
+                t.classList.toggle('hrf-tab-radio-active', t.dataset.tab === activeRadioTab && t.dataset.tab !== activeTab);
+            });
         }
 
         async function fetchInfo() {
@@ -1414,6 +1425,8 @@ function _injectStyles() {
         .hrf-tab { flex:1; padding:7px 2px; background:none; border:none; border-bottom:2px solid transparent; color:#666; font-family:inherit; font-size:0.65rem; cursor:pointer; letter-spacing:0.5px; transition:color 0.15s,border-color 0.15s,background 0.15s; white-space:nowrap; }
         .hrf-tab:hover { color:#aaa; background:rgba(176,96,255,0.04); }
         .hrf-tab-active { color:#b060ff; border-bottom-color:#b060ff; }
+        .hrf-tab-radio-active { animation: hrf-pulse 1.5s ease-in-out infinite; }
+        @keyframes hrf-pulse { 0%,100% { color:#b060ff; } 50% { color:#05ffa1; text-shadow:0 0 8px #05ffa144; } }
 
         /* ── Body ───────────────────────────────────────────────── */
         .hrf-body { flex:1; overflow-y:auto; min-height:0; display:flex; flex-direction:column; }
