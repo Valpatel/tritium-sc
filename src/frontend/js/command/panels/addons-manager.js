@@ -51,7 +51,7 @@ function _healthDot(addon) {
     return '<span class="addmgr-dot addmgr-dot-off" title="Disabled"></span>';
 }
 
-function _renderAddonCard(addon) {
+function _renderAddonCard(addon, manifest) {
     const id = _esc(addon.id || '');
     const name = _esc(addon.name || addon.id || 'Unknown');
     const version = _esc(addon.version || '0.0.0');
@@ -63,9 +63,31 @@ function _renderAddonCard(addon) {
     const catColor = _catColor(cat);
     const catIcon = _catIcon(cat);
 
+    // Get panels from manifest
+    const panels = (manifest && manifest.panels) || [];
+    const layers = (manifest && manifest.layers) || [];
+
     const cardClass = enabled
         ? (hasError ? 'addmgr-card addmgr-card-error' : 'addmgr-card addmgr-card-enabled')
         : 'addmgr-card addmgr-card-disabled';
+
+    // Panel quick-open buttons
+    let panelButtons = '';
+    if (enabled && panels.length > 0) {
+        panelButtons = `<div class="addmgr-panels">
+            ${panels.map(p => {
+                const panelId = _esc(p.id || p.file?.replace('.js', '') || '');
+                const panelTitle = _esc(p.title || panelId);
+                return `<button class="addmgr-panel-btn" data-open-panel="${panelId}" title="Open ${panelTitle}">${panelTitle}</button>`;
+            }).join('')}
+        </div>`;
+    }
+
+    // Layer info
+    let layerInfo = '';
+    if (layers.length > 0) {
+        layerInfo = `<span class="addmgr-layer-count" title="${layers.map(l => l.label || l.id).join(', ')}">${layers.length} layer${layers.length > 1 ? 's' : ''}</span>`;
+    }
 
     return `<div class="${cardClass}" data-addon-id="${id}">
         <div class="addmgr-card-row">
@@ -78,6 +100,7 @@ function _renderAddonCard(addon) {
                 </div>
                 <div class="addmgr-desc">${desc}</div>
                 ${hasError ? `<div class="addmgr-error">${errorMsg}</div>` : ''}
+                ${panelButtons}
             </div>
             <div class="addmgr-actions">
                 <label class="addmgr-toggle" title="${enabled ? 'Disable' : 'Enable'}">
@@ -88,7 +111,8 @@ function _renderAddonCard(addon) {
         </div>
         <div class="addmgr-card-footer">
             <span class="addmgr-badge" style="border-color:${catColor};color:${catColor}">${_esc(cat)}</span>
-            <button class="addmgr-settings-btn" data-settings="${id}" title="Settings (coming soon)" disabled>SETTINGS</button>
+            ${layerInfo}
+            <button class="addmgr-open-all-btn" data-open-all="${id}" title="Open all panels for this addon"${enabled ? '' : ' disabled'}>OPEN ALL</button>
         </div>
     </div>`;
 }
@@ -307,20 +331,54 @@ function _injectStyles() {
             text-transform: uppercase;
             letter-spacing: 0.06em;
         }
-        .addmgr-settings-btn {
-            font-size: 0.6rem;
-            background: transparent;
-            border: 1px solid #333;
-            color: #555;
-            padding: 1px 6px;
-            cursor: not-allowed;
-            border-radius: 2px;
-            font-family: inherit;
+        /* Panel quick-open buttons */
+        .addmgr-panels {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 6px;
         }
-        .addmgr-settings-btn:not(:disabled):hover {
-            border-color: #00f0ff66;
+        .addmgr-panel-btn {
+            font-size: 0.65rem;
+            font-family: inherit;
+            background: rgba(0, 240, 255, 0.06);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+            border-radius: 3px;
             color: #00f0ff;
+            padding: 3px 8px;
             cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .addmgr-panel-btn:hover {
+            background: rgba(0, 240, 255, 0.15);
+            border-color: #00f0ff88;
+            box-shadow: 0 0 6px rgba(0, 240, 255, 0.2);
+        }
+        .addmgr-open-all-btn {
+            font-size: 0.6rem;
+            font-family: inherit;
+            background: rgba(5, 255, 161, 0.08);
+            border: 1px solid rgba(5, 255, 161, 0.25);
+            border-radius: 2px;
+            color: #05ffa1;
+            padding: 2px 8px;
+            cursor: pointer;
+            transition: background 0.15s, box-shadow 0.15s;
+        }
+        .addmgr-open-all-btn:hover {
+            background: rgba(5, 255, 161, 0.18);
+            box-shadow: 0 0 6px rgba(5, 255, 161, 0.2);
+        }
+        .addmgr-open-all-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        .addmgr-layer-count {
+            font-size: 0.6rem;
+            color: #888;
+            cursor: help;
         }
         /* Footer link */
         .addmgr-footer {
@@ -378,6 +436,7 @@ export const AddonsManagerPanelDef = {
 
     mount(bodyEl, panel) {
         let addons = [];
+        let manifests = {};  // id → manifest data (panels, layers, shortcuts)
         let filterText = '';
         const listEl = bodyEl.querySelector('[data-bind="list"]');
         const countEl = bodyEl.querySelector('[data-bind="count"]');
@@ -385,10 +444,25 @@ export const AddonsManagerPanelDef = {
 
         async function fetchAddons() {
             try {
-                const resp = await fetch('/api/addons/');
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                const data = await resp.json();
-                addons = data.addons || [];
+                // Fetch addon list and manifests in parallel
+                const [addonsResp, manifestsResp] = await Promise.all([
+                    fetch('/api/addons/'),
+                    fetch('/api/addons/manifests'),
+                ]);
+
+                if (addonsResp.ok) {
+                    const data = await addonsResp.json();
+                    addons = data.addons || [];
+                }
+
+                if (manifestsResp.ok) {
+                    const mList = await manifestsResp.json();
+                    manifests = {};
+                    for (const m of (Array.isArray(mList) ? mList : [])) {
+                        if (m.id) manifests[m.id] = m;
+                    }
+                }
+
                 render();
             } catch (e) {
                 console.warn('[AddonsManager] Fetch failed:', e);
@@ -423,7 +497,7 @@ export const AddonsManagerPanelDef = {
                 return (a.name || a.id || '').localeCompare(b.name || b.id || '');
             });
 
-            listEl.innerHTML = sorted.map(_renderAddonCard).join('');
+            listEl.innerHTML = sorted.map(a => _renderAddonCard(a, manifests[a.id])).join('');
         }
 
         async function toggleAddon(addonId, shouldEnable) {
@@ -468,8 +542,35 @@ export const AddonsManagerPanelDef = {
             }
         });
 
-        // Event delegation for discover link
+        // Event delegation for clicks
         bodyEl.addEventListener('click', (e) => {
+            // Open a single addon panel
+            const panelBtn = e.target.closest('[data-open-panel]');
+            if (panelBtn) {
+                const panelId = panelBtn.dataset.openPanel;
+                EventBus.emit('panel:request-open', { id: panelId });
+                return;
+            }
+
+            // Open ALL panels for an addon
+            const openAllBtn = e.target.closest('[data-open-all]');
+            if (openAllBtn) {
+                const addonId = openAllBtn.dataset.openAll;
+                const manifest = manifests[addonId];
+                if (manifest && manifest.panels) {
+                    for (const p of manifest.panels) {
+                        const pid = p.id || p.file?.replace('.js', '') || '';
+                        if (pid) EventBus.emit('panel:request-open', { id: pid });
+                    }
+                    EventBus.emit('toast:show', {
+                        message: `Opened ${manifest.panels.length} panel(s) for ${addonId}`,
+                        type: 'info',
+                    });
+                }
+                return;
+            }
+
+            // Discover link
             if (e.target.closest('[data-action="discover"]')) {
                 EventBus.emit('toast:show', {
                     message: 'Addon marketplace coming soon',
