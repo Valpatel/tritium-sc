@@ -194,11 +194,12 @@ class ConnectionManager:
                     self._read_device_info()
                 except Exception as info_err:
                     log.warning(f"Device info read failed (connection still OK): {info_err}")
-                log.info(f"Connected to {self.device_info.get('long_name', port)} via serial")
+                log.info(f"Connected to {self.device_info.get('long_name', port)} via serial, is_connected={self.is_connected}")
                 if self.event_bus:
                     self.event_bus.emit("meshtastic:connected", {
                         "transport": "serial", "port": port, "device": self.device_info,
                     })
+                log.info(f"connect_serial returning, is_connected={self.is_connected}")
                 return  # success
             except asyncio.TimeoutError:
                 log.warning(f"Serial connection to {port} timed out after {timeout}s (attempt {attempt + 1})")

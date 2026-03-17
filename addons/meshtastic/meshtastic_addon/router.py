@@ -16,8 +16,14 @@ def create_router(connection, node_manager, message_bridge=None) -> APIRouter:
     @router.get("/status")
     async def status():
         """Connection and device status."""
+        # Check both our flag AND whether the interface object exists
+        connected = (connection.is_connected and connection.interface is not None) if connection else False
+        # If interface exists but is_connected is False, we may have a stale flag — trust the interface
+        if connection and connection.interface is not None and not connection.is_connected:
+            connection.is_connected = True  # Fix stale flag
+            connected = True
         return {
-            "connected": connection.is_connected if connection else False,
+            "connected": connected,
             "transport": connection.transport_type if connection else "none",
             "port": connection.port if connection else "",
             "device": connection.device_info if connection else {},
@@ -159,13 +165,18 @@ def create_router(connection, node_manager, message_bridge=None) -> APIRouter:
         else:
             return {"error": f"unsupported transport: {transport}"}
 
+        # Trust the interface object: if it exists, we're connected
+        actually_connected = connection.interface is not None
+        if actually_connected and not connection.is_connected:
+            connection.is_connected = True  # Fix stale flag
+
         result = {
-            "connected": connection.is_connected,
+            "connected": actually_connected,
             "transport": connection.transport_type,
             "port": connection.port,
             "device": connection.device_info,
         }
-        if not connection.is_connected:
+        if not actually_connected:
             result["error"] = "connection_failed"
             result["message"] = (
                 f"Failed to connect via {transport} on {port or 'default'}. "
