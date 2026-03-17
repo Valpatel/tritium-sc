@@ -112,12 +112,14 @@ class MessageBridge:
         event_bus=None,
         mqtt_bridge=None,
         site_id: str = "home",
+        data_store=None,
     ):
         self.connection = connection
         self.node_manager = node_manager
         self.event_bus = event_bus
         self.mqtt_bridge = mqtt_bridge
         self.site_id = site_id
+        self.data_store = data_store
 
         # Message history — newest at the end
         self._messages: deque[MeshMessage] = deque(maxlen=MAX_MESSAGE_HISTORY)
@@ -222,6 +224,7 @@ class MessageBridge:
 
         self._messages.append(msg)
         self.messages_received += 1
+        self._persist_message(msg)
 
         log.info(f"Mesh message from {sender_name} ({from_id}): {text[:80]}")
 
@@ -281,6 +284,7 @@ class MessageBridge:
 
         self._messages.append(msg)
         self.position_reports += 1
+        self._persist_message(msg)
 
         # Update node manager with position
         if self.node_manager:
@@ -364,6 +368,7 @@ class MessageBridge:
 
         self._messages.append(msg)
         self.telemetry_reports += 1
+        self._persist_message(msg)
 
         # Update node manager with telemetry
         if self.node_manager:
@@ -548,6 +553,20 @@ class MessageBridge:
             if name:
                 return name
         return node_id_str
+
+    def _persist_message(self, msg: MeshMessage):
+        """Persist a message to the data store (fire-and-forget async)."""
+        if not self.data_store:
+            return
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(self.data_store.store_message(msg.to_dict()))
+            else:
+                loop.run_until_complete(self.data_store.store_message(msg.to_dict()))
+        except Exception as e:
+            log.debug(f"Message persist failed: {e}")
 
     def _publish_mqtt(self, topic: str, payload: dict):
         """Publish a message to MQTT if the bridge is available."""

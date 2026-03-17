@@ -10,6 +10,7 @@ Each mesh node becomes a tracked target on the tactical map.
 from tritium_lib.sdk import SensorAddon, AddonInfo
 
 from .connection import ConnectionManager
+from .data_store import MeshtasticDataStore
 from .device_manager import DeviceManager
 from .message_bridge import MessageBridge
 from .node_manager import NodeManager
@@ -32,10 +33,12 @@ class MeshtasticAddon(SensorAddon):
     def __init__(self):
         super().__init__()
         self.connection: ConnectionManager | None = None
+        self.data_store: MeshtasticDataStore | None = None
         self.device_manager: DeviceManager | None = None
         self.message_bridge: MessageBridge | None = None
         self.node_manager: NodeManager | None = None
         self._poll_task = None
+        self._stats_task = None
 
     async def register(self, app):
         await super().register(app)
@@ -109,6 +112,7 @@ class MeshtasticAddon(SensorAddon):
             event_bus=event_bus,
             mqtt_bridge=mqtt_bridge,
             site_id=site_id,
+            data_store=self.data_store,
         )
 
         # Add API routes
@@ -120,6 +124,15 @@ class MeshtasticAddon(SensorAddon):
             from .device_manager import create_device_routes
             device_router = create_device_routes(self.device_manager)
             app.include_router(device_router, prefix="/api/addons/meshtastic", tags=["meshtastic-device"])
+
+        # Initialize persistent data store
+        self.data_store = MeshtasticDataStore()
+        try:
+            await self.data_store.initialize()
+            log.info("Meshtastic persistent data store ready")
+        except Exception as e:
+            log.warning(f"Meshtastic data store init failed (non-fatal): {e}")
+            self.data_store = None
 
         # Auto-detect and connect — skip if already connected (prevents rapid reconnect)
         if not self.connection.is_connected:
@@ -133,10 +146,12 @@ class MeshtasticAddon(SensorAddon):
         # Register message bridge callbacks after connection attempt
         self.message_bridge.register_callbacks()
 
-        # Start polling loop
+        # Start polling loop and stats snapshot loop
         import asyncio
         self._poll_task = asyncio.create_task(self._poll_loop())
         self._background_tasks.append(self._poll_task)
+        self._stats_task = asyncio.create_task(self._stats_loop())
+        self._background_tasks.append(self._stats_task)
 
     async def unregister(self, app):
         if self.message_bridge:
@@ -145,6 +160,9 @@ class MeshtasticAddon(SensorAddon):
         if self.connection:
             await self.connection.disconnect()
             self.connection = None
+        if self.data_store:
+            await self.data_store.close()
+            self.data_store = None
         self.node_manager = None
         await super().unregister(app)
 
@@ -155,7 +173,7 @@ class MeshtasticAddon(SensorAddon):
         return self.node_manager.get_targets()
 
     async def _poll_loop(self):
-        """Background loop: poll device for node updates."""
+        """Background loop: poll device for node updates and persist to data store."""
         import asyncio
         while self._registered:
             try:
@@ -163,10 +181,34 @@ class MeshtasticAddon(SensorAddon):
                     nodes = await self.connection.get_nodes()
                     if nodes and self.node_manager:
                         self.node_manager.update_nodes(nodes)
+
+                        # Persist each node to the data store
+                        if self.data_store:
+                            for node_id, node_data in self.node_manager.nodes.items():
+                                try:
+                                    await self.data_store.store_node(node_data)
+                                except Exception as e:
+                                    import logging
+                                    logging.getLogger("meshtastic").debug(
+                                        f"Data store error for {node_id}: {e}"
+                                    )
             except Exception as e:
                 import logging
                 logging.getLogger("meshtastic").warning(f"Poll error: {e}")
             await asyncio.sleep(10)
+
+    async def _stats_loop(self):
+        """Background loop: periodic network stats snapshots (every 5 minutes)."""
+        import asyncio
+        while self._registered:
+            await asyncio.sleep(300)  # 5 minutes
+            try:
+                if self.node_manager and self.data_store:
+                    stats = self.node_manager.get_stats()
+                    await self.data_store.store_stats_snapshot(stats)
+            except Exception as e:
+                import logging
+                logging.getLogger("meshtastic").debug(f"Stats snapshot error: {e}")
 
     def get_panels(self):
         return [
