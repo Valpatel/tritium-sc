@@ -546,7 +546,8 @@ class TestConnectionLifecycle:
         """auto_connect with no devices should end in disconnected mode."""
         with patch.dict("os.environ", {}, clear=True):
             with patch.object(self.conn, "_find_serial_device", return_value=None):
-                await self.conn.auto_connect()
+                with patch("pathlib.Path.exists", return_value=False):
+                    await self.conn.auto_connect()
 
         assert self.conn.is_connected is False
 
@@ -556,8 +557,9 @@ class TestConnectionLifecycle:
         mock_iface = _make_mock_interface()
         with patch.dict("os.environ", {"MESHTASTIC_TCP_HOST": "192.168.1.100"}):
             with patch.object(self.conn, "_find_serial_device", return_value=None):
-                with patch("meshtastic.tcp_interface.TCPInterface", return_value=mock_iface):
-                    await self.conn.auto_connect()
+                with patch("pathlib.Path.exists", return_value=False):
+                    with patch("meshtastic.tcp_interface.TCPInterface", return_value=mock_iface):
+                        await self.conn.auto_connect()
 
         assert self.conn.is_connected is True
         assert self.conn.transport_type == "tcp"
@@ -2091,7 +2093,7 @@ class TestEdgeCases:
             }
         }
         nm.update_nodes(raw)
-        assert nm.nodes["!test"]["role"] == "UNKNOWN(99)"
+        assert nm.nodes["!test"]["role"] == "ROLE_99"
 
     def test_message_bridge_legacy_callback(self):
         """_on_receive_legacy should delegate to _on_receive."""

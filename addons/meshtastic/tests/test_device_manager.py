@@ -57,9 +57,9 @@ class FakeConnection:
         # getMetadata
         metadata = SimpleNamespace(
             firmware_version="2.5.18.e787254",
-            has_wifi=True,
-            has_bluetooth=True,
-            has_ethernet=False,
+            hasWifi=True,
+            hasBluetooth=True,
+            hasEthernet=False,
             role="CLIENT",
             reboot_count=3,
         )
@@ -490,9 +490,9 @@ class TestFirmwareInfo:
         # Set an unknown firmware version
         metadata = SimpleNamespace(
             firmware_version="1.0.0.unknown",
-            has_wifi=False,
-            has_bluetooth=False,
-            has_ethernet=False,
+            hasWifi=False,
+            hasBluetooth=False,
+            hasEthernet=False,
             role="CLIENT",
             reboot_count=0,
         )

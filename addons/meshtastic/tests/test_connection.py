@@ -554,15 +554,13 @@ class TestAutoConnect:
         """auto_connect with no devices should end in disconnected mode."""
         cm = ConnectionManager()
         cm._find_serial_device = lambda: None
-        asyncio.run(cm.auto_connect())
+        with patch("pathlib.Path.exists", return_value=False):
+            asyncio.run(cm.auto_connect())
         assert not cm.is_connected
 
     def test_auto_connect_tries_mqtt_from_env(self, monkeypatch):
         """auto_connect should try MQTT if env var is set."""
         monkeypatch.setenv("MESHTASTIC_MQTT_HOST", "test-broker.local")
-        monkeypatch.setenv("MESHTASTIC_MQTT_TOPIC", "msh/test/#")
-        monkeypatch.setenv("MESHTASTIC_MQTT_USER", "user")
-        monkeypatch.setenv("MESHTASTIC_MQTT_PASSWORD", "pass")
 
         iface = _make_fake_interface()
         mock_cls = _get_mqtt_mock()
@@ -571,7 +569,8 @@ class TestAutoConnect:
 
         cm = ConnectionManager()
         cm._find_serial_device = lambda: None
-        asyncio.run(cm.auto_connect())
+        with patch("pathlib.Path.exists", return_value=False):
+            asyncio.run(cm.auto_connect())
 
         assert cm.is_connected
         assert cm.transport_type == "mqtt"
@@ -587,7 +586,8 @@ class TestAutoConnect:
 
         cm = ConnectionManager()
         cm._find_serial_device = lambda: None
-        asyncio.run(cm.auto_connect())
+        with patch("pathlib.Path.exists", return_value=False):
+            asyncio.run(cm.auto_connect())
 
         assert cm.is_connected
         assert cm.transport_type == "ble"
