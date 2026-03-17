@@ -175,9 +175,22 @@ class MeshtasticAddon(SensorAddon):
     async def _poll_loop(self):
         """Background loop: poll device for node updates and persist to data store."""
         import asyncio
+        from pathlib import Path
         while self._registered:
             try:
                 if self.connection and self.connection.is_connected:
+                    # Check if serial port still exists
+                    if self.connection.transport_type == "serial" and self.connection.port:
+                        if not Path(self.connection.port).exists():
+                            import logging
+                            logging.getLogger("meshtastic").warning(
+                                f"Serial port {self.connection.port} disappeared — device unplugged"
+                            )
+                            self.connection.is_connected = False
+                            self.connection._close_interface()
+                            await asyncio.sleep(10)
+                            continue
+
                     nodes = await self.connection.get_nodes()
                     if nodes and self.node_manager:
                         self.node_manager.update_nodes(nodes)
@@ -192,6 +205,16 @@ class MeshtasticAddon(SensorAddon):
                                     logging.getLogger("meshtastic").debug(
                                         f"Data store error for {node_id}: {e}"
                                     )
+                elif not self.connection.is_connected:
+                    # Not connected — try to auto-reconnect if port exists
+                    port = self.connection.port or "/dev/ttyACM0"
+                    if Path(port).exists():
+                        import logging
+                        logging.getLogger("meshtastic").info(f"Port {port} detected — attempting reconnect")
+                        try:
+                            await self.connection.connect_serial(port, timeout=30, noNodes=True)
+                        except Exception:
+                            pass
             except Exception as e:
                 import logging
                 logging.getLogger("meshtastic").warning(f"Poll error: {e}")
