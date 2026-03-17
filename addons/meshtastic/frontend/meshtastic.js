@@ -106,6 +106,7 @@ export const MeshtasticPanelDef = {
         let channels = [];
         let moduleConfig = {};
         let ports = [];
+        let bleDevices = [];
         let firmwareInfo = {};
         let firmwareVersions = [];
         let nodeSortKey = 'last_heard';
@@ -433,21 +434,30 @@ export const MeshtasticPanelDef = {
                 ` : `
                 <div class="msh-radio-ports">
                     <div class="msh-section-label">AVAILABLE RADIOS</div>
-                    ${ports.length === 0 ? '<div class="msh-empty" style="padding:12px 10px">No serial ports detected. Plug in a Meshtastic radio via USB.</div>' :
-                    `<div class="msh-port-list">
+                    <div class="msh-port-list">
+                        ${ports.length === 0 && bleDevices.length === 0 ? '<div class="msh-empty" style="padding:12px 10px">No radios detected. Click SCAN USB or SCAN BLE.</div>' : ''}
                         ${ports.map(p => {
                             const port = typeof p === 'string' ? p : (p.port || '');
                             const desc = typeof p === 'object' ? (p.description || p.manufacturer || '') : '';
                             return '<div class="msh-port-row" data-port="' + _esc(port) + '">' +
+                                '<span class="msh-port-icon" title="USB Serial">USB</span>' +
                                 '<span class="msh-port-name">' + _esc(port) + '</span>' +
                                 '<span class="msh-port-desc">' + _esc(desc) + '</span>' +
                                 '<button class="msh-btn msh-btn-connect msh-btn-sm" data-action="connect-port" data-port="' + _esc(port) + '" title="Connect to this radio via USB serial">CONNECT</button>' +
                             '</div>';
                         }).join('')}
-                    </div>`}
+                        ${bleDevices.map(d => {
+                            return '<div class="msh-port-row">' +
+                                '<span class="msh-port-icon" style="color:#b060ff" title="Bluetooth LE">BLE</span>' +
+                                '<span class="msh-port-name" style="color:#b060ff">' + _esc(d.name) + '</span>' +
+                                '<span class="msh-port-desc">' + d.rssi + ' dBm — ' + _esc(d.address) + '</span>' +
+                                '<button class="msh-btn msh-btn-connect msh-btn-sm" data-action="connect-ble" data-address="' + _esc(d.address) + '" title="Connect via Bluetooth LE">CONNECT</button>' +
+                            '</div>';
+                        }).join('')}
+                    </div>
                     <div style="padding:8px 10px;display:flex;gap:6px;flex-wrap:wrap;">
                         <button class="msh-btn" data-action="scan-ports" title="Rescan USB serial ports">SCAN USB</button>
-                        <button class="msh-btn" data-action="scan-ble" title="Scan for Meshtastic radios via BLE">SCAN BLE</button>
+                        <button class="msh-btn" data-action="scan-ble" title="Scan for Meshtastic BLE radios (~6 seconds)">SCAN BLE</button>
                     </div>
                 </div>
                 ${savedRadios.length > 0 ? `
@@ -491,6 +501,27 @@ export const MeshtasticPanelDef = {
                             fetchFirmware();
                         }
                     } catch (_) { /* ok */ }
+                    btn.disabled = false;
+                    btn.textContent = 'CONNECT';
+                });
+            });
+            body.querySelectorAll('[data-action="connect-ble"]').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const address = btn.dataset.address;
+                    btn.disabled = true;
+                    btn.textContent = 'CONNECTING...';
+                    try {
+                        const cr = await fetch(API + '/connect', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ transport: 'ble', address, timeout: 45 }),
+                        });
+                        if (cr.ok) {
+                            const cd = await cr.json();
+                            updateConnection(cd);
+                            fetchAll(); fetchDeviceInfo(); fetchChannels(); fetchModuleConfig(); fetchFirmware();
+                        }
+                    } catch (_) {}
                     btn.disabled = false;
                     btn.textContent = 'CONNECT';
                 });
@@ -546,54 +577,18 @@ export const MeshtasticPanelDef = {
                     const r = await fetch(API + '/ble-scan');
                     if (r.ok) {
                         const d = await r.json();
-                        const bleDevices = d.ble_devices || [];
-                        if (bleDevices.length > 0) {
-                            btn.textContent = `FOUND ${bleDevices.length} BLE`;
-                            btn.style.color = '#05ffa1';
-                            // Add BLE devices to the port list display
-                            const listEl = body.querySelector('.msh-port-list');
-                            if (listEl) {
-                                for (const dev of bleDevices) {
-                                    const row = document.createElement('div');
-                                    row.className = 'msh-port-row';
-                                    row.innerHTML = `
-                                        <span class="msh-port-name" style="color:#b060ff">${_esc(dev.name)}</span>
-                                        <span class="msh-port-desc">BLE ${dev.rssi}dBm</span>
-                                        <button class="msh-btn msh-btn-connect msh-btn-sm" data-action="connect-ble" data-address="${_esc(dev.address)}" title="Connect via Bluetooth LE">CONNECT</button>
-                                    `;
-                                    listEl.appendChild(row);
-                                    // Wire BLE connect
-                                    row.querySelector('[data-action="connect-ble"]').addEventListener('click', async (ev) => {
-                                        const cbtn = ev.currentTarget;
-                                        cbtn.disabled = true;
-                                        cbtn.textContent = 'CONNECTING...';
-                                        try {
-                                            const cr = await fetch(API + '/connect', {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ transport: 'ble', address: dev.address, timeout: 45 }),
-                                            });
-                                            if (cr.ok) {
-                                                const cd = await cr.json();
-                                                updateConnection(cd);
-                                                fetchAll(); fetchDeviceInfo();
-                                            }
-                                        } catch (_) {}
-                                        cbtn.disabled = false;
-                                        cbtn.textContent = 'CONNECT';
-                                    });
-                                }
-                            }
-                        } else {
-                            btn.textContent = 'NO BLE FOUND';
-                            btn.style.color = '#ff2a6d';
-                        }
+                        bleDevices = d.ble_devices || [];
+                        btn.textContent = bleDevices.length > 0
+                            ? `FOUND ${bleDevices.length} BLE`
+                            : 'NO BLE FOUND';
+                        btn.style.color = bleDevices.length > 0 ? '#05ffa1' : '#ff2a6d';
+                        // Re-render to show BLE devices in the list
+                        renderRadio();
                     }
                 } catch (_) {
                     btn.textContent = 'SCAN FAILED';
                     btn.style.color = '#ff2a6d';
                 }
-                setTimeout(() => { btn.disabled = false; btn.textContent = 'SCAN BLE'; btn.style.color = ''; }, 3000);
             });
             body.querySelector('[data-action="radio-disconnect"]')?.addEventListener('click', async () => {
                 try { await fetch(API + '/disconnect', { method: 'POST' }); } catch (_) { /* ok */ }
@@ -1629,6 +1624,8 @@ function _injectStyles() {
         .msh-radio-ports { margin-top:8px; }
         .msh-port-list { padding:0 10px; }
         .msh-port-row { display:flex; align-items:center; gap:8px; padding:6px 6px; border-bottom:1px solid #ffffff08; transition:background 0.15s; }
+        .msh-port-row:hover { background:rgba(0,240,255,0.03); }
+        .msh-port-icon { font-size:0.6rem; font-weight:bold; color:#00f0ff; border:1px solid rgba(0,240,255,0.3); border-radius:2px; padding:1px 4px; flex-shrink:0; letter-spacing:0.5px; }
         .msh-port-row:hover { background:rgba(0,240,255,0.03); }
         .msh-port-name { font-size:0.75rem; color:#00f0ff; min-width:120px; }
         .msh-port-desc { font-size:0.65rem; color:#888; flex:1; }
