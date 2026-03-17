@@ -13,6 +13,76 @@ from typing import Any, Optional
 
 log = logging.getLogger("meshtastic.connection")
 
+# Known Meshtastic USB VID:PIDs (hex strings, lowercase)
+KNOWN_MESHTASTIC_VIDS = {"303a", "10c4", "1a86", "0403"}  # Espressif, SiLabs, CH340, FTDI
+
+
+def detect_meshtastic_ports() -> list[dict]:
+    """Scan system for Meshtastic-compatible serial ports.
+
+    Checks /dev/ttyACM* and /dev/ttyUSB* for devices matching known
+    Meshtastic USB VID:PIDs (Espressif, SiLabs, CH340, FTDI).
+
+    Returns:
+        List of dicts with keys: port, device_id, transport, vid, pid,
+        description, manufacturer, meshtastic_match.
+    """
+    results: list[dict] = []
+    seen_ports: set[str] = set()
+
+    try:
+        import serial.tools.list_ports
+        for p in serial.tools.list_ports.comports():
+            # Only consider ttyACM and ttyUSB devices
+            if not (p.device.startswith("/dev/ttyACM") or p.device.startswith("/dev/ttyUSB")):
+                continue
+            if p.device in seen_ports:
+                continue
+            seen_ports.add(p.device)
+
+            vid_hex = f"{p.vid:04x}" if p.vid else ""
+            pid_hex = f"{p.pid:04x}" if p.pid else ""
+            is_match = bool(p.vid and vid_hex in KNOWN_MESHTASTIC_VIDS)
+
+            # Derive a stable device_id from the port name
+            port_name = p.device.split("/")[-1]  # e.g. "ttyACM0"
+            device_id = f"mesh-{port_name}"
+
+            results.append({
+                "port": p.device,
+                "device_id": device_id,
+                "transport": "serial",
+                "vid": vid_hex,
+                "pid": pid_hex,
+                "description": p.description or "",
+                "manufacturer": p.manufacturer or "",
+                "serial_number": p.serial_number or "",
+                "meshtastic_match": is_match,
+            })
+    except ImportError:
+        # No pyserial — fall back to glob scan
+        import glob as _glob
+        for pattern in ["/dev/ttyACM*", "/dev/ttyUSB*"]:
+            for port_path in sorted(_glob.glob(pattern)):
+                if port_path in seen_ports:
+                    continue
+                seen_ports.add(port_path)
+                port_name = port_path.split("/")[-1]
+                results.append({
+                    "port": port_path,
+                    "device_id": f"mesh-{port_name}",
+                    "transport": "serial",
+                    "vid": "",
+                    "pid": "",
+                    "description": "Serial device",
+                    "manufacturer": "",
+                    "serial_number": "",
+                    "meshtastic_match": True,  # Can't check VID without pyserial
+                })
+
+    return results
+
+
 # Default timeouts per transport.  Serial config exchange (channels, nodeinfo)
 # can take 30-60s on mesh networks with many nodes.  The meshtastic library's
 # SerialInterface `timeout` kwarg maps to `connectTimeout` (socket open), NOT

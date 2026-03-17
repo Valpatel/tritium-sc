@@ -14,7 +14,7 @@ import tempfile
 import os
 
 
-def create_router(device, spectrum, receiver, fm_decoder=None, tpms_decoder=None, ism_monitor=None, continuous_scanner=None, rtl433=None, fm_player=None, adsb_decoder=None, signal_db=None, radio_lock=None) -> APIRouter:
+def create_router(device, spectrum, receiver, fm_decoder=None, tpms_decoder=None, ism_monitor=None, continuous_scanner=None, rtl433=None, fm_player=None, adsb_decoder=None, signal_db=None, radio_lock=None, registry=None, device_instances=None, spectrum_instances=None, radio_locks=None, signal_dbs=None) -> APIRouter:
     """Create FastAPI router for HackRF addon endpoints.
 
     Args:
@@ -1085,5 +1085,102 @@ def create_router(device, spectrum, receiver, fm_decoder=None, tpms_decoder=None
         if fm_player is None:
             return {"success": False, "error": "FM player not available"}
         return await fm_player.save_wav()
+
+    # ── Multi-Device Endpoints ───────────────────────────────────
+
+    @router.get("/devices")
+    async def list_devices():
+        """List all registered HackRF devices with status."""
+        if registry is None:
+            # Fallback: report the single default device
+            info = device.get_info()
+            return {
+                "devices": [{
+                    "device_id": "hackrf-0",
+                    "device_type": "hackrf",
+                    "transport_type": "local",
+                    "state": "connected" if info else "disconnected",
+                    "metadata": {"serial": info.get("serial", "") if info else ""},
+                }],
+                "count": 1 if info else 0,
+            }
+        return {
+            "devices": [d.to_dict() for d in registry.list_devices()],
+            "count": registry.device_count,
+            "connected_count": registry.connected_count,
+        }
+
+    @router.get("/devices/{device_id}")
+    async def get_device(device_id: str):
+        """Get specific device info by device_id."""
+        if registry is None:
+            return {"error": "Device registry not available"}
+        dev = registry.get_device(device_id)
+        if dev is None:
+            return {"error": f"Device '{device_id}' not found"}
+        result = dev.to_dict()
+        # Augment with live device info
+        dev_inst = device_instances.get(device_id) if device_instances else None
+        if dev_inst:
+            info = dev_inst.get_info()
+            if info:
+                result["info"] = {k: v for k, v in info.items() if k != "raw_output"}
+        return result
+
+    @router.get("/devices/{device_id}/status")
+    async def device_status(device_id: str):
+        """Get status for a specific device."""
+        if registry is None:
+            return {"error": "Device registry not available"}
+        dev = registry.get_device(device_id)
+        if dev is None:
+            return {"error": f"Device '{device_id}' not found"}
+        spec = spectrum_instances.get(device_id) if spectrum_instances else None
+        sig_db = signal_dbs.get(device_id) if signal_dbs else None
+        rl = radio_locks.get(device_id) if radio_locks else None
+        dev_inst = device_instances.get(device_id) if device_instances else None
+        return {
+            "device_id": device_id,
+            "state": dev.state.value,
+            "connected": dev_inst.get_info() is not None if dev_inst else False,
+            "sweep_running": spec.is_running if spec else False,
+            "measurement_count": sig_db.count if sig_db else 0,
+            "radio_lock": rl.get_status() if rl else {"locked": False},
+        }
+
+    @router.post("/devices/{device_id}/sweep/start")
+    async def device_sweep_start(device_id: str, body: dict = None):
+        """Start a spectrum sweep on a specific device."""
+        if spectrum_instances is None or device_id not in spectrum_instances:
+            return {"error": f"Device '{device_id}' not found"}
+        body = body or {}
+        freq_start = int(body.get("freq_start", 0))
+        freq_end = int(body.get("freq_end", 6000))
+        bin_width = int(body.get("bin_width", 500_000))
+
+        rl = radio_locks.get(device_id) if radio_locks else None
+        if rl and not rl.acquire("sweep", f"{freq_start}-{freq_end} MHz"):
+            return {
+                "success": False,
+                "error": f"Radio busy: {rl.current_owner} ({rl.current_description})",
+            }
+
+        spec = spectrum_instances[device_id]
+        result = await spec.start_sweep(freq_start, freq_end, bin_width)
+        if not result.get("success") and rl:
+            rl.release("sweep")
+        return result
+
+    @router.post("/devices/{device_id}/sweep/stop")
+    async def device_sweep_stop(device_id: str):
+        """Stop the spectrum sweep on a specific device."""
+        if spectrum_instances is None or device_id not in spectrum_instances:
+            return {"error": f"Device '{device_id}' not found"}
+        spec = spectrum_instances[device_id]
+        result = await spec.stop_sweep()
+        rl = radio_locks.get(device_id) if radio_locks else None
+        if rl:
+            rl.release("sweep")
+        return result
 
     return router

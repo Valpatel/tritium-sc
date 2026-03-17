@@ -15,10 +15,26 @@ def _clean_role(role: str) -> str:
     return role
 
 
-def create_router(connection, node_manager, message_bridge=None) -> APIRouter:
-    """Create FastAPI router for Meshtastic addon endpoints."""
+def create_router(
+    connection, node_manager, message_bridge=None,
+    registry=None, connections=None, node_managers=None,
+) -> APIRouter:
+    """Create FastAPI router for Meshtastic addon endpoints.
+
+    Args:
+        connection: Primary ConnectionManager (legacy single-radio alias).
+        node_manager: Aggregate NodeManager (merged from all radios).
+        message_bridge: MessageBridge for chat/messaging.
+        registry: DeviceRegistry for multi-radio support.
+        connections: Dict of device_id -> ConnectionManager.
+        node_managers: Dict of device_id -> per-device NodeManager.
+    """
 
     router = APIRouter()
+
+    # Default to empty dicts if not provided (single-radio fallback)
+    _connections = connections or {}
+    _node_managers = node_managers or {}
 
     @router.get("/status")
     async def status():
@@ -394,6 +410,222 @@ def create_router(connection, node_manager, message_bridge=None) -> APIRouter:
             "status": "ok" if (connection and connection.is_connected) else "degraded",
             "connected": connection.is_connected if connection else False,
             "node_count": len(node_manager.nodes) if node_manager else 0,
+        }
+
+    # ------------------------------------------------------------------
+    # Multi-radio device endpoints
+    # ------------------------------------------------------------------
+
+    @router.get("/devices")
+    async def list_devices():
+        """List all registered radios with connection status."""
+        if not registry:
+            # Fallback: return single-radio info
+            return {
+                "devices": [{
+                    "device_id": "primary",
+                    "connected": connection.is_connected if connection else False,
+                    "transport": connection.transport_type if connection else "none",
+                    "port": connection.port if connection else "",
+                }] if connection else [],
+                "count": 1 if connection else 0,
+            }
+        devices = []
+        for dev in registry.list_devices():
+            conn = _connections.get(dev.device_id)
+            nm = _node_managers.get(dev.device_id)
+            devices.append({
+                **dev.to_dict(),
+                "connected": conn.is_connected if conn else False,
+                "transport": conn.transport_type if conn else dev.transport_type,
+                "port": conn.port if conn else dev.metadata.get("port", ""),
+                "node_count": len(nm.nodes) if nm else 0,
+            })
+        return {
+            "devices": devices,
+            "count": len(devices),
+            "connected_count": registry.connected_count,
+        }
+
+    @router.get("/devices/{device_id}")
+    async def get_device(device_id: str):
+        """Get info for a specific radio."""
+        if not registry:
+            return {"error": "registry_not_available"}
+        dev = registry.get_device(device_id)
+        if not dev:
+            return {"error": "not_found", "device_id": device_id}
+        conn = _connections.get(device_id)
+        nm = _node_managers.get(device_id)
+        return {
+            **dev.to_dict(),
+            "connected": conn.is_connected if conn else False,
+            "transport": conn.transport_type if conn else dev.transport_type,
+            "port": conn.port if conn else dev.metadata.get("port", ""),
+            "device_info": conn.device_info if conn else {},
+            "node_count": len(nm.nodes) if nm else 0,
+        }
+
+    @router.get("/devices/{device_id}/nodes")
+    async def get_device_nodes(device_id: str):
+        """Get nodes from a specific radio."""
+        nm = _node_managers.get(device_id)
+        if nm is None:
+            return {"error": "not_found", "device_id": device_id}
+        nodes = []
+        for nid, node in nm.nodes.items():
+            nodes.append({
+                "node_id": nid,
+                "long_name": node.get("long_name", ""),
+                "short_name": node.get("short_name", ""),
+                "hw_model": node.get("hw_model", ""),
+                "role": _clean_role(node.get("role", "")),
+                "lat": node.get("lat"),
+                "lng": node.get("lng"),
+                "battery": node.get("battery"),
+                "snr": node.get("snr"),
+                "last_heard": node.get("last_heard"),
+                "bridge_id": device_id,
+            })
+        return {"nodes": nodes, "count": len(nodes), "device_id": device_id}
+
+    @router.post("/devices/{device_id}/connect")
+    async def connect_device(device_id: str, body: dict = None):
+        """Connect a specific radio."""
+        if not registry:
+            return {"error": "registry_not_available"}
+        dev = registry.get_device(device_id)
+        if not dev:
+            return {"error": "not_found", "device_id": device_id}
+        conn = _connections.get(device_id)
+        if not conn:
+            return {"error": "no_connection_manager", "device_id": device_id}
+
+        body = body or {}
+        transport = body.get("transport", dev.metadata.get("transport", "serial"))
+        port = body.get("port", dev.metadata.get("port", ""))
+        timeout = float(body.get("timeout", 60))
+        noNodes = body.get("noNodes", True)
+
+        from tritium_lib.sdk import DeviceState
+        registry.set_state(device_id, DeviceState.CONNECTING)
+
+        if transport == "serial":
+            serial_port = port or "/dev/ttyACM0"
+            from pathlib import Path
+            if not Path(serial_port).exists():
+                registry.set_state(device_id, DeviceState.ERROR, error="port not found")
+                return {"connected": False, "error": "port_not_found", "device_id": device_id}
+            try:
+                await conn.connect_serial(serial_port, timeout=timeout, noNodes=noNodes)
+            except Exception as e:
+                registry.set_state(device_id, DeviceState.ERROR, error=str(e))
+                return {"connected": False, "error": str(e), "device_id": device_id}
+        elif transport == "tcp":
+            host = port or body.get("host", "localhost")
+            await conn.connect_tcp(host, timeout=timeout)
+        elif transport == "ble":
+            address = port or body.get("address", "")
+            await conn.connect_ble(address, timeout=timeout, noNodes=noNodes)
+        elif transport == "mqtt":
+            mqtt_host = port or body.get("host", "mqtt.meshtastic.org")
+            mqtt_port = int(body.get("mqtt_port", 1883))
+            topic = body.get("topic", "msh/US/2/e/#")
+            username = body.get("username", "meshdev")
+            password = body.get("password", "large4cats")
+            await conn.connect_mqtt(
+                mqtt_host, port=mqtt_port, topic=topic,
+                username=username, password=password, timeout=timeout,
+            )
+        else:
+            return {"error": f"unsupported transport: {transport}", "device_id": device_id}
+
+        if conn.is_connected:
+            registry.set_state(device_id, DeviceState.CONNECTED)
+            registry.touch(device_id)
+        else:
+            registry.set_state(device_id, DeviceState.ERROR, error="connect failed")
+
+        return {
+            "connected": conn.is_connected,
+            "device_id": device_id,
+            "transport": conn.transport_type,
+            "port": conn.port,
+            "device_info": conn.device_info,
+        }
+
+    @router.post("/devices/{device_id}/disconnect")
+    async def disconnect_device(device_id: str):
+        """Disconnect a specific radio."""
+        conn = _connections.get(device_id)
+        if not conn:
+            return {"error": "not_found", "device_id": device_id}
+        await conn.disconnect()
+        if registry:
+            from tritium_lib.sdk import DeviceState
+            registry.set_state(device_id, DeviceState.DISCONNECTED)
+        return {"connected": False, "device_id": device_id}
+
+    @router.post("/devices/add")
+    async def add_device(body: dict):
+        """Add a new radio device (serial port, BLE address, or TCP host).
+
+        Body: {
+            "device_id": "mesh-custom" (optional, auto-generated if omitted),
+            "transport": "serial"|"tcp"|"ble"|"mqtt",
+            "port": "/dev/ttyUSB1" or "192.168.1.50" or "AA:BB:CC:DD:EE:FF",
+            "metadata": {}  (optional extra metadata)
+        }
+        """
+        if not registry:
+            return {"error": "registry_not_available"}
+
+        transport = body.get("transport", "serial")
+        port = body.get("port", "")
+        device_id = body.get("device_id", "")
+        extra_meta = body.get("metadata", {})
+
+        # Auto-generate device_id if not provided
+        if not device_id:
+            if transport == "serial" and port:
+                port_name = port.split("/")[-1]
+                device_id = f"mesh-{port_name}"
+            elif transport == "tcp" and port:
+                device_id = f"mesh-tcp-{port.replace(':', '-').replace('.', '-')}"
+            elif transport == "ble" and port:
+                device_id = f"mesh-ble-{port.replace(':', '').lower()[:8]}"
+            elif transport == "mqtt":
+                device_id = f"mesh-mqtt-{len(_connections) + 1}"
+            else:
+                device_id = f"mesh-{len(_connections) + 1}"
+
+        if device_id in registry:
+            return {"error": "already_exists", "device_id": device_id}
+
+        metadata = {"port": port, "transport": transport, **extra_meta}
+        try:
+            registry.add_device(
+                device_id=device_id,
+                device_type="meshtastic",
+                transport_type=transport,
+                metadata=metadata,
+            )
+        except ValueError as e:
+            return {"error": str(e), "device_id": device_id}
+
+        # Create per-device NodeManager and ConnectionManager
+        from .node_manager import NodeManager as NM
+        from .connection import ConnectionManager as CM
+        per_nm = NM()
+        _node_managers[device_id] = per_nm
+        conn = CM(node_manager=per_nm)
+        _connections[device_id] = conn
+
+        return {
+            "added": True,
+            "device_id": device_id,
+            "transport": transport,
+            "port": port,
         }
 
     return router

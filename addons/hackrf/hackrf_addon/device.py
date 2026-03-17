@@ -14,6 +14,81 @@ from typing import Optional
 log = logging.getLogger("hackrf.device")
 
 
+async def detect_all_hackrfs() -> list[dict]:
+    """Run hackrf_info and parse output for ALL connected HackRF devices.
+
+    hackrf_info lists each device as an "Index: N" section.
+    Returns a list of device info dicts, one per device, each with a
+    device_id like ``hackrf-{serial_last8}`` or ``hackrf-{index}`` if
+    no serial is available.
+    """
+    if not shutil.which("hackrf_info"):
+        log.warning("hackrf_info not found on PATH — cannot detect devices")
+        return []
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "hackrf_info",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=15.0)
+    except (asyncio.TimeoutError, FileNotFoundError, OSError) as e:
+        log.error(f"detect_all_hackrfs failed: {e}")
+        return []
+
+    if proc.returncode != 0:
+        err = stderr.decode(errors="replace").strip()
+        log.warning(f"hackrf_info returned {proc.returncode}: {err}")
+        return []
+
+    output = stdout.decode(errors="replace")
+    if "Found HackRF" not in output and "Serial number" not in output:
+        return []
+
+    # Split by "Index:" sections — each HackRF starts with "Index: N"
+    sections = re.split(r"(?=Index:\s*\d+)", output)
+    devices: list[dict] = []
+    parser = HackRFDevice()
+
+    for section in sections:
+        section = section.strip()
+        if not section or "Index:" not in section:
+            continue
+        # Prepend "Found HackRF" so _parse_hackrf_info recognises the block
+        parseable = "Found HackRF\n" + section if "Found HackRF" not in section else section
+        info = parser._parse_hackrf_info(parseable)
+        if info is None:
+            continue
+
+        # Extract index
+        m = re.search(r"Index:\s*(\d+)", section)
+        info["index"] = int(m.group(1)) if m else len(devices)
+
+        # Build a stable device_id
+        serial = info.get("serial", "")
+        serial_clean = serial.replace(" ", "")
+        if serial_clean:
+            info["device_id"] = f"hackrf-{serial_clean[-8:]}"
+        else:
+            info["device_id"] = f"hackrf-{info['index']}"
+
+        devices.append(info)
+
+    if not devices:
+        # Single-device fallback: maybe hackrf_info didn't use Index sections
+        info = parser._parse_hackrf_info(output)
+        if info:
+            info["index"] = 0
+            serial = info.get("serial", "")
+            serial_clean = serial.replace(" ", "")
+            info["device_id"] = f"hackrf-{serial_clean[-8:]}" if serial_clean else "hackrf-0"
+            devices.append(info)
+
+    log.info(f"Detected {len(devices)} HackRF device(s)")
+    return devices
+
+
 class HackRFDevice:
     """Interface to a HackRF One device via command-line tools.
 
@@ -31,6 +106,18 @@ class HackRFDevice:
         if self._available is None:
             self._available = shutil.which("hackrf_info") is not None
         return self._available
+
+    @property
+    def serial_short(self) -> str:
+        """Return the last 8 characters of the device serial number.
+
+        Returns an empty string if no info has been detected yet.
+        """
+        if not self._info:
+            return ""
+        serial = self._info.get("serial", "")
+        serial_clean = serial.replace(" ", "")
+        return serial_clean[-8:] if serial_clean else ""
 
     def get_info(self) -> dict | None:
         """Return cached device info, or None if not yet detected."""

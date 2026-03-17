@@ -7,10 +7,10 @@ Provides spectrum analysis, FM reception, and signal monitoring
 using HackRF One hardware via subprocess wrappers (no Python bindings).
 """
 
-from tritium_lib.sdk import SensorAddon, AddonInfo
+from tritium_lib.sdk import SensorAddon, AddonInfo, DeviceRegistry, DeviceState, SubprocessManager
 
 from .data_store import HackRFDataStore
-from .device import HackRFDevice
+from .device import HackRFDevice, detect_all_hackrfs
 from .spectrum import SpectrumAnalyzer
 from .receiver import FMReceiver
 from .signal_db import SignalDatabase
@@ -28,8 +28,8 @@ class HackRFAddon(SensorAddon):
     info = AddonInfo(
         id="hackrf",
         name="HackRF One SDR",
-        version="2.2.0",
-        description="Software Defined Radio — spectrum analyzer, FM demodulation, TPMS tracking, ISM monitoring, ADS-B aircraft tracking",
+        version="3.0.0",
+        description="Software Defined Radio — spectrum analyzer, FM demodulation, TPMS tracking, ISM monitoring, ADS-B aircraft tracking (multi-device)",
         author="Valpatel Software LLC",
         category="radio",
         icon="📻",
@@ -37,6 +37,17 @@ class HackRFAddon(SensorAddon):
 
     def __init__(self):
         super().__init__()
+        # Multi-device support via DeviceRegistry
+        self.registry = DeviceRegistry("hackrf")
+        self.subprocess_mgr = SubprocessManager("hackrf")
+
+        # Per-device instances keyed by device_id
+        self._device_instances: dict[str, HackRFDevice] = {}
+        self._spectrum_instances: dict[str, SpectrumAnalyzer] = {}
+        self._radio_locks: dict[str, RadioLock] = {}
+        self._signal_dbs: dict[str, SignalDatabase] = {}
+
+        # Default/first device (backwards compatibility)
         self.device = HackRFDevice()
         self.signal_db = SignalDatabase()
         self.spectrum = SpectrumAnalyzer(signal_db=self.signal_db)
@@ -60,6 +71,7 @@ class HackRFAddon(SensorAddon):
         log = logging.getLogger("hackrf")
 
         # Kill any orphaned HackRF subprocesses from previous runs
+        self.subprocess_mgr.kill_all()
         self._kill_orphan_processes()
 
         # Resolve target_tracker from app.state.amy (same pattern as meshtastic addon)
@@ -88,13 +100,70 @@ class HackRFAddon(SensorAddon):
             log.warning(f"HackRF data store init failed (non-fatal): {e}")
             self.data_store = None
 
-        # Auto-detect HackRF device
-        info = await self.device.detect()
-        if info:
-            log.info(f"HackRF One detected: serial={info.get('serial', '?')}, "
-                      f"firmware={info.get('firmware_version', '?')}")
+        # Auto-detect all connected HackRF devices
+        detected = await detect_all_hackrfs()
+        if detected:
+            for dev_info in detected:
+                device_id = dev_info["device_id"]
+                dev_instance = HackRFDevice()
+                dev_instance._info = {k: v for k, v in dev_info.items()
+                                       if k not in ("device_id", "index")}
+
+                # Register in DeviceRegistry
+                self.registry.add_device(
+                    device_id=device_id,
+                    device_type="hackrf",
+                    transport_type="local",
+                    metadata={
+                        "serial": dev_info.get("serial", ""),
+                        "firmware": dev_info.get("firmware_version", ""),
+                        "index": dev_info.get("index", 0),
+                        "board_name": dev_info.get("board_name", ""),
+                    },
+                )
+                self.registry.set_state(device_id, DeviceState.CONNECTED)
+                self.registry.touch(device_id)
+
+                # Create per-device service instances
+                self._device_instances[device_id] = dev_instance
+                sig_db = SignalDatabase()
+                self._signal_dbs[device_id] = sig_db
+                self._spectrum_instances[device_id] = SpectrumAnalyzer(signal_db=sig_db)
+                self._radio_locks[device_id] = RadioLock()
+
+                log.info(f"Registered HackRF device: {device_id} "
+                         f"(serial={dev_info.get('serial', '?')}, "
+                         f"firmware={dev_info.get('firmware_version', '?')})")
+
+            # Backwards compatibility: alias first device
+            first_id = detected[0]["device_id"]
+            self.device = self._device_instances[first_id]
+            self.signal_db = self._signal_dbs[first_id]
+            self.spectrum = self._spectrum_instances[first_id]
+            self.radio_lock = self._radio_locks[first_id]
+            self.continuous_scanner = ContinuousScanner(self.spectrum, self.signal_db)
+
+            log.info(f"Detected {len(detected)} HackRF device(s), "
+                     f"primary={first_id}")
         else:
-            log.warning("HackRF One not detected — addon running in degraded mode")
+            # No devices detected — fall back to single-device degraded mode
+            info = await self.device.detect()
+            if info:
+                device_id = f"hackrf-{self.device.serial_short}" if self.device.serial_short else "hackrf-0"
+                self.registry.add_device(
+                    device_id=device_id,
+                    device_type="hackrf",
+                    transport_type="local",
+                    metadata={"serial": info.get("serial", "")},
+                )
+                self.registry.set_state(device_id, DeviceState.CONNECTED)
+                self._device_instances[device_id] = self.device
+                self._signal_dbs[device_id] = self.signal_db
+                self._spectrum_instances[device_id] = self.spectrum
+                self._radio_locks[device_id] = self.radio_lock
+                log.info(f"HackRF One detected (single): {device_id}")
+            else:
+                log.warning("HackRF One not detected — addon running in degraded mode")
 
         # Add API routes
         router = create_router(
@@ -108,6 +177,11 @@ class HackRFAddon(SensorAddon):
             adsb_decoder=self.adsb_decoder,
             fm_player=self.fm_player,
             signal_db=self.signal_db,
+            registry=self.registry,
+            device_instances=self._device_instances,
+            spectrum_instances=self._spectrum_instances,
+            radio_locks=self._radio_locks,
+            signal_dbs=self._signal_dbs,
         )
         if hasattr(app, 'include_router'):
             app.include_router(router, prefix="/api/addons/hackrf", tags=["hackrf"])
@@ -125,8 +199,12 @@ class HackRFAddon(SensorAddon):
             await self.rtl433.stop_monitoring()
         if self.continuous_scanner.is_running:
             await self.continuous_scanner.stop()
-        if self.spectrum.is_running:
-            await self.spectrum.stop_sweep()
+
+        # Stop per-device spectrum analyzers
+        for spec in self._spectrum_instances.values():
+            if spec.is_running:
+                await spec.stop_sweep()
+
         if self.receiver.is_running:
             await self.receiver.stop()
         if self.tpms_decoder.is_running:
@@ -136,7 +214,10 @@ class HackRFAddon(SensorAddon):
         if self.data_store:
             await self.data_store.close()
             self.data_store = None
-        # Kill any remaining subprocesses
+
+        # Kill all tracked subprocesses and disconnect devices
+        self.subprocess_mgr.kill_all()
+        await self.registry.disconnect_all()
         self._kill_orphan_processes()
         await super().unregister(app)
 
@@ -300,6 +381,17 @@ class HackRFAddon(SensorAddon):
 
     def health_check(self):
         info = self.device.get_info()
+        per_device = {}
+        for dev_id, dev in self._device_instances.items():
+            d_info = dev.get_info()
+            spec = self._spectrum_instances.get(dev_id)
+            sig_db = self._signal_dbs.get(dev_id)
+            per_device[dev_id] = {
+                "connected": d_info is not None,
+                "serial": d_info.get("serial", "") if d_info else "",
+                "sweep_running": spec.is_running if spec else False,
+                "measurement_count": sig_db.count if sig_db else 0,
+            }
         return {
             "status": "ok" if info else "degraded",
             "available": self.device.is_available,
@@ -308,4 +400,6 @@ class HackRFAddon(SensorAddon):
             "firmware": info.get("firmware_version", "") if info else "",
             "sweep_running": self.spectrum.is_running,
             "measurement_count": self.signal_db.count,
+            "device_count": self.registry.device_count,
+            "devices": per_device,
         }
