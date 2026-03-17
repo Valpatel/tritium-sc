@@ -1136,7 +1136,6 @@ export const MeshtasticPanelDef = {
         }
 
         // ─── FIRMWARE TAB ────────────────────────────────────────
-        let firmwareInfo = {};
         let availableVersions = [];
 
         async function fetchFirmwareInfo() {

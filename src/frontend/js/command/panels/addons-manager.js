@@ -114,7 +114,7 @@ function _renderAddonCard(addon, manifest) {
             <span class="addmgr-badge" style="border-color:${catColor};color:${catColor}">${_esc(cat)}</span>
             ${layerInfo}
             <button class="addmgr-reload-btn" data-reload="${id}" title="Hot-reload this addon (re-read code + manifest)">RELOAD</button>
-            <button class="addmgr-open-all-btn" data-open-all="${id}" title="Open all panels for this addon"${enabled ? '' : ' disabled'}>OPEN ALL</button>
+            <button class="addmgr-open-all-btn" data-open-addon="${id}" title="Open all panels for this addon"${enabled ? '' : ' disabled'}>OPEN</button>
         </div>
     </div>`;
 }
@@ -401,6 +401,13 @@ function _injectStyles() {
             opacity: 0.4;
             cursor: wait;
         }
+        /* Loading spinner */
+        .addmgr-spinner {
+            width: 24px; height: 24px; margin: 0 auto;
+            border: 2px solid #1a1a2e; border-top-color: #00f0ff;
+            border-radius: 50%; animation: addmgr-spin 0.8s linear infinite;
+        }
+        @keyframes addmgr-spin { to { transform: rotate(360deg); } }
         /* Footer link */
         .addmgr-footer {
             padding: 8px 12px;
@@ -464,6 +471,10 @@ export const AddonsManagerPanelDef = {
         const listEl = bodyEl.querySelector('[data-bind="list"]');
         const countEl = bodyEl.querySelector('[data-bind="count"]');
         const filterInput = bodyEl.querySelector('[data-bind="filter"]');
+
+        // Show loading state immediately
+        listEl.innerHTML = '<div class="addmgr-empty" style="padding:40px 10px"><div class="addmgr-spinner"></div><div style="margin-top:8px">Discovering addons...</div></div>';
+        countEl.textContent = 'loading...';
 
         async function fetchAddons() {
             try {
@@ -576,7 +587,7 @@ export const AddonsManagerPanelDef = {
             }
 
             // Open ALL panels for an addon
-            const openAllBtn = e.target.closest('[data-open-all]');
+            const openAllBtn = e.target.closest('[data-open-addon]');
             if (openAllBtn) {
                 const addonId = openAllBtn.dataset.openAll;
                 const manifest = manifests[addonId];
