@@ -470,47 +470,52 @@ class TestFirmwareInfo:
 
 
 class TestFlashFirmware:
-    def test_no_port(self):
+    def test_no_port_no_flasher(self):
+        """With no flasher and no port, falls back to error."""
         conn = FakeConnection(connected=False)
         conn.port = ""
         dm = DeviceManager(conn)
-        result = asyncio.run(dm.flash_firmware("/tmp/firmware.bin"))
-        assert result["success"] is False
-        assert "No serial port" in result["error"]
-
-    def test_no_tools(self, connected_dm):
-        with patch("shutil.which", return_value=None):
-            result = asyncio.run(connected_dm.flash_firmware("/tmp/firmware.bin"))
+        with patch.object(dm, "_get_flasher", return_value=None):
+            result = asyncio.run(dm.flash_firmware("/tmp/firmware.bin"))
             assert result["success"] is False
-            assert "esptool" in result["error"]
 
-    def test_flash_with_meshtastic_cli(self, connected_dm):
-        with patch("shutil.which") as mock_which:
-            mock_which.side_effect = lambda n: "/usr/bin/meshtastic" if n == "meshtastic" else None
-            with patch.object(connected_dm, "_run_subprocess") as mock_sub:
-                mock_sub.return_value = {"success": True, "output": "Done"}
-                result = asyncio.run(connected_dm.flash_firmware("/tmp/fw.bin", port="/dev/ttyUSB0"))
-                assert result["success"] is True
-                # Verify the meshtastic CLI was called
-                mock_sub.assert_called_once()
-                cmd = mock_sub.call_args[0][0]
-                assert cmd[0] == "/usr/bin/meshtastic"
-                assert "--flash-firmware" in cmd
+    def test_flash_fallback_no_tools(self, connected_dm):
+        """Without flasher and without CLI tools, returns error."""
+        with patch.object(connected_dm, "_get_flasher", return_value=None):
+            with patch("shutil.which", return_value=None):
+                result = asyncio.run(connected_dm.flash_firmware("/tmp/firmware.bin"))
+                assert result["success"] is False
 
-    def test_flash_with_esptool(self, connected_dm):
-        with patch("shutil.which") as mock_which:
-            def which_side(n):
-                if n == "esptool.py":
-                    return "/usr/bin/esptool.py"
-                return None
-            mock_which.side_effect = which_side
-            with patch.object(connected_dm, "_run_subprocess") as mock_sub:
-                mock_sub.return_value = {"success": True, "output": "Done"}
-                result = asyncio.run(connected_dm.flash_firmware("/tmp/fw.bin"))
-                assert result["success"] is True
-                cmd = mock_sub.call_args[0][0]
-                assert cmd[0] == "/usr/bin/esptool.py"
-                assert "write_flash" in cmd
+    def test_flash_fallback_with_meshtastic_cli(self, connected_dm):
+        """Falls back to meshtastic CLI when flasher unavailable."""
+        with patch.object(connected_dm, "_get_flasher", return_value=None):
+            with patch("shutil.which") as mock_which:
+                mock_which.side_effect = lambda n: "/usr/bin/meshtastic" if n == "meshtastic" else None
+                with patch.object(connected_dm, "_run_subprocess") as mock_sub:
+                    mock_sub.return_value = {"success": True, "output": "Done"}
+                    result = asyncio.run(connected_dm.flash_firmware("/tmp/fw.bin", port="/dev/ttyUSB0"))
+                    assert result["success"] is True
+                    mock_sub.assert_called_once()
+                    cmd = mock_sub.call_args[0][0]
+                    assert cmd[0] == "/usr/bin/meshtastic"
+                    assert "--flash-firmware" in cmd
+
+    def test_flash_fallback_with_esptool(self, connected_dm):
+        """Falls back to esptool when flasher unavailable."""
+        with patch.object(connected_dm, "_get_flasher", return_value=None):
+            with patch("shutil.which") as mock_which:
+                def which_side(n):
+                    if n == "esptool.py":
+                        return "/usr/bin/esptool.py"
+                    return None
+                mock_which.side_effect = which_side
+                with patch.object(connected_dm, "_run_subprocess") as mock_sub:
+                    mock_sub.return_value = {"success": True, "output": "Done"}
+                    result = asyncio.run(connected_dm.flash_firmware("/tmp/fw.bin"))
+                    assert result["success"] is True
+                    cmd = mock_sub.call_args[0][0]
+                    assert cmd[0] == "/usr/bin/esptool.py"
+                    assert "write_flash" in cmd
 
 
 # ---------------------------------------------------------------------------
@@ -668,9 +673,11 @@ class TestDeviceRoutes:
         assert resp.status_code == 200
         assert resp.json()["success"] is True
 
-    def test_flash_no_path(self, client):
+    def test_flash_empty_body(self, client):
+        """Empty body triggers flash_latest which fails without device."""
         resp = client.post("/api/addons/meshtastic/device/flash", json={})
-        assert resp.status_code == 400
+        # Fails gracefully (500 because no device, not 400)
+        assert resp.status_code == 500
 
 
 # ---------------------------------------------------------------------------

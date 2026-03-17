@@ -687,8 +687,18 @@ class DeviceManager:
         node.factoryReset()
 
     # =====================================================================
-    # 4. Firmware management
+    # 4. Firmware management (uses tritium_lib.firmware)
     # =====================================================================
+
+    def _get_flasher(self):
+        """Get or create a MeshtasticFlasher instance."""
+        try:
+            from tritium_lib.firmware import MeshtasticFlasher
+            port = self.connection.port if self.connection else ""
+            return MeshtasticFlasher(port=port)
+        except ImportError:
+            log.warning("tritium_lib.firmware not available — using fallback flash")
+            return None
 
     async def get_firmware_info(self) -> FirmwareInfo:
         """Check current firmware version and update availability."""
@@ -709,83 +719,93 @@ class DeviceManager:
         # Compare against known versions
         if fw.current_version:
             fw.latest_version = LATEST_STABLE
-            fw.update_available = (
-                fw.current_version != LATEST_STABLE
-                and fw.current_version in KNOWN_FIRMWARE_VERSIONS
-                and KNOWN_FIRMWARE_VERSIONS.index(fw.current_version)
-                > KNOWN_FIRMWARE_VERSIONS.index(LATEST_STABLE)
-            )
-            # Also mark as update available if current version is not in our list
-            # (likely older than what we track)
-            if fw.current_version not in KNOWN_FIRMWARE_VERSIONS:
-                fw.update_available = True
+            fw.update_available = fw.current_version != LATEST_STABLE
 
         return fw
 
+    async def detect_device(self) -> dict:
+        """Detect the connected device using the firmware flasher.
+
+        Returns device info: chip, board, firmware version, flash size.
+        """
+        flasher = self._get_flasher()
+        if not flasher:
+            return {"error": "Firmware flasher not available"}
+
+        detection = await flasher.detect()
+        return detection.to_dict()
+
     async def flash_firmware(
         self,
-        firmware_path: str,
+        firmware_path: str = "",
         port: str = "",
     ) -> dict:
-        """Flash firmware to the device via USB.
+        """Flash firmware to the device.
 
-        This uses esptool or the meshtastic CLI. The actual flashing
-        subprocess is run in an executor to avoid blocking.
+        If firmware_path is empty, downloads and flashes the latest
+        official Meshtastic firmware for the detected board.
 
         Args:
-            firmware_path: Path to the firmware .bin file.
-            port: Serial port (defaults to the currently connected port).
-
-        Returns a dict with status and output.
+            firmware_path: Path to firmware .bin (empty = download latest).
+            port: Serial port override.
         """
-        if not port and self.connection:
-            port = self.connection.port
-
-        if not port:
-            return {"success": False, "error": "No serial port specified"}
-
-        # Prefer meshtastic CLI, fall back to esptool
-        meshtastic_cli = shutil.which("meshtastic")
-        esptool = shutil.which("esptool.py") or shutil.which("esptool")
-
-        if meshtastic_cli:
-            return await self._flash_with_meshtastic_cli(meshtastic_cli, firmware_path, port)
-        elif esptool:
-            return await self._flash_with_esptool(esptool, firmware_path, port)
-        else:
-            return {
-                "success": False,
-                "error": "Neither meshtastic CLI nor esptool found. "
-                         "Install with: pip install meshtastic esptool",
-            }
-
-    async def _flash_with_meshtastic_cli(
-        self, cli_path: str, firmware_path: str, port: str
-    ) -> dict:
-        """Flash using the meshtastic CLI."""
         # Disconnect first so the port is free
         if self.connection and self.connection.is_connected:
             await self.connection.disconnect()
 
-        cmd = [cli_path, "--port", port, "--flash-firmware", firmware_path]
+        flasher = self._get_flasher()
+        if flasher:
+            if port:
+                flasher.port = port
+
+            if firmware_path:
+                result = await flasher.flash(firmware_path, erase_all=True)
+            else:
+                result = await flasher.flash_latest()
+
+            return result.to_dict()
+
+        # Fallback: direct subprocess
+        if not port and self.connection:
+            port = self.connection.port
+        if not port:
+            return {"success": False, "error": "No serial port specified"}
+
+        meshtastic_cli = shutil.which("meshtastic")
+        esptool = shutil.which("esptool.py") or shutil.which("esptool")
+
+        if firmware_path:
+            if meshtastic_cli:
+                cmd = [meshtastic_cli, "--port", port, "--flash-firmware", firmware_path]
+            elif esptool:
+                cmd = [esptool, "--port", port, "--baud", "921600", "write_flash", "0x0", firmware_path]
+            else:
+                return {"success": False, "error": "Neither esptool nor meshtastic CLI found"}
+        else:
+            if meshtastic_cli:
+                cmd = [meshtastic_cli, "--port", port, "--flash-firmware"]
+            else:
+                return {"success": False, "error": "meshtastic CLI needed for auto-update"}
+
         return await self._run_subprocess(cmd)
 
-    async def _flash_with_esptool(
-        self, esptool_path: str, firmware_path: str, port: str
-    ) -> dict:
-        """Flash using esptool directly."""
-        if self.connection and self.connection.is_connected:
-            await self.connection.disconnect()
+    async def flash_latest(self) -> dict:
+        """Download and flash the latest official Meshtastic firmware."""
+        return await self.flash_firmware()
 
-        cmd = [
-            esptool_path,
-            "--port", port,
-            "--baud", "921600",
-            "write_flash",
-            "0x0",
-            firmware_path,
-        ]
-        return await self._run_subprocess(cmd)
+    async def get_available_versions(self, limit: int = 10) -> list[dict]:
+        """Fetch available Meshtastic firmware versions from GitHub."""
+        flasher = self._get_flasher()
+        if not flasher:
+            return []
+
+        try:
+            return await self._run_in_executor(
+                flasher.get_available_versions, limit,
+            )
+        except Exception as e:
+            log.warning(f"Failed to get versions: {e}")
+            return []
 
     async def _run_subprocess(self, cmd: list[str]) -> dict:
         """Run a subprocess in an executor and capture output."""
@@ -800,10 +820,7 @@ class DeviceManager:
         """Run a subprocess synchronously — called from executor."""
         try:
             proc = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=300,  # 5 minute timeout for firmware flashing
+                cmd, capture_output=True, text=True, timeout=300,
             )
             return {
                 "success": proc.returncode == 0,
@@ -967,21 +984,48 @@ def create_device_routes(device_manager: DeviceManager) -> "APIRouter":
             raise HTTPException(status_code=503, detail="Device not connected or reset failed")
         return {"success": True, "message": "Factory reset initiated"}
 
+    @router.get("/detect")
+    async def detect_device():
+        """Detect the connected device (chip, board, firmware, flash size)."""
+        return await device_manager.detect_device()
+
     @router.post("/flash")
-    async def flash_firmware(body: dict):
+    async def flash_firmware(body: dict = None):
         """Flash firmware to the device.
 
-        Body: { "firmware_path": "/path/to/firmware.bin", "port": "/dev/ttyACM0" (optional) }
-        """
-        firmware_path = body.get("firmware_path", "")
-        if not firmware_path:
-            raise HTTPException(status_code=400, detail="firmware_path required")
+        Body: {
+            "firmware_path": "/path/to/firmware.bin" (optional — omit for latest),
+            "port": "/dev/ttyACM0" (optional)
+        }
 
+        If firmware_path is omitted, downloads and flashes the latest
+        official Meshtastic firmware for the detected board.
+        """
+        body = body or {}
+        firmware_path = body.get("firmware_path", "")
         port = body.get("port", "")
+
         result = await device_manager.flash_firmware(firmware_path, port=port)
         if not result.get("success"):
             raise HTTPException(status_code=500, detail=result.get("error", "Flash failed"))
         return result
+
+    @router.post("/flash-latest")
+    async def flash_latest():
+        """Download and flash the latest official Meshtastic firmware.
+
+        Detects the board automatically and downloads the correct firmware.
+        """
+        result = await device_manager.flash_latest()
+        if not result.get("success"):
+            raise HTTPException(status_code=500, detail=result.get("error", "Flash failed"))
+        return result
+
+    @router.get("/firmware/versions")
+    async def firmware_versions(limit: int = 10):
+        """Available Meshtastic firmware versions from GitHub."""
+        versions = await device_manager.get_available_versions(limit=limit)
+        return {"versions": versions}
 
     return router
 
