@@ -5046,7 +5046,7 @@
     flex-direction: column;
     background: var(--surface-1, #0e0e14);
     border-bottom: 1px solid #05ffa133;
-    z-index: 200;
+    z-index: 150;       /* Below command bar (z:300) so menu dropdowns aren't blocked */
     position: relative;
     flex-shrink: 0;
     user-select: none;

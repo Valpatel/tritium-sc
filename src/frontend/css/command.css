@@ -3143,7 +3143,7 @@ body.v2 {
     padding: 0 8px;
     background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%);
     border-bottom: 1px solid var(--border);
-    z-index: 200;       /* Above panels (z:100) so menu dropdowns are always readable */
+    z-index: 300;       /* Above panels (z:100) AND tactical banner (z:150) so dropdowns aren't blocked */
     position: relative;
 }
 
