@@ -136,7 +136,10 @@ def create_router(connection, node_manager, message_bridge=None) -> APIRouter:
                     "error": "port_not_found",
                     "message": f"Serial port {serial_port} does not exist. Is the device plugged in?",
                 }
-            await connection.connect_serial(serial_port, timeout=timeout, noNodes=noNodes)
+            try:
+                await connection.connect_serial(serial_port, timeout=timeout, noNodes=noNodes)
+            except Exception as e:
+                return {"connected": False, "error": "connect_exception", "message": str(e)}
         elif transport == "tcp":
             host = port or "localhost"
             await connection.connect_tcp(host, timeout=timeout)

@@ -201,12 +201,14 @@ class ConnectionManager:
                 log.warning(f"Serial connection to {port} timed out after {timeout}s (attempt {attempt + 1})")
                 self._close_interface()
                 self.is_connected = False
-            except ImportError:
-                log.warning("meshtastic package not installed — pip install meshtastic")
+            except ImportError as ie:
+                log.error(f"meshtastic import failed: {ie}")
                 self.is_connected = False
                 return  # no point retrying
             except Exception as e:
-                log.warning(f"Serial connection failed on {port}: {e} (attempt {attempt + 1})")
+                log.warning(f"Serial connection failed on {port}: {type(e).__name__}: {e} (attempt {attempt + 1})")
+                import traceback
+                log.debug(traceback.format_exc())
                 self._close_interface()
                 self.is_connected = False
 
