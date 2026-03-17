@@ -8,6 +8,13 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 
+def _clean_role(role: str) -> str:
+    """Strip UNKNOWN() wrapper from role names."""
+    if role and role.startswith("UNKNOWN(") and role.endswith(")"):
+        return role[8:-1]
+    return role
+
+
 def create_router(connection, node_manager, message_bridge=None) -> APIRouter:
     """Create FastAPI router for Meshtastic addon endpoints."""
 
@@ -113,7 +120,7 @@ def create_router(connection, node_manager, message_bridge=None) -> APIRouter:
                 "long_name": node.get("long_name", ""),
                 "short_name": node.get("short_name", ""),
                 "hw_model": node.get("hw_model", ""),
-                "role": node.get("role", ""),
+                "role": _clean_role(node.get("role", "")),
                 "lat": node.get("lat"),
                 "lng": node.get("lng"),
                 "altitude": node.get("altitude"),

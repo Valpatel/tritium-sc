@@ -63,10 +63,20 @@ class MeshtasticAddon(SensorAddon):
         else:
             log.warning("Meshtastic addon: no TargetTracker found — mesh nodes will not appear on tactical map")
 
-        self.node_manager = NodeManager(
-            event_bus=event_bus,
-            target_tracker=target_tracker,
-        )
+        # Reuse existing node_manager from app.state if available (preserves nodes across hot-reload)
+        existing_nm = getattr(getattr(app, 'state', None), 'meshtastic_node_manager', None)
+        if existing_nm and existing_nm.nodes:
+            log.info(f"Reusing existing NodeManager with {len(existing_nm.nodes)} nodes")
+            self.node_manager = existing_nm
+            self.node_manager.event_bus = event_bus
+            self.node_manager.target_tracker = target_tracker
+        else:
+            self.node_manager = NodeManager(
+                event_bus=event_bus,
+                target_tracker=target_tracker,
+            )
+        if hasattr(app, 'state'):
+            app.state.meshtastic_node_manager = self.node_manager
 
         # Reuse existing connection from app.state if available (survives hot-reload)
         existing_conn = getattr(getattr(app, 'state', None), 'meshtastic_connection', None)
