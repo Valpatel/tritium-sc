@@ -180,7 +180,7 @@ class ConnectionManager:
                         debugOut=None,
                         noProto=False,
                         noNodes=noNodes,
-                        connectTimeout=connect_timeout,
+                        timeout=connect_timeout,
                     )
 
                 self.interface = await asyncio.wait_for(
@@ -229,7 +229,7 @@ class ConnectionManager:
             def _connect():
                 return meshtastic.tcp_interface.TCPInterface(
                     host, portNumber=port, noProto=False,
-                    connectTimeout=connect_timeout,
+                    timeout=connect_timeout,
                 )
 
             self.interface = await asyncio.wait_for(
