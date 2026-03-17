@@ -3,6 +3,6 @@
 # Licensed under AGPL-3.0 — see LICENSE for details.
 """Loader shim for the Meshtastic plugin package."""
 
-from plugins.meshtastic.plugin import MeshtasticPlugin
+from plugins.meshtastic_bridge.plugin import MeshtasticPlugin
 
 __all__ = ["MeshtasticPlugin"]
