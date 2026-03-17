@@ -250,9 +250,14 @@ class NodeManager:
         position = raw.get("position", {})
         metrics = raw.get("deviceMetrics", {})
 
-        # Role from user protobuf
-        role_num = user.get("role", 0)
-        role_name = ROLE_NAMES.get(role_num, f"UNKNOWN({role_num})")
+        # Role from user protobuf — can be int (enum) or string (name)
+        role_raw = user.get("role", 0)
+        if isinstance(role_raw, int):
+            role_name = ROLE_NAMES.get(role_raw, f"ROLE_{role_raw}")
+        elif isinstance(role_raw, str) and role_raw:
+            role_name = role_raw
+        else:
+            role_name = "CLIENT"
 
         node = {
             "node_id": node_id,
