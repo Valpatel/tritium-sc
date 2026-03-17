@@ -1,0 +1,63 @@
+[addon]
+id = "meshtastic"
+name = "Meshtastic LoRa Mesh"
+version = "1.0.0"
+description = "LoRa mesh radio network integration with fleet management"
+author = "Valpatel Software LLC"
+license = "AGPL-3.0"
+addon_api = ">=1.0, <2.0"
+
+[addon.category]
+window = "radio"
+tab_order = 1
+icon = "📡"
+
+[dependencies]
+requires = []
+optional = []
+python_packages = ["meshtastic>=2.3"]
+
+[hardware]
+devices = ["meshtastic-radio"]
+auto_detect = true
+serial_vid_pid = [
+    "303a:1001",
+    "10c4:ea60",
+    "1a86:7523",
+]
+
+[permissions]
+serial = true
+network = true
+mqtt = true
+storage = true
+
+[backend]
+module = "meshtastic_addon"
+router_prefix = "/api/addons/meshtastic"
+mqtt_topics = [
+    "tritium/{site}/meshtastic/+/nodes",
+    "tritium/{site}/meshtastic/+/telemetry",
+    "tritium/{site}/meshtastic/+/messages",
+    "tritium/{site}/meshtastic/+/position",
+]
+
+[frontend]
+panels = [
+    { id = "mesh-network", title = "MESHTASTIC", file = "mesh-network.js", tab_order = 1 },
+    { id = "mesh-nodes", title = "MESH NODES", file = "mesh-nodes.js", tab_order = 2 },
+    { id = "mesh-config", title = "DEVICE CONFIG", file = "mesh-config.js", tab_order = 3 },
+    { id = "mesh-messages", title = "MESH CHAT", file = "mesh-messages.js", tab_order = 4 },
+]
+layers = [
+    { id = "meshNodes", label = "Mesh Nodes", category = "MESH NETWORK", color = "#00d4aa" },
+    { id = "meshLinks", label = "Mesh Links", category = "MESH NETWORK", color = "#00d4aa" },
+    { id = "meshCoverage", label = "Coverage Estimate", category = "MESH NETWORK", color = "rgba(0,212,170,0.3)" },
+]
+context_menu = [
+    { label = "Send Mesh Message...", action = "meshtastic:send_to", when = "target.source == 'mesh'" },
+    { label = "Ping Node", action = "meshtastic:ping", when = "target.source == 'mesh'" },
+]
+shortcuts = [
+    { key = "Shift+M", action = "meshtastic:toggle_nodes", description = "Toggle mesh nodes on map" },
+]
