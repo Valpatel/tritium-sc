@@ -135,11 +135,11 @@ class NodeManager:
         now = time.time()
         for node_id, node in self.nodes.items():
             last_heard = node.get("last_heard") or 0
-            age_s = now - last_heard if last_heard > 0 else float("inf")
+            age_s = (now - last_heard) if last_heard > 0 else 999999
 
             target = {
                 "target_id": f"mesh_{node_id.replace('!', '')}",
-                "name": node.get("long_name", node_id),
+                "name": node.get("long_name") or node_id,
                 "source": "mesh",
                 "asset_type": "mesh_radio",
                 "alliance": "friendly",

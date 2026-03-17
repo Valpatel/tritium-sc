@@ -425,18 +425,40 @@ class TestConnectionLifecycle:
     @pytest.mark.asyncio
     async def test_connect_mqtt_success(self):
         """MQTT connect should succeed."""
-        mock_iface = MagicMock()
-        # The meshtastic package may not have mqtt_interface installed;
-        # create the module in sys.modules so patch can find it.
         import sys
-        mock_mqtt_mod = MagicMock()
-        mock_mqtt_mod.MQTTInterface = MagicMock(return_value=mock_iface)
-        with patch.dict(sys.modules, {"meshtastic.mqtt_interface": mock_mqtt_mod}):
+        import types
+
+        mock_iface = MagicMock()
+        # Create a fake meshtastic.mqtt_interface module with MQTTInterface
+        mqtt_mod = types.ModuleType("meshtastic.mqtt_interface")
+        mqtt_mod.MQTTInterface = MagicMock(return_value=mock_iface)
+
+        # Insert into sys.modules so `import meshtastic.mqtt_interface` resolves
+        # Also set as attribute on the meshtastic package
+        import meshtastic
+        had_attr = hasattr(meshtastic, "mqtt_interface")
+        old_attr = getattr(meshtastic, "mqtt_interface", None)
+        old_mod = sys.modules.get("meshtastic.mqtt_interface")
+
+        try:
+            sys.modules["meshtastic.mqtt_interface"] = mqtt_mod
+            meshtastic.mqtt_interface = mqtt_mod
+
             await self.conn.connect_mqtt(
                 host="mqtt.meshtastic.org", port=1883,
                 topic="msh/US/2/e/#", username="meshdev", password="large4cats",
                 timeout=5.0,
             )
+        finally:
+            # Restore
+            if old_mod is not None:
+                sys.modules["meshtastic.mqtt_interface"] = old_mod
+            else:
+                sys.modules.pop("meshtastic.mqtt_interface", None)
+            if had_attr:
+                meshtastic.mqtt_interface = old_attr
+            elif hasattr(meshtastic, "mqtt_interface"):
+                delattr(meshtastic, "mqtt_interface")
 
         assert self.conn.is_connected is True
         assert self.conn.transport_type == "mqtt"
