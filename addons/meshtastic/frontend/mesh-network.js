@@ -14,8 +14,8 @@ const REFRESH_MS = 5000;
 export const MeshNetworkPanelDef = {
     id: 'mesh-network',
     title: 'MESHTASTIC',
-    defaultPosition: { x: 8, y: 60 },
-    defaultSize: { w: 340, h: 400 },
+    defaultPosition: { x: 8, y: 80 },
+    defaultSize: { w: 420, h: 540 },
 
     create(panel) {
         const el = document.createElement('div');
@@ -53,22 +53,22 @@ export const MeshNetworkPanelDef = {
                 <div class="panel-section-label">MESH STATS</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;padding:4px 8px;">
                     <div class="panel-stat-row" style="flex-direction:column;align-items:flex-start;">
-                        <span class="panel-stat-label" style="font-size:0.6rem">NODES</span>
+                        <span class="panel-stat-label" style="font-size:0.8rem">NODES</span>
                         <span class="panel-stat-value mono" data-bind="node-count"
                               style="font-size:1.4rem;color:var(--cyan, #00f0ff)">0</span>
                     </div>
                     <div class="panel-stat-row" style="flex-direction:column;align-items:flex-start;">
-                        <span class="panel-stat-label" style="font-size:0.6rem">WITH GPS</span>
+                        <span class="panel-stat-label" style="font-size:0.8rem">WITH GPS</span>
                         <span class="panel-stat-value mono" data-bind="gps-count"
                               style="font-size:1.4rem;color:var(--green, #05ffa1)">0</span>
                     </div>
                     <div class="panel-stat-row" style="flex-direction:column;align-items:flex-start;">
-                        <span class="panel-stat-label" style="font-size:0.6rem">AVG BATTERY</span>
+                        <span class="panel-stat-label" style="font-size:0.8rem">AVG BATTERY</span>
                         <span class="panel-stat-value mono" data-bind="avg-battery"
                               style="font-size:1.4rem;color:var(--yellow, #fcee0a)">--%</span>
                     </div>
                     <div class="panel-stat-row" style="flex-direction:column;align-items:flex-start;">
-                        <span class="panel-stat-label" style="font-size:0.6rem">MESH UTIL</span>
+                        <span class="panel-stat-label" style="font-size:0.8rem">MESH UTIL</span>
                         <span class="panel-stat-value mono" data-bind="mesh-util"
                               style="font-size:1.4rem;color:var(--magenta, #ff2a6d)">--%</span>
                     </div>
@@ -195,7 +195,7 @@ export const MeshNetworkPanelDef = {
                         const bat = n.battery !== null && n.battery !== undefined
                             ? Math.round(n.battery) + '%' : '';
                         return `<li class="panel-list-item" style="padding:3px 4px;font-size:0.75rem;">
-                            <span class="panel-icon-badge" style="color:var(--cyan);border-color:var(--cyan);font-size:0.6rem;width:16px;height:16px;line-height:16px">M</span>
+                            <span class="panel-icon-badge" style="color:var(--cyan);border-color:var(--cyan);font-size:0.8rem;width:16px;height:16px;line-height:16px">M</span>
                             <span class="mono" style="flex:1">${name}</span>
                             <span class="mono" style="color:var(--text-dim);margin-right:6px">${bat}</span>
                             <span class="mono" style="color:var(--text-dim)">${age}</span>

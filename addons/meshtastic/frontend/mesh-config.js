@@ -12,8 +12,8 @@ const API_BASE = '/api/addons/meshtastic';
 export const MeshConfigPanelDef = {
     id: 'mesh-config',
     title: 'DEVICE CONFIG',
-    defaultPosition: { x: 360, y: 60 },
-    defaultSize: { w: 340, h: 440 },
+    defaultPosition: { x: 440, y: 80 },
+    defaultSize: { w: 420, h: 520 },
 
     create(panel) {
         const el = document.createElement('div');
@@ -49,9 +49,9 @@ export const MeshConfigPanelDef = {
             <div class="mesh-cfg-capabilities">
                 <div class="panel-section-label">CAPABILITIES</div>
                 <div style="display:flex;gap:8px;padding:4px 8px;flex-wrap:wrap;" data-bind="caps">
-                    <span class="panel-badge" style="background:var(--surface-2,#1a1a2e);color:var(--text-dim,#888);padding:2px 8px;border-radius:3px;font-size:0.65rem;" data-cap="wifi">WiFi</span>
-                    <span class="panel-badge" style="background:var(--surface-2,#1a1a2e);color:var(--text-dim,#888);padding:2px 8px;border-radius:3px;font-size:0.65rem;" data-cap="ble">BLE</span>
-                    <span class="panel-badge" style="background:var(--surface-2,#1a1a2e);color:var(--text-dim,#888);padding:2px 8px;border-radius:3px;font-size:0.65rem;" data-cap="gps">GPS</span>
+                    <span class="panel-badge" style="background:var(--surface-2,#1a1a2e);color:var(--text-dim,#888);padding:2px 8px;border-radius:3px;font-size:0.8rem;" data-cap="wifi">WiFi</span>
+                    <span class="panel-badge" style="background:var(--surface-2,#1a1a2e);color:var(--text-dim,#888);padding:2px 8px;border-radius:3px;font-size:0.8rem;" data-cap="ble">BLE</span>
+                    <span class="panel-badge" style="background:var(--surface-2,#1a1a2e);color:var(--text-dim,#888);padding:2px 8px;border-radius:3px;font-size:0.8rem;" data-cap="gps">GPS</span>
                 </div>
             </div>
 
@@ -59,14 +59,14 @@ export const MeshConfigPanelDef = {
                 <div class="panel-section-label">CONNECT</div>
                 <div style="padding:4px 8px;">
                     <div style="display:flex;gap:6px;margin-bottom:6px;">
-                        <label class="mono" style="font-size:0.65rem;color:var(--text-dim,#888);min-width:70px;line-height:26px;">TRANSPORT</label>
+                        <label class="mono" style="font-size:0.8rem;color:var(--text-dim,#888);min-width:70px;line-height:26px;">TRANSPORT</label>
                         <select class="panel-filter" data-bind="transport-select" style="flex:1;font-size:0.7rem;">
                             <option value="serial">Serial (USB)</option>
                             <option value="tcp">TCP/IP</option>
                         </select>
                     </div>
                     <div data-bind="serial-fields" style="display:flex;gap:6px;margin-bottom:6px;">
-                        <label class="mono" style="font-size:0.65rem;color:var(--text-dim,#888);min-width:70px;line-height:26px;">PORT</label>
+                        <label class="mono" style="font-size:0.8rem;color:var(--text-dim,#888);min-width:70px;line-height:26px;">PORT</label>
                         <select class="panel-filter" data-bind="port-select" style="flex:1;font-size:0.7rem;">
                             <option value="/dev/ttyACM0">/dev/ttyACM0</option>
                             <option value="/dev/ttyUSB0">/dev/ttyUSB0</option>
@@ -77,7 +77,7 @@ export const MeshConfigPanelDef = {
                         </select>
                     </div>
                     <div data-bind="tcp-fields" style="display:none;gap:6px;margin-bottom:6px;">
-                        <label class="mono" style="font-size:0.65rem;color:var(--text-dim,#888);min-width:70px;line-height:26px;">HOST</label>
+                        <label class="mono" style="font-size:0.8rem;color:var(--text-dim,#888);min-width:70px;line-height:26px;">HOST</label>
                         <input type="text" class="panel-filter" data-bind="tcp-host"
                                placeholder="192.168.1.50:4403" autocomplete="off"
                                style="flex:1;font-size:0.7rem;" />
@@ -93,7 +93,7 @@ export const MeshConfigPanelDef = {
 
             <div class="mesh-cfg-future" style="padding:8px;margin-top:auto;">
                 <div class="panel-section-label">CONFIGURATION</div>
-                <div class="panel-empty" style="font-size:0.65rem;padding:8px;text-align:center;">
+                <div class="panel-empty" style="font-size:0.8rem;padding:8px;text-align:center;">
                     Name, channel, and role configuration coming soon.
                     <br/>Connect a device to enable settings.
                 </div>

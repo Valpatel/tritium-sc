@@ -42,8 +42,8 @@ const COLUMNS = [
 export const MeshNodesPanelDef = {
     id: 'mesh-nodes',
     title: 'MESH NODES',
-    defaultPosition: { x: 8, y: 470 },
-    defaultSize: { w: 620, h: 380 },
+    defaultPosition: { x: 8, y: 630 },
+    defaultSize: { w: 680, h: 420 },
 
     create(panel) {
         const el = document.createElement('div');
@@ -53,7 +53,7 @@ export const MeshNodesPanelDef = {
         // Build header row
         const headerCells = COLUMNS.map(col =>
             `<th class="mesh-nodes-th" data-sort="${col.key}"
-                style="width:${col.width};text-align:${col.align || 'left'};cursor:pointer;padding:3px 4px;font-size:0.65rem;color:var(--text-dim,#888);border-bottom:1px solid var(--border,#1a1a2e);user-select:none;white-space:nowrap;">
+                style="width:${col.width};text-align:${col.align || 'left'};cursor:pointer;padding:3px 4px;font-size:0.8rem;color:var(--text-dim,#888);border-bottom:1px solid var(--border,#1a1a2e);user-select:none;white-space:nowrap;">
                 ${col.label} <span class="mesh-sort-arrow" data-arrow="${col.key}"></span>
             </th>`
         ).join('');

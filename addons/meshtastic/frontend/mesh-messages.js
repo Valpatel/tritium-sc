@@ -15,8 +15,8 @@ const MSG_CHAR_LIMIT = 228;
 export const MeshMessagesPanelDef = {
     id: 'mesh-messages',
     title: 'MESH CHAT',
-    defaultPosition: { x: 360, y: 510 },
-    defaultSize: { w: 340, h: 360 },
+    defaultPosition: { x: 440, y: 610 },
+    defaultSize: { w: 420, h: 400 },
 
     create(panel) {
         const el = document.createElement('div');
