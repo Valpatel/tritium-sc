@@ -896,6 +896,149 @@ def create_router(device, spectrum, receiver, fm_decoder=None, tpms_decoder=None
             },
         )
 
+    @router.get("/fm/capture")
+    async def fm_capture(freq_mhz: float = 92.5, duration_s: float = 3.0):
+        """Capture and demodulate FM audio, return as WAV file.
+
+        This is a one-shot capture: tunes to frequency, records IQ for
+        the specified duration, demodulates FM, and returns a WAV file
+        that can be played in the browser with <audio> element.
+
+        Query params:
+            freq_mhz: FM frequency in MHz (default 92.5)
+            duration_s: Duration in seconds (default 3, max 10)
+        """
+        from fastapi.responses import Response
+        import subprocess, tempfile, os, numpy as np
+        from scipy.signal import firwin, lfilter, decimate
+        import wave, struct
+
+        if radio_lock and not radio_lock.acquire("fm_capture", f"FM {freq_mhz} MHz"):
+            return {"error": f"Radio busy: {radio_lock.current_owner}"}
+
+        duration_s = min(duration_s, 10.0)  # Cap at 10 seconds
+        freq_hz = int(freq_mhz * 1e6)
+        sample_rate = 2000000
+        num_samples = int(sample_rate * duration_s)
+
+        try:
+            # Capture IQ
+            with tempfile.NamedTemporaryFile(suffix='.raw', delete=False) as f:
+                raw_file = f.name
+
+            proc = await asyncio.create_subprocess_exec(
+                'hackrf_transfer', '-r', raw_file,
+                '-f', str(freq_hz), '-s', str(sample_rate),
+                '-n', str(num_samples * 2), '-l', '32', '-g', '20',
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            )
+            await asyncio.wait_for(proc.communicate(), timeout=duration_s + 10)
+
+            raw = np.fromfile(raw_file, dtype=np.int8)
+            os.unlink(raw_file)
+
+            if len(raw) < 1000:
+                return {"error": "Capture too short — device may be busy"}
+
+            # Demodulate FM
+            iq = raw[0::2].astype(np.float32) + 1j * raw[1::2].astype(np.float32)
+            iq /= 128.0
+            taps = firwin(101, 100000, fs=sample_rate)
+            filtered = lfilter(taps, 1.0, iq)
+            discriminated = np.angle(filtered[1:] * np.conj(filtered[:-1]))
+            dec_factor = max(1, sample_rate // 48000)
+            audio = decimate(discriminated, dec_factor, zero_phase=True)
+            audio = (audio / max(0.001, np.max(np.abs(audio))) * 0.8 * 32767).astype(np.int16)
+
+            # Encode WAV in memory
+            import io
+            buf = io.BytesIO()
+            with wave.open(buf, 'w') as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(48000)
+                wf.writeframes(audio.tobytes())
+
+            return Response(
+                content=buf.getvalue(),
+                media_type="audio/wav",
+                headers={"Content-Disposition": f"inline; filename=fm_{freq_mhz:.1f}mhz.wav"},
+            )
+        except asyncio.TimeoutError:
+            return {"error": "Capture timed out"}
+        except Exception as e:
+            return {"error": str(e)}
+        finally:
+            if radio_lock:
+                radio_lock.release("fm_capture")
+
+    @router.get("/antenna/profile")
+    async def antenna_profile():
+        """Characterize the connected antenna by sweeping 1-6000 MHz.
+
+        Returns power levels across the full HackRF frequency range,
+        showing where the antenna is most/least sensitive. Helps users
+        understand what their antenna can actually receive.
+        """
+        if radio_lock and not radio_lock.acquire("antenna_profile", "1-6000 MHz characterization"):
+            return {"error": f"Radio busy: {radio_lock.current_owner}"}
+
+        try:
+            result = await spectrum.start_sweep(1, 6000, 1000000)
+            if not result.get("success"):
+                return {"error": result.get("error", "Sweep failed")}
+
+            import asyncio
+            await asyncio.sleep(5)  # Let sweep collect data
+
+            data = spectrum.get_data()
+            await spectrum.stop_sweep()
+
+            if not data:
+                return {"error": "No data collected"}
+
+            # Analyze by band
+            bands = [
+                ("VHF Low (30-88)", 30e6, 88e6),
+                ("FM Radio (88-108)", 88e6, 108e6),
+                ("VHF High (108-174)", 108e6, 174e6),
+                ("UHF (300-500)", 300e6, 500e6),
+                ("UHF TV (470-700)", 470e6, 700e6),
+                ("Cellular (700-960)", 700e6, 960e6),
+                ("L-Band (1-2 GHz)", 1e9, 2e9),
+                ("S-Band (2-3 GHz)", 2e9, 3e9),
+                ("WiFi 5GHz (5-6)", 5e9, 6e9),
+            ]
+
+            profile = []
+            for name, flo, fhi in bands:
+                pts = [p for p in data if flo <= p["freq_hz"] <= fhi]
+                if pts:
+                    avg = sum(p["power_dbm"] for p in pts) / len(pts)
+                    peak = max(pts, key=lambda p: p["power_dbm"])
+                    # Higher avg power = better antenna sensitivity at this band
+                    profile.append({
+                        "band": name,
+                        "avg_power_dbm": round(avg, 1),
+                        "peak_power_dbm": round(peak["power_dbm"], 1),
+                        "peak_freq_hz": peak["freq_hz"],
+                        "bins": len(pts),
+                        "quality": "good" if avg > -60 else "fair" if avg > -70 else "poor",
+                    })
+
+            # Overall best/worst bands
+            profile.sort(key=lambda b: -b["avg_power_dbm"])
+
+            return {
+                "profile": profile,
+                "best_band": profile[0]["band"] if profile else None,
+                "worst_band": profile[-1]["band"] if profile else None,
+                "note": "Higher power = better antenna sensitivity. The default telescoping antenna works best at 300-600 MHz.",
+            }
+        finally:
+            if radio_lock:
+                radio_lock.release("antenna_profile")
+
     @router.get("/fm/scan")
     async def fm_scan(
         freq_start: float = 87.5,

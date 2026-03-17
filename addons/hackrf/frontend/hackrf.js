@@ -410,10 +410,21 @@ export const HackRFPanelDef = {
                     ${_infoRow('HW Revision', info.hardware_revision || '--')}
                 </div>
 
+                <div class="hrf-section-label">FM RADIO</div>
+                <div class="hrf-radio-actions" style="align-items:center">
+                    <input class="hrf-input hrf-input-sm" type="number" data-bind="fm-freq" value="92.5" min="87.5" max="108" step="0.1" style="width:70px" title="FM frequency in MHz">
+                    <span style="color:#888;font-size:0.7rem">MHz</span>
+                    <button class="hrf-btn hrf-btn-action" data-action="fm-listen" title="Capture and play 3 seconds of FM audio">LISTEN</button>
+                    <button class="hrf-btn" data-action="fm-scan-stations" title="Scan for active FM stations">SCAN STATIONS</button>
+                </div>
+                <div data-bind="fm-player" style="padding:4px 8px"></div>
+                <div data-bind="fm-stations" style="padding:0 8px;max-height:80px;overflow-y:auto;font-size:0.7rem"></div>
+
                 <div class="hrf-section-label">QUICK ACTIONS</div>
                 <div class="hrf-radio-actions">
                     <button class="hrf-btn hrf-btn-action" data-action="sweep-fm">SWEEP FM BAND</button>
                     <button class="hrf-btn hrf-btn-action" data-action="sweep-ism">SWEEP ISM BAND</button>
+                    <button class="hrf-btn hrf-btn-action" data-action="antenna-profile" title="Sweep 1-6GHz to characterize your antenna">ANTENNA PROFILE</button>
                     <button class="hrf-btn" data-action="refresh-info">REFRESH</button>
                 </div>
 
@@ -437,6 +448,110 @@ export const HackRFPanelDef = {
                 startSweep(430, 440, sweepBinWidth);
             });
             body.querySelector('[data-action="refresh-info"]')?.addEventListener('click', () => fetchAll());
+
+            // FM Listen — capture and play audio
+            body.querySelector('[data-action="fm-listen"]')?.addEventListener('click', async () => {
+                const freqInput = body.querySelector('[data-bind="fm-freq"]');
+                const playerDiv = body.querySelector('[data-bind="fm-player"]');
+                const freq = parseFloat(freqInput?.value || '92.5');
+                const btn = body.querySelector('[data-action="fm-listen"]');
+                btn.disabled = true;
+                btn.textContent = 'CAPTURING...';
+                _logCommand(`Listening to FM ${freq} MHz`);
+
+                playerDiv.innerHTML = '<div style="color:#b060ff;font-size:0.7rem">Capturing audio...</div>';
+
+                try {
+                    const audioUrl = API + `/fm/capture?freq_mhz=${freq}&duration_s=3`;
+                    const r = await fetch(audioUrl);
+                    if (r.ok && r.headers.get('content-type')?.includes('audio')) {
+                        const blob = await r.blob();
+                        const url = URL.createObjectURL(blob);
+                        playerDiv.innerHTML = `
+                            <audio controls autoplay style="width:100%;height:32px" src="${url}"></audio>
+                            <div style="color:#05ffa1;font-size:0.65rem;margin-top:2px">FM ${freq} MHz — ${(blob.size/1024).toFixed(0)} KB</div>
+                        `;
+                    } else {
+                        const d = await r.json().catch(() => ({}));
+                        playerDiv.innerHTML = `<div style="color:#ff2a6d;font-size:0.7rem">Error: ${d.error || 'capture failed'}</div>`;
+                    }
+                } catch (e) {
+                    playerDiv.innerHTML = `<div style="color:#ff2a6d;font-size:0.7rem">Error: ${e.message}</div>`;
+                }
+                btn.disabled = false;
+                btn.textContent = 'LISTEN';
+            });
+
+            // FM Scan Stations
+            body.querySelector('[data-action="fm-scan-stations"]')?.addEventListener('click', async () => {
+                const stationsDiv = body.querySelector('[data-bind="fm-stations"]');
+                const btn = body.querySelector('[data-action="fm-scan-stations"]');
+                btn.disabled = true;
+                btn.textContent = 'SCANNING...';
+                stationsDiv.innerHTML = '<div style="color:#888">Scanning FM band (~10s)...</div>';
+                _logCommand('Scanning FM band');
+
+                try {
+                    const r = await fetch(API + '/fm/scan');
+                    if (r.ok) {
+                        const d = await r.json();
+                        const stations = d.stations || [];
+                        if (stations.length === 0) {
+                            stationsDiv.innerHTML = '<div style="color:#888">No stations found</div>';
+                        } else {
+                            stationsDiv.innerHTML = stations.map(s =>
+                                `<div style="display:flex;gap:6px;padding:2px 0;cursor:pointer;border-bottom:1px solid #ffffff06" data-fm-freq="${s.freq_mhz}" title="Click to tune">
+                                    <span style="color:#b060ff;font-weight:bold;min-width:50px">${s.freq_mhz}</span>
+                                    <span style="color:#888;min-width:50px;text-align:right">${s.power_dbm.toFixed(0)} dBm</span>
+                                    <span style="color:#ccc;flex:1">${_esc(s.name)}</span>
+                                </div>`
+                            ).join('');
+                            // Click station to tune
+                            stationsDiv.querySelectorAll('[data-fm-freq]').forEach(el => {
+                                el.addEventListener('click', () => {
+                                    const freqInput = body.querySelector('[data-bind="fm-freq"]');
+                                    if (freqInput) freqInput.value = el.dataset.fmFreq;
+                                });
+                            });
+                        }
+                    }
+                } catch (e) {
+                    stationsDiv.innerHTML = `<div style="color:#ff2a6d">${e.message}</div>`;
+                }
+                btn.disabled = false;
+                btn.textContent = 'SCAN STATIONS';
+            });
+
+            // Antenna Profile
+            body.querySelector('[data-action="antenna-profile"]')?.addEventListener('click', async () => {
+                const btn = body.querySelector('[data-action="antenna-profile"]');
+                btn.disabled = true;
+                btn.textContent = 'PROFILING...';
+                _logCommand('Characterizing antenna (1-6 GHz sweep)');
+
+                try {
+                    const r = await fetch(API + '/antenna/profile');
+                    if (r.ok) {
+                        const d = await r.json();
+                        const profile = d.profile || [];
+                        if (profile.length > 0) {
+                            let html = '<div class="hrf-section-label" style="margin-top:8px">ANTENNA PROFILE</div>';
+                            html += '<div style="padding:4px 8px;font-size:0.7rem">';
+                            html += `<div style="color:#05ffa1;margin-bottom:4px">Best: ${d.best_band} | Worst: ${d.worst_band}</div>`;
+                            html += profile.map(b => {
+                                const color = b.quality === 'good' ? '#05ffa1' : b.quality === 'fair' ? '#fcee0a' : '#ff2a6d';
+                                return `<div style="display:flex;gap:4px;padding:1px 0"><span style="color:${color};min-width:12px">${b.quality === 'good' ? '+' : b.quality === 'fair' ? '~' : '-'}</span><span style="min-width:160px">${b.band}</span><span style="color:#888">${b.avg_power_dbm} dBm avg</span></div>`;
+                            }).join('');
+                            html += `<div style="color:#666;margin-top:4px;font-size:0.6rem">${d.note || ''}</div>`;
+                            html += '</div>';
+                            // Insert after the presets section
+                            body.insertAdjacentHTML('beforeend', html);
+                        }
+                    }
+                } catch (e) { /* ok */ }
+                btn.disabled = false;
+                btn.textContent = 'ANTENNA PROFILE';
+            });
 
             body.querySelectorAll('[data-preset-start]').forEach(btn => {
                 btn.addEventListener('click', () => {
