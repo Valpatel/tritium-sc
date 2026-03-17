@@ -227,7 +227,7 @@ class MessageBridge:
 
         # Emit to Tritium event bus
         if self.event_bus:
-            self.event_bus.emit("meshtastic:message_received", msg.to_dict())
+            self.event_bus.publish("meshtastic:message_received", msg.to_dict())
 
         # Publish to MQTT
         self._publish_mqtt(
@@ -318,7 +318,7 @@ class MessageBridge:
 
         # Emit event
         if self.event_bus:
-            self.event_bus.emit("meshtastic:position_received", msg.to_dict())
+            self.event_bus.publish("meshtastic:position_received", msg.to_dict())
 
         # Publish to MQTT
         self._publish_mqtt(
@@ -384,7 +384,7 @@ class MessageBridge:
 
         # Emit event
         if self.event_bus:
-            self.event_bus.emit("meshtastic:telemetry_received", msg.to_dict())
+            self.event_bus.publish("meshtastic:telemetry_received", msg.to_dict())
 
         # Publish to MQTT
         self._publish_mqtt(
@@ -453,7 +453,7 @@ class MessageBridge:
             self._messages.append(msg)
 
             if self.event_bus:
-                self.event_bus.emit("meshtastic:message_sent", msg.to_dict())
+                self.event_bus.publish("meshtastic:message_sent", msg.to_dict())
 
             log.info(f"Sent to mesh: {text[:80]} -> {destination or 'broadcast'}")
 

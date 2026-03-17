@@ -202,7 +202,7 @@ class ConnectionManager:
                     log.warning(f"Device info read failed (connection still OK): {info_err}")
                 log.info(f"Connected to {self.device_info.get('long_name', port)} via serial, is_connected={self.is_connected}")
                 if self.event_bus:
-                    self.event_bus.emit("meshtastic:connected", {
+                    self.event_bus.publish("meshtastic:connected", {
                         "transport": "serial", "port": port, "device": self.device_info,
                     })
                 log.info(f"connect_serial returning, is_connected={self.is_connected}")
@@ -254,7 +254,7 @@ class ConnectionManager:
             self._read_device_info()
             log.info(f"Connected to {self.device_info.get('long_name', host)} via TCP")
             if self.event_bus:
-                self.event_bus.emit("meshtastic:connected", {
+                self.event_bus.publish("meshtastic:connected", {
                     "transport": "tcp", "port": self.port, "device": self.device_info,
                 })
         except asyncio.TimeoutError:
@@ -323,7 +323,7 @@ class ConnectionManager:
                 f"Connected to {self.device_info.get('long_name', address)} via BLE"
             )
             if self.event_bus:
-                self.event_bus.emit("meshtastic:connected", {
+                self.event_bus.publish("meshtastic:connected", {
                     "transport": "ble", "address": address, "device": self.device_info,
                 })
         except asyncio.TimeoutError:
@@ -401,7 +401,7 @@ class ConnectionManager:
             }
             log.info(f"Connected to Meshtastic MQTT broker at {host}:{port}")
             if self.event_bus:
-                self.event_bus.emit("meshtastic:connected", {
+                self.event_bus.publish("meshtastic:connected", {
                     "transport": "mqtt",
                     "host": host,
                     "port": port,

@@ -59,7 +59,7 @@ class NodeManager:
 
                 # Detect new nodes
                 if prev is None and self.event_bus:
-                    self.event_bus.emit("meshtastic:node_discovered", {
+                    self.event_bus.publish("meshtastic:node_discovered", {
                         "node_id": node_id,
                         "name": node.get("long_name", node_id),
                     })
@@ -79,7 +79,7 @@ class NodeManager:
                     log.debug(f"Failed to update target tracker for {t.get('target_id')}: {e}")
 
         if self.event_bus and updated > 0:
-            self.event_bus.emit("meshtastic:nodes_updated", {
+            self.event_bus.publish("meshtastic:nodes_updated", {
                 "count": updated,
                 "total": len(self.nodes),
             })
