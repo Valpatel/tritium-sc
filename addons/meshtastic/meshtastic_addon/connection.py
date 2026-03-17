@@ -496,8 +496,8 @@ class ConnectionManager:
                 drained += len(data)
                 _time.sleep(0.05)
             s.close()
-            # Wait for OS to fully release the port
-            _time.sleep(0.3)
+            # Wait for OS to fully release the port lock
+            _time.sleep(1.0)
             if drained > 0:
                 log.info(f"Drained {drained} stale bytes from {port}")
         except Exception as e:
