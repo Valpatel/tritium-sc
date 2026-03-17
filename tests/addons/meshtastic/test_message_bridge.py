@@ -34,7 +34,8 @@ from meshtastic_addon.message_bridge import (
 @pytest.fixture
 def mock_event_bus():
     bus = MagicMock()
-    bus.emit = MagicMock()
+    bus.publish = MagicMock()
+    bus.emit = bus.publish  # Alias for backward compat
     return bus
 
 
@@ -157,8 +158,8 @@ class TestTextMessages:
         assert msg.channel == 0
 
         # Event bus was called
-        mock_event_bus.emit.assert_called()
-        call_args = mock_event_bus.emit.call_args
+        mock_event_bus.publish.assert_called()
+        call_args = mock_event_bus.publish.call_args
         assert call_args[0][0] == "meshtastic:message_received"
 
         # MQTT was published
@@ -271,7 +272,7 @@ class TestPositionBridging:
         packet = make_position_packet()
         bridge._on_receive(packet)
 
-        call_topics = [c[0][0] for c in mock_event_bus.emit.call_args_list]
+        call_topics = [c[0][0] for c in mock_event_bus.publish.call_args_list]
         assert "meshtastic:position_received" in call_topics
 
 
@@ -304,7 +305,7 @@ class TestTelemetryBridging:
         packet = make_telemetry_packet()
         bridge._on_receive(packet)
 
-        call_topics = [c[0][0] for c in mock_event_bus.emit.call_args_list]
+        call_topics = [c[0][0] for c in mock_event_bus.publish.call_args_list]
         assert "meshtastic:telemetry_received" in call_topics
 
     def test_telemetry_publishes_mqtt(self, bridge, mock_mqtt_bridge):
@@ -372,7 +373,7 @@ class TestOutboundMessaging:
     async def test_send_records_event(self, bridge, mock_event_bus):
         await bridge.send_text("Event test")
 
-        call_topics = [c[0][0] for c in mock_event_bus.emit.call_args_list]
+        call_topics = [c[0][0] for c in mock_event_bus.publish.call_args_list]
         assert "meshtastic:message_sent" in call_topics
 
 

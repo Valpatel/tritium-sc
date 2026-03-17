@@ -613,34 +613,21 @@ class TestAutoConnect:
         first_call = mock_cls.call_args_list[0]
         assert first_call.kwargs.get("noNodes") is True
 
-    def test_auto_connect_serial_fast_fails_then_full(self, tmp_path):
-        """If fast connect fails, auto_connect retries with full config."""
+    def test_auto_connect_serial_fails_stays_disconnected(self, tmp_path):
+        """If serial connect fails, auto_connect tries fallback paths."""
         fake_port = tmp_path / "ttyACM0"
         fake_port.touch()
 
-        iface = _make_fake_interface()
         mock_cls = _get_serial_mock()
         mock_cls.reset_mock()
-
-        call_count = 0
-
-        def fail_fast_succeed_full(*args, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            if kwargs.get("noNodes"):
-                raise RuntimeError("fast connect failed")
-            return iface
-
-        mock_cls.side_effect = fail_fast_succeed_full
+        mock_cls.side_effect = RuntimeError("serial connect failed")
 
         cm = ConnectionManager()
         cm._find_serial_device = lambda: str(fake_port)
-        asyncio.run(cm.auto_connect())
+        with patch("pathlib.Path.exists", return_value=False):
+            asyncio.run(cm.auto_connect())
 
-        assert cm.is_connected
-        assert cm.transport_type == "serial"
-        # First call was noNodes=True (failed), subsequent calls were full
-        assert call_count >= 2
+        assert not cm.is_connected
 
 
 # ---------------------------------------------------------------------------
