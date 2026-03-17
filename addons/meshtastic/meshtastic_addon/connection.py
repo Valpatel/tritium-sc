@@ -523,5 +523,18 @@ class ConnectionManager:
                 self.device_info["has_wifi"] = getattr(metadata, 'has_wifi', False)
                 self.device_info["has_bluetooth"] = getattr(metadata, 'has_bluetooth', False)
                 self.device_info["role"] = getattr(metadata, 'role', '')
+
+            # Read radio config from localConfig (already cached, no blocking)
+            try:
+                lc = self.interface.localConfig
+                if lc:
+                    lora = getattr(lc, 'lora', None)
+                    if lora:
+                        self.device_info['region'] = str(getattr(lora, 'region', ''))
+                        self.device_info['modem_preset'] = str(getattr(lora, 'modem_preset', ''))
+                        self.device_info['tx_power'] = getattr(lora, 'tx_power', 0)
+                        self.device_info['hop_limit'] = getattr(lora, 'hop_limit', 0)
+            except Exception:
+                pass
         except Exception as e:
             log.warning(f"Failed to read device info: {e}")

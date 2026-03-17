@@ -111,8 +111,21 @@ export const MeshtasticPanelDef = {
         let nodeSortDir = -1;
         let selectedChannel = 0; // for message channel selector
         let channelEditIndex = -1; // which channel slot is being edited
+        let chatOnlyFilter = true; // filter system messages by default
+        let deviceInfoFetched = false; // track if we've fetched device info this session
 
         _injectStyles();
+
+        // Load cached data from localStorage
+        const cached = localStorage.getItem('tritium.meshtastic.cache');
+        if (cached) {
+            try {
+                const c = JSON.parse(cached);
+                if (c.deviceInfo) deviceInfo = c.deviceInfo;
+                if (c.nodes) nodes = c.nodes;
+                if (c.status) updateConnection(c.status);
+            } catch (_) {}
+        }
 
         // ── Tab switching ───────────────────────────────────────
         tabContainer.addEventListener('click', (e) => {
@@ -174,6 +187,14 @@ export const MeshtasticPanelDef = {
         }
 
         // ── Data fetching ───────────────────────────────────────
+        function _saveCache() {
+            try {
+                localStorage.setItem('tritium.meshtastic.cache', JSON.stringify({
+                    status, deviceInfo, nodes, timestamp: Date.now(),
+                }));
+            } catch (_) {}
+        }
+
         async function fetchAll() {
             try {
                 const [sRes, nRes] = await Promise.all([
@@ -182,6 +203,7 @@ export const MeshtasticPanelDef = {
                 ]);
                 if (sRes) updateConnection(sRes);
                 if (nRes) { nodes = nRes.nodes || []; }
+                _saveCache();
                 renderBody();
             } catch (_) { /* network error */ }
         }
@@ -199,7 +221,11 @@ export const MeshtasticPanelDef = {
         async function fetchDeviceInfo() {
             try {
                 const r = await fetch(API + '/device/info');
-                if (r.ok) deviceInfo = await r.json();
+                if (r.ok) {
+                    deviceInfo = await r.json();
+                    deviceInfoFetched = true;
+                    _saveCache();
+                }
             } catch (_) { /* ok */ }
         }
 
@@ -341,7 +367,8 @@ export const MeshtasticPanelDef = {
                     <div class="msh-cfg-row"><span class="msh-cfg-lbl">Firmware</span><span class="msh-cfg-val">${_esc(di.firmware_version || '--')}</span></div>
                     <div class="msh-cfg-row"><span class="msh-cfg-lbl">Role</span><span class="msh-cfg-val">${_esc(di.role || '--')}</span></div>
                     <div class="msh-cfg-row"><span class="msh-cfg-lbl">Region</span><span class="msh-cfg-val">${_esc(di.region || '--')}</span></div>
-                    <div class="msh-cfg-row"><span class="msh-cfg-lbl">Modem Preset</span><span class="msh-cfg-val">${_esc(di.modem_preset || '--')}</span></div>
+                    <div class="msh-cfg-row"><span class="msh-cfg-lbl">Modem Preset</span><span class="msh-cfg-val${_isModemPresetRecommended(di.modem_preset) ? '' : ' msh-cfg-warn'}">${_esc(di.modem_preset || '--')}</span></div>
+                    ${!_isModemPresetRecommended(di.modem_preset) && di.modem_preset && di.modem_preset !== '--' ? '<div class="msh-preset-warning">Bay Area Meshtastic recommends MEDIUM_FAST for this region</div>' : ''}
                     <div class="msh-cfg-row"><span class="msh-cfg-lbl">TX Power</span><span class="msh-cfg-val">${di.tx_power != null ? di.tx_power + ' dBm' : '--'}</span></div>
                     <div class="msh-cfg-row"><span class="msh-cfg-lbl">Channels</span><span class="msh-cfg-val">${di.num_channels || channels.length || '--'}</span></div>
                 </div>
@@ -432,11 +459,16 @@ export const MeshtasticPanelDef = {
         // =====================================================================
         function renderMessages() {
             const now = Math.floor(Date.now() / 1000);
+            const SYSTEM_TYPES = ['position', 'telemetry', 'nodeinfo', 'routing', 'admin'];
             // Filter messages by selected channel
-            const filtered = messages.filter(m => {
+            let filtered = messages.filter(m => {
                 if (m.channel == null) return selectedChannel === 0;
                 return m.channel === selectedChannel;
             });
+            // Apply chat-only filter (hide system/position/telemetry packets)
+            if (chatOnlyFilter) {
+                filtered = filtered.filter(m => !m.type || m.type === 'text');
+            }
             const visible = filtered.slice(-80);
 
             // Channel selector options
@@ -452,12 +484,14 @@ export const MeshtasticPanelDef = {
             body.innerHTML = `
                 <div class="msh-msg-header">
                     <select class="msh-channel-select" data-bind="channel-select">${chOptions.join('')}</select>
+                    <button class="msh-btn msh-btn-sm msh-msg-filter-btn${chatOnlyFilter ? ' msh-msg-filter-active' : ''}" data-action="toggle-msg-filter">${chatOnlyFilter ? 'CHAT ONLY' : 'ALL MESSAGES'}</button>
                     <span class="msh-msg-count">${filtered.length} message${filtered.length !== 1 ? 's' : ''}</span>
                 </div>
                 <div class="msh-chat-log" data-bind="chat-log">
                     ${visible.length === 0
                         ? '<div class="msh-empty" style="padding:30px;text-align:center">No messages on this channel</div>'
                         : visible.map(m => {
+                            const isSystem = m.type && SYSTEM_TYPES.includes(m.type);
                             const sender = _esc(m.from_short || m.from_name || m.from || 'Unknown');
                             const text = _esc(m.text || '');
                             const time = m.timestamp
@@ -466,9 +500,11 @@ export const MeshtasticPanelDef = {
                             const self = m.is_self;
                             const ack = m.ack === true ? 'msh-msg-acked' : (m.ack === false ? 'msh-msg-nack' : '');
                             const hops = m.hop_limit != null ? `<span class="msh-msg-hops">${m.hop_limit}h</span>` : '';
-                            return `<div class="msh-msg${self ? ' msh-msg-self' : ''} ${ack}">
+                            const typeBadge = isSystem ? `<span class="msh-msg-type-badge">${_esc(m.type.toUpperCase())}</span>` : '';
+                            return `<div class="msh-msg${self ? ' msh-msg-self' : ''} ${ack}${isSystem ? ' msh-msg-system' : ''}">
                                 <div class="msh-msg-meta">
                                     <span class="msh-msg-from">${sender}</span>
+                                    ${typeBadge}
                                     ${hops}
                                     <span class="msh-msg-time">${time}</span>
                                     ${self && m.ack === true ? '<span class="msh-msg-delivery" title="Delivered">OK</span>' : ''}
@@ -497,6 +533,12 @@ export const MeshtasticPanelDef = {
                     renderMessages();
                 });
             }
+
+            // Message filter toggle
+            body.querySelector('[data-action="toggle-msg-filter"]')?.addEventListener('click', () => {
+                chatOnlyFilter = !chatOnlyFilter;
+                renderMessages();
+            });
 
             // Wire send
             const input = body.querySelector('[data-bind="chat-input"]');
@@ -760,6 +802,7 @@ export const MeshtasticPanelDef = {
                     <div class="msh-config-grid">
                         ${_cfgSelect('Region', 'cfg-region', di.region || 'UNSET', REGIONS)}
                         ${_cfgSelect('Modem Preset', 'cfg-modem-preset', di.modem_preset || 'LONG_FAST', MODEM_PRESETS)}
+                        ${!_isModemPresetRecommended(di.modem_preset) ? '<div class="msh-preset-warning" style="padding:2px 0 4px 108px">Bay Area Meshtastic recommends MEDIUM_FAST for this region</div>' : ''}
                         ${_cfgInput('TX Power (dBm)', 'cfg-tx-power', di.tx_power != null ? String(di.tx_power) : '', 'number', '0-30')}
                         ${_cfgInput('Hop Limit', 'cfg-hop-limit', di.hop_limit != null ? String(di.hop_limit) : '3', 'number', '1-7')}
                     </div>
@@ -1100,9 +1143,15 @@ export const MeshtasticPanelDef = {
         ];
 
         // ── Auto-refresh loop ───────────────────────────────────
+        let refreshTick = 0;
         const timer = setInterval(() => {
             fetchAll();
             if (activeTab === 'messages') fetchMessages();
+            // Refresh device info every 30s (6 ticks at 5s interval)
+            refreshTick++;
+            if (refreshTick % 6 === 0 && connected) {
+                fetchDeviceInfo();
+            }
         }, REFRESH_MS);
 
         // ── Init ─────────────────────────────────────────────────
@@ -1123,6 +1172,12 @@ export const MeshtasticPanelDef = {
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────
+function _isModemPresetRecommended(preset) {
+    if (!preset || preset === '--') return true; // unknown, don't warn
+    // Modem preset enum: 4 = MEDIUM_FAST (string or numeric)
+    return preset === 'MEDIUM_FAST' || preset === '4' || preset === 4;
+}
+
 function _age(seconds) {
     if (seconds === null || seconds === undefined || seconds < 0) return '--';
     if (seconds < 60) return seconds + 's';
@@ -1288,6 +1343,19 @@ function _injectStyles() {
         .msh-module-collapsed .msh-module-body { display:none; }
         .msh-module-collapsed .msh-module-arrow { transform:rotate(0deg); }
         .msh-module-section:not(.msh-module-collapsed) .msh-module-arrow { transform:rotate(90deg); }
+
+        /* ── Modem preset warning ──────────────────────────────── */
+        .msh-cfg-warn { color:#fcee0a !important; }
+        .msh-preset-warning { font-size:0.6rem; color:#fcee0a; padding:2px 10px; background:rgba(252,238,10,0.06); border-left:2px solid #fcee0a; margin:2px 10px 4px; }
+
+        /* ── Message filter button ─────────────────────────────── */
+        .msh-msg-filter-btn { font-size:0.6rem !important; letter-spacing:0.5px; }
+        .msh-msg-filter-active { background:rgba(5,255,161,0.12); border-color:rgba(5,255,161,0.3); color:#05ffa1; }
+
+        /* ── System messages (dimmed) ──────────────────────────── */
+        .msh-msg-system { opacity:0.55; }
+        .msh-msg-system .msh-msg-text { font-size:0.65rem; }
+        .msh-msg-type-badge { font-size:0.55rem; color:#fcee0a; background:rgba(252,238,10,0.1); border:1px solid rgba(252,238,10,0.2); border-radius:2px; padding:0 3px; letter-spacing:0.5px; }
     `;
     document.head.appendChild(s);
 }
