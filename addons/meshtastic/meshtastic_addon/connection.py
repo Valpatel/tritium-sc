@@ -479,7 +479,8 @@ class ConnectionManager:
         try:
             import serial as _serial
             import time as _time
-            s = _serial.Serial(port, 115200, timeout=0.5)
+            # Open WITHOUT exclusive lock so we don't block the meshtastic library
+            s = _serial.Serial(port, 115200, timeout=0.5, exclusive=False)
             # Toggle DTR to reset USB-CDC
             s.dtr = False
             _time.sleep(0.1)
@@ -487,11 +488,16 @@ class ConnectionManager:
             _time.sleep(0.5)
             # Drain any queued data
             drained = 0
-            while s.in_waiting:
-                data = s.read(s.in_waiting)
+            for _ in range(20):  # Max 20 iterations to prevent infinite loop
+                waiting = s.in_waiting
+                if waiting <= 0:
+                    break
+                data = s.read(waiting)
                 drained += len(data)
                 _time.sleep(0.05)
             s.close()
+            # Wait for OS to fully release the port
+            _time.sleep(0.3)
             if drained > 0:
                 log.info(f"Drained {drained} stale bytes from {port}")
         except Exception as e:
