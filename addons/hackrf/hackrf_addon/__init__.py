@@ -18,6 +18,7 @@ from .router import create_router
 from .decoders import FMRadioDecoder, TPMSDecoder, ISMBandMonitor, ADSBDecoder
 from .decoders.rtl433_wrapper import RTL433Wrapper
 from .continuous_scan import ContinuousScanner
+from .radio_lock import RadioLock
 from .fm_player import FMPlayer
 
 
@@ -46,6 +47,7 @@ class HackRFAddon(SensorAddon):
         self.adsb_decoder = ADSBDecoder()
         self.continuous_scanner = ContinuousScanner(self.spectrum, self.signal_db)
         self.rtl433 = RTL433Wrapper()
+        self.radio_lock = RadioLock()
         self.fm_player = FMPlayer()
         self.data_store: HackRFDataStore | None = None
         self.target_tracker = None
@@ -102,6 +104,7 @@ class HackRFAddon(SensorAddon):
             ism_monitor=self.ism_monitor,
             continuous_scanner=self.continuous_scanner,
             rtl433=self.rtl433,
+            radio_lock=self.radio_lock,
             adsb_decoder=self.adsb_decoder,
             fm_player=self.fm_player,
             signal_db=self.signal_db,

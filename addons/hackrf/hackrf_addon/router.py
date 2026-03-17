@@ -14,7 +14,7 @@ import tempfile
 import os
 
 
-def create_router(device, spectrum, receiver, fm_decoder=None, tpms_decoder=None, ism_monitor=None, continuous_scanner=None, rtl433=None, fm_player=None, adsb_decoder=None, signal_db=None) -> APIRouter:
+def create_router(device, spectrum, receiver, fm_decoder=None, tpms_decoder=None, ism_monitor=None, continuous_scanner=None, rtl433=None, fm_player=None, adsb_decoder=None, signal_db=None, radio_lock=None) -> APIRouter:
     """Create FastAPI router for HackRF addon endpoints.
 
     Args:
@@ -45,6 +45,7 @@ def create_router(device, spectrum, receiver, fm_decoder=None, tpms_decoder=None
             },
             "sweep": spectrum.get_status(),
             "receiver": receiver.get_status(),
+            "radio_lock": radio_lock.get_status() if radio_lock else {"locked": False},
         }
 
     @router.get("/info")
@@ -102,12 +103,28 @@ def create_router(device, spectrum, receiver, fm_decoder=None, tpms_decoder=None
         freq_start = int(body.get("freq_start", 0))
         freq_end = int(body.get("freq_end", 6000))
         bin_width = int(body.get("bin_width", 500_000))
-        return await spectrum.start_sweep(freq_start, freq_end, bin_width)
+
+        # Check radio lock
+        if radio_lock and not radio_lock.acquire("sweep", f"{freq_start}-{freq_end} MHz"):
+            return {
+                "success": False,
+                "error": f"Radio busy: {radio_lock.current_owner} ({radio_lock.current_description})",
+                "busy_owner": radio_lock.current_owner,
+                "busy_description": radio_lock.current_description,
+            }
+
+        result = await spectrum.start_sweep(freq_start, freq_end, bin_width)
+        if not result.get("success") and radio_lock:
+            radio_lock.release("sweep")
+        return result
 
     @router.post("/sweep/stop")
     async def sweep_stop():
         """Stop the running spectrum sweep."""
-        return await spectrum.stop_sweep()
+        result = await spectrum.stop_sweep()
+        if radio_lock:
+            radio_lock.release("sweep")
+        return result
 
     @router.get("/sweep/data")
     async def sweep_data(max_points: int = 600):
@@ -571,14 +588,30 @@ def create_router(device, spectrum, receiver, fm_decoder=None, tpms_decoder=None
         body = body or {}
         freq = int(body.get("freq_hz", 315000000))
         protocols = body.get("protocols")
-        return await rtl433.start_monitoring(freq_hz=freq, protocols=protocols)
+
+        # Check radio lock
+        freq_desc = f"{freq/1e6:.1f} MHz ISM"
+        if radio_lock and not radio_lock.acquire("rtl_433", freq_desc):
+            return {
+                "success": False,
+                "error": f"Radio busy: {radio_lock.current_owner} ({radio_lock.current_description})",
+                "busy_owner": radio_lock.current_owner,
+            }
+
+        result = await rtl433.start_monitoring(freq_hz=freq, protocols=protocols)
+        if not result.get("success") and radio_lock:
+            radio_lock.release("rtl_433")
+        return result
 
     @router.post("/rtl433/stop")
     async def rtl433_stop():
         """Stop rtl_433 monitoring."""
         if rtl433 is None:
             return {"error": "rtl_433 wrapper not available"}
-        return await rtl433.stop_monitoring()
+        result = await rtl433.stop_monitoring()
+        if radio_lock:
+            radio_lock.release("rtl_433")
+        return result
 
     @router.get("/rtl433/events")
     async def rtl433_events(limit: int = 50):
