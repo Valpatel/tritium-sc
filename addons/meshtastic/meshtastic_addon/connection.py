@@ -60,14 +60,16 @@ class ConnectionManager:
         Uses a two-phase strategy for serial: try fast connect first (noNodes,
         shorter timeout), then retry with full config exchange on failure.
         """
-        # Try USB serial first — full connect (noNodes=False) to get all config
+        # Try USB serial first — fast connect, then config is read after
         port = self._find_serial_device()
         if port:
             try:
                 await self.connect_serial(
-                    port, timeout=DEFAULT_SERIAL_TIMEOUT, retries=1, noNodes=False,
+                    port, timeout=DEFAULT_SERIAL_TIMEOUT, retries=1, noNodes=True,
                 )
                 if self.is_connected:
+                    # localConfig should be populated from config exchange
+                    # even with noNodes=True (noNodes skips nodedb, not config)
                     return
             except Exception as e:
                 log.warning(f"Serial connect to {port} failed: {e}")
