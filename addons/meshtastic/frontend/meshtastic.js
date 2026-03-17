@@ -393,7 +393,7 @@ export const MeshtasticPanelDef = {
             const avgBat = batts.length ? Math.round(batts.reduce((a, b) => a + b, 0) / batts.length) : null;
             const utils = nodes.map(n => n.channel_util).filter(u => u != null);
             const avgUtil = utils.length ? (utils.reduce((a, b) => a + b, 0) / utils.length).toFixed(1) : null;
-            const airUtils = nodes.map(n => n.air_util_tx).filter(u => u != null);
+            const airUtils = nodes.map(n => n.air_util).filter(u => u != null);
             const avgAirUtil = airUtils.length ? (airUtils.reduce((a, b) => a + b, 0) / airUtils.length).toFixed(1) : null;
             const savedRadios = _getSavedRadios();
 
@@ -808,13 +808,13 @@ export const MeshtasticPanelDef = {
             if (n == null) return '';
             const isFav = _isFavorite(nodeId);
             const now = Math.floor(Date.now() / 1000);
-            const lastHeardSec = n.last_heard != null ? (now - n.last_heard) : null;
-            const lastHeardStr = lastHeardSec != null ? _age(lastHeardSec) + ' ago' : '--';
-            const hasGps = n.latitude != null && n.longitude != null;
+            const lastHeardSec = (n.last_heard != null && n.last_heard > 1000000000) ? (now - n.last_heard) : null;
+            const lastHeardStr = lastHeardSec != null && lastHeardSec < 86400 * 365 ? _age(lastHeardSec) + ' ago' : 'never';
+            const hasGps = n.lat != null && n.lng != null;
             const ownPos = _getOwnPosition();
             let distStr = '--';
             if (hasGps && ownPos) {
-                const km = _haversine(ownPos.lat, ownPos.lng, n.latitude, n.longitude);
+                const km = _haversine(ownPos.lat, ownPos.lng, n.lat, n.lng);
                 distStr = km < 1 ? Math.round(km * 1000) + ' m' : km.toFixed(2) + ' km';
             }
             const hops = n.hopsAway != null ? String(n.hopsAway) : (n.hops_away != null ? String(n.hops_away) : '--');
@@ -822,8 +822,8 @@ export const MeshtasticPanelDef = {
             const bat = n.battery != null ? Math.round(n.battery) + '%' : '--';
             const volt = n.voltage != null ? n.voltage.toFixed(2) + 'V' : '--';
             const snr = n.snr != null ? n.snr.toFixed(1) + ' dB' : '--';
-            const chUtil = n.channel_utilization != null ? n.channel_utilization.toFixed(1) + '%' : '--';
-            const airUtil = n.air_util_tx != null ? n.air_util_tx.toFixed(1) + '%' : '--';
+            const chUtil = n.channel_util != null ? n.channel_util.toFixed(1) + '%' : '--';
+            const airUtil = n.air_util != null ? n.air_util.toFixed(1) + '%' : '--';
             const temp = n.temperature != null ? n.temperature.toFixed(1) + ' C' : null;
             const humidity = n.humidity != null ? n.humidity.toFixed(0) + '%' : null;
             const pressure = n.pressure != null ? n.pressure.toFixed(1) + ' hPa' : null;
@@ -858,11 +858,11 @@ export const MeshtasticPanelDef = {
                     <div class="msh-detail-row"><span class="msh-detail-lbl">HARDWARE</span><span class="msh-detail-val">${_esc(n.hw_model || '--')}</span></div>
                     <div class="msh-detail-row"><span class="msh-detail-lbl">ROLE</span><span class="msh-detail-val">${_esc(n.role || '--')}</span></div>
                     <div class="msh-detail-section">POSITION</div>
-                    <div class="msh-detail-row"><span class="msh-detail-lbl">LATITUDE</span><span class="msh-detail-val">${hasGps ? n.latitude.toFixed(6) : '--'}</span></div>
-                    <div class="msh-detail-row"><span class="msh-detail-lbl">LONGITUDE</span><span class="msh-detail-val">${hasGps ? n.longitude.toFixed(6) : '--'}</span></div>
+                    <div class="msh-detail-row"><span class="msh-detail-lbl">LATITUDE</span><span class="msh-detail-val">${hasGps ? n.lat.toFixed(6) : '--'}</span></div>
+                    <div class="msh-detail-row"><span class="msh-detail-lbl">LONGITUDE</span><span class="msh-detail-val">${hasGps ? n.lng.toFixed(6) : '--'}</span></div>
                     <div class="msh-detail-row"><span class="msh-detail-lbl">ALTITUDE</span><span class="msh-detail-val">${n.altitude != null ? Math.round(n.altitude) + ' m' : '--'}</span></div>
                     <div class="msh-detail-row"><span class="msh-detail-lbl">DISTANCE</span><span class="msh-detail-val">${distStr}</span></div>
-                    ${hasGps ? `<div style="padding:4px 0"><button class="msh-btn msh-btn-primary msh-btn-sm" data-action="fly-to" data-lat="${n.latitude}" data-lng="${n.longitude}">FLY TO</button></div>` : ''}
+                    ${hasGps ? `<div style="padding:4px 0"><button class="msh-btn msh-btn-primary msh-btn-sm" data-action="fly-to" data-lat="${n.lat}" data-lng="${n.lng}">FLY TO</button></div>` : ''}
                     <div class="msh-detail-section">RADIO</div>
                     <div class="msh-detail-row"><span class="msh-detail-lbl">BATTERY</span><span class="msh-detail-val">${bat}</span></div>
                     <div class="msh-detail-row"><span class="msh-detail-lbl">VOLTAGE</span><span class="msh-detail-val">${volt}</span></div>
@@ -924,7 +924,8 @@ export const MeshtasticPanelDef = {
             const rows = sorted.map(n => {
                 const nid = n.node_id || n.num || '';
                 const isFav = favs.indexOf(nid) >= 0;
-                const age = _age(now - (n.last_heard || 0));
+                const lh = n.last_heard || 0;
+                const age = lh > 1000000000 && (now - lh) < 86400 * 365 ? _age(now - lh) : 'never';
                 const bat = n.battery != null ? Math.round(n.battery) + '%' : '';
                 const batColor = n.battery != null ? (n.battery > 50 ? '#05ffa1' : n.battery > 20 ? '#fcee0a' : '#ff2a6d') : '#888';
                 const snr = n.snr != null ? n.snr.toFixed(1) : '';
@@ -934,8 +935,8 @@ export const MeshtasticPanelDef = {
                 let dist = '';
                 if (n.distance != null) {
                     dist = _formatDist(n.distance);
-                } else if (ownPos && n.latitude != null && n.longitude != null) {
-                    const km = _haversine(ownPos.lat, ownPos.lng, n.latitude, n.longitude);
+                } else if (ownPos && n.lat != null && n.lng != null) {
+                    const km = _haversine(ownPos.lat, ownPos.lng, n.lat, n.lng);
                     dist = km < 1 ? Math.round(km * 1000) + 'm' : km.toFixed(1) + 'km';
                 }
                 const isSelected = selectedNodeId === nid;
@@ -953,10 +954,10 @@ export const MeshtasticPanelDef = {
             }).join('');
 
             const online = nodes.filter(n => {
-                if (n.last_heard == null) return false;
+                if (!n.last_heard || n.last_heard < 1000000000) return false;
                 return (now - n.last_heard) < 900; // 15 min
             }).length;
-            const withGps = nodes.filter(n => n.latitude != null && n.longitude != null).length;
+            const withGps = nodes.filter(n => n.lat != null && n.lng != null).length;
             const favCount = favs.filter(fid => nodes.some(n => (n.node_id || n.num || '') === fid)).length;
 
             const detailHtml = selectedNodeId ? _renderNodeDetail(selectedNodeId) : '';
