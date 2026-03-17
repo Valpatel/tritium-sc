@@ -31,10 +31,19 @@ class ConnectionManager:
         self.node_manager = node_manager
         self.event_bus = event_bus
         self.interface = None
-        self.is_connected = False
+        self._is_connected = False
         self.transport_type: str = "none"  # serial, tcp, ble, mqtt
         self.port: str = ""
         self.device_info: dict = {}
+
+    @property
+    def is_connected(self):
+        """True if interface exists and we believe connection is active."""
+        return self.interface is not None and self._is_connected
+
+    @is_connected.setter
+    def is_connected(self, value):
+        self._is_connected = value
 
     async def auto_connect(self):
         """Try to auto-detect and connect to a Meshtastic device.
