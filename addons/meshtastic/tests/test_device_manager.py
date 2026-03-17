@@ -92,6 +92,31 @@ class FakeConnection:
 
         local_node = MagicMock()
         local_node.channels = [ch0, ch1]
+        # localConfig on localNode — used by _sync config methods
+        local_node.localConfig = SimpleNamespace(
+            device=SimpleNamespace(role=0),
+            lora=SimpleNamespace(region=1, modem_preset=0, tx_power=27),
+            position=SimpleNamespace(gps_mode=1),
+            network=SimpleNamespace(wifi_enabled=False, wifi_ssid="", wifi_psk=""),
+            bluetooth=SimpleNamespace(enabled=True),
+            display=SimpleNamespace(
+                screen_on_secs=0, gps_format=0,
+                auto_screen_carousel_secs=0, flip_screen=False, units=0,
+            ),
+            power=SimpleNamespace(is_power_saving=False, on_battery_shutdown_after_secs=0),
+        )
+        # moduleConfig on localNode — used by MQTT/telemetry config methods
+        local_node.moduleConfig = SimpleNamespace(
+            mqtt=SimpleNamespace(
+                enabled=False, address="", username="", password="",
+                encryption_enabled=True, json_enabled=False,
+            ),
+            telemetry=SimpleNamespace(
+                device_update_interval=900,
+                environment_measurement_enabled=False,
+                environment_update_interval=900,
+            ),
+        )
         iface.localNode = local_node
 
         # moduleConfig
@@ -196,7 +221,7 @@ class TestDeviceRole:
         assert DeviceRole.TRACKER.value == "TRACKER"
 
     def test_role_count(self):
-        assert len(DeviceRole) == 11
+        assert len(DeviceRole) == 13
 
 
 # ---------------------------------------------------------------------------
@@ -289,7 +314,9 @@ class TestSetRole:
         ok = asyncio.run(connected_dm.set_role("ROUTER"))
         assert ok is True
         node = connected_dm.connection.interface.localNode
-        node.setConfig.assert_called_with("device", {"role": "ROUTER"})
+        # New pattern: sets field on localConfig then calls writeConfig
+        assert node.localConfig.device.role == 2  # ROUTER = 2
+        node.writeConfig.assert_called_with("device")
 
     def test_set_role_case_insensitive(self, connected_dm):
         ok = asyncio.run(connected_dm.set_role("tracker"))
@@ -330,11 +357,14 @@ class TestSetLoraConfig:
         ok = asyncio.run(connected_dm.set_lora_config(tx_power=20))
         assert ok is True
         node = connected_dm.connection.interface.localNode
-        node.setConfig.assert_called_with("lora", {"tx_power": 20})
+        assert node.localConfig.lora.tx_power == 20
+        node.writeConfig.assert_called_with("lora")
 
     def test_set_region(self, connected_dm):
         ok = asyncio.run(connected_dm.set_lora_config(region="EU_868"))
         assert ok is True
+        node = connected_dm.connection.interface.localNode
+        assert node.localConfig.lora.region == 3  # EU_868 = 3
 
     def test_set_nothing(self, connected_dm):
         ok = asyncio.run(connected_dm.set_lora_config())
@@ -366,11 +396,10 @@ class TestSetWifi:
         ok = asyncio.run(connected_dm.set_wifi(enabled=True, ssid="MyNet", password="secret"))
         assert ok is True
         node = connected_dm.connection.interface.localNode
-        node.setConfig.assert_called_with("network", {
-            "wifi_enabled": True,
-            "wifi_ssid": "MyNet",
-            "wifi_psk": "secret",
-        })
+        assert node.localConfig.network.wifi_enabled is True
+        assert node.localConfig.network.wifi_ssid == "MyNet"
+        assert node.localConfig.network.wifi_psk == "secret"
+        node.writeConfig.assert_called_with("network")
 
     def test_disable_wifi(self, connected_dm):
         ok = asyncio.run(connected_dm.set_wifi(enabled=False))
@@ -382,7 +411,8 @@ class TestSetBluetooth:
         ok = asyncio.run(connected_dm.set_bluetooth(enabled=True))
         assert ok is True
         node = connected_dm.connection.interface.localNode
-        node.setConfig.assert_called_with("bluetooth", {"enabled": True})
+        assert node.localConfig.bluetooth.enabled is True
+        node.writeConfig.assert_called_with("bluetooth")
 
     def test_disconnected(self, disconnected_dm):
         ok = asyncio.run(disconnected_dm.set_bluetooth(enabled=True))
@@ -678,6 +708,229 @@ class TestDeviceRoutes:
         resp = client.post("/api/addons/meshtastic/device/flash", json={})
         # Fails gracefully (500 because no device, not 400)
         assert resp.status_code == 500
+
+    def test_post_display_config(self, client):
+        resp = client.post("/api/addons/meshtastic/device/display", json={
+            "screen_on_secs": 60,
+            "flip_screen": True,
+        })
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+    def test_post_power_config(self, client):
+        resp = client.post("/api/addons/meshtastic/device/power", json={
+            "is_power_saving": True,
+            "on_battery_shutdown_after_secs": 3600,
+        })
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+    def test_post_mqtt_config(self, client):
+        resp = client.post("/api/addons/meshtastic/device/mqtt", json={
+            "enabled": True,
+            "address": "mqtt.example.com",
+        })
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+    def test_post_telemetry_config(self, client):
+        resp = client.post("/api/addons/meshtastic/device/telemetry", json={
+            "device_update_interval": 300,
+            "environment_measurement_enabled": True,
+        })
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+    def test_get_channel_url(self, client):
+        resp = client.get("/api/addons/meshtastic/device/channel-url")
+        assert resp.status_code == 200
+        assert "url" in resp.json()
+
+    def test_post_channel_url(self, client):
+        resp = client.post("/api/addons/meshtastic/device/channel-url", json={
+            "url": "https://meshtastic.org/e/#test",
+        })
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+    def test_post_channel_url_missing(self, client):
+        resp = client.post("/api/addons/meshtastic/device/channel-url", json={})
+        assert resp.status_code == 400
+
+    def test_shutdown(self, client):
+        resp = client.post("/api/addons/meshtastic/device/shutdown")
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+    def test_export_config(self, client):
+        resp = client.get("/api/addons/meshtastic/device/export")
+        assert resp.status_code == 200
+
+    def test_post_config_display(self, client):
+        resp = client.post("/api/addons/meshtastic/device/config", json={
+            "screen_on_secs": 30,
+            "flip_screen": True,
+        })
+        assert resp.status_code == 200
+        assert resp.json()["results"]["display"] is True
+
+    def test_post_config_power(self, client):
+        resp = client.post("/api/addons/meshtastic/device/config", json={
+            "is_power_saving": True,
+        })
+        assert resp.status_code == 200
+        assert resp.json()["results"]["power"] is True
+
+    def test_post_config_mqtt(self, client):
+        resp = client.post("/api/addons/meshtastic/device/config", json={
+            "mqtt_enabled": True,
+            "mqtt_address": "mqtt.local",
+        })
+        assert resp.status_code == 200
+        assert resp.json()["results"]["mqtt"] is True
+
+
+# ---------------------------------------------------------------------------
+# DeviceManager — new config methods
+# ---------------------------------------------------------------------------
+
+class TestSetDisplayConfig:
+    def test_set_display(self, connected_dm):
+        ok = asyncio.run(connected_dm.set_display_config(
+            screen_on_secs=60, flip_screen=True,
+        ))
+        assert ok is True
+        node = connected_dm.connection.interface.localNode
+        assert node.localConfig.display.screen_on_secs == 60
+        assert node.localConfig.display.flip_screen is True
+        node.writeConfig.assert_called_with("display")
+
+    def test_disconnected(self, disconnected_dm):
+        ok = asyncio.run(disconnected_dm.set_display_config(screen_on_secs=30))
+        assert ok is False
+
+
+class TestSetPowerConfig:
+    def test_set_power(self, connected_dm):
+        ok = asyncio.run(connected_dm.set_power_config(
+            is_power_saving=True, on_battery_shutdown_after_secs=3600,
+        ))
+        assert ok is True
+        node = connected_dm.connection.interface.localNode
+        assert node.localConfig.power.is_power_saving is True
+        assert node.localConfig.power.on_battery_shutdown_after_secs == 3600
+        node.writeConfig.assert_called_with("power")
+
+    def test_disconnected(self, disconnected_dm):
+        ok = asyncio.run(disconnected_dm.set_power_config(is_power_saving=True))
+        assert ok is False
+
+
+class TestSetMqttConfig:
+    def test_set_mqtt(self, connected_dm):
+        ok = asyncio.run(connected_dm.set_mqtt_config(
+            enabled=True, address="mqtt.local", json_enabled=True,
+        ))
+        assert ok is True
+        node = connected_dm.connection.interface.localNode
+        assert node.localConfig is not None
+        node.writeConfig.assert_called_with("mqtt")
+
+    def test_set_mqtt_nothing(self, connected_dm):
+        ok = asyncio.run(connected_dm.set_mqtt_config())
+        assert ok is True
+
+    def test_disconnected(self, disconnected_dm):
+        ok = asyncio.run(disconnected_dm.set_mqtt_config(enabled=True))
+        assert ok is False
+
+
+class TestSetTelemetryConfig:
+    def test_set_telemetry(self, connected_dm):
+        ok = asyncio.run(connected_dm.set_telemetry_config(
+            device_update_interval=300,
+            environment_measurement_enabled=True,
+        ))
+        assert ok is True
+        node = connected_dm.connection.interface.localNode
+        node.writeConfig.assert_called_with("telemetry")
+
+    def test_disconnected(self, disconnected_dm):
+        ok = asyncio.run(disconnected_dm.set_telemetry_config(device_update_interval=300))
+        assert ok is False
+
+
+class TestChannelUrl:
+    def test_get_url(self, connected_dm):
+        url = asyncio.run(connected_dm.get_channel_url())
+        # MagicMock returns a MagicMock by default, just check it doesn't crash
+        assert url is not None
+
+    def test_get_url_disconnected(self, disconnected_dm):
+        url = asyncio.run(disconnected_dm.get_channel_url())
+        assert url == ""
+
+    def test_set_url(self, connected_dm):
+        ok = asyncio.run(connected_dm.set_channel_url("https://meshtastic.org/e/#test"))
+        assert ok is True
+        node = connected_dm.connection.interface.localNode
+        node.setURL.assert_called_once_with("https://meshtastic.org/e/#test")
+
+    def test_set_url_disconnected(self, disconnected_dm):
+        ok = asyncio.run(disconnected_dm.set_channel_url("https://meshtastic.org/e/#test"))
+        assert ok is False
+
+
+class TestShutdown:
+    def test_shutdown(self, connected_dm):
+        ok = asyncio.run(connected_dm.shutdown())
+        assert ok is True
+        node = connected_dm.connection.interface.localNode
+        node.shutdown.assert_called_once()
+        assert connected_dm.connection.is_connected is False
+
+    def test_shutdown_disconnected(self, disconnected_dm):
+        ok = asyncio.run(disconnected_dm.shutdown())
+        assert ok is False
+
+
+class TestExportConfig:
+    def test_export(self, connected_dm):
+        config = asyncio.run(connected_dm.export_config())
+        assert isinstance(config, dict)
+        assert "channels" in config
+
+    def test_export_disconnected(self, disconnected_dm):
+        config = asyncio.run(disconnected_dm.export_config())
+        assert config == {}
+
+
+class TestImportConfig:
+    def test_import(self, connected_dm):
+        results = asyncio.run(connected_dm.import_config({
+            "channel_url": "https://meshtastic.org/e/#test",
+        }))
+        assert isinstance(results, dict)
+
+    def test_import_disconnected(self, disconnected_dm):
+        results = asyncio.run(disconnected_dm.import_config({"device": {}}))
+        assert results == {}
+
+
+class TestNewDeviceRoles:
+    def test_router_late(self):
+        assert DeviceRole.ROUTER_LATE.value == "ROUTER_LATE"
+
+    def test_client_base(self):
+        assert DeviceRole.CLIENT_BASE.value == "CLIENT_BASE"
+
+    def test_set_router_late(self, connected_dm):
+        ok = asyncio.run(connected_dm.set_role("ROUTER_LATE"))
+        assert ok is True
+
+    def test_set_client_base(self, connected_dm):
+        ok = asyncio.run(connected_dm.set_role("CLIENT_BASE"))
+        assert ok is True
 
 
 # ---------------------------------------------------------------------------
