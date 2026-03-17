@@ -30,14 +30,14 @@ class TestFMRadioDecoder:
 
     def test_station_lookup_exact(self):
         fm = FMRadioDecoder()
-        name = fm.get_station_name(101_100_000)
-        assert "WCBS" in name
+        name = fm.get_station_name(88_500_000)
+        assert "KQED" in name
 
     def test_station_lookup_rounded(self):
         fm = FMRadioDecoder()
-        # 101.12 MHz should round to 101.1 (nearest 100 kHz)
-        name = fm.get_station_name(101_120_000)
-        assert "WCBS" in name
+        # 88.52 MHz should round to 88.5 (nearest 100 kHz)
+        name = fm.get_station_name(88_520_000)
+        assert "KQED" in name
 
     def test_station_lookup_unknown(self):
         fm = FMRadioDecoder()
