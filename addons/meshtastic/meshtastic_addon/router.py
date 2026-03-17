@@ -44,6 +44,9 @@ def create_router(connection, node_manager, message_bridge=None) -> APIRouter:
             import serial.tools.list_ports
             known_vids = {0x303a, 0x10c4, 0x1a86, 0x0403}  # Espressif, SiLabs, CH340, FTDI
             for p in serial.tools.list_ports.comports():
+                # Skip system serial ports (ttyS*) with no VID — these are noise
+                if p.device.startswith("/dev/ttyS") and not p.vid:
+                    continue
                 port_info = {
                     "port": p.device,
                     "description": p.description or "",
@@ -75,6 +78,28 @@ def create_router(connection, node_manager, message_bridge=None) -> APIRouter:
             "count": len(matched_ports),
             "total_count": len(all_ports),
         }
+
+    @router.get("/ble-scan")
+    async def ble_scan():
+        """Scan for Meshtastic BLE devices. Takes ~5-8 seconds."""
+        try:
+            from bleak import BleakScanner
+            devices = await BleakScanner.discover(timeout=6.0, return_adv=True)
+            results = []
+            for addr, (device, adv) in devices.items():
+                name = device.name or adv.local_name or ""
+                if "meshtastic" in name.lower():
+                    results.append({
+                        "address": device.address,
+                        "name": name,
+                        "rssi": adv.rssi,
+                        "transport": "ble",
+                    })
+            return {"ble_devices": results, "count": len(results)}
+        except ImportError:
+            return {"ble_devices": [], "count": 0, "error": "bleak not installed"}
+        except Exception as e:
+            return {"ble_devices": [], "count": 0, "error": str(e)}
 
     @router.get("/nodes")
     async def get_nodes():

@@ -527,12 +527,73 @@ export const MeshtasticPanelDef = {
                     renderRadio();
                 });
             });
-            body.querySelector('[data-action="scan-ports"]')?.addEventListener('click', async () => {
+            body.querySelector('[data-action="scan-ports"]')?.addEventListener('click', async (e) => {
+                const btn = e.currentTarget;
+                btn.disabled = true;
+                btn.textContent = 'SCANNING...';
+                btn.style.color = '#fcee0a';
                 await fetchPorts();
+                btn.textContent = ports.length > 0 ? `FOUND ${ports.length}` : 'NONE FOUND';
+                btn.style.color = ports.length > 0 ? '#05ffa1' : '#ff2a6d';
                 renderRadio();
             });
-            body.querySelector('[data-action="scan-ble"]')?.addEventListener('click', () => {
-                EventBus.emit('toast:show', { message: 'BLE scanning not yet available from server', type: 'info' });
+            body.querySelector('[data-action="scan-ble"]')?.addEventListener('click', async (e) => {
+                const btn = e.currentTarget;
+                btn.disabled = true;
+                btn.textContent = 'SCANNING BLE...';
+                btn.style.color = '#fcee0a';
+                try {
+                    const r = await fetch(API + '/ble-scan');
+                    if (r.ok) {
+                        const d = await r.json();
+                        const bleDevices = d.ble_devices || [];
+                        if (bleDevices.length > 0) {
+                            btn.textContent = `FOUND ${bleDevices.length} BLE`;
+                            btn.style.color = '#05ffa1';
+                            // Add BLE devices to the port list display
+                            const listEl = body.querySelector('.msh-port-list');
+                            if (listEl) {
+                                for (const dev of bleDevices) {
+                                    const row = document.createElement('div');
+                                    row.className = 'msh-port-row';
+                                    row.innerHTML = `
+                                        <span class="msh-port-name" style="color:#b060ff">${_esc(dev.name)}</span>
+                                        <span class="msh-port-desc">BLE ${dev.rssi}dBm</span>
+                                        <button class="msh-btn msh-btn-connect msh-btn-sm" data-action="connect-ble" data-address="${_esc(dev.address)}" title="Connect via Bluetooth LE">CONNECT</button>
+                                    `;
+                                    listEl.appendChild(row);
+                                    // Wire BLE connect
+                                    row.querySelector('[data-action="connect-ble"]').addEventListener('click', async (ev) => {
+                                        const cbtn = ev.currentTarget;
+                                        cbtn.disabled = true;
+                                        cbtn.textContent = 'CONNECTING...';
+                                        try {
+                                            const cr = await fetch(API + '/connect', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ transport: 'ble', address: dev.address, timeout: 45 }),
+                                            });
+                                            if (cr.ok) {
+                                                const cd = await cr.json();
+                                                updateConnection(cd);
+                                                fetchAll(); fetchDeviceInfo();
+                                            }
+                                        } catch (_) {}
+                                        cbtn.disabled = false;
+                                        cbtn.textContent = 'CONNECT';
+                                    });
+                                }
+                            }
+                        } else {
+                            btn.textContent = 'NO BLE FOUND';
+                            btn.style.color = '#ff2a6d';
+                        }
+                    }
+                } catch (_) {
+                    btn.textContent = 'SCAN FAILED';
+                    btn.style.color = '#ff2a6d';
+                }
+                setTimeout(() => { btn.disabled = false; btn.textContent = 'SCAN BLE'; btn.style.color = ''; }, 3000);
             });
             body.querySelector('[data-action="radio-disconnect"]')?.addEventListener('click', async () => {
                 try { await fetch(API + '/disconnect', { method: 'POST' }); } catch (_) { /* ok */ }
