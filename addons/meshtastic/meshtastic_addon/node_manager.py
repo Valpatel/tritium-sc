@@ -36,14 +36,14 @@ class NodeManager:
 
         self._last_update = time.time()
 
-        # Emit targets to the tracker
+        # Emit targets to the TargetTracker via update_from_mesh()
         if self.target_tracker and updated > 0:
             targets = self.get_targets()
             for t in targets:
                 try:
-                    self.target_tracker.update_target(t)
-                except Exception:
-                    pass  # Target tracker might not support this method yet
+                    self.target_tracker.update_from_mesh(t)
+                except Exception as e:
+                    log.debug(f"Failed to update target tracker for {t.get('target_id')}: {e}")
 
         if self.event_bus and updated > 0:
             self.event_bus.emit("meshtastic:nodes_updated", {

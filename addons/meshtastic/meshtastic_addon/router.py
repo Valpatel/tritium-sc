@@ -8,7 +8,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 
-def create_router(connection, node_manager) -> APIRouter:
+def create_router(connection, node_manager, message_bridge=None) -> APIRouter:
     """Create FastAPI router for Meshtastic addon endpoints."""
 
     router = APIRouter()
@@ -107,20 +107,59 @@ def create_router(connection, node_manager) -> APIRouter:
             await connection.disconnect()
         return {"connected": False}
 
+    @router.get("/messages")
+    async def get_messages(
+        limit: int = 100,
+        type: str = None,
+        since: float = None,
+    ):
+        """Message history from the mesh bridge.
+
+        Query params:
+            limit: Max messages to return (default 100).
+            type: Filter by type ('text', 'position', 'telemetry').
+            since: Only messages after this Unix timestamp.
+        """
+        if not message_bridge:
+            return {"messages": [], "count": 0}
+        msgs = message_bridge.get_messages(limit=limit, msg_type=type, since=since)
+        return {"messages": msgs, "count": len(msgs)}
+
     @router.post("/send")
     async def send_message(body: dict):
         """Send a text message via the mesh.
 
-        Body: { "text": "Hello mesh!", "destination": "!ba33ff38" (optional) }
+        Body: {
+            "text": "Hello mesh!",
+            "destination": "!ba33ff38" (optional, omit for broadcast),
+            "channel": 0 (optional, default primary channel)
+        }
         """
-        if not connection:
-            return {"error": "not_connected"}
         text = body.get("text", "")
         dest = body.get("destination")
+        channel = body.get("channel", 0)
         if not text:
             return {"error": "empty_message"}
+
+        # Use message bridge if available (records history + events)
+        if message_bridge:
+            ok = await message_bridge.send_text(
+                text, destination=dest, channel=channel,
+            )
+            return {"sent": ok, "text": text, "destination": dest, "channel": channel}
+
+        # Fallback to direct connection send
+        if not connection:
+            return {"error": "not_connected"}
         ok = await connection.send_text(text, destination=dest)
         return {"sent": ok, "text": text, "destination": dest}
+
+    @router.get("/bridge/stats")
+    async def bridge_stats():
+        """Message bridge statistics."""
+        if not message_bridge:
+            return {"error": "bridge_not_available"}
+        return message_bridge.get_stats()
 
     @router.get("/health")
     async def health():
@@ -132,3 +171,54 @@ def create_router(connection, node_manager) -> APIRouter:
         }
 
     return router
+
+
+def create_compat_router(connection, node_manager) -> APIRouter:
+    """Backward-compatible router at /api/meshtastic for existing mesh-layer.js.
+
+    The existing frontend mesh layer fetches from /api/meshtastic/nodes.
+    This router serves the same data at the old path.
+    """
+    compat = APIRouter()
+
+    @compat.get("/nodes")
+    async def compat_nodes(has_gps: bool = False):
+        """Backward-compatible node endpoint for mesh-layer.js."""
+        if not node_manager:
+            return {"nodes": []}
+        nodes = []
+        for nid, node in node_manager.nodes.items():
+            if has_gps and node.get("lat") is None:
+                continue
+            nodes.append({
+                "num": node.get("num", 0),
+                "user": {
+                    "id": nid,
+                    "longName": node.get("long_name", ""),
+                    "shortName": node.get("short_name", ""),
+                    "hwModel": node.get("hw_model", ""),
+                },
+                "position": {
+                    "latitude": node.get("lat"),
+                    "longitude": node.get("lng"),
+                    "altitude": node.get("altitude", 0),
+                } if node.get("lat") is not None else {},
+                "deviceMetrics": {
+                    "batteryLevel": node.get("battery", 0),
+                    "voltage": node.get("voltage", 0),
+                    "channelUtilization": node.get("channel_util", 0),
+                    "airUtilTx": node.get("air_util", 0),
+                },
+                "lastHeard": node.get("last_heard", 0),
+                "snr": node.get("snr"),
+            })
+        return {"nodes": nodes, "count": len(nodes)}
+
+    @compat.get("/status")
+    async def compat_status():
+        return {
+            "connected": connection.is_connected if connection else False,
+            "node_count": len(node_manager.nodes) if node_manager else 0,
+        }
+
+    return compat

@@ -229,17 +229,17 @@ class MeshtasticBridge:
                     node.position = {"lat": lat, "lng": lng, "alt": alt}
                     node.last_heard = time.monotonic()
 
-            # Update target tracker with local coordinates
-            self._tracker.update_from_simulation({
+            # Update target tracker with mesh node data
+            self._tracker.update_from_mesh({
                 "target_id": f"mesh_{from_id}",
                 "name": self._get_node_name(from_id),
                 "alliance": "friendly",
                 "asset_type": "mesh_radio",
+                "lat": lat,
+                "lng": lng,
+                "alt": alt,
                 "position": {"x": x, "y": y},
-                "heading": 0,
-                "speed": 0,
                 "battery": self._get_node_battery(from_id),
-                "status": "active",
             })
 
             self._event_bus.publish("mesh_position", {

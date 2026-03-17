@@ -27,20 +27,48 @@ class ConnectionManager:
         self.device_info: dict = {}
 
     async def auto_connect(self):
-        """Try to auto-detect and connect to a Meshtastic device."""
+        """Try to auto-detect and connect to a Meshtastic device.
+
+        Connection priority:
+        1. Environment variable MESHTASTIC_SERIAL_PORT (exact port)
+        2. /dev/ttyACM0 (known T-LoRa Pager port)
+        3. Auto-detect by VID:PID scan
+        4. TCP host if MESHTASTIC_TCP_HOST is set
+        5. Graceful disconnected mode if all fail
+        """
         # Try USB serial first
         port = self._find_serial_device()
         if port:
-            await self.connect_serial(port)
-            return
+            try:
+                await self.connect_serial(port)
+                if self.is_connected:
+                    return
+            except Exception as e:
+                log.warning(f"Serial connect to {port} failed: {e}")
+
+        # Try known port /dev/ttyACM0 as fallback (T-LoRa Pager default)
+        if not self.is_connected:
+            from pathlib import Path
+            fallback_port = "/dev/ttyACM0"
+            if Path(fallback_port).exists() and port != fallback_port:
+                try:
+                    await self.connect_serial(fallback_port)
+                    if self.is_connected:
+                        return
+                except Exception as e:
+                    log.warning(f"Fallback serial connect to {fallback_port} failed: {e}")
 
         # Try TCP if configured
         tcp_host = os.environ.get("MESHTASTIC_TCP_HOST")
-        if tcp_host:
-            await self.connect_tcp(tcp_host)
-            return
+        if tcp_host and not self.is_connected:
+            try:
+                await self.connect_tcp(tcp_host)
+                if self.is_connected:
+                    return
+            except Exception as e:
+                log.warning(f"TCP connect to {tcp_host} failed: {e}")
 
-        log.info("No Meshtastic device found — running in disconnected mode")
+        log.info("No Meshtastic device found — running in disconnected mode (connect later via API)")
 
     async def connect_serial(self, port: str):
         """Connect via USB serial port."""

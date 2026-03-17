@@ -10,8 +10,9 @@ Each mesh node becomes a tracked target on the tactical map.
 from tritium_lib.sdk import SensorAddon, AddonInfo
 
 from .connection import ConnectionManager
+from .device_manager import DeviceManager
 from .node_manager import NodeManager
-from .router import create_router
+from .router import create_router, create_compat_router
 
 
 class MeshtasticAddon(SensorAddon):
@@ -30,29 +31,64 @@ class MeshtasticAddon(SensorAddon):
     def __init__(self):
         super().__init__()
         self.connection: ConnectionManager | None = None
+        self.device_manager: DeviceManager | None = None
         self.node_manager: NodeManager | None = None
         self._poll_task = None
 
     async def register(self, app):
         await super().register(app)
 
+        # Resolve target_tracker from app.state.amy (where the Command Center stores it)
+        target_tracker = None
+        event_bus = None
+
+        # Try app.state.amy first (the standard SC pattern)
+        amy = getattr(getattr(app, 'state', None), 'amy', None)
+        if amy is not None:
+            target_tracker = getattr(amy, 'target_tracker', None)
+            event_bus = getattr(amy, 'event_bus', None)
+
+        # Fallback: direct attributes on app (for testing or alternate setups)
+        if target_tracker is None:
+            target_tracker = getattr(app, 'target_tracker', None)
+        if event_bus is None:
+            event_bus = getattr(app, 'event_bus', None)
+
+        import logging
+        log = logging.getLogger("meshtastic")
+        if target_tracker:
+            log.info("Meshtastic addon wired to TargetTracker")
+        else:
+            log.warning("Meshtastic addon: no TargetTracker found — mesh nodes will not appear on tactical map")
+
         self.node_manager = NodeManager(
-            event_bus=getattr(app, 'event_bus', None),
-            target_tracker=getattr(app, 'target_tracker', None),
+            event_bus=event_bus,
+            target_tracker=target_tracker,
         )
 
         self.connection = ConnectionManager(
             node_manager=self.node_manager,
-            event_bus=getattr(app, 'event_bus', None),
+            event_bus=event_bus,
         )
+
+        # Device manager for config/firmware/control
+        self.device_manager = DeviceManager(self.connection)
 
         # Add API routes
         router = create_router(self.connection, self.node_manager)
         if hasattr(app, 'include_router'):
             app.include_router(router, prefix="/api/addons/meshtastic", tags=["meshtastic"])
 
-        # Auto-detect and connect
-        await self.connection.auto_connect()
+            # Add device management routes
+            from .device_manager import create_device_routes
+            device_router = create_device_routes(self.device_manager)
+            app.include_router(device_router, prefix="/api/addons/meshtastic", tags=["meshtastic-device"])
+
+        # Auto-detect and connect (non-blocking, graceful failure)
+        try:
+            await self.connection.auto_connect()
+        except Exception as e:
+            log.warning(f"Meshtastic auto-connect failed (will retry via API): {e}")
 
         # Start polling loop
         import asyncio

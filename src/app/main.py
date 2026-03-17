@@ -1375,7 +1375,12 @@ app.include_router(target_groups_router)
 app.include_router(reid_router)
 app.include_router(unified_alerts_router)
 
-# Static files
+# Static files — addon frontend files served before main frontend
+# so the SPA catch-all doesn't intercept /addons/ requests.
+addons_path = Path(__file__).parent.parent.parent / "addons"
+if addons_path.exists():
+    app.mount("/addons", StaticFiles(directory=addons_path, follow_symlink=True), name="addon-static")
+
 frontend_path = Path(__file__).parent.parent / "frontend"
 if frontend_path.exists():
     app.mount("/static", StaticFiles(directory=frontend_path, follow_symlink=True), name="static")
@@ -1385,7 +1390,7 @@ if frontend_path.exists():
 async def no_cache_static(request: Request, call_next):
     """Disable caching for static CSS/JS during development."""
     response = await call_next(request)
-    if request.url.path.startswith("/static/"):
+    if request.url.path.startswith(("/static/", "/addons/")):
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 
