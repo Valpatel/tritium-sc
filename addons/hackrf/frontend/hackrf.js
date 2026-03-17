@@ -711,38 +711,76 @@ export const HackRFPanelDef = {
             }
         }
 
+        // Pre-computed color LUT for waterfall (256 entries, avoids per-pixel color math)
+        const _colorLUT = new Uint8Array(256 * 3);
+        for (let i = 0; i < 256; i++) {
+            const norm = i / 255;
+            let r, g, b;
+            if (norm < 0.25) {
+                const t = norm / 0.25;
+                r = 0; g = Math.round(t * 80); b = Math.round(80 + (1 - t) * 175);
+            } else if (norm < 0.5) {
+                const t = (norm - 0.25) / 0.25;
+                r = Math.round(t * 100); g = Math.round(80 + t * 175); b = Math.round(255 * (1 - t));
+            } else if (norm < 0.75) {
+                const t = (norm - 0.5) / 0.25;
+                r = Math.round(100 + t * 155); g = Math.round(255 - t * 17); b = 0;
+            } else {
+                const t = (norm - 0.75) / 0.25;
+                r = 255; g = Math.round(238 - t * 238); b = Math.round(t * 109);
+            }
+            _colorLUT[i * 3] = r;
+            _colorLUT[i * 3 + 1] = g;
+            _colorLUT[i * 3 + 2] = b;
+        }
+
         function _drawWaterfall(canvas, history) {
             if (canvas == null) return;
             const ctx = canvas.getContext('2d');
+
+            // Scale to container
+            const container = canvas.parentElement;
+            if (container) {
+                const cw = container.clientWidth || 600;
+                if (canvas.width !== cw) canvas.width = cw;
+            }
+
             const w = canvas.width;
             const h = canvas.height;
-
-            ctx.fillStyle = '#0a0a0f';
-            ctx.fillRect(0, 0, w, h);
-
             const rows = history.length;
+
             if (rows === 0) {
+                ctx.fillStyle = '#0a0a0f';
+                ctx.fillRect(0, 0, w, h);
                 ctx.fillStyle = '#555';
                 ctx.font = '11px monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText('Waterfall history builds as sweep runs', w / 2, h / 2);
+                ctx.fillText('Waterfall builds as sweep runs', w / 2, h / 2);
                 return;
             }
 
+            // Use ImageData for bulk pixel writes (much faster than fillRect per cell)
+            const imgData = ctx.createImageData(w, h);
+            const pixels = imgData.data;
             const cols = history[0].length;
-            if (cols === 0) return;
-            const cellW = w / cols;
-            const cellH = h / Math.min(rows, WATERFALL_MAX_ROWS);
+            const visibleRows = Math.min(rows, h);
 
-            for (let row = 0; row < rows; row++) {
+            for (let row = 0; row < visibleRows; row++) {
                 const rowData = history[row];
-                for (let col = 0; col < rowData.length; col++) {
-                    const power = rowData[col]; // dBm value
-                    const norm = Math.max(0, Math.min(1, (power + 80) / 60)); // -80 to -20 dBm range
-                    ctx.fillStyle = _powerColor(norm);
-                    ctx.fillRect(col * cellW, row * cellH, cellW + 1, cellH + 1);
+                const yStart = row;
+                for (let x = 0; x < w; x++) {
+                    const col = Math.floor((x / w) * cols);
+                    const power = col < rowData.length ? rowData[col] : -100;
+                    const normIdx = Math.max(0, Math.min(255, Math.round(((power + 80) / 60) * 255)));
+                    const pxIdx = (yStart * w + x) * 4;
+                    pixels[pxIdx]     = _colorLUT[normIdx * 3];
+                    pixels[pxIdx + 1] = _colorLUT[normIdx * 3 + 1];
+                    pixels[pxIdx + 2] = _colorLUT[normIdx * 3 + 2];
+                    pixels[pxIdx + 3] = 255;
                 }
             }
+
+            ctx.putImageData(imgData, 0, 0);
         }
 
         // ── SIGNALS tab ────────────────────────────────────────────
@@ -1212,24 +1250,65 @@ export const HackRFPanelDef = {
             return `<div class="hrf-info-row"><span class="hrf-info-lbl">${_esc(label)}</span><span class="hrf-info-val">${_esc(String(value))}</span></div>`;
         }
 
-        // ── Polling ────────────────────────────────────────────────
+        // ── High-performance render loop ─────────────────────────
+        // Separate data fetching from rendering:
+        // - Fetches happen on a timer, store data when complete
+        // - Rendering happens on requestAnimationFrame (smooth 60fps)
+        // - Never start a fetch if the previous one is still in flight
+        let _fetchInFlight = false;
+        let _needsRender = false;
+        let _lastFetchTime = 0;
+        let _alive = true;  // Set to false on unmount
+
+        // Status fetch — slow, only every 5 seconds
         const statusTimer = setInterval(() => {
-            fetchStatus();
-            if (sweepRunning) fetchSweepData();
+            if (_alive) fetchStatus();
         }, REFRESH_MS);
 
-        let sweepTimer = setInterval(() => {
-            if (sweepRunning && activeTab === 'spectrum') fetchSweepData();
-        }, SWEEP_REFRESH_MS);
+        // Spectrum data fetch — debounced, only when previous completes
+        async function _scheduleFetch() {
+            if (!_alive || _fetchInFlight) return;
+            const now = performance.now();
+            if (now - _lastFetchTime < SWEEP_REFRESH_MS) return;
+
+            _fetchInFlight = true;
+            _lastFetchTime = now;
+            try {
+                await fetchSweepData();
+                _needsRender = true;
+            } catch (_) {}
+            _fetchInFlight = false;
+        }
+
+        // rAF render loop — only draws when new data arrives
+        function _renderLoop() {
+            if (!_alive) return;
+
+            if (sweepRunning) _scheduleFetch();
+
+            if (_needsRender && activeTab === 'spectrum') {
+                const specCanvas = body.querySelector('[data-bind="spectrum-canvas"]');
+                const wfCanvas = body.querySelector('[data-bind="waterfall-canvas"]');
+                const peakList = body.querySelector('[data-bind="peak-list"]');
+                if (specCanvas) _drawSpectrum(specCanvas, sweepData);
+                if (wfCanvas) _drawWaterfall(wfCanvas, waterfallHistory);
+                if (peakList) _renderPeaks(peakList, sweepData);
+                _needsRender = false;
+            }
+
+            requestAnimationFrame(_renderLoop);
+        }
 
         // Initial load
         fetchAll();
         renderBody();
+        requestAnimationFrame(_renderLoop);
 
         // Save cleanup
         panel._hrfCleanup = {
-            timers: [statusTimer, sweepTimer],
-            tabTimers: () => {
+            timers: [statusTimer],
+            stop: () => {
+                _alive = false;
                 if (devicesTimer) { clearInterval(devicesTimer); devicesTimer = null; }
                 if (aircraftTimer) { clearInterval(aircraftTimer); aircraftTimer = null; }
             },
@@ -1239,7 +1318,7 @@ export const HackRFPanelDef = {
     unmount(bodyEl, panel) {
         if (panel._hrfCleanup) {
             (panel._hrfCleanup.timers || []).forEach(t => clearInterval(t));
-            if (typeof panel._hrfCleanup.tabTimers === 'function') panel._hrfCleanup.tabTimers();
+            if (typeof panel._hrfCleanup.stop === 'function') panel._hrfCleanup.stop();
             panel._hrfCleanup = null;
         }
     },
