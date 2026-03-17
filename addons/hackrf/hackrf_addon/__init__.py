@@ -57,6 +57,9 @@ class HackRFAddon(SensorAddon):
         import logging
         log = logging.getLogger("hackrf")
 
+        # Kill any orphaned HackRF subprocesses from previous runs
+        self._kill_orphan_processes()
+
         # Resolve target_tracker from app.state.amy (same pattern as meshtastic addon)
         target_tracker = None
         amy = getattr(getattr(app, 'state', None), 'amy', None)
@@ -130,7 +133,24 @@ class HackRFAddon(SensorAddon):
         if self.data_store:
             await self.data_store.close()
             self.data_store = None
+        # Kill any remaining subprocesses
+        self._kill_orphan_processes()
         await super().unregister(app)
+
+    @staticmethod
+    def _kill_orphan_processes():
+        """Kill any orphaned HackRF-related subprocesses from previous runs."""
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["pkill", "-f", "hackrf_sweep|hackrf_transfer|rtl_433.*hackrf"],
+                capture_output=True, timeout=5,
+            )
+            if result.returncode == 0:
+                import logging
+                logging.getLogger("hackrf").info("Killed orphaned HackRF subprocesses")
+        except Exception:
+            pass
 
     async def gather(self) -> list[dict]:
         """Return SDR-detected entities as target dicts.
