@@ -12,7 +12,7 @@ import tempfile
 import os
 
 
-def create_router(device, spectrum, receiver, fm_decoder=None, tpms_decoder=None, ism_monitor=None) -> APIRouter:
+def create_router(device, spectrum, receiver, fm_decoder=None, tpms_decoder=None, ism_monitor=None, continuous_scanner=None) -> APIRouter:
     """Create FastAPI router for HackRF addon endpoints.
 
     Args:
@@ -418,5 +418,43 @@ def create_router(device, spectrum, receiver, fm_decoder=None, tpms_decoder=None
         if ism_monitor is None:
             return {"bands": [], "error": "ISM monitor not available"}
         return {"bands": ism_monitor.get_band_summary()}
+
+    # ── Continuous Scanner ──────────────────────────────────────
+
+    @router.post("/scanner/start")
+    async def scanner_start():
+        """Start 24/7 continuous RF environment scanning.
+
+        Cycles through all frequency bands, building a complete picture
+        of the RF environment over time.
+        """
+        if continuous_scanner is None:
+            return {"error": "Continuous scanner not available"}
+        return await continuous_scanner.start()
+
+    @router.post("/scanner/stop")
+    async def scanner_stop():
+        """Stop continuous scanning."""
+        if continuous_scanner is None:
+            return {"error": "Continuous scanner not available"}
+        return await continuous_scanner.stop()
+
+    @router.get("/scanner/summary")
+    async def scanner_summary():
+        """Get RF environment summary from continuous scanning."""
+        if continuous_scanner is None:
+            return {"error": "Continuous scanner not available"}
+        return continuous_scanner.get_summary().to_dict()
+
+    @router.get("/scanner/status")
+    async def scanner_status():
+        """Check if continuous scanner is running."""
+        if continuous_scanner is None:
+            return {"running": False, "error": "not available"}
+        return {
+            "running": continuous_scanner.is_running,
+            "bands": len(continuous_scanner.bands),
+            "band_names": [b.name for b in continuous_scanner.bands],
+        }
 
     return router

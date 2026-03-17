@@ -14,6 +14,8 @@ from .spectrum import SpectrumAnalyzer
 from .receiver import FMReceiver
 from .signal_db import SignalDatabase
 from .router import create_router
+from .decoders import FMRadioDecoder, TPMSDecoder, ISMBandMonitor
+from .continuous_scan import ContinuousScanner
 
 
 class HackRFAddon(SensorAddon):
@@ -22,8 +24,8 @@ class HackRFAddon(SensorAddon):
     info = AddonInfo(
         id="hackrf",
         name="HackRF One SDR",
-        version="1.0.0",
-        description="Software Defined Radio — spectrum analyzer, FM receiver, signal monitoring",
+        version="2.0.0",
+        description="Software Defined Radio — spectrum analyzer, FM demodulation, TPMS tracking, ISM monitoring",
         author="Valpatel Software LLC",
         category="radio",
         icon="📻",
@@ -35,6 +37,10 @@ class HackRFAddon(SensorAddon):
         self.signal_db = SignalDatabase()
         self.spectrum = SpectrumAnalyzer(signal_db=self.signal_db)
         self.receiver = FMReceiver()
+        self.fm_decoder = FMRadioDecoder()
+        self.tpms_decoder = TPMSDecoder()
+        self.ism_monitor = ISMBandMonitor()
+        self.continuous_scanner = ContinuousScanner(self.spectrum, self.signal_db)
         self._poll_task = None
 
     async def register(self, app):
@@ -52,7 +58,13 @@ class HackRFAddon(SensorAddon):
             log.warning("HackRF One not detected — addon running in degraded mode")
 
         # Add API routes
-        router = create_router(self.device, self.spectrum, self.receiver)
+        router = create_router(
+            self.device, self.spectrum, self.receiver,
+            fm_decoder=self.fm_decoder,
+            tpms_decoder=self.tpms_decoder,
+            ism_monitor=self.ism_monitor,
+            continuous_scanner=self.continuous_scanner,
+        )
         if hasattr(app, 'include_router'):
             app.include_router(router, prefix="/api/addons/hackrf", tags=["hackrf"])
 
@@ -62,11 +74,17 @@ class HackRFAddon(SensorAddon):
         self._background_tasks.append(self._poll_task)
 
     async def unregister(self, app):
-        # Stop any running sweep or capture
+        # Stop all running operations
+        if self.continuous_scanner.is_running:
+            await self.continuous_scanner.stop()
         if self.spectrum.is_running:
             await self.spectrum.stop_sweep()
         if self.receiver.is_running:
             await self.receiver.stop()
+        if self.tpms_decoder.is_running:
+            await self.tpms_decoder.stop_monitoring()
+        if self.ism_monitor.is_running:
+            await self.ism_monitor.stop_monitoring()
         await super().unregister(app)
 
     async def gather(self) -> list[dict]:
