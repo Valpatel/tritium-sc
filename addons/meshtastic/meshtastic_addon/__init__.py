@@ -295,6 +295,20 @@ class MeshtasticAddon(SensorAddon):
         # Register message bridge callbacks after connection attempt
         self.message_bridge.register_callbacks()
 
+        # Wire up MQTT bridge for remote Meshtastic radios
+        self._mqtt_remote_bridge = None
+        mqtt_client = mqtt_bridge  # already resolved above
+        if mqtt_client is not None:
+            from .mqtt_bridge import MeshtasticMQTTBridge
+            self._mqtt_remote_bridge = MeshtasticMQTTBridge(
+                self.registry, self._node_managers,
+                site_id=site_id,
+                event_bus=event_bus,
+                target_tracker=target_tracker,
+            )
+            self._mqtt_remote_bridge.start(mqtt_client)
+            log.info("Meshtastic MQTT remote bridge started for remote radio ingestion")
+
         # Start polling loop and stats snapshot loop
         import asyncio
         self._poll_task = asyncio.create_task(self._poll_loop())
@@ -303,6 +317,11 @@ class MeshtasticAddon(SensorAddon):
         self._background_tasks.append(self._stats_task)
 
     async def unregister(self, app):
+        # Stop MQTT remote bridge
+        if self._mqtt_remote_bridge:
+            self._mqtt_remote_bridge.stop()
+            self._mqtt_remote_bridge = None
+
         if self.message_bridge:
             self.message_bridge.unregister_callbacks()
             self.message_bridge = None

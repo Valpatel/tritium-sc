@@ -186,12 +186,32 @@ class HackRFAddon(SensorAddon):
         if hasattr(app, 'include_router'):
             app.include_router(router, prefix="/api/addons/hackrf", tags=["hackrf"])
 
+        # Wire up MQTT bridge for remote HackRF devices
+        self._mqtt_bridge = None
+        mqtt_client = getattr(getattr(app, 'state', None), 'mqtt_bridge', None)
+        if mqtt_client is None:
+            mqtt_client = getattr(app, 'mqtt_bridge', None)
+        if mqtt_client is not None:
+            from .mqtt_bridge import HackRFMQTTBridge
+            site_id = getattr(app, 'site_id', 'home')
+            self._mqtt_bridge = HackRFMQTTBridge(
+                self.registry, self._spectrum_instances, self._signal_dbs,
+                site_id=site_id,
+            )
+            self._mqtt_bridge.start(mqtt_client)
+            log.info("HackRF MQTT bridge started for remote device ingestion")
+
         # Start background polling for spectrum data
         import asyncio
         self._poll_task = asyncio.create_task(self._poll_loop())
         self._background_tasks.append(self._poll_task)
 
     async def unregister(self, app):
+        # Stop MQTT bridge
+        if self._mqtt_bridge:
+            self._mqtt_bridge.stop()
+            self._mqtt_bridge = None
+
         # Stop all running operations
         if self.fm_player._playing:
             await self.fm_player.stop()
