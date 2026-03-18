@@ -1183,4 +1183,70 @@ def create_router(device, spectrum, receiver, fm_decoder=None, tpms_decoder=None
             rl.release("sweep")
         return result
 
+    # ------------------------------------------------------------------
+    # GeoJSON endpoints for tactical map integration
+    # ------------------------------------------------------------------
+
+    @router.get("/geojson/adsb")
+    async def geojson_adsb():
+        """ADS-B aircraft as GeoJSON FeatureCollection.
+
+        Returns all tracked aircraft with lat/lng positions as GeoJSON
+        Point features consumable by MapLibre GL as a GeoJSON source.
+        """
+        if not adsb_decoder:
+            return {"type": "FeatureCollection", "features": []}
+
+        features = []
+        for ac in adsb_decoder.get_aircraft():
+            lat = ac.get("latitude")
+            lng = ac.get("longitude")
+            if lat is None or lng is None:
+                continue
+            icao = ac.get("icao", "")
+            callsign = ac.get("callsign", "")
+            features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [lng, lat],
+                },
+                "properties": {
+                    "target_id": f"adsb_{icao}",
+                    "callsign": callsign,
+                    "altitude_ft": ac.get("altitude_ft"),
+                    "heading": ac.get("heading", 0),
+                    "speed_kt": ac.get("velocity_kt", 0),
+                    "squawk": ac.get("squawk", ""),
+                    "icon": "aircraft",
+                },
+            })
+        return {"type": "FeatureCollection", "features": features}
+
+    @router.get("/geojson/signals")
+    async def geojson_signals():
+        """Strong RF signal detections as GeoJSON FeatureCollection.
+
+        Returns signal peaks as features. Geometry is null since RF signals
+        detected by a single SDR do not have inherent positions.
+        """
+        if not signal_db:
+            return {"type": "FeatureCollection", "features": []}
+
+        peaks = signal_db.get_peaks(threshold_dbm=-30.0)
+        features = []
+        for peak in peaks[:50]:
+            freq_mhz = peak["freq_hz"] / 1_000_000
+            features.append({
+                "type": "Feature",
+                "geometry": None,
+                "properties": {
+                    "freq_mhz": round(freq_mhz, 3),
+                    "power_dbm": round(peak["power_dbm"], 1),
+                    "label": f"{freq_mhz:.2f} MHz ISM",
+                    "icon": "rf_signal",
+                },
+            })
+        return {"type": "FeatureCollection", "features": features}
+
     return router

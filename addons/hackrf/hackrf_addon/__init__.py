@@ -7,7 +7,7 @@ Provides spectrum analysis, FM reception, and signal monitoring
 using HackRF One hardware via subprocess wrappers (no Python bindings).
 """
 
-from tritium_lib.sdk import SensorAddon, AddonInfo, DeviceRegistry, DeviceState, SubprocessManager
+from tritium_lib.sdk import SensorAddon, AddonInfo, AddonGeoLayer, DeviceRegistry, DeviceState, SubprocessManager
 
 from .data_store import HackRFDataStore
 from .device import HackRFDevice, detect_all_hackrfs
@@ -397,6 +397,30 @@ class HackRFAddon(SensorAddon):
              "color": "#b060ff", "key": "showRfSpectrum"},
             {"id": "adsbAircraft", "label": "ADS-B Aircraft", "category": "SDR",
              "color": "#ffaa00", "key": "showAdsbAircraft"},
+        ]
+
+    def get_geojson_layers(self):
+        return [
+            AddonGeoLayer(
+                layer_id="hackrf-adsb",
+                addon_id=self.info.id,
+                label="ADS-B Aircraft",
+                category="SDR",
+                color="#ffaa00",
+                geojson_endpoint="/api/addons/hackrf/geojson/adsb",
+                refresh_interval=3,
+                visible_by_default=False,
+            ),
+            AddonGeoLayer(
+                layer_id="hackrf-signals",
+                addon_id=self.info.id,
+                label="RF Signals",
+                category="SDR",
+                color="#b060ff",
+                geojson_endpoint="/api/addons/hackrf/geojson/signals",
+                refresh_interval=10,
+                visible_by_default=False,
+            ),
         ]
 
     def health_check(self):

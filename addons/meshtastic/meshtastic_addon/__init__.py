@@ -7,7 +7,7 @@ Connects to Meshtastic devices via USB serial, Bluetooth, WiFi/TCP, or MQTT.
 Each mesh node becomes a tracked target on the tactical map.
 """
 
-from tritium_lib.sdk import SensorAddon, AddonInfo, DeviceRegistry, DeviceState
+from tritium_lib.sdk import SensorAddon, AddonInfo, AddonGeoLayer, DeviceRegistry, DeviceState
 
 from .connection import ConnectionManager, detect_meshtastic_ports
 from .data_store import MeshtasticDataStore
@@ -446,6 +446,30 @@ class MeshtasticAddon(SensorAddon):
              "color": "#00d4aa", "key": "showMeshLinks"},
             {"id": "meshCoverage", "label": "Coverage Estimate", "category": "MESH NETWORK",
              "color": "rgba(0,212,170,0.3)", "key": "showMeshCoverage"},
+        ]
+
+    def get_geojson_layers(self):
+        return [
+            AddonGeoLayer(
+                layer_id="meshtastic-nodes",
+                addon_id=self.info.id,
+                label="Mesh Nodes",
+                category="MESH",
+                color="#00d4aa",
+                geojson_endpoint="/api/addons/meshtastic/geojson/nodes",
+                refresh_interval=5,
+                visible_by_default=True,
+            ),
+            AddonGeoLayer(
+                layer_id="meshtastic-links",
+                addon_id=self.info.id,
+                label="Mesh Links",
+                category="MESH",
+                color="#00d4aa",
+                geojson_endpoint="/api/addons/meshtastic/geojson/links",
+                refresh_interval=10,
+                visible_by_default=False,
+            ),
         ]
 
     def health_check(self):

@@ -125,6 +125,7 @@ import { TargetTrailManager } from './target-trails.js';
 import { HandoffLineManager } from './handoff-lines.js';
 import { ConvoyOverlayManager } from './convoy-overlay.js';
 import { startAdsbOverlay, toggleAdsbOverlay } from './adsb-overlay.js';
+import { AddonMapLayers } from './addon-map-layers.js';
 
 // Make available on window for console debugging
 window.TritiumStore = TritiumStore;
@@ -850,6 +851,22 @@ function initPanelSystem(container) {
     // If map is already ready, try to start with window._tritiumMap
     if (window._tritiumMap) {
         convoyOverlay.start(window._tritiumMap);
+    }
+
+    // Addon GeoJSON map layers (polls addon endpoints, renders on map)
+    EventBus.on('map:ready', (mapInstance) => {
+        const addonLayers = new AddonMapLayers(mapInstance);
+        addonLayers.loadFromAddons().catch(err => {
+            console.warn('[TRITIUM] Addon map layer loading failed:', err);
+        });
+        window._addonMapLayers = addonLayers;
+    });
+    if (window._tritiumMap) {
+        const addonLayers = new AddonMapLayers(window._tritiumMap);
+        addonLayers.loadFromAddons().catch(err => {
+            console.warn('[TRITIUM] Addon map layer loading failed:', err);
+        });
+        window._addonMapLayers = addonLayers;
     }
 
     // Enhanced map screenshot hotkey (Ctrl+Shift+P)

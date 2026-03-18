@@ -13,7 +13,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
@@ -1444,6 +1444,64 @@ async def command_center():
     if cmd_path.exists():
         return FileResponse(cmd_path)
     return HTMLResponse(content="Command center not found")
+
+
+@app.get("/addon/{addon_id}/", response_class=HTMLResponse)
+async def addon_standalone(addon_id: str, request: Request):
+    """Serve standalone full-screen addon app."""
+    standalone_path = frontend_path / "addon-standalone.html"
+    if standalone_path.exists():
+        html = standalone_path.read_text()
+        html = html.replace("__ADDON_ID__", addon_id)
+        return HTMLResponse(content=html)
+    return HTMLResponse(
+        content=f"""
+        <html>
+            <head><title>{addon_id.upper()} — Tritium</title></head>
+            <body style="background: #0a0a0f; color: #00f0ff; font-family: monospace;">
+                <h1>{addon_id.upper()} — Standalone Mode</h1>
+                <p>addon-standalone.html not found. Please check installation.</p>
+                <a href="/" style="color: #ff2a6d;">Back to Command Center</a>
+            </body>
+        </html>
+        """
+    )
+
+
+@app.get("/addon/{addon_id}/manifest.json")
+async def addon_pwa_manifest(addon_id: str, request: Request):
+    """Generate PWA manifest for this addon."""
+    loader = getattr(request.app.state, "addon_loader", None)
+    addon_name = addon_id.upper()
+    addon_description = f"Tritium {addon_name} standalone addon"
+
+    if loader:
+        entry = loader.registry.get(addon_id)
+        if entry and entry.manifest:
+            addon_name = entry.manifest.name or addon_name
+            addon_description = entry.manifest.description or addon_description
+
+    return JSONResponse({
+        "name": f"{addon_name} — Tritium",
+        "short_name": addon_id.upper(),
+        "start_url": f"/addon/{addon_id}/",
+        "display": "standalone",
+        "background_color": "#0a0a0f",
+        "theme_color": "#00f0ff",
+        "description": addon_description,
+        "icons": [
+            {
+                "src": "/static/img/tritium-icon-192.png",
+                "sizes": "192x192",
+                "type": "image/png",
+            },
+            {
+                "src": "/static/img/tritium-icon-512.png",
+                "sizes": "512x512",
+                "type": "image/png",
+            },
+        ],
+    })
 
 
 @app.get("/health")

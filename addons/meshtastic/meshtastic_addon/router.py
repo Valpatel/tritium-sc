@@ -403,6 +403,94 @@ def create_router(
 
         return {"type": "FeatureCollection", "features": features}
 
+    @router.get("/geojson/nodes")
+    async def geojson_nodes():
+        """Mesh nodes with GPS as GeoJSON FeatureCollection.
+
+        Returns nodes that have valid GPS coordinates as GeoJSON Point
+        features. Similar to /geojson but uses the addon GeoJSON layer
+        naming convention for addon map integration.
+        """
+        if not node_manager:
+            return {"type": "FeatureCollection", "features": []}
+
+        features = []
+        for nid, node in node_manager.nodes.items():
+            lat = node.get("lat")
+            lng = node.get("lng")
+            if lat is None or lng is None:
+                continue
+            if lat == 0.0 and lng == 0.0:
+                continue
+
+            features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [lng, lat],
+                },
+                "properties": {
+                    "target_id": f"mesh_{nid.replace('!', '')}",
+                    "long_name": node.get("long_name") or nid,
+                    "short_name": node.get("short_name", ""),
+                    "battery": node.get("battery"),
+                    "snr": node.get("snr"),
+                    "role": _clean_role(node.get("role", "")),
+                    "icon": "mesh_node",
+                },
+            })
+        return {"type": "FeatureCollection", "features": features}
+
+    @router.get("/geojson/links")
+    async def geojson_links():
+        """Mesh radio links as GeoJSON LineString features.
+
+        Returns links between nodes that both have valid GPS coordinates.
+        Each feature is a LineString connecting two mesh nodes.
+        """
+        if not node_manager:
+            return {"type": "FeatureCollection", "features": []}
+
+        links = node_manager.get_links()
+        features = []
+        for link in links:
+            from_id = link.get("from")
+            to_id = link.get("to")
+            if not from_id or not to_id:
+                continue
+
+            from_node = node_manager.nodes.get(from_id, {})
+            to_node = node_manager.nodes.get(to_id, {})
+
+            from_lat = from_node.get("lat")
+            from_lng = from_node.get("lng")
+            to_lat = to_node.get("lat")
+            to_lng = to_node.get("lng")
+
+            if any(v is None for v in (from_lat, from_lng, to_lat, to_lng)):
+                continue
+            if (from_lat == 0.0 and from_lng == 0.0) or (to_lat == 0.0 and to_lng == 0.0):
+                continue
+
+            features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [
+                        [from_lng, from_lat],
+                        [to_lng, to_lat],
+                    ],
+                },
+                "properties": {
+                    "from_node": from_id,
+                    "to_node": to_id,
+                    "snr": link.get("snr"),
+                    "hops": link.get("hops", 1),
+                    "icon": "mesh_link",
+                },
+            })
+        return {"type": "FeatureCollection", "features": features}
+
     @router.get("/health")
     async def health():
         """Addon health check."""

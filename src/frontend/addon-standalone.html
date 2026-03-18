@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<!--
+  Created by Matthew Valancy
+  Copyright 2026 Valpatel Software LLC
+  Licensed under AGPL-3.0 — see LICENSE for details.
+
+  Standalone full-screen addon app.
+  Served at /addon/{addon_id}/ — loads a single addon panel
+  without the Command Center map or other panels.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#00f0ff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>__ADDON_ID__ — Tritium</title>
+    <link rel="stylesheet" href="/static/css/cybercore.css">
+    <link rel="stylesheet" href="/static/css/addon-ui.css">
+    <link rel="manifest" href="/addon/__ADDON_ID__/manifest.json">
+    <style>
+        /* Standalone addon overrides */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #0a0a0f;
+            color: #c0c0c0;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 13px;
+        }
+        body.tritium-standalone {
+            display: flex;
+            flex-direction: column;
+        }
+        .standalone-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            height: 40px;
+            min-height: 40px;
+            padding: 0 12px;
+            background: #0e0e14;
+            border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+            z-index: 100;
+        }
+        .back-link {
+            color: #ff2a6d;
+            text-decoration: none;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            white-space: nowrap;
+            transition: color 0.2s;
+        }
+        .back-link:hover {
+            color: #00f0ff;
+            text-shadow: 0 0 6px rgba(0, 240, 255, 0.5);
+        }
+        .addon-title {
+            color: #00f0ff;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+            white-space: nowrap;
+        }
+        .header-spacer {
+            flex: 1;
+        }
+        #device-bar {
+            flex-shrink: 0;
+        }
+        #addon-content {
+            flex: 1;
+            min-height: 0;
+            overflow: auto;
+            position: relative;
+        }
+        .addon-load-error {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #ff2a6d;
+            font-size: 16px;
+            text-align: center;
+            padding: 40px;
+        }
+        .addon-load-error code {
+            color: #00f0ff;
+            background: #12121a;
+            padding: 4px 10px;
+            border-radius: 3px;
+            margin-top: 12px;
+        }
+    </style>
+</head>
+<body class="tritium-standalone">
+    <header class="standalone-header">
+        <a href="/" class="back-link">&#8592; COMMAND CENTER</a>
+        <span class="addon-title" id="addon-title">__ADDON_ID__</span>
+        <div class="header-spacer"></div>
+        <div id="conn-bar"></div>
+        <div id="device-bar"></div>
+    </header>
+    <main id="addon-content"></main>
+
+    <script type="module">
+        // Standalone addon bootstrapper
+        // Fetches addon manifest, imports panel JS, mounts into #addon-content.
+
+        const ADDON_ID = '__ADDON_ID__';
+        const contentEl = document.getElementById('addon-content');
+        const titleEl = document.getElementById('addon-title');
+        const connBarEl = document.getElementById('conn-bar');
+
+        // Import shared UI components
+        let ConnectionBar, showSpinner, hideSpinner;
+        try {
+            const connMod = await import('/static/js/addon-ui/conn-bar.js');
+            ConnectionBar = connMod.ConnectionBar;
+            const spinMod = await import('/static/js/addon-ui/spinner.js');
+            showSpinner = spinMod.showSpinner;
+            hideSpinner = spinMod.hideSpinner;
+        } catch (e) {
+            console.warn('Addon UI components not available:', e);
+        }
+
+        // Show loading spinner
+        if (showSpinner) {
+            showSpinner(contentEl, `Loading ${ADDON_ID}...`);
+        }
+
+        // Initialize connection bar
+        let connBar = null;
+        if (ConnectionBar && connBarEl) {
+            connBar = new ConnectionBar(connBarEl);
+            connBar.setStatus('LOADING', 'info');
+        }
+
+        // Fetch addon manifest from API
+        let manifest = null;
+        try {
+            const resp = await fetch('/api/addons/manifests');
+            if (resp.ok) {
+                const manifests = await resp.json();
+                manifest = manifests.find(m => m.id === ADDON_ID);
+            }
+        } catch (e) {
+            console.warn('Failed to fetch addon manifests:', e);
+        }
+
+        // Fallback: try the addon-specific list
+        if (!manifest) {
+            try {
+                const resp = await fetch('/api/addons/');
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const addons = data.addons || [];
+                    const found = addons.find(a => a.id === ADDON_ID);
+                    if (found) {
+                        manifest = found;
+                    }
+                }
+            } catch (e) {
+                console.warn('Failed to fetch addon list:', e);
+            }
+        }
+
+        // Update title from manifest
+        if (manifest && manifest.name) {
+            titleEl.textContent = manifest.name;
+            document.title = `${manifest.name} — Tritium`;
+        }
+
+        // Try to load the addon's frontend JS
+        // Convention: /addons/{id}/frontend/{id}.js exports a panel class or init function
+        const modulePaths = [
+            `/addons/${ADDON_ID}/frontend/${ADDON_ID}.js`,
+        ];
+
+        // Also try panels from manifest
+        if (manifest && manifest.panels) {
+            for (const panel of manifest.panels) {
+                if (panel.module) {
+                    modulePaths.push(panel.module);
+                }
+            }
+        }
+
+        let loaded = false;
+        for (const modulePath of modulePaths) {
+            try {
+                const mod = await import(modulePath);
+
+                if (hideSpinner) hideSpinner(contentEl);
+
+                // Try different export conventions
+                if (typeof mod.mountStandalone === 'function') {
+                    // Preferred: explicit standalone mount
+                    await mod.mountStandalone(contentEl, { addonId: ADDON_ID, manifest });
+                    loaded = true;
+                } else if (typeof mod.createPanel === 'function') {
+                    // Panel factory
+                    const panel = mod.createPanel(contentEl, { standalone: true, addonId: ADDON_ID });
+                    if (panel && typeof panel.init === 'function') await panel.init();
+                    loaded = true;
+                } else if (typeof mod.default === 'function') {
+                    // Default export as init function
+                    await mod.default(contentEl, { standalone: true, addonId: ADDON_ID });
+                    loaded = true;
+                } else if (typeof mod.init === 'function') {
+                    await mod.init(contentEl, { standalone: true, addonId: ADDON_ID });
+                    loaded = true;
+                }
+
+                if (loaded) {
+                    if (connBar) connBar.setConnected(true, ADDON_ID);
+                    break;
+                }
+            } catch (e) {
+                console.warn(`Failed to load ${modulePath}:`, e);
+            }
+        }
+
+        if (!loaded) {
+            if (hideSpinner) hideSpinner(contentEl);
+            if (connBar) connBar.setStatus('NOT FOUND', 'error');
+            contentEl.innerHTML = `
+                <div class="addon-load-error">
+                    <div>Addon <strong>${ADDON_ID}</strong> not found or has no frontend module.</div>
+                    <code>/addons/${ADDON_ID}/frontend/${ADDON_ID}.js</code>
+                    <div style="margin-top: 20px; font-size: 12px; color: #555;">
+                        The addon must export one of: mountStandalone(), createPanel(), default(), or init()
+                    </div>
+                    <a href="/" style="margin-top: 24px; color: #00f0ff; text-decoration: none;">
+                        Return to Command Center
+                    </a>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

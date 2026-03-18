@@ -31,6 +31,30 @@ async def get_manifests(request: Request):
     return loader.get_manifests()
 
 
+@router.get("/geojson-layers")
+async def get_geojson_layers(request: Request):
+    """Return GeoJSON layer definitions from all enabled addons.
+
+    The frontend polls this once at startup to discover which addon
+    GeoJSON endpoints to render on the tactical map.
+    """
+    loader = getattr(request.app.state, "addon_loader", None)
+    if not loader:
+        return []
+    layers = []
+    for addon_id in loader.enabled:
+        entry = loader.registry.get(addon_id)
+        if not entry or not entry.instance:
+            continue
+        try:
+            geo_layers = entry.instance.get_geojson_layers()
+            for gl in geo_layers:
+                layers.append(gl.to_dict() if hasattr(gl, "to_dict") else gl)
+        except Exception:
+            pass
+    return layers
+
+
 @router.get("/health")
 async def addon_health(request: Request):
     """Addon system health summary."""
