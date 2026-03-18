@@ -24,7 +24,7 @@ import pytest
 # Mark all tests in this module as visual
 pytestmark = [pytest.mark.visual]
 
-SCREENSHOT_DIR = Path("test_report/screenshots")
+SCREENSHOT_DIR = Path("output/reports/screenshots")
 SERVER_URL = os.environ.get("TRITIUM_URL", "http://localhost:8000")
 
 
