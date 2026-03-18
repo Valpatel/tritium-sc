@@ -52,7 +52,9 @@ Tick rate (10 Hz / fixed 0.1s step):
 
 from __future__ import annotations
 
+import asyncio
 import math
+import os
 import random
 import threading
 import time
@@ -94,8 +96,17 @@ from .vision import VisionSystem
 from .objectives import ObjectiveTracker
 from .weapons import WeaponSystem
 
+try:
+    from tritium_lib.sim_engine.core.npc_thinker import NPCThinker
+except ImportError:
+    NPCThinker = None  # type: ignore[misc,assignment]
+
 if TYPE_CHECKING:
     from engine.comms.event_bus import EventBus
+
+# LLM-powered NPC thinking — OFF by default (expensive inference).
+# Enable via NPC_THINKING=true environment variable.
+NPC_THINKING_ENABLED = os.environ.get("NPC_THINKING", "false").lower() == "true"
 
 _HOSTILE_NAMES = [
     "Intruder Alpha",
@@ -225,6 +236,12 @@ class SimulationEngine:
 
         # NPC intelligence plugin (brains + thoughts, set externally)
         self._npc_intelligence = None
+
+        # LLM-powered NPC thinker — generates ambient thoughts for neutral NPCs
+        self._npc_thinker: NPCThinker | None = None
+        if NPC_THINKING_ENABLED and NPCThinker is not None:
+            self._npc_thinker = NPCThinker(cooldown_s=30.0)
+            logger.info("NPCThinker enabled (NPC_THINKING=true)")
 
         # Mission-type subsystems (initialized on game start, cleared on reset)
         self._crowd_density_tracker: CrowdDensityTracker | None = None
@@ -862,6 +879,63 @@ class SimulationEngine:
             self._combat_sub_thread.join(timeout=2.0)
             self._combat_sub_thread = None
 
+    # -- NPC LLM thinking helpers -------------------------------------------
+
+    def _fire_npc_thought(self, target: SimulationTarget) -> None:
+        """Schedule an async NPCThinker.think() call from the sync tick thread.
+
+        The result is published as an ``npc_thought`` event on the EventBus,
+        which the WebSocket bridge forwards to the frontend.
+        """
+        thinker = self._npc_thinker
+        if thinker is None:
+            return
+
+        npc_dict = target.to_dict()
+
+        # Determine time of day from sim clock or wall clock
+        import datetime
+        hour = datetime.datetime.now().hour
+        if hour < 6:
+            time_of_day = "night"
+        elif hour < 12:
+            time_of_day = "morning"
+        elif hour < 18:
+            time_of_day = "afternoon"
+        else:
+            time_of_day = "evening"
+
+        situation = {
+            "time_of_day": time_of_day,
+            "location": f"({target.position[0]:.0f}, {target.position[1]:.0f})",
+        }
+
+        async def _do_think():
+            try:
+                thought = await thinker.think(npc_dict, situation)
+                if thought:
+                    self._event_bus.publish("npc_thought", {
+                        "unit_id": thought.npc_id,
+                        "text": thought.thought,
+                        "emotion": "neutral",
+                        "duration": 8.0,
+                        "importance": "normal",
+                    })
+            except Exception:
+                logger.debug("NPCThinker inference failed", exc_info=True)
+
+        # Run in a background event loop — don't block the tick thread
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(_do_think())
+        except RuntimeError:
+            # No running loop in this thread — spin up a throwaway one
+            threading.Thread(
+                target=lambda: asyncio.run(_do_think()),
+                name="npc-think",
+                daemon=True,
+            ).start()
+
     # Engagement range — a friendly within this distance of a hostile
     # neutralizes the hostile on the next tick.
     INTERCEPT_RANGE = 2.0
@@ -1036,6 +1110,18 @@ class SimulationEngine:
                 if t.alliance == "neutral" and t.asset_type in ("person", "vehicle", "animal")
             ]
             self._npc_intelligence.tick(dt, targets_with_positions=twp)
+
+        # LLM-powered NPC thoughts — pick a random neutral NPC every ~1s
+        # and generate an ambient thought via a local LLM.  NPCThinker.think()
+        # is async, so we fire-and-forget into an event loop from this sync thread.
+        if self._npc_thinker is not None and self._tick_counter % 10 == 0:
+            neutrals = [
+                t for t in targets
+                if t.alliance == "neutral" and t.status == "active"
+            ]
+            if neutrals:
+                npc = random.choice(neutrals)
+                self._fire_npc_thought(npc)
 
         # Tick external plugins that have tick() methods (e.g. npc_thoughts)
         if self._plugin_manager is not None:
