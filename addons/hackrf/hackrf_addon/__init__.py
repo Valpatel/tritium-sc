@@ -186,20 +186,23 @@ class HackRFAddon(SensorAddon):
         if hasattr(app, 'include_router'):
             app.include_router(router, prefix="/api/addons/hackrf", tags=["hackrf"])
 
-        # Wire up MQTT bridge for remote HackRF devices
+        # Wire up MQTT bridge for remote HackRF devices (only if MQTT supports subscribe)
         self._mqtt_bridge = None
         mqtt_client = getattr(getattr(app, 'state', None), 'mqtt_bridge', None)
         if mqtt_client is None:
             mqtt_client = getattr(app, 'mqtt_bridge', None)
-        if mqtt_client is not None:
-            from .mqtt_bridge import HackRFMQTTBridge
-            site_id = getattr(app, 'site_id', 'home')
-            self._mqtt_bridge = HackRFMQTTBridge(
-                self.registry, self._spectrum_instances, self._signal_dbs,
-                site_id=site_id,
-            )
-            self._mqtt_bridge.start(mqtt_client)
-            log.info("HackRF MQTT bridge started for remote device ingestion")
+        if mqtt_client is not None and hasattr(mqtt_client, 'subscribe'):
+            try:
+                from .mqtt_bridge import HackRFMQTTBridge
+                site_id = getattr(app, 'site_id', 'home')
+                self._mqtt_bridge = HackRFMQTTBridge(
+                    self.registry, self._spectrum_instances, self._signal_dbs,
+                    site_id=site_id,
+                )
+                self._mqtt_bridge.start(mqtt_client)
+                log.info("HackRF MQTT bridge started for remote device ingestion")
+            except Exception as e:
+                log.debug(f"HackRF MQTT bridge not started (non-fatal): {e}")
 
         # Start background polling for spectrum data
         import asyncio

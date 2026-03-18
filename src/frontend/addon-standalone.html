@@ -222,6 +222,28 @@
                 } else if (typeof mod.init === 'function') {
                     await mod.init(contentEl, { standalone: true, addonId: ADDON_ID });
                     loaded = true;
+                } else {
+                    // Try PanelDef object pattern: { id, title, create(panel) }
+                    const panelDef = mod.default || Object.values(mod).find(v => v && typeof v === 'object' && typeof v.create === 'function');
+                    if (panelDef && typeof panelDef.create === 'function') {
+                        // Create a panel body container like PanelManager would
+                        const bodyEl = document.createElement('div');
+                        bodyEl.className = 'panel-body';
+                        bodyEl.style.cssText = 'flex:1;overflow:auto;';
+                        contentEl.appendChild(bodyEl);
+                        // Create a minimal panel-like object for the create() call
+                        const fakePanel = { bodyEl, el: contentEl, id: panelDef.id || ADDON_ID };
+                        const result = panelDef.create(fakePanel);
+                        if (result instanceof HTMLElement) {
+                            bodyEl.appendChild(result);
+                        }
+                        // Call mount(bodyEl, panel) if it exists — bodyEl is the created element
+                        if (typeof panelDef.mount === 'function') {
+                            const mountTarget = (result instanceof HTMLElement) ? result : bodyEl;
+                            panelDef.mount(mountTarget, fakePanel);
+                        }
+                        loaded = true;
+                    }
                 }
 
                 if (loaded) {

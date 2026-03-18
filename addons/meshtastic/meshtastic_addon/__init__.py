@@ -295,19 +295,22 @@ class MeshtasticAddon(SensorAddon):
         # Register message bridge callbacks after connection attempt
         self.message_bridge.register_callbacks()
 
-        # Wire up MQTT bridge for remote Meshtastic radios
+        # Wire up MQTT bridge for remote Meshtastic radios (only if MQTT supports subscribe)
         self._mqtt_remote_bridge = None
         mqtt_client = mqtt_bridge  # already resolved above
-        if mqtt_client is not None:
-            from .mqtt_bridge import MeshtasticMQTTBridge
-            self._mqtt_remote_bridge = MeshtasticMQTTBridge(
-                self.registry, self._node_managers,
-                site_id=site_id,
-                event_bus=event_bus,
-                target_tracker=target_tracker,
-            )
-            self._mqtt_remote_bridge.start(mqtt_client)
-            log.info("Meshtastic MQTT remote bridge started for remote radio ingestion")
+        if mqtt_client is not None and hasattr(mqtt_client, 'subscribe'):
+            try:
+                from .mqtt_bridge import MeshtasticMQTTBridge
+                self._mqtt_remote_bridge = MeshtasticMQTTBridge(
+                    self.registry, self._node_managers,
+                    site_id=site_id,
+                    event_bus=event_bus,
+                    target_tracker=target_tracker,
+                )
+                self._mqtt_remote_bridge.start(mqtt_client)
+                log.info("Meshtastic MQTT remote bridge started for remote radio ingestion")
+            except Exception as e:
+                log.debug(f"Meshtastic MQTT remote bridge not started (non-fatal): {e}")
 
         # Start polling loop and stats snapshot loop
         import asyncio
