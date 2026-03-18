@@ -1688,6 +1688,7 @@ body.v2 {
 .toast-amy { border-left-color: var(--cyan); }
 .toast-robot { border-left-color: var(--green); }
 .toast-alert { border-left-color: var(--magenta); }
+.toast-npc { border-left-color: var(--green); font-style: italic; }
 .toast-fade { animation: v2-fadeOut 0.3s ease forwards; }
 
 .toast-label {
@@ -1698,6 +1699,7 @@ body.v2 {
 .toast-amy .toast-label { color: var(--cyan); }
 .toast-robot .toast-label { color: var(--green); }
 .toast-alert .toast-label { color: var(--magenta); }
+.toast-npc .toast-label { color: var(--green); }
 
 .toast-text { font-size: 0.7rem; color: var(--text-secondary); }
 

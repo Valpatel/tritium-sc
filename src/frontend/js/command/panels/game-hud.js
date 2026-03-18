@@ -1028,7 +1028,7 @@ export const GameHudPanelDef = {
                 if (d && d.text && d.unit_id) {
                     const unit = TritiumStore.units.get(d.unit_id);
                     const name = (unit && unit.name) ? unit.name : d.unit_id;
-                    EventBus.emit('toast:show', { message: `${name}: "${d.text}"`, type: 'info', duration: 4000 });
+                    EventBus.emit('toast:show', { message: `${name}: "${d.text}"`, type: 'npc', duration: 5000 });
                 }
             }),
             EventBus.on('npc:alliance_change', (d) => {
