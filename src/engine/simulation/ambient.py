@@ -8,6 +8,7 @@ The canonical implementation now lives in
 original import paths so existing SC code continues to work unchanged.
 """
 
+from datetime import datetime  # noqa: F401 — needed for test mock targets
 from tritium_lib.sim_engine.game.ambient import (  # noqa: F401
     AmbientSpawner,
     _generate_street_grid,

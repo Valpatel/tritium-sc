@@ -3,3 +3,4 @@
 # Licensed under AGPL-3.0 — see LICENSE for details.
 """Re-export from tritium-lib for backwards compatibility."""
 from tritium_lib.sim_engine.core.movement import *  # noqa: F401,F403
+from tritium_lib.sim_engine.core.movement import _angle_diff  # noqa: F401

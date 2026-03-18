@@ -1239,7 +1239,7 @@ class TestTimeOfDay:
 
     def test_daytime_high_ambient(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """During daytime (10am), ambient should be 1.0 and hostile low."""
-        from engine.simulation import ambient as amb_mod
+        import tritium_lib.sim_engine.game.ambient as amb_mod
         from datetime import datetime as _dt
 
         class FakeDatetime(_dt):
@@ -1254,7 +1254,7 @@ class TestTimeOfDay:
 
     def test_night_high_hostile(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """At 3am, ambient should be minimal and hostile at peak."""
-        from engine.simulation import ambient as amb_mod
+        import tritium_lib.sim_engine.game.ambient as amb_mod
         from datetime import datetime as _dt
 
         class FakeDatetime(_dt):
@@ -1269,7 +1269,7 @@ class TestTimeOfDay:
 
     def test_late_evening_moderate(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """At 11pm, ambient should be low and hostile high."""
-        from engine.simulation import ambient as amb_mod
+        import tritium_lib.sim_engine.game.ambient as amb_mod
         from datetime import datetime as _dt
 
         class FakeDatetime(_dt):

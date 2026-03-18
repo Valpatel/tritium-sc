@@ -1,5 +1,7 @@
-# Created by Matthew Valancy
-# Copyright 2026 Valpatel Software LLC
-# Licensed under AGPL-3.0 — see LICENSE for details.
 """Re-export from tritium-lib for backwards compatibility."""
 from tritium_lib.sim_engine.combat.weapons import *  # noqa: F401,F403
+# Private names needed by tests
+try:
+    from tritium_lib.sim_engine.combat.weapons import _DEFAULT_WEAPONS  # noqa: F401
+except ImportError:
+    pass
