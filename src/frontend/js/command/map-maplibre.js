@@ -591,6 +591,12 @@ function _createMap(mapDiv) {
 
         // Start unit update loop
         _startUnitLoop();
+
+        // Expose map instance globally for addon layers and other consumers
+        window._tritiumMap = _state.map;
+        window._tritiumMapInstance = _state.map;
+        EventBus.emit('map:ready', _state.map);
+        console.log('[MAP-ML] Map ready — exposed on window._tritiumMap, emitted map:ready');
     };
 
     _state.map.on('load', _onMapLoaded);
