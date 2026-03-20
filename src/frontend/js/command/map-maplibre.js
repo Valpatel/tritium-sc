@@ -5569,14 +5569,23 @@ async function _loadGeoLayer(layerMeta) {
                 layout: { 'visibility': _state.showGeoLayers ? 'visible' : 'none' },
             });
         } else if (geomType === 'polygon') {
+            // Use per-feature fill_color if present (terrain overlay),
+            // otherwise fall back to the catalog color
+            const hasFillColor = geojson.features.some(
+                f => f.properties && f.properties.fill_color
+            );
+            const fillColor = hasFillColor
+                ? ['coalesce', ['get', 'fill_color'], color]
+                : color;
+            const fillOpacity = hasFillColor ? 0.35 : 0.15;
             // Fill
             _state.map.addLayer({
                 id: `${layerId}-fill`,
                 type: 'fill',
                 source: sourceId,
                 paint: {
-                    'fill-color': color,
-                    'fill-opacity': 0.15,
+                    'fill-color': fillColor,
+                    'fill-opacity': fillOpacity,
                 },
                 layout: { 'visibility': _state.showGeoLayers ? 'visible' : 'none' },
             });
@@ -5586,7 +5595,9 @@ async function _loadGeoLayer(layerMeta) {
                 type: 'line',
                 source: sourceId,
                 paint: {
-                    'line-color': color,
+                    'line-color': hasFillColor
+                        ? ['coalesce', ['get', 'fill_color'], color]
+                        : color,
                     'line-width': 1.5,
                     'line-opacity': 0.6,
                 },

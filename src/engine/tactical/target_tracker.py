@@ -101,6 +101,8 @@ class TrackedTarget:
     speed: float = 0.0
     battery: float = 1.0
     last_seen: float = field(default_factory=time.monotonic)
+    first_seen: float = field(default_factory=time.monotonic)
+    signal_count: int = 0  # number of sightings/updates received
     source: str = "manual"  # "simulation", "yolo", "manual"
     status: str = "active"
     position_source: str = "unknown"  # "gps", "simulation", "mqtt", "fixed", "yolo", "unknown"
@@ -144,6 +146,8 @@ class TrackedTarget:
             "speed": self.speed,
             "battery": self.battery,
             "last_seen": self.last_seen,
+            "first_seen": self.first_seen,
+            "signal_count": self.signal_count,
             "source": self.source,
             "status": self.status,
             "position_source": self.position_source,
@@ -250,6 +254,7 @@ class TargetTracker:
                 t.battery = sim_data.get("battery", 1.0)
                 t.status = sim_data.get("status", "active")
                 t.last_seen = time.monotonic()
+                t.signal_count += 1
                 self._add_confirming_source(t, "simulation")
             else:
                 self._targets[tid] = TrackedTarget(
@@ -262,6 +267,8 @@ class TargetTracker:
                     speed=sim_data.get("speed", 0.0),
                     battery=sim_data.get("battery", 1.0),
                     last_seen=time.monotonic(),
+                    first_seen=time.monotonic(),
+                    signal_count=1,
                     source="simulation",
                     status=sim_data.get("status", "active"),
                     position_source="simulation",
@@ -323,6 +330,7 @@ class TargetTracker:
                 self._check_velocity(matched, (cx, cy))
                 matched.position = (cx, cy)
                 matched.last_seen = time.monotonic()
+                matched.signal_count += 1
                 self._add_confirming_source(matched, "yolo")
                 tid = matched.target_id
             else:
@@ -335,6 +343,8 @@ class TargetTracker:
                     asset_type=asset_type,
                     position=(cx, cy),
                     last_seen=time.monotonic(),
+                    first_seen=time.monotonic(),
+                    signal_count=1,
                     source="yolo",
                     position_source="yolo",
                     position_confidence=0.1,
@@ -445,6 +455,7 @@ class TargetTracker:
                     t.position = position
                     t.position_source = pos_source
                 t.last_seen = time.monotonic()
+                t.signal_count += 1
                 t.position_confidence = confidence
                 t._initial_confidence = confidence
                 self._add_confirming_source(t, "ble")
@@ -463,6 +474,8 @@ class TargetTracker:
                     asset_type=asset_type,
                     position=position,
                     last_seen=time.monotonic(),
+                    first_seen=time.monotonic(),
+                    signal_count=1,
                     source="ble",
                     position_source=pos_source,
                     position_confidence=confidence,
@@ -544,6 +557,7 @@ class TargetTracker:
                 t.name = name
                 t.battery = battery
                 t.last_seen = time.monotonic()
+                t.signal_count += 1
                 t.position_confidence = confidence
                 t._initial_confidence = confidence
                 self._add_confirming_source(t, "mesh")
@@ -555,6 +569,8 @@ class TargetTracker:
                     asset_type=asset_type,
                     position=position,
                     last_seen=time.monotonic(),
+                    first_seen=time.monotonic(),
+                    signal_count=1,
                     source="mesh",
                     battery=battery,
                     position_source=pos_source,
@@ -629,6 +645,7 @@ class TargetTracker:
                 t.heading = heading
                 t.speed = speed
                 t.last_seen = time.monotonic()
+                t.signal_count += 1
                 t.position_confidence = confidence
                 t._initial_confidence = confidence
                 self._add_confirming_source(t, "adsb")
@@ -642,6 +659,8 @@ class TargetTracker:
                     heading=heading,
                     speed=speed,
                     last_seen=time.monotonic(),
+                    first_seen=time.monotonic(),
+                    signal_count=1,
                     source="adsb",
                     position_source=pos_source,
                     position_confidence=confidence,
@@ -684,6 +703,7 @@ class TargetTracker:
                 t.position_confidence = confidence
                 t._initial_confidence = confidence
                 t.last_seen = time.monotonic()
+                t.signal_count += 1
                 t.status = f"motion:{direction}"
                 self._add_confirming_source(t, "rf_motion")
             else:
@@ -694,6 +714,8 @@ class TargetTracker:
                     asset_type="motion_detected",
                     position=position,
                     last_seen=time.monotonic(),
+                    first_seen=time.monotonic(),
+                    signal_count=1,
                     source="rf_motion",
                     position_source="rf_pair_midpoint",
                     position_confidence=confidence,

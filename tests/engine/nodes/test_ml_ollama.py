@@ -50,6 +50,8 @@ class TestOllamaConnectivity:
             goals="(no goals set)",
             war_mode="",
             tactical_situation="",
+            edge_sensors="",
+            terrain="",
         )
 
         response = ollama_chat(

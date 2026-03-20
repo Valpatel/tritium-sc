@@ -49,6 +49,8 @@ RECENT THOUGHTS:
 
 {edge_sensors}
 
+{terrain}
+
 {tactical_situation}
 
 Respond with a Lua function call. For complex situations, you may chain 2-3 actions:
@@ -467,6 +469,16 @@ class ThinkingThread:
         if edge_parts:
             edge_sensors_ctx = "EDGE SENSORS:\n" + "\n".join(edge_parts)
 
+        # Geospatial terrain brief (from satellite/aerial imagery segmentation)
+        terrain_ctx = ""
+        try:
+            from amy.commander import _get_terrain_brief
+            terrain_brief = _get_terrain_brief(commander)
+            if terrain_brief:
+                terrain_ctx = terrain_brief
+        except Exception:
+            pass
+
         system = THINKING_SYSTEM_PROMPT.format(
             narrative=narrative,
             battlespace=battlespace_ctx,
@@ -479,6 +491,7 @@ class ThinkingThread:
             war_mode=war_mode_ctx,
             tactical_situation=tactical_ctx,
             edge_sensors=edge_sensors_ctx,
+            terrain=terrain_ctx,
         )
 
         messages = [

@@ -216,7 +216,7 @@ class TestCatalogEndpoint:
                 assert resp.status_code == 200
                 data = resp.json()
                 assert isinstance(data, list)
-                assert len(data) == len(_LAYERS)
+                assert len(data) >= len(_LAYERS)  # may include dynamic layers (segmented terrain)
 
     def test_catalog_entry_fields(self):
         with tempfile.TemporaryDirectory() as td:
@@ -245,6 +245,9 @@ class TestCatalogEndpoint:
                 resp = client.get("/api/geo/layers/catalog")
                 data = resp.json()
                 for entry in data:
+                    # Skip dynamically added layers (segmented terrain)
+                    if entry["id"] == "segmented-terrain":
+                        continue
                     assert entry["cached"] is False
                     assert entry["fresh"] is False
                     assert entry["feature_count"] == 0

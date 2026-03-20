@@ -266,6 +266,7 @@ class TestThinkingModeContext:
             war_mode="",
             tactical_situation="",
             edge_sensors="",
+            terrain="",
         )
         assert "SIMULATION MODE" in system
         assert "simulated targets" in system
@@ -289,6 +290,7 @@ class TestThinkingModeContext:
             war_mode="",
             tactical_situation="",
             edge_sensors="",
+            terrain="",
         )
         assert "LIVE SENSORS" in system
         assert "real cameras" in system

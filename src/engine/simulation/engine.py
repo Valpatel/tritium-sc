@@ -188,6 +188,9 @@ class SimulationEngine:
         self.terrain_map = TerrainMap(map_bounds=self._map_bounds)
         self.behaviors.set_terrain_map(self.terrain_map)
         self.behaviors.set_upgrade_system(self.upgrade_system)
+        # Geospatial terrain layer (optional — from tritium-lib)
+        self.terrain_layer = None
+        self.sidewalk_graph = None
         self.vision_system = VisionSystem(terrain_map=self.terrain_map)
         self.squad_manager = SquadManager()
         self.hostile_commander = HostileCommander(event_bus=event_bus)
@@ -670,6 +673,7 @@ class SimulationEngine:
             obstacles=self._obstacles,
             alliance=alliance,
             terrain_map=self.terrain_map,
+            sidewalk_graph=self.sidewalk_graph,
         )
         return path if path else [end]
 
@@ -697,6 +701,37 @@ class SimulationEngine:
             "unit_id": target_id,
             "destination": {"x": destination[0], "y": destination[1]},
         })
+
+    def load_terrain_layer(self, terrain_layer) -> int:
+        """Load a geospatial TerrainLayer into the simulation.
+
+        Populates the TerrainMap grid with classified terrain from satellite
+        imagery segmentation. Also builds a SidewalkGraph for pedestrian
+        navigation.
+
+        Args:
+            terrain_layer: A TerrainLayer from tritium_lib.intelligence.geospatial
+
+        Returns:
+            Number of terrain cells populated.
+        """
+        self.terrain_layer = terrain_layer
+        count = 0
+
+        # Populate the grid-based TerrainMap
+        if hasattr(terrain_layer, 'populate_terrain_map'):
+            count = terrain_layer.populate_terrain_map(self.terrain_map)
+
+        # Build sidewalk graph for pedestrian navigation
+        try:
+            from tritium_lib.intelligence.geospatial.sidewalk_graph import SidewalkGraph
+            sg = SidewalkGraph()
+            sg.build_from_terrain_layer(terrain_layer)
+            self.sidewalk_graph = sg
+        except Exception:
+            pass
+
+        return count
 
     def reset_game(self) -> None:
         """Reset game state. Clear all hostiles, heal friendlies, reset combat.

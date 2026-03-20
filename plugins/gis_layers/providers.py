@@ -290,10 +290,133 @@ class TerrainProvider(LayerProvider):
         return {"type": "FeatureCollection", "features": features}
 
 
+class SegmentedTerrainProvider(LayerProvider):
+    """Segmented terrain polygons from geospatial intelligence pipeline.
+
+    Serves cached terrain segmentation results (buildings, roads, water,
+    vegetation, sidewalks, parking, bridges) as colored GeoJSON polygons
+    for the tactical map.
+
+    Colors:
+        Buildings — dark gray (#404040)
+        Water — blue (#0066cc, 0.4 opacity)
+        Vegetation — green (#228B22, 0.3 opacity)
+        Roads — dark gray (#333333)
+        Sidewalks — light gray (#999999)
+        Parking — hatched (#666666, 0.3 opacity)
+        Bridges — steel blue (#4682B4)
+        Barren — tan (#D2B48C)
+        Rail — dark red (#8B0000)
+    """
+
+    _TERRAIN_COLORS = {
+        "building": "#404040",
+        "road": "#333333",
+        "water": "#0066cc",
+        "vegetation": "#228B22",
+        "sidewalk": "#999999",
+        "parking": "#666666",
+        "bridge": "#4682B4",
+        "barren": "#D2B48C",
+        "rail": "#8B0000",
+    }
+
+    _TERRAIN_OPACITY = {
+        "building": 0.6,
+        "road": 0.4,
+        "water": 0.4,
+        "vegetation": 0.3,
+        "sidewalk": 0.3,
+        "parking": 0.3,
+        "bridge": 0.5,
+        "barren": 0.3,
+        "rail": 0.5,
+    }
+
+    def __init__(self, ao_id: str | None = None, cache_dir: str = "data/cache/terrain") -> None:
+        self._ao_id = ao_id
+        self._cache_dir = cache_dir
+        self._terrain_layer = None
+
+    @property
+    def layer_id(self) -> str:
+        return "segmented_terrain"
+
+    @property
+    def layer_name(self) -> str:
+        return "Segmented Terrain"
+
+    @property
+    def attribution(self) -> str:
+        return "Tritium Geospatial Segmentation"
+
+    @property
+    def description(self) -> str:
+        return "Classified terrain polygons from satellite/aerial imagery segmentation"
+
+    def set_terrain_layer(self, terrain_layer: Any) -> None:
+        """Directly set a TerrainLayer instance."""
+        self._terrain_layer = terrain_layer
+
+    def _ensure_loaded(self) -> bool:
+        """Load terrain layer from cache if not already loaded."""
+        if self._terrain_layer is not None:
+            return True
+
+        if self._ao_id is None:
+            return False
+
+        try:
+            from tritium_lib.intelligence.geospatial.terrain_layer import TerrainLayer
+            tl = TerrainLayer(cache_dir=self._cache_dir)
+            if tl.load_cached(self._ao_id):
+                self._terrain_layer = tl
+                return True
+        except Exception:
+            pass
+
+        return False
+
+    def query(self, bounds: BBox) -> dict[str, Any]:
+        """Return segmented terrain as GeoJSON with styling properties."""
+        if not self._ensure_loaded():
+            return {"type": "FeatureCollection", "features": []}
+
+        # Get raw GeoJSON from terrain layer
+        try:
+            geojson = self._terrain_layer.to_geojson()
+        except Exception:
+            return {"type": "FeatureCollection", "features": []}
+
+        # Filter to bounds and add styling properties
+        filtered = []
+        for feature in geojson.get("features", []):
+            props = feature.get("properties", {})
+            terrain_type = props.get("terrain_type", "unknown")
+
+            # Filter by bounds if centroid is available
+            centroid = props.get("centroid")
+            if centroid and isinstance(centroid, (list, tuple)) and len(centroid) >= 2:
+                lon, lat = centroid[0], centroid[1]
+                if not (bounds.south <= lat <= bounds.north and bounds.west <= lon <= bounds.east):
+                    continue
+
+            # Add styling properties for frontend rendering
+            props["fill_color"] = self._TERRAIN_COLORS.get(terrain_type, "#808080")
+            props["fill_opacity"] = self._TERRAIN_OPACITY.get(terrain_type, 0.3)
+            props["stroke_color"] = self._TERRAIN_COLORS.get(terrain_type, "#808080")
+            props["stroke_width"] = 1
+
+            filtered.append(feature)
+
+        return {"type": "FeatureCollection", "features": filtered}
+
+
 # Registry of all built-in providers
 BUILTIN_PROVIDERS: list[type[LayerProvider]] = [
     OSMTileProvider,
     SatelliteProvider,
     BuildingFootprintProvider,
     TerrainProvider,
+    SegmentedTerrainProvider,
 ]

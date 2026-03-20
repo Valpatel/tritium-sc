@@ -170,9 +170,15 @@ class TestConvoyDetector:
         detector.analyze()
 
         summary = detector.get_summary()
-        assert summary["active_convoys"] == 1
-        assert summary["total_members"] == 3
-        assert summary["highest_suspicious_score"] > 0
+        # get_summary may return a dataclass or dict
+        if hasattr(summary, "active_convoys"):
+            assert summary.active_convoys == 1
+            assert summary.total_members == 3
+            assert summary.highest_suspicious_score > 0
+        else:
+            assert summary["active_convoys"] == 1
+            assert summary["total_members"] == 3
+            assert summary["highest_suspicious_score"] > 0
 
     def test_circular_mean(self):
         # North (0) and slightly east — should average to ~10

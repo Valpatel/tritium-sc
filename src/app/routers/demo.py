@@ -80,6 +80,10 @@ async def demo_start(request: Request):
         return {"status": "already_active", **controller.status()}
 
     controller.start()
+
+    # Auto-load terrain layer if cached data exists
+    _try_load_terrain(request)
+
     return {"status": "started", **controller.status()}
 
 
@@ -205,3 +209,66 @@ async def list_robots(request: Request):
             pass
 
     return {"robots": robots, "count": len(robots)}
+
+
+# ---------------------------------------------------------------------------
+# Terrain auto-load on demo start
+# ---------------------------------------------------------------------------
+
+def _try_load_terrain(request: Request) -> None:
+    """Try to load cached terrain data when demo starts.
+
+    Checks for any cached terrain layer (demo_area, default, or any AO)
+    and wires it into the simulation engine and Amy if found.
+    """
+    try:
+        from pathlib import Path
+        from tritium_lib.intelligence.geospatial.terrain_layer import TerrainLayer
+
+        cache_dir = Path("data/cache/terrain")
+        if not cache_dir.exists():
+            return
+
+        # Try known AO IDs in priority order
+        layer = TerrainLayer(cache_dir=cache_dir)
+        loaded = False
+        for ao_id in ["demo_area", "default"]:
+            if layer.load_cached(ao_id):
+                loaded = True
+                break
+
+        # Fall back to any cached area
+        if not loaded:
+            for d in sorted(cache_dir.iterdir()):
+                if d.is_dir() and (d / "metadata.json").exists():
+                    if layer.load_cached(d.name):
+                        loaded = True
+                        break
+
+        if not loaded:
+            return
+
+        # Wire into terrain router
+        try:
+            from app.routers.terrain import set_terrain_layer
+            set_terrain_layer(layer)
+        except Exception:
+            pass
+
+        # Wire into simulation engine
+        amy = getattr(request.app.state, "amy", None)
+        if amy is not None:
+            amy.terrain_layer = layer
+            engine = getattr(amy, "simulation_engine", None)
+            if engine is not None and hasattr(engine, "load_terrain_layer"):
+                engine.load_terrain_layer(layer)
+
+        region_count = len(layer.regions) if hasattr(layer, "regions") else 0
+        ao = layer.metadata.ao_id if layer.metadata else "unknown"
+        logger.info(
+            "Auto-loaded terrain for demo: AO '%s' with %d features",
+            ao, region_count,
+        )
+
+    except Exception as e:
+        logger.debug("Terrain auto-load skipped: %s", e)

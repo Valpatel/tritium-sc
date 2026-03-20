@@ -327,6 +327,12 @@ def build_tactical_context(cmd) -> str:
 
     parts = ["== TACTICAL SITUATION =="]
 
+    # Terrain brief from geospatial segmentation (if available)
+    terrain_brief = _get_terrain_brief(cmd)
+    if terrain_brief:
+        parts.append(terrain_brief)
+        parts.append("")
+
     summary = _generate_tactical_summary(cmd)
     if summary:
         parts.append(summary)
@@ -338,6 +344,35 @@ def build_tactical_context(cmd) -> str:
             parts.append(f"  - {evt['text']}")
 
     return "\n".join(parts)
+
+
+def _get_terrain_brief(cmd) -> str:
+    """Get terrain brief from geospatial TerrainLayer if available.
+
+    Checks cmd.terrain_layer, cmd.simulation_engine.world.terrain_layer,
+    or the cached terrain brief.
+    """
+    # Direct terrain layer on commander
+    terrain_layer = getattr(cmd, "terrain_layer", None)
+    if terrain_layer is not None and hasattr(terrain_layer, "terrain_brief"):
+        try:
+            return terrain_layer.terrain_brief()
+        except Exception:
+            pass
+
+    # Terrain layer on simulation engine's world
+    engine = getattr(cmd, "simulation_engine", None)
+    if engine is not None:
+        world = getattr(engine, "world", None)
+        if world is not None:
+            tl = getattr(world, "terrain_layer", None)
+            if tl is not None and hasattr(tl, "terrain_brief"):
+                try:
+                    return tl.terrain_brief()
+                except Exception:
+                    pass
+
+    return ""
 
 
 def _clear_combat_state(cmd) -> None:
@@ -1051,6 +1086,9 @@ class Commander:
         self.speaker = None
         self.listener = None
         self._ack_wavs: list[bytes] = []
+
+        # Geospatial terrain layer (optional — from intelligence.geospatial)
+        self.terrain_layer = None
 
         # Tactical combat state (used by module-level tactical functions)
         self._recent_combat_events: list = []

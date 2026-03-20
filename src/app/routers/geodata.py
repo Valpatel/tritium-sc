@@ -322,6 +322,37 @@ async def get_parcels():
     return await _get_layer("parcels")
 
 
+@router.get("/segmented-terrain")
+async def get_segmented_terrain():
+    """Segmented terrain polygons from geospatial intelligence pipeline.
+
+    Returns classified terrain features (buildings, roads, water,
+    vegetation, sidewalks, parking) as colored GeoJSON polygons.
+    Process an area first via POST /api/terrain/process.
+    """
+    try:
+        from app.routers.terrain import _load_terrain
+        layer = _load_terrain("default") or _load_terrain("demo_area")
+        if layer is None:
+            return {"type": "FeatureCollection", "features": []}
+
+        geojson = layer.to_geojson()
+
+        # Add rendering colors per feature
+        _COLORS = {
+            "building": "#404040", "road": "#555555", "water": "#0066cc",
+            "vegetation": "#228B22", "sidewalk": "#aaaaaa", "parking": "#666666",
+            "bridge": "#4682B4", "barren": "#D2B48C", "rail": "#8B0000",
+        }
+        for f in geojson.get("features", []):
+            tt = f.get("properties", {}).get("terrain_type", "unknown")
+            f["properties"]["fill_color"] = _COLORS.get(tt, "#808080")
+
+        return geojson
+    except Exception:
+        return {"type": "FeatureCollection", "features": []}
+
+
 @router.get("/catalog")
 async def get_catalog():
     """Return a catalog of all available GIS layers.
@@ -349,5 +380,24 @@ async def get_catalog():
             "feature_count": feature_count,
             "endpoint": f"/api/geo/layers/{layer_id}",
         })
+
+    # Add segmented terrain layer if data exists
+    try:
+        from app.routers.terrain import _load_terrain
+        layer = _load_terrain("default") or _load_terrain("demo_area")
+        if layer is not None:
+            regions = layer.regions if hasattr(layer, 'regions') else []
+            catalog.append({
+                "id": "segmented-terrain",
+                "name": "Segmented Terrain",
+                "type": "polygon",
+                "color": "#00f0ff",
+                "cached": True,
+                "fresh": True,
+                "feature_count": len(regions),
+                "endpoint": "/api/geo/layers/segmented-terrain",
+            })
+    except Exception:
+        pass
 
     return catalog

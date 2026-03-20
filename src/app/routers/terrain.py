@@ -1,23 +1,34 @@
 # Created by Matthew Valancy
 # Copyright 2026 Valpatel Software LLC
 # Licensed under AGPL-3.0 — see LICENSE for details.
-"""Terrain analysis and RF coverage API endpoints.
+"""Terrain analysis — RF coverage AND geospatial segmentation endpoints.
 
-Provides elevation profiles, line-of-sight checks, RF propagation
-estimates, and sensor coverage analysis for placement optimization.
-
-Endpoints:
+RF propagation:
     POST /api/terrain/propagation  — estimate RF signal at distance
     POST /api/terrain/coverage     — compute coverage grid for a sensor
     POST /api/terrain/los          — line-of-sight check between two points
     GET  /api/terrain/types        — list terrain types
+
+Geospatial segmentation:
+    POST /api/terrain/process      — segment satellite imagery for a bbox
+    GET  /api/terrain/layer        — get cached terrain as GeoJSON
+    GET  /api/terrain/brief        — terrain brief text for commander AI
+    GET  /api/terrain/status       — pipeline status and cache info
+    GET  /api/terrain/query        — query terrain type at a point
 """
 
+import json
+import logging
 import math
+import time
+from pathlib import Path
 from threading import Lock
+from typing import Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/terrain", tags=["terrain"])
 
@@ -274,3 +285,259 @@ async def get_terrain_types():
         }
         for t, f in _TERRAIN_FACTORS.items()
     ]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# GEOSPATIAL SEGMENTATION ENDPOINTS
+# ═══════════════════════════════════════════════════════════════════════════
+
+_terrain_layer = None
+_processing = False
+
+
+class GeoProcessRequest(BaseModel):
+    """Request to process an area of operations via satellite segmentation."""
+    min_lat: float
+    min_lon: float
+    max_lat: float
+    max_lon: float
+    zoom: int = 16
+    ao_id: str = "default"
+    source: str = "satellite"
+    use_llm: bool = True
+
+
+@router.post("/process")
+async def process_terrain_area(req: GeoProcessRequest):
+    """Process an area — download satellite tiles, segment, classify, cache.
+
+    Runs the full geospatial pipeline and makes results available via
+    /api/terrain/layer and the map overlay.
+    """
+    global _terrain_layer, _processing
+
+    if _processing:
+        raise HTTPException(status_code=409, detail="Processing already in progress")
+
+    _processing = True
+    t0 = time.monotonic()
+
+    try:
+        from tritium_lib.models.gis import TileBounds
+        from tritium_lib.intelligence.geospatial.models import (
+            AreaOfOperations, SegmentationConfig, SegmentedRegion,
+            TerrainLayerMetadata,
+        )
+        from tritium_lib.intelligence.geospatial.tile_downloader import TileDownloader
+        from tritium_lib.intelligence.geospatial.segmentation import SegmentationEngine
+        from tritium_lib.intelligence.geospatial.terrain_classifier import TerrainClassifier
+        from tritium_lib.intelligence.geospatial.vector_converter import VectorConverter
+        from tritium_lib.intelligence.geospatial.terrain_layer import TerrainLayer
+
+        import numpy as np
+        from PIL import Image
+
+        ao = AreaOfOperations(
+            id=req.ao_id,
+            name=f"AO {req.ao_id}",
+            bounds=TileBounds(
+                min_lat=req.min_lat, min_lon=req.min_lon,
+                max_lat=req.max_lat, max_lon=req.max_lon,
+            ),
+            zoom=req.zoom,
+        )
+
+        # Check for llama-server
+        llm_ok = False
+        if req.use_llm:
+            try:
+                import requests as http_req
+                llm_ok = http_req.get("http://127.0.0.1:8081/health", timeout=1).status_code == 200
+            except Exception:
+                pass
+
+        config = SegmentationConfig(llm_classify=llm_ok, llm_endpoint="http://127.0.0.1:8081")
+
+        # Pipeline
+        dl = TileDownloader(cache_dir=Path("data/cache/tiles"))
+        image_path = dl.download_tiles(ao, source=req.source)
+
+        engine = SegmentationEngine(config)
+        segments = engine.segment_image(image_path)
+
+        img = Image.open(image_path)
+        img_array = np.array(img.convert("RGB"))
+        geo_transform = dl.get_geo_transform(ao, img.width, img.height)
+
+        classifier = TerrainClassifier(config)
+        classifications = classifier.classify_segments(img_array, segments)
+
+        converter = VectorConverter(min_area_px=50)
+        regions = []
+        for i, seg in enumerate(segments):
+            tt, conf = classifications[i]
+            for poly in converter.mask_to_polygons(seg["mask"], geo_transform):
+                area = poly.get("area_m2", 0)
+                if area < 10 or area > 100000:
+                    continue
+                c = poly.get("centroid", (0, 0))
+                regions.append(SegmentedRegion(
+                    geometry_wkt=poly["wkt"], terrain_type=tt, confidence=conf,
+                    area_m2=area, centroid_lon=c[0], centroid_lat=c[1],
+                ))
+
+        elapsed = time.monotonic() - t0
+
+        layer = TerrainLayer(cache_dir=Path("data/cache/terrain"))
+        layer._regions = regions
+        layer._bounds = ao.bounds
+        layer._metadata = TerrainLayerMetadata(
+            ao_id=ao.id, segment_count=len(regions),
+            processing_time_s=elapsed, source_imagery=req.source, bounds=ao.bounds,
+        )
+        layer._build_grid_index()
+        layer._save_cache(ao.id)
+        _terrain_layer = layer
+
+        # Wire into simulation engine + Amy
+        _wire_terrain_to_sim(layer)
+
+        type_counts = {}
+        for r in regions:
+            t = r.terrain_type.value
+            type_counts[t] = type_counts.get(t, 0) + 1
+
+        logger.info("Terrain processed: %d features in %.1fs", len(regions), elapsed)
+
+        return {
+            "status": "complete",
+            "ao_id": ao.id,
+            "features": len(regions),
+            "processing_time_s": round(elapsed, 1),
+            "terrain_types": type_counts,
+            "llm_used": llm_ok,
+            "brief": layer.terrain_brief(),
+        }
+
+    except Exception as e:
+        logger.error("Terrain processing failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        _processing = False
+
+
+@router.get("/layer")
+async def get_geo_layer(
+    ao_id: str = Query("default"),
+    bbox: Optional[str] = Query(None, description="west,south,east,north"),
+):
+    """Get cached terrain layer as GeoJSON for map rendering."""
+    layer = _load_terrain(ao_id)
+    if layer is None:
+        return {"type": "FeatureCollection", "features": []}
+
+    geojson = layer.to_geojson()
+
+    # Add rendering hints per feature
+    colors = {
+        "building": "#404040", "road": "#333333", "water": "#0066cc",
+        "vegetation": "#228B22", "sidewalk": "#999999", "parking": "#666666",
+        "bridge": "#4682B4", "barren": "#D2B48C", "rail": "#8B0000",
+    }
+    opacities = {
+        "building": 0.6, "road": 0.4, "water": 0.4, "vegetation": 0.3,
+        "sidewalk": 0.3, "parking": 0.3, "bridge": 0.5, "barren": 0.3, "rail": 0.5,
+    }
+    for f in geojson.get("features", []):
+        tt = f.get("properties", {}).get("terrain_type", "unknown")
+        f["properties"]["fill_color"] = colors.get(tt, "#808080")
+        f["properties"]["fill_opacity"] = opacities.get(tt, 0.3)
+
+    return geojson
+
+
+@router.get("/brief")
+async def get_geo_brief(ao_id: str = Query("default")):
+    """Get terrain brief text for commander AI."""
+    layer = _load_terrain(ao_id)
+    if layer is None:
+        return {"brief": "No terrain data. POST /api/terrain/process to segment an area."}
+    return {"brief": layer.terrain_brief()}
+
+
+@router.get("/status")
+async def get_geo_status():
+    """Pipeline status and cached areas."""
+    cache_dir = Path("data/cache/terrain")
+    areas = []
+    if cache_dir.exists():
+        for d in sorted(cache_dir.iterdir()):
+            meta_path = d / "metadata.json"
+            if d.is_dir() and meta_path.exists():
+                try:
+                    meta = json.loads(meta_path.read_text())
+                    areas.append({
+                        "ao_id": meta.get("ao_id", d.name),
+                        "features": meta.get("segment_count", 0),
+                        "time_s": meta.get("processing_time_s", 0),
+                        "source": meta.get("source_imagery", ""),
+                    })
+                except Exception:
+                    pass
+
+    return {
+        "processing": _processing,
+        "active": _terrain_layer is not None,
+        "cached_areas": areas,
+    }
+
+
+@router.get("/query")
+async def query_terrain_at(
+    lat: float = Query(...), lon: float = Query(...),
+    ao_id: str = Query("default"),
+):
+    """Query terrain type at a geographic point."""
+    layer = _load_terrain(ao_id)
+    if layer is None:
+        return {"terrain_type": "unknown"}
+
+    return {"terrain_type": layer.terrain_at(lat, lon).value, "lat": lat, "lon": lon}
+
+
+def _load_terrain(ao_id: str):
+    """Get active terrain layer or load from cache."""
+    global _terrain_layer
+    if _terrain_layer and _terrain_layer.metadata and _terrain_layer.metadata.ao_id == ao_id:
+        return _terrain_layer
+
+    try:
+        from tritium_lib.intelligence.geospatial.terrain_layer import TerrainLayer
+        tl = TerrainLayer(cache_dir=Path("data/cache/terrain"))
+        if tl.load_cached(ao_id):
+            _terrain_layer = tl
+            return tl
+    except Exception:
+        pass
+    return _terrain_layer
+
+
+def _wire_terrain_to_sim(layer) -> None:
+    """Wire terrain layer into running simulation engine + Amy."""
+    try:
+        from app.main import get_amy
+        amy = get_amy()
+        if amy is not None:
+            amy.terrain_layer = layer
+            eng = getattr(amy, "simulation_engine", None)
+            if eng and hasattr(eng, "load_terrain_layer"):
+                eng.load_terrain_layer(layer)
+                logger.info("Wired terrain into simulation engine")
+    except Exception:
+        pass
+
+
+def set_terrain_layer(layer) -> None:
+    """Set the active terrain layer (called by other modules)."""
+    global _terrain_layer
+    _terrain_layer = layer
