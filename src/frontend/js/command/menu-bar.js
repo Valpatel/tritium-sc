@@ -241,6 +241,43 @@ function _gameMenuItems(mapActions) {
         { label: 'Start Battle', shortcut: 'B',
           action: () => { if (mapActions.beginWar) mapActions.beginWar(); } },
         { separator: true },
+        { label: 'Process Terrain', action: async () => {
+            // Process terrain for the current map viewport
+            const center = mapActions.getMapCenter ? mapActions.getMapCenter() : null;
+            if (!center) {
+                EventBus.emit('toast:show', { message: 'Map center not available', type: 'alert' });
+                return;
+            }
+            EventBus.emit('toast:show', { message: 'Processing terrain...', type: 'info' });
+            try {
+                const res = await fetch('/api/terrain/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        min_lat: center.lat - 0.008,
+                        min_lon: center.lng - 0.010,
+                        max_lat: center.lat + 0.008,
+                        max_lon: center.lng + 0.010,
+                        zoom: 16,
+                        fuse_osm: true,
+                    }),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    EventBus.emit('toast:show', {
+                        message: `Terrain: ${data.features} features processed`,
+                        type: 'info',
+                    });
+                } else {
+                    EventBus.emit('toast:show', {
+                        message: data.detail || 'Terrain processing failed',
+                        type: 'alert',
+                    });
+                }
+            } catch (e) {
+                EventBus.emit('toast:show', { message: 'Terrain error: ' + e.message, type: 'alert' });
+            }
+        }},
         { label: 'Reset Game',
           action: () => { if (mapActions.resetGame) mapActions.resetGame(); } },
     ];
