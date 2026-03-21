@@ -381,22 +381,30 @@ async def get_catalog():
             "endpoint": f"/api/geo/layers/{layer_id}",
         })
 
-    # Add segmented terrain layer if data exists
+    # Add segmented terrain layer if cached data exists on disk
     try:
-        from app.routers.terrain import _load_terrain
-        layer = _load_terrain("default") or _load_terrain("demo_area")
-        if layer is not None:
-            regions = layer.regions if hasattr(layer, 'regions') else []
-            catalog.append({
-                "id": "segmented-terrain",
-                "name": "Segmented Terrain",
-                "type": "polygon",
-                "color": "#00f0ff",
-                "cached": True,
-                "fresh": True,
-                "feature_count": len(regions),
-                "endpoint": "/api/geo/layers/segmented-terrain",
-            })
+        from pathlib import Path
+        import json as _json
+        terrain_cache = Path("data/cache/terrain")
+        if terrain_cache.exists():
+            for d in sorted(terrain_cache.iterdir()):
+                meta_path = d / "metadata.json"
+                if d.is_dir() and meta_path.exists():
+                    try:
+                        meta = _json.loads(meta_path.read_text())
+                        catalog.append({
+                            "id": "segmented-terrain",
+                            "name": f"Segmented Terrain ({meta.get('ao_id', d.name)})",
+                            "type": "polygon",
+                            "color": "#00f0ff",
+                            "cached": True,
+                            "fresh": True,
+                            "feature_count": meta.get("segment_count", 0),
+                            "endpoint": "/api/geo/layers/segmented-terrain",
+                        })
+                        break  # only add the first/best one
+                    except Exception:
+                        pass
     except Exception:
         pass
 
