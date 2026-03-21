@@ -305,6 +305,7 @@ class GeoProcessRequest(BaseModel):
     ao_id: str = "default"
     source: str = "satellite"
     use_llm: bool = True
+    fuse_osm: bool = True  # fuse with OSM data for richer terrain
 
 
 @router.post("/process")
@@ -395,6 +396,34 @@ async def process_terrain_area(req: GeoProcessRequest):
             ao_id=ao.id, segment_count=len(regions),
             processing_time_s=elapsed, source_imagery=req.source, bounds=ao.bounds,
         )
+        # Fuse with OSM data for richer terrain (real road/building names)
+        if req.fuse_osm:
+            try:
+                from tritium_lib.intelligence.geospatial.osm_enrichment import OSMEnrichment
+                osm_enrichment = OSMEnrichment()
+                osm_features = osm_enrichment.fetch_osm(ao.bounds)
+                if osm_features:
+                    osm_regions = []
+                    osm_cells = set()
+                    for f in osm_features:
+                        if f.lat == 0 and f.lon == 0:
+                            continue
+                        props = {"osm_id": f.osm_id, "source": "osm"}
+                        if f.name:
+                            props["osm_name"] = f.name
+                        osm_regions.append(SegmentedRegion(
+                            geometry_wkt="POLYGON EMPTY", terrain_type=f.terrain_type,
+                            confidence=0.85, area_m2=100,
+                            centroid_lat=f.lat, centroid_lon=f.lon, properties=props,
+                        ))
+                        osm_cells.add((int(f.lon * 10000), int(f.lat * 10000)))
+                    sat_fill = sum(1 for r in regions if (int(r.centroid_lon * 10000), int(r.centroid_lat * 10000)) not in osm_cells)
+                    regions = osm_regions + [r for r in regions if (int(r.centroid_lon * 10000), int(r.centroid_lat * 10000)) not in osm_cells]
+                    layer._regions = regions
+                    logger.info("Fused %d OSM + %d satellite = %d features", len(osm_features), sat_fill, len(regions))
+            except Exception as e:
+                logger.debug("OSM fusion skipped: %s", e)
+
         layer._build_grid_index()
         layer._save_cache(ao.id)
         _terrain_layer = layer
