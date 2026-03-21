@@ -5515,6 +5515,19 @@ async function _loadGeoLayers() {
     } catch (e) {
         console.warn('[MAP-ML] Layer catalog fetch failed:', e.message);
     }
+
+    // Always try to load segmented terrain layer (from geospatial pipeline)
+    try {
+        _loadGeoLayer({
+            id: 'segmented-terrain',
+            name: 'Segmented Terrain',
+            type: 'polygon',
+            color: '#00f0ff',
+            endpoint: '/api/geo/layers/segmented-terrain',
+        });
+    } catch (e) {
+        // Terrain layer may not exist yet — that's fine
+    }
 }
 
 async function _loadGeoLayer(layerMeta) {
