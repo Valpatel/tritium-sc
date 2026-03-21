@@ -731,6 +731,12 @@ class SimulationEngine:
         except Exception:
             pass
 
+        # Load cover objects from terrain buildings and vegetation
+        try:
+            self.cover_system.load_from_terrain_layer(terrain_layer)
+        except Exception:
+            pass
+
         return count
 
     def reset_game(self) -> None:
