@@ -638,7 +638,7 @@ class MissionDirector:
         self,
         event_bus: EventBus,
         model: str = "gemma3:4b",
-        ollama_host: str = "http://localhost:11434",
+        ollama_host: str = "http://localhost:8081",
         map_center: tuple[float, float] | None = None,
     ) -> None:
         self._event_bus = event_bus
@@ -656,9 +656,14 @@ class MissionDirector:
         if requests is None:
             return []
         try:
-            resp = requests.get(f"{self._ollama_host}/api/tags", timeout=3)
+            # Try llama-server /v1/models first, then ollama /api/tags
+            is_llama = any(p in self._ollama_host for p in [":8081", ":8082", ":8083"])
+            endpoint = "/v1/models" if is_llama else "/api/tags"
+            resp = requests.get(f"{self._ollama_host}{endpoint}", timeout=3)
             if resp.status_code == 200:
                 data = resp.json()
+                if is_llama:
+                    return [m.get("id", "") for m in data.get("data", [])]
                 return [m["name"] for m in data.get("models", [])]
         except Exception:
             pass
@@ -1201,33 +1206,42 @@ class MissionDirector:
     # -- Ollama API call -----------------------------------------------------
 
     def _call_ollama(self, prompt: str, model: str) -> str:
-        """Call Ollama chat API and return response text."""
+        """Call LLM chat API and return response text.
+
+        Uses llama-server (OpenAI-compatible) or ollama (legacy).
+        """
         if requests is None:
             raise RuntimeError("requests library not available")
 
-        resp = requests.post(
-            f"{self._ollama_host}/api/chat",
-            json={
-                "model": model,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are a game scenario designer for a neighborhood security simulation "
-                            "set in West Dublin, California. The battlespace is a real residential "
-                            "neighborhood with actual buildings, streets, and landmarks. "
-                            "Always respond with valid JSON only. No extra text."
-                        ),
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                "stream": False,
-                "options": {"temperature": 0.8, "num_predict": 512},
+        is_llama = any(p in self._ollama_host for p in [":8081", ":8082", ":8083"])
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a game scenario designer for a neighborhood security simulation "
+                    "set in West Dublin, California. The battlespace is a real residential "
+                    "neighborhood with actual buildings, streets, and landmarks. "
+                    "Always respond with valid JSON only. No extra text."
+                ),
             },
-            timeout=30,
-        )
+            {"role": "user", "content": prompt},
+        ]
+
+        if is_llama:
+            endpoint = "/v1/chat/completions"
+            body = {"model": model, "messages": messages, "max_tokens": 512, "temperature": 0.8}
+        else:
+            endpoint = "/api/chat"
+            body = {"model": model, "messages": messages, "stream": False,
+                    "options": {"temperature": 0.8, "num_predict": 512}}
+
+        resp = requests.post(f"{self._ollama_host}{endpoint}", json=body, timeout=30)
         resp.raise_for_status()
         data = resp.json()
+
+        if is_llama:
+            choices = data.get("choices", [])
+            return choices[0]["message"]["content"] if choices else ""
         return data.get("message", {}).get("content", "")
 
     # -- Convert scenario to engine targets ----------------------------------

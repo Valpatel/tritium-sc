@@ -24,11 +24,11 @@ import time
 
 import pytest
 
-from engine.simulation.combat import CombatSystem
+from tritium_lib.sim_engine.combat.combat import CombatSystem
 from engine.simulation.engine import SimulationEngine
 from engine.simulation.game_mode import GameMode, _COUNTDOWN_DURATION, _WAVE_ADVANCE_DELAY
 from engine.simulation.mission_director import MissionDirector, GAME_MODES
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.simulation.crowd_density import CrowdDensityTracker
 from engine.simulation.scenario import BattleScenario
 

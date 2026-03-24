@@ -12,10 +12,10 @@ and radio_signal_strength based on distance.
 import math
 import pytest
 
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.simulation.terrain import TerrainMap
-from engine.simulation.spatial import SpatialGrid
-from engine.simulation.vision import VisionSystem
+from tritium_lib.sim_engine.core.spatial import SpatialGrid
+from tritium_lib.sim_engine.world.vision import VisionSystem
 
 
 # ---------------------------------------------------------------------------

@@ -18,7 +18,7 @@ import pytest
 from unittest.mock import MagicMock, patch, call
 
 from engine.comms.event_bus import EventBus
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.simulation.combat_bridge import CombatBridge
 
 

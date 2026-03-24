@@ -62,7 +62,7 @@ if TYPE_CHECKING:
     from engine.comms.event_bus import EventBus
     from engine.tactical.ble_classifier import BLEClassifier
     from engine.tactical.correlator import TargetCorrelator
-    from engine.tactical.dossier import DossierStore
+    from tritium_lib.tracking.dossier import DossierStore
     from engine.tactical.geofence import GeofenceEngine
     from engine.tactical.investigation import InvestigationEngine
     from engine.tactical.target_tracker import TargetTracker

@@ -106,7 +106,7 @@ class TestStreetGraphWiring:
 
     def test_dispatch_unit_uses_street_graph(self, engine):
         """dispatch_unit() routes through street graph when available."""
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         sg = _make_mock_street_graph()
         engine.set_street_graph(sg)
 
@@ -140,7 +140,7 @@ class TestGracefulFallback:
 
     def test_no_street_graph_dispatch_still_works(self, engine):
         """dispatch_unit works without a street graph (direct path)."""
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         rover = SimulationTarget(
             target_id="rover-2",
             name="Rover Bravo",

@@ -19,9 +19,9 @@ import pytest
 from unittest.mock import MagicMock
 
 from engine.comms.event_bus import EventBus
-from engine.simulation.combat import CombatSystem
-from engine.simulation.behaviors import UnitBehaviors
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.combat.combat import CombatSystem
+from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 # ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ class TestSquadFormation:
 
     def test_squad_forms_with_two_nearby_hostiles(self):
         """Two hostiles within 15m should form a squad."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0))
@@ -113,7 +113,7 @@ class TestSquadFormation:
 
     def test_squad_does_not_form_when_far_apart(self):
         """Two hostiles >15m apart should NOT form a squad."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 0.0))
@@ -129,7 +129,7 @@ class TestSquadFormation:
 
     def test_squad_forms_with_three_hostiles(self):
         """Three hostiles within 15m should all be in same squad."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0))
@@ -144,7 +144,7 @@ class TestSquadFormation:
 
     def test_only_active_hostiles_form_squads(self):
         """Eliminated or escaped hostiles should not be included in squads."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0))
@@ -159,7 +159,7 @@ class TestSquadFormation:
 
     def test_separate_squads_for_distant_groups(self):
         """Two groups of hostiles >15m apart should form separate squads."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         # Group A at (0, 30)
@@ -185,7 +185,7 @@ class TestSquadFormation:
 
     def test_non_hostiles_ignored(self):
         """Friendly and neutral targets should not form squads."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         turret = _make_turret("t1", pos=(0.0, 0.0))
@@ -206,7 +206,7 @@ class TestLeaderSelection:
 
     def test_leader_is_highest_health(self):
         """Leader should be the hostile with highest health."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0), health=50.0)
@@ -225,7 +225,7 @@ class TestLeaderSelection:
 
     def test_leader_succession_on_elimination(self):
         """When leader is eliminated, next-highest-health becomes leader."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0), health=80.0)
@@ -253,7 +253,7 @@ class TestLeaderSelection:
 
     def test_leader_succession_on_health_change(self):
         """If another member gains more health than leader, leader changes."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0), health=80.0)
@@ -282,7 +282,7 @@ class TestFormationOffsets:
 
     def test_wedge_formation_offsets(self):
         """Wedge formation: leader at front, members at 45 degrees behind."""
-        from engine.simulation.squads import SquadManager, Squad
+        from tritium_lib.sim_engine.combat.squads import SquadManager, Squad
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0), health=80.0)
@@ -311,7 +311,7 @@ class TestFormationOffsets:
 
     def test_wedge_formation_spacing(self):
         """Wedge formation spacing should be 3-5m between members."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0), health=80.0)
@@ -334,7 +334,7 @@ class TestFormationOffsets:
 
     def test_line_formation_offsets(self):
         """Line formation: members side by side."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0), health=80.0)
@@ -356,7 +356,7 @@ class TestFormationOffsets:
 
     def test_line_formation_spacing(self):
         """Line formation spacing should be 3-5m between members."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0), health=80.0)
@@ -379,7 +379,7 @@ class TestFormationOffsets:
 
     def test_default_formation_is_wedge(self):
         """New squads should default to wedge formation."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0))
@@ -403,7 +403,7 @@ class TestSquadDissolution:
 
     def test_squad_dissolves_when_all_but_one_eliminated(self):
         """Squad dissolves when only one member remains."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0))
@@ -425,7 +425,7 @@ class TestSquadDissolution:
 
     def test_squad_dissolves_when_members_scatter(self):
         """Squad dissolves when members move >15m apart."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0))
@@ -444,7 +444,7 @@ class TestSquadDissolution:
 
     def test_squad_id_cleared_on_dissolution(self):
         """When squad dissolves, squad_id on targets should be set to None."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0))
@@ -486,7 +486,7 @@ class TestEngineIntegration:
     def test_engine_tick_calls_squad_manager(self, event_bus):
         """Engine tick loop should call squad_manager.tick() during game."""
         from engine.simulation.engine import SimulationEngine
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         engine = SimulationEngine(event_bus, map_bounds=200.0)
 
@@ -549,7 +549,7 @@ class TestFocusFire:
 
     def test_squad_selects_shared_target(self):
         """Squad should select a single shared target for all members."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 10.0))
@@ -572,7 +572,7 @@ class TestFocusFire:
 
     def test_squad_shared_target_is_nearest_to_leader(self):
         """Squad's shared target should be the nearest enemy to the leader."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 10.0), health=80.0)
@@ -595,7 +595,7 @@ class TestFocusFire:
 
     def test_shared_target_updated_when_eliminated(self):
         """When shared target is eliminated, squad picks next nearest."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 10.0), health=80.0)
@@ -624,7 +624,7 @@ class TestFocusFire:
 
     def test_shared_target_none_when_no_enemies(self):
         """Squad shared_target_id should be None when no enemies visible."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0))
@@ -647,7 +647,7 @@ class TestFormationMovement:
 
     def test_formation_positions_relative_to_leader(self):
         """Members should be positioned at formation offsets relative to leader."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0), health=80.0)
@@ -677,7 +677,7 @@ class TestFormationMovement:
 
     def test_leader_position_not_modified(self):
         """Leader's position should NOT be modified by formation offsets."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0), health=80.0)
@@ -702,14 +702,14 @@ class TestBehaviorsIntegration:
 
     def test_squad_manager_get_squad_returns_none_for_no_squad(self):
         """get_squad with invalid ID should return None."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         assert sm.get_squad("nonexistent") is None
 
     def test_squad_has_member_ids(self):
         """Squad object should track member IDs."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0))
@@ -725,7 +725,7 @@ class TestBehaviorsIntegration:
 
     def test_squad_clear_resets_all(self):
         """Calling clear() on SquadManager should dissolve all squads."""
-        from engine.simulation.squads import SquadManager
+        from tritium_lib.sim_engine.combat.squads import SquadManager
 
         sm = SquadManager()
         h1 = _make_hostile("h1", pos=(0.0, 30.0))

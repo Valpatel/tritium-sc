@@ -17,7 +17,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from engine.simulation.engine import SimulationEngine
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 pytestmark = pytest.mark.unit
 
@@ -256,7 +256,7 @@ class TestResetClearsNPCManager:
     def test_npc_manager_missions_cleared(self):
         """Stale NPC missions should not leak across games."""
         engine = _make_engine()
-        from engine.simulation.npc import NPCManager
+        from tritium_lib.sim_engine.behavior.npc import NPCManager
         mgr = NPCManager(engine)
         mgr._missions["npc-1"] = object()
         mgr._npc_ids.add("npc-1")
@@ -268,7 +268,7 @@ class TestResetClearsNPCManager:
     def test_npc_manager_used_names_cleared(self):
         """Name pool should recycle between games."""
         engine = _make_engine()
-        from engine.simulation.npc import NPCManager
+        from tritium_lib.sim_engine.behavior.npc import NPCManager
         mgr = NPCManager(engine)
         mgr._used_names.update({"Alice", "Bob", "Carol"})
         engine._npc_manager = mgr

@@ -47,19 +47,19 @@ class TestNPCManagerAutoSpawn:
     """Test that NPCManager auto-spawns when started."""
 
     def test_npc_manager_has_start_method(self):
-        from engine.simulation.npc import NPCManager
+        from tritium_lib.sim_engine.behavior.npc import NPCManager
         engine = _make_engine()
         mgr = NPCManager(engine)
         assert hasattr(mgr, "start")
 
     def test_npc_manager_has_stop_method(self):
-        from engine.simulation.npc import NPCManager
+        from tritium_lib.sim_engine.behavior.npc import NPCManager
         engine = _make_engine()
         mgr = NPCManager(engine)
         assert hasattr(mgr, "stop")
 
     def test_default_caps_increased(self):
-        from engine.simulation.npc import NPCManager
+        from tritium_lib.sim_engine.behavior.npc import NPCManager
         engine = _make_engine()
         mgr = NPCManager(engine)
         assert mgr.max_vehicles >= 150
@@ -67,7 +67,7 @@ class TestNPCManagerAutoSpawn:
 
     def test_auto_spawn_creates_vehicles(self):
         """After calling _auto_spawn_tick, should create vehicles."""
-        from engine.simulation.npc import NPCManager
+        from tritium_lib.sim_engine.behavior.npc import NPCManager
         engine = _make_engine()
         mgr = NPCManager(engine)
 
@@ -78,7 +78,7 @@ class TestNPCManagerAutoSpawn:
 
     def test_auto_spawn_respects_vehicle_cap(self):
         """Should not exceed vehicle capacity."""
-        from engine.simulation.npc import NPCManager
+        from tritium_lib.sim_engine.behavior.npc import NPCManager
         engine = _make_engine()
         mgr = NPCManager(engine, max_vehicles=5, max_pedestrians=5)
 
@@ -95,7 +95,7 @@ class TestNPCManagerAutoSpawn:
 
     def test_auto_spawn_batch_size(self):
         """Auto-spawn should create multiple entities per tick for fast fill."""
-        from engine.simulation.npc import NPCManager
+        from tritium_lib.sim_engine.behavior.npc import NPCManager
         engine = _make_engine()
         mgr = NPCManager(engine, max_vehicles=100, max_pedestrians=100)
 
@@ -105,7 +105,7 @@ class TestNPCManagerAutoSpawn:
 
     def test_spawn_loop_can_start_and_stop(self):
         """Start and stop the auto-spawn thread without hanging."""
-        from engine.simulation.npc import NPCManager
+        from tritium_lib.sim_engine.behavior.npc import NPCManager
         engine = _make_engine()
         mgr = NPCManager(engine, max_vehicles=5, max_pedestrians=5)
         mgr.start()
@@ -134,15 +134,15 @@ class TestTrafficDensityScaling:
     """Test time-of-day traffic density for auto-spawning."""
 
     def test_rush_hour_high(self):
-        from engine.simulation.npc import traffic_density
+        from tritium_lib.sim_engine.behavior.npc import traffic_density
         assert traffic_density(8) >= 0.7
         assert traffic_density(17) >= 0.7
 
     def test_night_low(self):
-        from engine.simulation.npc import traffic_density
+        from tritium_lib.sim_engine.behavior.npc import traffic_density
         assert traffic_density(3) <= 0.1
 
     def test_midday_moderate(self):
-        from engine.simulation.npc import traffic_density
+        from tritium_lib.sim_engine.behavior.npc import traffic_density
         d = traffic_density(12)
         assert 0.3 <= d <= 0.8

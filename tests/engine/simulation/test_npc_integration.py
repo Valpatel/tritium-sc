@@ -14,7 +14,7 @@ import pytest
 
 from engine.comms.event_bus import EventBus
 from engine.simulation.engine import SimulationEngine
-from engine.simulation.npc import NPCManager, traffic_density, NPC_VEHICLE_TYPES
+from tritium_lib.sim_engine.behavior.npc import NPCManager, traffic_density, NPC_VEHICLE_TYPES
 
 pytestmark = pytest.mark.unit
 
@@ -130,11 +130,11 @@ class TestNPCPathfinding:
     """Test that NPC vehicles use the pathfinder correctly."""
 
     def test_vehicle_in_road_types(self) -> None:
-        from engine.simulation.pathfinding import _ROAD_TYPES
+        from tritium_lib.sim_engine.world.pathfinding import _ROAD_TYPES
         assert "vehicle" in _ROAD_TYPES
 
     def test_plan_path_routes_vehicle_on_roads(self) -> None:
-        from engine.simulation.pathfinding import plan_path
+        from tritium_lib.sim_engine.world.pathfinding import plan_path
 
         class FakeGraph:
             graph = True
@@ -162,7 +162,7 @@ class TestNPCCoT:
 
     def test_vehicle_cot_xml_valid(self) -> None:
         from engine.comms.cot import target_to_cot_xml
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
 
         npc = SimulationTarget(
             target_id="npc-sedan-001",
@@ -180,7 +180,7 @@ class TestNPCCoT:
 
     def test_pedestrian_cot_xml_valid(self) -> None:
         from engine.comms.cot import target_to_cot_xml
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
 
         npc = SimulationTarget(
             target_id="npc-ped-001",

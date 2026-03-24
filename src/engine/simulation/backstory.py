@@ -37,7 +37,7 @@ from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING:
     from engine.inference.fleet import FleetHost, OllamaFleet
     from engine.comms.event_bus import EventBus
-    from .target import SimulationTarget
+    from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 log = logging.getLogger(__name__)
 

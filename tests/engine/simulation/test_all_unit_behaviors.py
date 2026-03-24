@@ -25,9 +25,9 @@ import pytest
 
 from engine.units import all_types, get_type, mobile_type_ids, static_type_ids, flying_type_ids
 from engine.units.base import MovementCategory, CombatStats
-from engine.simulation.target import SimulationTarget, _profile_key
-from engine.simulation.combat import CombatSystem
-from engine.simulation.behaviors import UnitBehaviors
+from tritium_lib.sim_engine.core.entity import SimulationTarget, _profile_key
+from tritium_lib.sim_engine.combat.combat import CombatSystem
+from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
 from engine.comms.event_bus import EventBus
 
 

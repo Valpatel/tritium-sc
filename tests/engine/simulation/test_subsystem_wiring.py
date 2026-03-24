@@ -15,17 +15,17 @@ import time
 from unittest.mock import MagicMock
 
 from engine.simulation.engine import SimulationEngine
-from engine.simulation.combat import CombatSystem
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.combat.combat import CombatSystem
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.simulation.morale import MoraleSystem
-from engine.simulation.cover import CoverSystem
+from tritium_lib.sim_engine.world.cover import CoverSystem
 from engine.simulation.degradation import DegradationSystem
 from engine.simulation.pursuit import PursuitSystem
 from engine.simulation.comms import UnitComms
 from engine.simulation.stats import StatsTracker
 from engine.simulation.terrain import TerrainMap
 from engine.simulation.upgrades import UpgradeSystem
-from engine.simulation.weapons import WeaponSystem, Weapon
+from tritium_lib.sim_engine.combat.weapons import WeaponSystem, Weapon
 from engine.simulation.replay import ReplayRecorder
 
 
@@ -462,8 +462,8 @@ class TestMoraleBehaviorEffects:
 
     def test_broken_hostile_skips_firing(self):
         """Hostile with morale < 0.1 should not fire (broken = fleeing)."""
-        from engine.simulation.combat import CombatSystem
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_bus()
         combat = CombatSystem(bus)
         behaviors = UnitBehaviors(combat)
@@ -481,8 +481,8 @@ class TestMoraleBehaviorEffects:
 
     def test_suppressed_hostile_skips_firing(self):
         """Hostile with morale < 0.3 should not fire (suppressed)."""
-        from engine.simulation.combat import CombatSystem
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_bus()
         combat = CombatSystem(bus)
         behaviors = UnitBehaviors(combat)
@@ -499,8 +499,8 @@ class TestMoraleBehaviorEffects:
 
     def test_normal_morale_hostile_fires(self):
         """Hostile with morale >= 0.3 should fire normally at nearby target."""
-        from engine.simulation.combat import CombatSystem
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_bus()
         combat = CombatSystem(bus)
         behaviors = UnitBehaviors(combat)
@@ -528,8 +528,8 @@ class TestCoverCombatWiring:
 
     def test_cover_reduces_projectile_damage(self):
         """Target behind cover should take less damage from a hit."""
-        from engine.simulation.combat import CombatSystem
-        from engine.simulation.cover import CoverSystem, CoverObject
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
+        from tritium_lib.sim_engine.world.cover import CoverSystem, CoverObject
 
         bus = _make_bus()
         combat = CombatSystem(bus)
@@ -563,8 +563,8 @@ class TestCoverCombatWiring:
 
     def test_no_cover_full_damage(self):
         """Target without cover should take full damage."""
-        from engine.simulation.combat import CombatSystem
-        from engine.simulation.inventory import UnitInventory
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
+        from tritium_lib.sim_engine.core.inventory import UnitInventory
 
         bus = _make_bus()
         combat = CombatSystem(bus)
@@ -584,7 +584,7 @@ class TestCoverCombatWiring:
 
     def test_cover_backward_compatible_no_arg(self):
         """combat.tick() without cover_system should work (backward compat)."""
-        from engine.simulation.combat import CombatSystem
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
 
         bus = _make_bus()
         combat = CombatSystem(bus)
@@ -606,7 +606,7 @@ class TestCoverCombatWiring:
         engine.add_target(target)
 
         # Add cover near the hostile
-        from engine.simulation.cover import CoverObject
+        from tritium_lib.sim_engine.world.cover import CoverObject
         engine.cover_system.add_cover(CoverObject(position=(5.0, 5.0), radius=3.0, cover_value=0.6))
 
         # Set game to active so combat runs
@@ -646,8 +646,8 @@ class TestDegradationWiring:
 
     def test_heavily_damaged_unit_cannot_fire(self):
         """Unit below 10% health should not fire (degradation disables weapon)."""
-        from engine.simulation.combat import CombatSystem
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
 
         bus = _make_bus()
         combat = CombatSystem(bus)
@@ -667,8 +667,8 @@ class TestDegradationWiring:
 
     def test_healthy_unit_can_fire(self):
         """Unit above 10% health should fire normally."""
-        from engine.simulation.combat import CombatSystem
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
 
         bus = _make_bus()
         combat = CombatSystem(bus)
@@ -688,8 +688,8 @@ class TestDegradationWiring:
 
     def test_degraded_turret_cannot_fire(self):
         """Friendly turret below 10% health should not fire."""
-        from engine.simulation.combat import CombatSystem
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
 
         bus = _make_bus()
         combat = CombatSystem(bus)
@@ -716,8 +716,8 @@ class TestTerrainLOSWiring:
 
     def test_terrain_blocks_shot(self):
         """Turret cannot fire through building with terrain_map wired."""
-        from engine.simulation.combat import CombatSystem
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         from engine.simulation.terrain import TerrainMap
 
         bus = _make_bus()
@@ -744,8 +744,8 @@ class TestTerrainLOSWiring:
 
     def test_clear_los_allows_shot(self):
         """Turret can fire when LOS is clear (no building between)."""
-        from engine.simulation.combat import CombatSystem
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         from engine.simulation.terrain import TerrainMap
 
         bus = _make_bus()
@@ -802,7 +802,7 @@ class TestStatsTrackerWiring:
 
     def test_hit_recorded(self):
         """When a projectile hits, stats_tracker should record a hit."""
-        from engine.simulation.combat import CombatSystem
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
 
         engine = _make_engine()
         turret = _make_target("turret-1", "friendly", "turret", position=(0.0, 0.0))
@@ -1297,7 +1297,7 @@ class TestUpgradeSystemWiring:
 
     def test_damage_reduction_reduces_hit_damage(self):
         """Reinforced chassis upgrade reduces incoming damage."""
-        from engine.simulation.inventory import UnitInventory
+        from tritium_lib.sim_engine.core.inventory import UnitInventory
         bus = _make_bus()
         upgrade_sys = UpgradeSystem()
         ws = WeaponSystem()
@@ -1483,7 +1483,7 @@ class TestStatsTelemetryWiring:
 
         # Add target directly to the targets dict, bypassing add_target()
         # (which would auto-register in StatsTracker)
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         rogue = SimulationTarget(
             target_id="rogue1",
             name="Rogue",

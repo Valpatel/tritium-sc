@@ -13,7 +13,7 @@ import queue
 import pytest
 
 from engine.comms.event_bus import EventBus
-from engine.simulation.cover import CoverSystem, CoverObject
+from tritium_lib.sim_engine.world.cover import CoverSystem, CoverObject
 
 pytestmark = pytest.mark.unit
 

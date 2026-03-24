@@ -30,7 +30,7 @@ import math
 import uuid
 from typing import TYPE_CHECKING
 
-from .target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 if TYPE_CHECKING:
     from .engine import SimulationEngine

@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from engine.tactical.heatmap import (
+from tritium_lib.tracking.heatmap import (
     HeatmapEngine,
     HeatmapEvent,
     VALID_LAYERS,

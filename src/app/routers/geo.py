@@ -14,12 +14,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from pathlib import Path
 from typing import Optional
 
 import httpx
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from loguru import logger
 from pydantic import BaseModel
 
@@ -37,7 +38,20 @@ _GEOCODE_CACHE = _CACHE_DIR / "geocode"
 _BUILDINGS_CACHE = _CACHE_DIR / "buildings"
 _GIS_CACHE = _CACHE_DIR / "gis"
 
+_CACHE_TTL_S = 86400  # 24 hours for non-tile caches
+
 _USER_AGENT = "TRITIUM-SC/0.1.0"
+
+
+def _cache_fresh(path: Path) -> bool:
+    """Return True if cache file exists and is younger than _CACHE_TTL_S."""
+    if not path.exists():
+        return False
+    age = time.time() - path.stat().st_mtime
+    if age > _CACHE_TTL_S:
+        logger.info(f"Cache expired ({age:.0f}s old): {path.name}")
+        return False
+    return True
 _NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 _ESRI_TILE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
 _ESRI_ROAD_URL = "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"
@@ -152,7 +166,7 @@ async def geocode(request: GeocodeRequest):
     # Check disk cache
     cache_key = hashlib.sha256(address.lower().encode()).hexdigest()
     cache_path = _GEOCODE_CACHE / f"{cache_key}.json"
-    if cache_path.exists():
+    if _cache_fresh(cache_path):
         try:
             data = json.loads(cache_path.read_text())
             return GeocodeResponse(**data)
@@ -296,6 +310,175 @@ async def get_terrain_tile(z: int, x: int, y: int):
 
 
 # ---------------------------------------------------------------------------
+# Elevation grid — decoded terrain heightmap for 3D rendering
+# ---------------------------------------------------------------------------
+
+@router.get("/elevation-grid")
+async def get_elevation_grid(
+    lat: float = Query(..., description="Center latitude"),
+    lng: float = Query(..., description="Center longitude"),
+    radius: float = Query(300.0, description="Radius in meters", ge=50, le=2000),
+    resolution: int = Query(64, description="Grid resolution (NxN)", ge=16, le=256),
+):
+    """Return a decoded elevation height grid for 3D terrain rendering.
+
+    Fetches Terrarium-encoded terrain tiles, decodes RGB to meters,
+    and returns a flat height array (row-major, south-to-north) plus
+    metadata for mesh generation.
+
+    Terrarium encoding: elevation = (red * 256 + green + blue / 256) - 32768
+    """
+    import math
+    import struct
+
+    # Check cache
+    cache_key = f"elev_{lat:.5f}_{lng:.5f}_{radius:.0f}_{resolution}"
+    cache_hash = hashlib.sha256(cache_key.encode()).hexdigest()[:16]
+    cache_path = _GIS_CACHE / f"{cache_hash}.json"
+    if _cache_fresh(cache_path):
+        try:
+            return json.loads(cache_path.read_text())
+        except Exception:
+            pass
+
+    # Calculate tile coordinates
+    lat_rad = math.radians(lat)
+    meters_per_deg_lat = 111320.0
+    meters_per_deg_lng = 111320.0 * math.cos(lat_rad)
+
+    dlat = radius / meters_per_deg_lat
+    dlng = radius / meters_per_deg_lng
+
+    min_lat, max_lat = lat - dlat, lat + dlat
+    min_lng, max_lng = lng - dlng, lng + dlng
+
+    # Use zoom 13 for ~19m/pixel (good for 300m radius)
+    zoom = 13
+    if radius > 500:
+        zoom = 12
+    if radius > 1000:
+        zoom = 11
+
+    n = 2 ** zoom
+
+    def latlng_to_tile(lt, ln):
+        tx = int((ln + 180) / 360 * n)
+        ty = int((1 - math.log(math.tan(math.radians(lt)) + 1 / math.cos(math.radians(lt))) / math.pi) / 2 * n)
+        return tx, ty
+
+    def tile_to_latlng(tx, ty):
+        ln = tx / n * 360 - 180
+        lt = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * ty / n))))
+        return lt, ln
+
+    # Get corner tiles
+    tx0, ty0 = latlng_to_tile(max_lat, min_lng)  # NW corner
+    tx1, ty1 = latlng_to_tile(min_lat, max_lng)  # SE corner
+
+    # Fetch and decode tiles
+    try:
+        from PIL import Image
+        import io
+    except ImportError:
+        raise HTTPException(
+            status_code=501,
+            detail="Pillow (PIL) not installed for elevation decoding",
+        )
+
+    heights_raw = {}  # (px_global, py_global) -> height_m
+
+    async with httpx.AsyncClient() as client:
+        for tx in range(tx0, tx1 + 1):
+            for ty in range(ty0, ty1 + 1):
+                # Try cache first
+                tile_cache = _TERRAIN_CACHE / str(zoom) / str(tx) / f"{ty}.png"
+                if tile_cache.exists():
+                    tile_data = tile_cache.read_bytes()
+                else:
+                    url = _TERRAIN_TILE_URL.format(z=zoom, y=ty, x=tx)
+                    try:
+                        resp = await client.get(url, timeout=15.0)
+                        resp.raise_for_status()
+                        tile_data = resp.content
+                        tile_cache.parent.mkdir(parents=True, exist_ok=True)
+                        try:
+                            tile_cache.write_bytes(tile_data)
+                        except Exception:
+                            pass
+                    except Exception:
+                        continue
+
+                # Decode tile
+                try:
+                    img = Image.open(io.BytesIO(tile_data))
+                    pixels = img.load()
+                    w, h = img.size
+                    for py_local in range(0, h, max(1, h // 32)):
+                        for px_local in range(0, w, max(1, w // 32)):
+                            r, g, b = pixels[px_local, py_local][:3]
+                            elev = (r * 256 + g + b / 256) - 32768
+                            # Convert tile pixel to lat/lng
+                            px_frac = px_local / w
+                            py_frac = py_local / h
+                            pt_lat, pt_lng = tile_to_latlng(tx + px_frac, ty + py_frac)
+                            # Convert to local meters
+                            lx = (pt_lng - lng) * meters_per_deg_lng
+                            ly = (pt_lat - lat) * meters_per_deg_lat
+                            if abs(lx) <= radius and abs(ly) <= radius:
+                                heights_raw[(round(lx, 1), round(ly, 1))] = elev
+                except Exception:
+                    continue
+
+    if not heights_raw:
+        return {"grid": [], "resolution": 0, "radius": radius, "min_elev": 0, "max_elev": 0}
+
+    # Resample to regular grid
+    step = (radius * 2) / resolution
+    grid = []
+    min_elev = float('inf')
+    max_elev = float('-inf')
+
+    for iy in range(resolution):
+        for ix in range(resolution):
+            x = -radius + ix * step
+            y = -radius + iy * step
+
+            # Find nearest raw height
+            best_dist = float('inf')
+            best_h = 0
+            for (rx, ry), rh in heights_raw.items():
+                d = (rx - x) ** 2 + (ry - y) ** 2
+                if d < best_dist:
+                    best_dist = d
+                    best_h = rh
+            grid.append(round(best_h, 1))
+            min_elev = min(min_elev, best_h)
+            max_elev = max(max_elev, best_h)
+
+    result = {
+        "grid": grid,
+        "resolution": resolution,
+        "radius": radius,
+        "min_elev": round(min_elev, 1),
+        "max_elev": round(max_elev, 1),
+        "center": {"lat": lat, "lng": lng},
+    }
+
+    # Cache
+    _GIS_CACHE.mkdir(parents=True, exist_ok=True)
+    try:
+        cache_path.write_text(json.dumps(result))
+    except Exception:
+        pass
+
+    logger.info(
+        f"Elevation grid: {resolution}x{resolution}, "
+        f"range {min_elev:.1f}-{max_elev:.1f}m at ({lat:.5f}, {lng:.5f})"
+    )
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Road tile proxy (transparent overlay)
 # ---------------------------------------------------------------------------
 
@@ -364,7 +547,7 @@ async def get_buildings(
     cache_key = f"{lat:.6f}_{lng:.6f}_{radius:.0f}"
     cache_hash = hashlib.sha256(cache_key.encode()).hexdigest()[:16]
     cache_path = _BUILDINGS_CACHE / f"{cache_hash}.json"
-    if cache_path.exists():
+    if _cache_fresh(cache_path):
         try:
             return json.loads(cache_path.read_text())
         except Exception:
@@ -489,7 +672,7 @@ async def get_msft_buildings(
 
                 # Check disk cache
                 cache_path = _MSFT_CACHE / f"{zoom}_{tx}_{ty}.json"
-                if cache_path.exists():
+                if _cache_fresh(cache_path):
                     try:
                         cached = json.loads(cache_path.read_text())
                         all_buildings.extend(cached)
@@ -576,6 +759,481 @@ async def get_overlay(request: Request):
     roads = getattr(request.app.state, "road_polylines", None) or []
     buildings = getattr(request.app.state, "building_dicts", None) or []
     return {"roads": roads, "buildings": buildings}
+
+
+# ---------------------------------------------------------------------------
+# City data — comprehensive OSM features for 3D city rendering
+# ---------------------------------------------------------------------------
+
+# Default heights by building type (from arnis study + OSM wiki)
+_BUILDING_TYPE_HEIGHTS: dict[str, float] = {
+    "apartments": 15.0,
+    "residential": 8.0,
+    "house": 7.0,
+    "detached": 7.0,
+    "terrace": 8.0,
+    "commercial": 12.0,
+    "retail": 5.0,
+    "industrial": 8.0,
+    "warehouse": 7.0,
+    "office": 18.0,
+    "hotel": 20.0,
+    "hospital": 15.0,
+    "school": 10.0,
+    "university": 12.0,
+    "church": 15.0,
+    "cathedral": 25.0,
+    "mosque": 12.0,
+    "synagogue": 10.0,
+    "public": 10.0,
+    "civic": 12.0,
+    "government": 15.0,
+    "garage": 3.0,
+    "garages": 3.0,
+    "parking": 9.0,
+    "shed": 3.0,
+    "roof": 4.0,
+    "hut": 3.0,
+    "cabin": 4.0,
+    "farm": 6.0,
+    "barn": 7.0,
+    "service": 4.0,
+    "kiosk": 3.0,
+    "supermarket": 6.0,
+    "train_station": 10.0,
+    "prison": 10.0,
+    "temple": 12.0,
+    "shrine": 6.0,
+    "chapel": 10.0,
+    "dormitory": 12.0,
+    "semidetached_house": 8.0,
+    "manufacture": 8.0,
+    "kindergarten": 6.0,
+    "fire_station": 10.0,
+    "yes": 8.0,
+}
+
+# Road width by highway type (meters, from arnis study + OSM wiki)
+_ROAD_WIDTHS: dict[str, float] = {
+    "motorway": 14.0,
+    "trunk": 12.0,
+    "primary": 10.0,
+    "secondary": 8.0,
+    "tertiary": 7.0,
+    "residential": 6.0,
+    "service": 4.0,
+    "unclassified": 6.0,
+    "living_street": 5.0,
+    "pedestrian": 4.0,
+    "footway": 2.0,
+    "cycleway": 2.0,
+    "path": 1.5,
+    "track": 3.0,
+    "motorway_link": 6.0,
+    "trunk_link": 5.0,
+    "primary_link": 5.0,
+    "secondary_link": 4.5,
+    "tertiary_link": 4.0,
+}
+
+# Building category for material selection
+_BUILDING_CATEGORIES: dict[str, str] = {
+    "apartments": "residential",
+    "residential": "residential",
+    "house": "residential",
+    "detached": "residential",
+    "terrace": "residential",
+    "semidetached_house": "residential",
+    "dormitory": "residential",
+    "farm": "residential",
+    "cabin": "residential",
+    "hut": "residential",
+    "commercial": "commercial",
+    "retail": "commercial",
+    "supermarket": "commercial",
+    "kiosk": "commercial",
+    "office": "commercial",
+    "hotel": "commercial",
+    "industrial": "industrial",
+    "warehouse": "industrial",
+    "manufacture": "industrial",
+    "hospital": "civic",
+    "school": "civic",
+    "university": "civic",
+    "kindergarten": "civic",
+    "public": "civic",
+    "civic": "civic",
+    "government": "civic",
+    "fire_station": "civic",
+    "train_station": "civic",
+    "prison": "civic",
+    "church": "religious",
+    "cathedral": "religious",
+    "chapel": "religious",
+    "mosque": "religious",
+    "synagogue": "religious",
+    "temple": "religious",
+    "shrine": "religious",
+    "garage": "utility",
+    "garages": "utility",
+    "parking": "utility",
+    "shed": "utility",
+    "roof": "utility",
+    "service": "utility",
+}
+
+
+def _estimate_building_height(tags: dict) -> float:
+    """Estimate building height from OSM tags."""
+    # Explicit height tag (meters)
+    height_str = tags.get("height")
+    if height_str:
+        try:
+            return float(height_str.replace("m", "").strip())
+        except (ValueError, TypeError):
+            pass
+
+    # building:levels tag
+    levels_str = tags.get("building:levels")
+    if levels_str:
+        try:
+            return float(levels_str) * 3.0 + 1.0  # 3m per floor + roof
+        except (ValueError, TypeError):
+            pass
+
+    # Fallback by building type
+    btype = tags.get("building", "yes").lower()
+    return _BUILDING_TYPE_HEIGHTS.get(btype, 8.0)
+
+
+def _classify_building(tags: dict) -> str:
+    """Classify building into category for material selection."""
+    btype = tags.get("building", "yes").lower()
+    return _BUILDING_CATEGORIES.get(btype, "residential")
+
+
+@router.get("/city-data")
+async def get_city_data(
+    lat: float = Query(..., description="Center latitude"),
+    lng: float = Query(..., description="Center longitude"),
+    radius: float = Query(300.0, description="Search radius in meters", ge=50, le=2000),
+):
+    """Fetch comprehensive city data from OSM for 3D rendering.
+
+    Returns buildings with types/heights, roads with widths, trees,
+    land use polygons, and barriers — everything needed to render
+    a realistic 3D city.
+
+    All coordinates are returned as local meters relative to (lat, lng).
+    """
+    import math
+
+    # Include schema version in cache key to auto-invalidate on schema changes
+    _SCHEMA_VERSION = 2  # Bump when response shape changes
+    cache_key = f"city_{lat:.6f}_{lng:.6f}_{radius:.0f}_v{_SCHEMA_VERSION}"
+    cache_hash = hashlib.sha256(cache_key.encode()).hexdigest()[:16]
+    cache_path = _GIS_CACHE / f"{cache_hash}.json"
+    if _cache_fresh(cache_path):
+        try:
+            return json.loads(cache_path.read_text())
+        except Exception:
+            pass
+
+    # Single comprehensive Overpass query
+    query = f"""[out:json][timeout:60];
+(
+  way["building"](around:{radius},{lat},{lng});
+  way["highway"](around:{radius},{lat},{lng});
+  way["landuse"](around:{radius},{lat},{lng});
+  way["natural"="water"](around:{radius},{lat},{lng});
+  way["leisure"="park"](around:{radius},{lat},{lng});
+  way["leisure"="garden"](around:{radius},{lat},{lng});
+  way["barrier"](around:{radius},{lat},{lng});
+  way["waterway"](around:{radius},{lat},{lng});
+  node["natural"="tree"](around:{radius},{lat},{lng});
+  node["entrance"](around:{radius},{lat},{lng});
+  node["door"](around:{radius},{lat},{lng});
+  node["amenity"](around:{radius},{lat},{lng});
+  node["amenity"="bench"](around:{radius},{lat},{lng});
+  node["emergency"="fire_hydrant"](around:{radius},{lat},{lng});
+  node["highway"="street_lamp"](around:{radius},{lat},{lng});
+  node["amenity"="waste_basket"](around:{radius},{lat},{lng});
+);
+out geom;"""
+
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.post(
+                _OVERPASS_URL,
+                data={"data": query},
+                headers={"User-Agent": _USER_AGENT},
+                timeout=60.0,
+            )
+            resp.raise_for_status()
+        except httpx.HTTPError as e:
+            logger.warning(f"City data Overpass request failed: {e}")
+            raise HTTPException(status_code=502, detail="OSM data service unavailable")
+
+    data = resp.json()
+    elements = data.get("elements", [])
+
+    ref_lat_rad = math.radians(lat)
+    meters_per_deg_lng = 111320.0 * math.cos(ref_lat_rad)
+
+    def to_local(plat: float, plng: float) -> list[float]:
+        x = (plng - lng) * meters_per_deg_lng
+        y = (plat - lat) * 111320.0
+        return [round(x, 2), round(y, 2)]
+
+    buildings = []
+    roads = []
+    trees = []
+    landuse = []
+    barriers = []
+    water = []
+    entrances = []
+    pois = []
+    furniture = []
+
+    for el in elements:
+        tags = el.get("tags", {})
+        el_type = el.get("type", "node")
+
+        if el_type == "node":
+            # Trees
+            if tags.get("natural") == "tree":
+                trees.append({
+                    "pos": to_local(el["lat"], el["lon"]),
+                    "species": tags.get("species", tags.get("genus", "")),
+                    "height": float(tags["height"].replace("m", "")) if tags.get("height") else 6.0,
+                    "leaf_type": tags.get("leaf_type", "broadleaved"),
+                })
+            # Entrances/doors
+            elif tags.get("entrance") or tags.get("door"):
+                entrances.append({
+                    "pos": to_local(el["lat"], el["lon"]),
+                    "type": tags.get("entrance", tags.get("door", "yes")),
+                    "wheelchair": tags.get("wheelchair", ""),
+                    "name": tags.get("name", ""),
+                })
+            # Street furniture
+            elif tags.get("amenity") == "bench":
+                furniture.append({
+                    "pos": to_local(el["lat"], el["lon"]),
+                    "type": "bench",
+                })
+            elif tags.get("emergency") == "fire_hydrant":
+                furniture.append({
+                    "pos": to_local(el["lat"], el["lon"]),
+                    "type": "hydrant",
+                })
+            elif tags.get("highway") == "street_lamp":
+                furniture.append({
+                    "pos": to_local(el["lat"], el["lon"]),
+                    "type": "lamp",
+                })
+            elif tags.get("amenity") == "waste_basket":
+                furniture.append({
+                    "pos": to_local(el["lat"], el["lon"]),
+                    "type": "bin",
+                })
+            # Amenity POIs
+            elif tags.get("amenity"):
+                pois.append({
+                    "pos": to_local(el["lat"], el["lon"]),
+                    "type": tags.get("amenity"),
+                    "name": tags.get("name", ""),
+                    "cuisine": tags.get("cuisine", ""),
+                })
+            continue
+
+        geometry = el.get("geometry", [])
+        if not geometry or len(geometry) < 2:
+            continue
+
+        points = [to_local(pt["lat"], pt["lon"]) for pt in geometry]
+
+        # Validate: skip if any coordinates are NaN/Inf
+        if any(math.isnan(c) or math.isinf(c) for pt in points for c in pt):
+            continue
+
+        # Buildings (require >= 3 points for valid polygon)
+        if "building" in tags and len(points) >= 3:
+            buildings.append({
+                "id": el["id"],
+                "polygon": points,
+                "height": round(_estimate_building_height(tags), 1),
+                "type": tags.get("building", "yes"),
+                "category": _classify_building(tags),
+                "name": tags.get("name", ""),
+                "levels": int(tags["building:levels"]) if tags.get("building:levels") else None,
+                "roof_shape": tags.get("roof:shape", ""),
+                "colour": tags.get("building:colour", tags.get("building:color", "")),
+                "material": tags.get("building:material", ""),
+                "address": tags.get("addr:housenumber", ""),
+                "street": tags.get("addr:street", ""),
+            })
+            continue
+
+        # Roads
+        highway = tags.get("highway")
+        if highway:
+            lane_count = 2
+            if tags.get("lanes"):
+                try:
+                    lane_count = int(tags["lanes"])
+                except ValueError:
+                    pass
+            width = _ROAD_WIDTHS.get(highway, 6.0)
+            if tags.get("width"):
+                try:
+                    width = float(tags["width"].replace("m", "").strip())
+                except (ValueError, TypeError):
+                    pass
+
+            roads.append({
+                "id": el["id"],
+                "points": points,
+                "class": highway,
+                "name": tags.get("name", ""),
+                "width": round(width, 1),
+                "lanes": lane_count,
+                "surface": tags.get("surface", "asphalt"),
+                "oneway": tags.get("oneway") == "yes",
+                "bridge": tags.get("bridge") == "yes",
+                "tunnel": tags.get("tunnel") == "yes",
+                "maxspeed": tags.get("maxspeed", ""),
+            })
+            continue
+
+        # Land use
+        landuse_val = tags.get("landuse")
+        leisure_val = tags.get("leisure")
+        if landuse_val or leisure_val:
+            lu_type = landuse_val or leisure_val
+            landuse.append({
+                "id": el["id"],
+                "polygon": points,
+                "type": lu_type,
+                "name": tags.get("name", ""),
+            })
+            continue
+
+        # Barriers
+        if "barrier" in tags:
+            barrier_type = tags.get("barrier", "fence")
+            barrier_height = 1.5
+            if tags.get("height"):
+                try:
+                    barrier_height = float(tags["height"].replace("m", "").strip())
+                except (ValueError, TypeError):
+                    pass
+            elif barrier_type == "wall":
+                barrier_height = 2.5
+            elif barrier_type == "hedge":
+                barrier_height = 1.5
+            elif barrier_type == "fence":
+                barrier_height = 1.2
+
+            barriers.append({
+                "id": el["id"],
+                "points": points,
+                "type": barrier_type,
+                "height": round(barrier_height, 1),
+            })
+            continue
+
+        # Water
+        if tags.get("natural") == "water" or tags.get("waterway"):
+            water.append({
+                "id": el["id"],
+                "polygon": points if len(points) >= 3 else None,
+                "points": points if len(points) < 3 else None,
+                "type": tags.get("waterway", "water"),
+                "name": tags.get("name", ""),
+            })
+            continue
+
+    result = {
+        "center": {"lat": lat, "lng": lng},
+        "radius": radius,
+        "schema_version": _SCHEMA_VERSION,
+        "buildings": buildings,
+        "roads": roads,
+        "trees": trees,
+        "landuse": landuse,
+        "barriers": barriers,
+        "water": water,
+        "entrances": entrances,
+        "pois": pois,
+        "furniture": furniture,
+        "stats": {
+            "buildings": len(buildings),
+            "roads": len(roads),
+            "trees": len(trees),
+            "landuse": len(landuse),
+            "barriers": len(barriers),
+            "water": len(water),
+            "entrances": len(entrances),
+            "pois": len(pois),
+            "furniture": len(furniture),
+        },
+    }
+
+    # Atomic cache write — temp file + rename prevents race condition corruption
+    _GIS_CACHE.mkdir(parents=True, exist_ok=True)
+    try:
+        tmp_path = cache_path.with_suffix('.tmp')
+        tmp_path.write_text(json.dumps(result))
+        tmp_path.rename(cache_path)
+    except Exception:
+        pass
+
+    logger.info(
+        f"City data: {len(buildings)} buildings, {len(roads)} roads, "
+        f"{len(trees)} trees, {len(entrances)} entrances, {len(pois)} POIs, "
+        f"{len(furniture)} furniture at ({lat:.5f}, {lng:.5f})"
+    )
+    return result
+
+
+@router.get("/city-data/status")
+async def get_city_data_status(
+    lat: float = Query(..., description="Center latitude"),
+    lng: float = Query(..., description="Center longitude"),
+    radius: float = Query(300.0, description="Search radius in meters", ge=50, le=2000),
+):
+    """Return cache status and summary for a city-data query.
+
+    Reports whether data is cached, how fresh it is, element counts,
+    and schema version — without fetching from Overpass.
+    """
+    import time
+
+    _SCHEMA_VERSION = 2
+    cache_key = f"city_{lat:.6f}_{lng:.6f}_{radius:.0f}_v{_SCHEMA_VERSION}"
+    cache_hash = hashlib.sha256(cache_key.encode()).hexdigest()[:16]
+    cache_path = _GIS_CACHE / f"{cache_hash}.json"
+
+    status: dict = {
+        "cached": False,
+        "schema_version": _SCHEMA_VERSION,
+        "cache_key": cache_hash,
+        "center": {"lat": lat, "lng": lng},
+        "radius": radius,
+    }
+
+    if cache_path.exists():
+        status["cached"] = True
+        status["cache_age_s"] = round(time.time() - cache_path.stat().st_mtime, 1)
+        try:
+            data = json.loads(cache_path.read_text())
+            status["stats"] = data.get("stats", {})
+            status["schema_version"] = data.get("schema_version", 1)
+        except Exception:
+            status["cache_corrupt"] = True
+
+    return status
 
 
 # ---------------------------------------------------------------------------
@@ -769,7 +1427,7 @@ async def _fetch_overpass_geojson(
     cache_hash = hashlib.sha256(cache_key.encode()).hexdigest()[:16]
     cache_path = _GIS_CACHE / f"{cache_hash}.json"
 
-    if cache_path.exists():
+    if _cache_fresh(cache_path):
         try:
             return json.loads(cache_path.read_text())
         except Exception:
@@ -1158,3 +1816,199 @@ async def get_pois(
         }
         for p in pois
     ]
+
+
+# ---------------------------------------------------------------------------
+# Cache management
+# ---------------------------------------------------------------------------
+
+def cleanup_orphaned_tmp_files() -> int:
+    """Remove orphaned .tmp files from the GIS cache directory.
+
+    Called on server startup to clean up files left by interrupted
+    atomic writes. Returns the number of files deleted.
+    """
+    deleted = 0
+    if not _GIS_CACHE.exists():
+        return deleted
+    for tmp_file in _GIS_CACHE.glob("*.tmp"):
+        try:
+            tmp_file.unlink()
+            deleted += 1
+        except Exception:
+            pass
+    if deleted:
+        logger.info(f"Cleaned up {deleted} orphaned .tmp files from GIS cache")
+    return deleted
+
+
+@router.get("/cache/stats")
+async def get_cache_stats():
+    """Return cache health statistics.
+
+    Reports total files, total size, oldest file age, and count of
+    expired entries across all geo cache directories.
+    """
+    total_files = 0
+    total_size = 0
+    oldest_age = 0.0
+    expired_count = 0
+    now = time.time()
+
+    cache_dirs = [
+        _GEOCODE_CACHE, _BUILDINGS_CACHE, _GIS_CACHE,
+        _MSFT_CACHE, _TILE_CACHE,
+    ]
+    for cache_dir in cache_dirs:
+        if not cache_dir.exists():
+            continue
+        for f in cache_dir.rglob("*"):
+            if not f.is_file():
+                continue
+            total_files += 1
+            total_size += f.stat().st_size
+            age = now - f.stat().st_mtime
+            if age > oldest_age:
+                oldest_age = age
+            # Tiles don't expire, but other caches do
+            if cache_dir not in (_TILE_CACHE,) and age > _CACHE_TTL_S:
+                expired_count += 1
+
+    return {
+        "total_files": total_files,
+        "total_size_mb": round(total_size / (1024 * 1024), 2),
+        "oldest_file_age_hours": round(oldest_age / 3600, 1),
+        "expired_count": expired_count,
+    }
+
+
+@router.post("/cache/clear")
+async def clear_cache():
+    """Delete all cached geo files.
+
+    Removes all files from geocode, buildings, GIS, and Microsoft
+    building cache directories. Tile caches are also cleared.
+    Returns count and size of freed data.
+    """
+    files_deleted = 0
+    bytes_freed = 0
+
+    cache_dirs = [
+        _GEOCODE_CACHE, _BUILDINGS_CACHE, _GIS_CACHE,
+        _MSFT_CACHE, _TILE_CACHE,
+    ]
+    for cache_dir in cache_dirs:
+        if not cache_dir.exists():
+            continue
+        for f in cache_dir.rglob("*"):
+            if not f.is_file():
+                continue
+            try:
+                size = f.stat().st_size
+                f.unlink()
+                files_deleted += 1
+                bytes_freed += size
+            except Exception:
+                pass
+
+    logger.info(
+        f"Cache cleared: {files_deleted} files, "
+        f"{bytes_freed / (1024 * 1024):.1f} MB freed"
+    )
+    return {
+        "files_deleted": files_deleted,
+        "bytes_freed": bytes_freed,
+    }
+
+
+# --- City Simulation Scenarios ---
+
+CITY_SIM_SCENARIOS = [
+    {
+        "id": "rush_hour",
+        "name": "Rush Hour",
+        "description": "Morning commute, heavy traffic",
+        "vehicles": 200,
+        "pedestrians": 80,
+        "startTime": 8.0,
+        "timeScale": 60,
+        "weather": "clear",
+        "emergencyVehicles": 0,
+        "sensorBridgeEnabled": False,
+    },
+    {
+        "id": "night_patrol",
+        "name": "Night Patrol",
+        "description": "Late night, minimal traffic, surveillance mode",
+        "vehicles": 20,
+        "pedestrians": 5,
+        "startTime": 23.0,
+        "timeScale": 60,
+        "weather": "clear",
+        "emergencyVehicles": 0,
+        "sensorBridgeEnabled": True,
+    },
+    {
+        "id": "lunch_rush",
+        "name": "Lunch Rush",
+        "description": "Midday pedestrian activity near restaurants",
+        "vehicles": 100,
+        "pedestrians": 60,
+        "startTime": 12.0,
+        "timeScale": 60,
+        "weather": "clear",
+        "emergencyVehicles": 0,
+        "sensorBridgeEnabled": False,
+    },
+    {
+        "id": "emergency",
+        "name": "Emergency Response",
+        "description": "Active incident with emergency vehicles",
+        "vehicles": 50,
+        "pedestrians": 30,
+        "startTime": 14.0,
+        "timeScale": 30,
+        "weather": "clear",
+        "emergencyVehicles": 3,
+        "sensorBridgeEnabled": True,
+    },
+    {
+        "id": "rainy_commute",
+        "name": "Rainy Commute",
+        "description": "Evening rush in rain, reduced visibility",
+        "vehicles": 150,
+        "pedestrians": 40,
+        "startTime": 17.5,
+        "timeScale": 60,
+        "weather": "rain",
+        "emergencyVehicles": 0,
+        "sensorBridgeEnabled": False,
+    },
+    {
+        "id": "weekend_morning",
+        "name": "Weekend Morning",
+        "description": "Light traffic, joggers and dog walkers",
+        "vehicles": 30,
+        "pedestrians": 50,
+        "startTime": 9.0,
+        "timeScale": 120,
+        "weather": "clear",
+        "emergencyVehicles": 0,
+        "sensorBridgeEnabled": False,
+    },
+]
+
+
+@router.get("/city-sim/scenarios")
+async def get_city_sim_scenarios():
+    """List available city simulation scenarios."""
+    return CITY_SIM_SCENARIOS
+
+
+@router.get("/city-sim/scenarios/{scenario_id}")
+async def get_city_sim_scenario(scenario_id: str):
+    """Get a specific city simulation scenario by ID."""
+    for s in CITY_SIM_SCENARIOS:
+        if s["id"] == scenario_id:
+            return s
+    return JSONResponse(status_code=404, content={"error": f"Scenario '{scenario_id}' not found"})

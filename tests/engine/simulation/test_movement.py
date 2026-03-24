@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 import pytest
 
-from engine.simulation.movement import MovementController, _angle_diff, smooth_path
+from tritium_lib.sim_engine.core.movement import MovementController, _angle_diff, smooth_path
 
 
 # ---------------------------------------------------------------------------

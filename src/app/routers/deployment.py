@@ -138,21 +138,40 @@ def _service_status_meshtastic_bridge() -> dict:
 
 
 def _service_status_ollama() -> dict:
-    """Check Ollama LLM service status."""
-    reachable = _check_port("localhost", 11434)
-    pid = _find_pid("ollama serve")
-    installed = shutil.which("ollama") is not None
+    """Check LLM service status (llama-server preferred, ollama legacy)."""
+    # Check llama-server first
+    llama_reachable = _check_port("localhost", 8081)
+    llama_pid = _find_pid("llama-server")
+    # Fallback to ollama
+    ollama_reachable = _check_port("localhost", 11434)
+    ollama_pid = _find_pid("ollama serve")
 
+    if llama_reachable:
+        return {
+            "name": "llm",
+            "display_name": "llama-server (LLM)",
+            "state": "running",
+            "pid": llama_pid,
+            "uptime_s": _process_uptime(llama_pid) if llama_pid else 0.0,
+            "port": 8081,
+            "installed": True,
+            "can_start": False,
+            "can_stop": llama_pid is not None,
+            "start_command": "llama-server -m <model> --port 8081",
+            "stop_command": "kill",
+        }
+
+    installed = shutil.which("ollama") is not None
     return {
-        "name": "ollama",
-        "display_name": "Ollama (LLM)",
-        "state": "running" if reachable else "stopped",
-        "pid": pid,
-        "uptime_s": _process_uptime(pid) if pid else 0.0,
+        "name": "llm",
+        "display_name": "ollama (LLM, legacy)",
+        "state": "running" if ollama_reachable else "stopped",
+        "pid": ollama_pid,
+        "uptime_s": _process_uptime(ollama_pid) if ollama_pid else 0.0,
         "port": 11434,
         "installed": installed,
-        "can_start": installed and not reachable,
-        "can_stop": reachable and pid is not None,
+        "can_start": installed and not ollama_reachable,
+        "can_stop": ollama_reachable and ollama_pid is not None,
         "start_command": "ollama serve",
         "stop_command": "kill",
     }

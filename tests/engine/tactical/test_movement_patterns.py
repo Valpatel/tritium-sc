@@ -13,7 +13,7 @@ import pytest
 _sc_root = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(_sc_root / "src"))
 
-from engine.tactical.movement_patterns import (
+from tritium_lib.tracking.movement_patterns import (
     MovementPatternAnalyzer,
     MovementPattern,
     LOITER_RADIUS,

@@ -65,8 +65,8 @@ class Settings(BaseSettings):
     influx_org: str = "tritium"
     influx_bucket: str = "telemetry"
 
-    # Ollama (Phase 5)
-    ollama_host: str = "http://localhost:11434"
+    # LLM inference (llama-server on 8081-8083, ollama legacy on 11434)
+    ollama_host: str = "http://localhost:8081"  # llama-server primary
     ollama_model: str = "llava:13b"
 
     # Geo engine

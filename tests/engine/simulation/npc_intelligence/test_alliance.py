@@ -22,7 +22,7 @@ import pytest
 from engine.comms.event_bus import EventBus
 from engine.simulation.npc_intelligence.alliance import AllianceManager
 from engine.simulation.npc_intelligence.brain import NPCBrain, NPCPersonality
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 # ---------------------------------------------------------------------------

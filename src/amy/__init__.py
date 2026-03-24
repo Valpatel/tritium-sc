@@ -77,7 +77,7 @@ def create_amy(settings=None, simulation_engine=None) -> "Commander":
     wake_word = "amy"
     camera_device = None
     think_interval = 8.0
-    ollama_host = "http://localhost:11434"
+    ollama_host = "http://localhost:8081"  # llama-server (OpenAI-compatible)
 
     if settings is not None:
         deep_model = getattr(settings, "amy_deep_model", deep_model)

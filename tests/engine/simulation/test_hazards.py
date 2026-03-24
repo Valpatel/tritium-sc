@@ -27,7 +27,7 @@ import pytest
 from engine.comms.event_bus import EventBus
 from engine.simulation.hazards import Hazard, HazardManager
 from engine.simulation.engine import SimulationEngine
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 pytestmark = pytest.mark.unit
@@ -313,7 +313,7 @@ class TestPathfinderBlockedPositions:
     @pytest.mark.skip(reason="plan_path() does not accept blocked_positions parameter")
     def test_plan_path_accepts_blocked_positions(self):
         """plan_path() should accept an optional blocked_positions parameter."""
-        from engine.simulation.pathfinding import plan_path
+        from tritium_lib.sim_engine.world.pathfinding import plan_path
         # Direct path for a drone (ignores roads), should still accept the param
         path = plan_path(
             (0.0, 0.0), (100.0, 100.0), "drone",
@@ -326,7 +326,7 @@ class TestPathfinderBlockedPositions:
 
     def test_plan_path_without_blocked_positions(self):
         """plan_path() works without blocked_positions (backward compat)."""
-        from engine.simulation.pathfinding import plan_path
+        from tritium_lib.sim_engine.world.pathfinding import plan_path
         path = plan_path(
             (0.0, 0.0), (100.0, 100.0), "drone",
             street_graph=None, obstacles=None,

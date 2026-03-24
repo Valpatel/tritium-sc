@@ -23,11 +23,11 @@ import pytest
 
 from engine.comms.event_bus import EventBus
 from engine.simulation.engine import SimulationEngine
-from engine.simulation.sensors import SensorSimulator
-from engine.simulation.target import SimulationTarget
-from engine.simulation.unit_states import create_hostile_fsm
-from engine.simulation.behaviors import UnitBehaviors
-from engine.simulation.combat import CombatSystem
+from tritium_lib.sim_engine.world.sensors import SensorSimulator
+from tritium_lib.sim_engine.core.entity import SimulationTarget
+from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
+from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
+from tritium_lib.sim_engine.combat.combat import CombatSystem
 
 
 # ---------------------------------------------------------------------------
@@ -291,7 +291,7 @@ class TestFSMSensorTransitions:
 
     def test_reconning_hostile_detected_transitions_to_advancing(self):
         """A reconning hostile that gets detected should advance (cover blown)."""
-        from engine.simulation.state_machine import StateMachine
+        from tritium_lib.sim_engine.core.state_machine import StateMachine
 
         fsm = create_hostile_fsm()
 

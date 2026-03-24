@@ -27,8 +27,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from engine.simulation.behavior.hostile import HostileBehavior
-from engine.simulation.combat import CombatSystem
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.combat.combat import CombatSystem
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 class SimpleEventBus:

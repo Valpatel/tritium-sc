@@ -10,8 +10,8 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "src"))
 
-from engine.tactical.target_history import TargetHistory
-from engine.tactical.kalman_predictor import (
+from tritium_lib.tracking.target_history import TargetHistory
+from tritium_lib.tracking.kalman_predictor import (
     kalman_update,
     predict_target_kalman,
     predict_all_targets_kalman,

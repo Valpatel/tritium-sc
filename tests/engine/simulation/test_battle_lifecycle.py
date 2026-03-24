@@ -30,16 +30,16 @@ import time
 
 import pytest
 
-from engine.simulation.combat import CombatSystem, Projectile, HIT_RADIUS
+from tritium_lib.sim_engine.combat.combat import CombatSystem, Projectile, HIT_RADIUS
 from engine.simulation.engine import SimulationEngine
-from engine.simulation.weapons import Weapon
+from tritium_lib.sim_engine.combat.weapons import Weapon
 from engine.simulation.game_mode import (
     GameMode,
     WAVE_CONFIGS,
     _COUNTDOWN_DURATION,
     _WAVE_ADVANCE_DELAY,
 )
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.simulation.degradation import DegradationSystem
 from engine.simulation.morale import (
     MoraleSystem,
@@ -387,7 +387,7 @@ class TestCombatCycle:
         assert engine.combat.projectile_count == 1
 
     def test_projectile_hits_close_target(self):
-        from engine.simulation.inventory import UnitInventory
+        from tritium_lib.sim_engine.core.inventory import UnitInventory
         bus, engine = _make_engine()
         hit_sub = bus.subscribe("projectile_hit")
         turret = _make_turret()
@@ -407,7 +407,7 @@ class TestCombatCycle:
         assert hostile.health < 100.0
 
     def test_damage_reduces_health(self):
-        from engine.simulation.inventory import UnitInventory
+        from tritium_lib.sim_engine.core.inventory import UnitInventory
         bus, engine = _make_engine()
         turret = _make_turret()
         hostile = _make_hostile(position=(2.0, 0.0), health=80.0)

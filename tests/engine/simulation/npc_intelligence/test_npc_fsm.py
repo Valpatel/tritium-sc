@@ -10,7 +10,7 @@ from engine.simulation.npc_intelligence.npc_fsm import (
     create_animal_fsm,
     create_npc_fsm,
 )
-from engine.simulation.state_machine import StateMachine
+from tritium_lib.sim_engine.core.state_machine import StateMachine
 
 
 # ============================================================================

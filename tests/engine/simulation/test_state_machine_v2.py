@@ -11,7 +11,7 @@ import time
 
 import pytest
 
-from engine.simulation.state_machine import State, StateMachine, Transition
+from tritium_lib.sim_engine.core.state_machine import State, StateMachine, Transition
 
 
 # =====================================================================
@@ -559,7 +559,7 @@ class TestTurretFSMEnhancements:
 
     def test_scanning_has_min_duration(self):
         """Turret scanning should have min_duration preventing instant lock-on."""
-        from engine.simulation.unit_states import create_turret_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_turret_fsm
         sm = create_turret_fsm()
         # First tick: idle -> scanning
         sm.tick(0.1, {"enemies_in_range": [], "weapon_ready": True, "aimed_at_target": False, "just_fired": False})
@@ -570,7 +570,7 @@ class TestTurretFSMEnhancements:
 
     def test_scanning_transitions_after_min_duration(self):
         """Turret scanning should allow tracking after min_duration."""
-        from engine.simulation.unit_states import create_turret_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_turret_fsm
         sm = create_turret_fsm()
         # idle -> scanning
         sm.tick(0.1, {"enemies_in_range": [], "weapon_ready": True, "aimed_at_target": False, "just_fired": False})
@@ -581,7 +581,7 @@ class TestTurretFSMEnhancements:
 
     def test_engaging_guard_blocks_jammed_weapon(self):
         """Turret should NOT engage if weapon is jammed (degradation >= 0.8)."""
-        from engine.simulation.unit_states import create_turret_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_turret_fsm
         sm = create_turret_fsm()
         # idle -> scanning
         sm.tick(0.1, {"enemies_in_range": [], "weapon_ready": True, "aimed_at_target": False, "just_fired": False, "degradation": 0.0})
@@ -605,7 +605,7 @@ class TestHostileFSMEnhancements:
 
     def test_spawning_has_min_duration(self):
         """Hostile should stay in spawning for at least min_duration."""
-        from engine.simulation.unit_states import create_hostile_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
         sm = create_hostile_fsm()
         assert sm.current_state == "spawning"
         # One tick should NOT be enough to transition
@@ -614,7 +614,7 @@ class TestHostileFSMEnhancements:
 
     def test_spawning_transitions_after_min_duration(self):
         """Hostile should advance after spawning min_duration."""
-        from engine.simulation.unit_states import create_hostile_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
         sm = create_hostile_fsm()
         # Tick past spawning min_duration (1.0s)
         for _ in range(12):
@@ -623,7 +623,7 @@ class TestHostileFSMEnhancements:
 
     def test_fleeing_max_duration_rallies_to_advancing(self):
         """Hostile fleeing should rally back to advancing after max_duration."""
-        from engine.simulation.unit_states import create_hostile_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
         sm = create_hostile_fsm()
         # Fast-forward past spawning
         for _ in range(12):
@@ -659,7 +659,7 @@ class TestHostileFSMEnhancements:
 
     def test_fleeing_priority_over_engaging(self):
         """Fleeing transitions should have higher priority than engaging."""
-        from engine.simulation.unit_states import create_hostile_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
         sm = create_hostile_fsm()
         # Fast-forward past spawning to advancing
         for _ in range(12):
@@ -683,7 +683,7 @@ class TestRoverFSMEnhancements:
 
     def test_pursuing_max_duration_returns_to_patrol(self):
         """Rover should stop chasing after max_duration and return to patrolling."""
-        from engine.simulation.unit_states import create_rover_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_rover_fsm
         sm = create_rover_fsm()
         # idle -> pursuing (enemy in range, not in weapon range)
         ctx = {
@@ -708,7 +708,7 @@ class TestRoverFSMEnhancements:
 
     def test_engaging_guard_blocks_jammed_weapon(self):
         """Rover should not engage with jammed weapon."""
-        from engine.simulation.unit_states import create_rover_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_rover_fsm
         sm = create_rover_fsm()
         # idle with enemy in weapon range but degradation high
         sm.tick(0.1, {
@@ -720,7 +720,7 @@ class TestRoverFSMEnhancements:
 
     def test_retreating_has_min_duration(self):
         """Rover should commit to retreat for min_duration."""
-        from engine.simulation.unit_states import create_rover_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_rover_fsm
         sm = create_rover_fsm()
         # idle -> engaging -> retreating
         sm.tick(0.1, {
@@ -793,31 +793,31 @@ class TestBackwardCompatibility:
 
     def test_existing_turret_fsm_works(self):
         """Existing turret FSM factory should still produce a working FSM."""
-        from engine.simulation.unit_states import create_turret_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_turret_fsm
         sm = create_turret_fsm()
         assert sm.current_state == "idle"
 
     def test_existing_hostile_fsm_works(self):
         """Existing hostile FSM factory should still produce a working FSM."""
-        from engine.simulation.unit_states import create_hostile_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
         sm = create_hostile_fsm()
         assert sm.current_state == "spawning"
 
     def test_existing_rover_fsm_works(self):
         """Existing rover FSM factory should still produce a working FSM."""
-        from engine.simulation.unit_states import create_rover_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_rover_fsm
         sm = create_rover_fsm()
         assert sm.current_state == "idle"
 
     def test_existing_drone_fsm_works(self):
         """Existing drone FSM factory should still produce a working FSM."""
-        from engine.simulation.unit_states import create_drone_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_drone_fsm
         sm = create_drone_fsm()
         assert sm.current_state == "idle"
 
     def test_create_fsm_for_type_still_works(self):
         """create_fsm_for_type should still return correct FSMs."""
-        from engine.simulation.unit_states import create_fsm_for_type
+        from tritium_lib.sim_engine.behavior.unit_states import create_fsm_for_type
         assert create_fsm_for_type("turret") is not None
         assert create_fsm_for_type("rover") is not None
         assert create_fsm_for_type("drone") is not None
@@ -840,7 +840,7 @@ class TestEnginePassesTimeInState:
     def _make_engine_with_turret(self):
         from engine.comms.event_bus import EventBus
         from engine.simulation.engine import SimulationEngine
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         bus = EventBus()
         engine = SimulationEngine(bus, map_bounds=100)
         turret = SimulationTarget(

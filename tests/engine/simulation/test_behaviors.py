@@ -12,9 +12,9 @@ import time
 
 import pytest
 
-from engine.simulation.behaviors import UnitBehaviors
-from engine.simulation.combat import CombatSystem
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
+from tritium_lib.sim_engine.combat.combat import CombatSystem
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 class SimpleEventBus:
@@ -474,7 +474,7 @@ class TestWeaponTypeDispatch:
 
     def test_weapon_types_map_completeness(self):
         """Verify _WEAPON_TYPES covers all combatant unit types."""
-        from engine.simulation.behaviors import _WEAPON_TYPES
+        from tritium_lib.sim_engine.behavior.behaviors import _WEAPON_TYPES
         expected_types = {
             "turret", "heavy_turret", "missile_turret",
             "drone", "scout_drone", "rover", "tank", "apc",
@@ -485,7 +485,7 @@ class TestWeaponTypeDispatch:
 
     def test_weapon_types_values_non_empty(self):
         """All weapon type values should be non-empty strings or None for non-firing units."""
-        from engine.simulation.behaviors import _WEAPON_TYPES
+        from tritium_lib.sim_engine.behavior.behaviors import _WEAPON_TYPES
         # Units that intentionally cannot fire (None weapon type)
         no_weapon_types = {"scout_swarm", "bomber_swarm"}
         for unit_type, weapon in _WEAPON_TYPES.items():

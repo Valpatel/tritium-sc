@@ -25,16 +25,16 @@ import pytest
 
 sys.path.insert(0, "src")
 
-from engine.simulation.inventory import (
+from tritium_lib.sim_engine.core.inventory import (
     InventoryItem,
     UnitInventory,
     build_loadout,
     select_best_weapon,
     ITEM_CATALOG,
 )
-from engine.simulation.target import SimulationTarget
-from engine.simulation.combat import CombatSystem
-from engine.simulation.weapons import WeaponSystem, Weapon
+from tritium_lib.sim_engine.core.entity import SimulationTarget
+from tritium_lib.sim_engine.combat.combat import CombatSystem
+from tritium_lib.sim_engine.combat.weapons import WeaponSystem, Weapon
 from engine.comms.event_bus import EventBus
 
 
@@ -127,7 +127,7 @@ class TestSelectBestWeaponDeadCode:
         """Verify that behaviors.py does not import or call select_best_weapon.
         This test documents the gap: the function was built but never wired."""
         import inspect
-        from engine.simulation import behaviors
+        from tritium_lib.sim_engine.behavior import behaviors
 
         source = inspect.getsource(behaviors)
         assert "select_best_weapon" not in source, (

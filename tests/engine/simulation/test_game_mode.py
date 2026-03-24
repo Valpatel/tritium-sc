@@ -11,7 +11,7 @@ import time
 
 import pytest
 
-from engine.simulation.combat import CombatSystem
+from tritium_lib.sim_engine.combat.combat import CombatSystem
 from engine.simulation.engine import SimulationEngine
 from engine.simulation.game_mode import (
     GameMode,
@@ -20,7 +20,7 @@ from engine.simulation.game_mode import (
     _COUNTDOWN_DURATION,
     _WAVE_ADVANCE_DELAY,
 )
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 class SimpleEventBus:

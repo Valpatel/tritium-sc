@@ -61,7 +61,7 @@ class _MockEngine:
         return list(self._targets)
 
     def spawn_hostile(self, **kwargs):
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id=f"h-{len(self._targets)}",
             name="Hostile",
@@ -80,7 +80,7 @@ class _MockEngine:
 
 def _make_game_mode(infinite: bool = False):
     """Create a GameMode with optional infinite mode enabled."""
-    from engine.simulation.combat import CombatSystem
+    from tritium_lib.sim_engine.combat.combat import CombatSystem
     from engine.simulation.game_mode import GameMode
 
     bus = SimpleEventBus()
@@ -92,7 +92,7 @@ def _make_game_mode(infinite: bool = False):
 
 def _add_friendly(engine: _MockEngine) -> None:
     """Add a friendly combatant to the engine so defeat doesn't trigger."""
-    from engine.simulation.target import SimulationTarget
+    from tritium_lib.sim_engine.core.entity import SimulationTarget
     friendly = SimulationTarget(
         target_id="friendly-1",
         name="Turret Alpha",

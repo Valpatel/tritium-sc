@@ -20,12 +20,12 @@ import uuid
 
 import pytest
 
-from engine.simulation.behaviors import UnitBehaviors
-from engine.simulation.combat import CombatSystem
+from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
+from tritium_lib.sim_engine.combat.combat import CombatSystem
 from engine.simulation.engine import SimulationEngine
 from engine.simulation.scenario import load_battle_scenario
-from engine.simulation.spatial import SpatialGrid
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.spatial import SpatialGrid
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 class SimpleEventBus:

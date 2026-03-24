@@ -13,7 +13,7 @@ import time
 
 import pytest
 
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 # ---------------------------------------------------------------------------
@@ -316,8 +316,8 @@ class TestSwarmInBehaviors:
     def test_swarm_drones_handled_in_hostile_tick(self):
         """Swarm drone hostiles should be processed by behaviors.tick()."""
         from engine.comms.event_bus import EventBus
-        from engine.simulation.behaviors import UnitBehaviors
-        from engine.simulation.combat import CombatSystem
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
 
         bus = EventBus()
         combat = CombatSystem(bus)
@@ -333,8 +333,8 @@ class TestSwarmInBehaviors:
     def test_swarm_drones_fire_at_defenders(self):
         """Swarm drones should fire at nearby defenders."""
         from engine.comms.event_bus import EventBus
-        from engine.simulation.behaviors import UnitBehaviors
-        from engine.simulation.combat import CombatSystem
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
 
         bus = EventBus()
         combat = CombatSystem(bus)

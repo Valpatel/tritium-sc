@@ -19,9 +19,9 @@ Validates:
 import math
 import pytest
 
-from engine.simulation.squads import Squad, SquadManager
+from tritium_lib.sim_engine.combat.squads import Squad, SquadManager
 from engine.simulation.morale import MoraleSystem
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 # ---------------------------------------------------------------------------

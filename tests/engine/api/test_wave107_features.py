@@ -25,7 +25,7 @@ class TestMeshtasticMessageForwarding:
     @pytest.mark.unit
     def test_on_mqtt_message_forwards_to_chat(self):
         """When a mesh text message arrives, it should be forwarded to operator chat."""
-        from plugins.meshtastic.plugin import MeshtasticPlugin
+        from plugins.meshtastic_bridge.plugin import MeshtasticPlugin
 
         plugin = MeshtasticPlugin()
         plugin._logger = MagicMock()
@@ -61,7 +61,7 @@ class TestMeshtasticMessageForwarding:
     @pytest.mark.unit
     def test_forward_skips_empty_messages(self):
         """Empty mesh messages should not be forwarded."""
-        from plugins.meshtastic.plugin import MeshtasticPlugin
+        from plugins.meshtastic_bridge.plugin import MeshtasticPlugin
 
         plugin = MeshtasticPlugin()
         plugin._logger = MagicMock()
@@ -77,7 +77,7 @@ class TestMeshtasticMessageForwarding:
     @pytest.mark.unit
     def test_forward_without_mqtt_bridge(self):
         """If no MQTT bridge, message should still be stored locally."""
-        from plugins.meshtastic.plugin import MeshtasticPlugin
+        from plugins.meshtastic_bridge.plugin import MeshtasticPlugin
 
         plugin = MeshtasticPlugin()
         plugin._logger = MagicMock()
@@ -95,8 +95,8 @@ class TestMeshtasticMessageForwarding:
     @pytest.mark.unit
     def test_operator_chat_route_exists(self):
         """The /api/meshtastic/chat POST route should exist."""
-        from plugins.meshtastic.plugin import MeshtasticPlugin
-        from plugins.meshtastic.routes import create_router
+        from plugins.meshtastic_bridge.plugin import MeshtasticPlugin
+        from plugins.meshtastic_bridge.routes import create_router
 
         plugin = MeshtasticPlugin()
         plugin._app = FastAPI()

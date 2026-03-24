@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from engine.tactical.trilateration import TrilaterationEngine, PositionResult
+from tritium_lib.tracking.trilateration import TrilaterationEngine, PositionResult
 
 
 # ---------------------------------------------------------------------------

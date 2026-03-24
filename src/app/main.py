@@ -181,19 +181,19 @@ def _create_simulation_engine():
     from engine.comms.event_bus import EventBus
     from engine.simulation import SimulationEngine, load_layout
 
-    # Set global Ollama host early so all LLM consumers use fleet
+    # Set global LLM host early so all consumers use fleet (llama-server preferred)
     try:
         from engine.perception.vision import set_ollama_host
         if settings.fleet_enabled:
-            from engine.inference.fleet import OllamaFleet
-            fleet = OllamaFleet(auto_discover=settings.fleet_auto_discover)
+            from engine.inference.fleet import LLMFleet
+            fleet = LLMFleet(auto_discover=settings.fleet_auto_discover)
             if fleet.hosts:
                 set_ollama_host(fleet.hosts[0].url)
-                logger.info(f"Ollama fleet: {len(fleet.hosts)} host(s), primary={fleet.hosts[0].name}")
+                logger.info(f"LLM fleet: {fleet.status()}")
         else:
             set_ollama_host(settings.ollama_host)
     except Exception:
-        logger.debug("Ollama fleet discovery skipped", exc_info=True)
+        logger.debug("LLM fleet discovery skipped", exc_info=True)
 
     # Temporary event bus; gets replaced by Amy's actual bus after create_amy
     engine = SimulationEngine(EventBus())
@@ -838,6 +838,10 @@ async def lifespan(app: FastAPI):
             f"{settings.map_center_lng:.7f}, alt={settings.map_center_alt:.1f}"
         )
 
+    # Clean up orphaned .tmp files from interrupted cache writes
+    from app.routers.geo import cleanup_orphaned_tmp_files
+    cleanup_orphaned_tmp_files()
+
     # NVR camera discovery — run in background so server starts immediately
     asyncio.create_task(_discover_cameras())
 
@@ -1408,6 +1412,11 @@ if _has_local_addons:
     app.mount("/addons", StaticFiles(directory=_local_addons, follow_symlink=True), name="addon-static")
 elif _submodule_addons.exists():
     app.mount("/addons", StaticFiles(directory=_submodule_addons, follow_symlink=True), name="addon-static")
+
+# Mount tritium-lib shared web assets at /lib/ (JS map components, asset types)
+_lib_web = _sc_root.parent / "tritium-lib" / "web"
+if _lib_web.exists():
+    app.mount("/lib", StaticFiles(directory=_lib_web, follow_symlink=True), name="lib-static")
 
 frontend_path = Path(__file__).parent.parent / "frontend"
 if frontend_path.exists():

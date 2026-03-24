@@ -20,7 +20,7 @@ import pytest
 from unittest.mock import MagicMock
 
 from engine.tactical.obstacles import BuildingObstacles, _point_in_polygon
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.simulation.engine import SimulationEngine
 from engine.simulation.ambient import AmbientSpawner
 

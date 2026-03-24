@@ -133,7 +133,7 @@ class TestUpdateFromMesh:
         assert len(tracker.get_all()) == 1
 
         # Fast-forward time past the stale timeout
-        with patch("engine.tactical.target_tracker.time") as mock_time:
+        with patch("tritium_lib.tracking.target_tracker.time") as mock_time:
             mock_time.monotonic.return_value = time.monotonic() + 400.0
             targets = tracker.get_all()
             assert len(targets) == 0

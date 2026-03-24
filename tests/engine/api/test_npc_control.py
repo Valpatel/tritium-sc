@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 
 from engine.comms.event_bus import EventBus
 from engine.simulation.engine import SimulationEngine
-from engine.simulation.npc import NPCManager
+from tritium_lib.sim_engine.behavior.npc import NPCManager
 from engine.simulation.npc_intelligence.plugin import NPCIntelligencePlugin
 from engine.simulation.npc_intelligence.thought_registry import ThoughtRegistry
 

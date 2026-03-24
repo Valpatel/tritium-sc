@@ -8,8 +8,8 @@ import time
 
 import pytest
 
-from engine.tactical.target_history import TargetHistory
-from engine.tactical.target_prediction import (
+from tritium_lib.tracking.target_history import TargetHistory
+from tritium_lib.tracking.target_prediction import (
     MIN_SAMPLES,
     MIN_SPEED_THRESHOLD,
     PredictedPosition,

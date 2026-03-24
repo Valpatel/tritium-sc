@@ -23,6 +23,8 @@ from app.routers.geo import (
     GeocodeResponse,
     BuildingPolygon,
     SetReferenceRequest,
+    _estimate_building_height,
+    _classify_building,
     router,
 )
 
@@ -446,3 +448,112 @@ class TestPositionCorrections:
                 }
                 resp = client.post("/api/geo/layout/corrections", json=payload)
                 assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Building Height Estimation and Classification
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestBuildingEstimation:
+    """_estimate_building_height and _classify_building helpers."""
+
+    def test_explicit_height_tag(self):
+        assert _estimate_building_height({"height": "12.5"}) == 12.5
+
+    def test_height_with_m_suffix(self):
+        assert _estimate_building_height({"height": "10m"}) == 10.0
+
+    def test_levels_to_height(self):
+        h = _estimate_building_height({"building:levels": "5"})
+        assert h == pytest.approx(16.0)  # 5*3 + 1
+
+    def test_type_default_apartments(self):
+        assert _estimate_building_height({"building": "apartments"}) == 15.0
+
+    def test_type_default_garage(self):
+        assert _estimate_building_height({"building": "garage"}) == 3.0
+
+    def test_unknown_type_default(self):
+        assert _estimate_building_height({"building": "yes"}) == 8.0
+
+    def test_explicit_height_overrides_levels(self):
+        h = _estimate_building_height({"height": "20", "building:levels": "3"})
+        assert h == 20.0
+
+    def test_classify_residential(self):
+        assert _classify_building({"building": "apartments"}) == "residential"
+        assert _classify_building({"building": "house"}) == "residential"
+
+    def test_classify_commercial(self):
+        assert _classify_building({"building": "retail"}) == "commercial"
+        assert _classify_building({"building": "office"}) == "commercial"
+
+    def test_classify_industrial(self):
+        assert _classify_building({"building": "warehouse"}) == "industrial"
+
+    def test_classify_civic(self):
+        assert _classify_building({"building": "hospital"}) == "civic"
+        assert _classify_building({"building": "school"}) == "civic"
+
+    def test_classify_religious(self):
+        assert _classify_building({"building": "church"}) == "religious"
+        assert _classify_building({"building": "mosque"}) == "religious"
+
+    def test_classify_utility(self):
+        assert _classify_building({"building": "garage"}) == "utility"
+        assert _classify_building({"building": "shed"}) == "utility"
+
+    def test_classify_unknown_defaults_residential(self):
+        assert _classify_building({"building": "yes"}) == "residential"
+
+
+# ---------------------------------------------------------------------------
+# City Data Endpoint
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestCityDataEndpoint:
+    """GET /api/geo/city-data — comprehensive OSM city data."""
+
+    def test_city_data_cached(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as td:
+            gis_cache = Path(td) / "gis"
+            gis_cache.mkdir()
+            cache_key = "city_37.774900_-122.419400_300_v2"
+            cache_hash = hashlib.sha256(cache_key.encode()).hexdigest()[:16]
+            city_data = {
+                "center": {"lat": 37.7749, "lng": -122.4194},
+                "radius": 300,
+                "buildings": [{"id": 1, "polygon": [[0, 0], [10, 0], [10, 10], [0, 10]],
+                              "height": 12.0, "type": "apartments", "category": "residential",
+                              "name": "", "levels": 4, "roof_shape": "", "colour": ""}],
+                "roads": [],
+                "trees": [],
+                "landuse": [],
+                "barriers": [],
+                "water": [],
+                "stats": {"buildings": 1, "roads": 0, "trees": 0,
+                          "landuse": 0, "barriers": 0, "water": 0},
+            }
+            (gis_cache / f"{cache_hash}.json").write_text(json.dumps(city_data))
+
+            with patch("app.routers.geo._GIS_CACHE", gis_cache):
+                client = TestClient(_make_app())
+                resp = client.get("/api/geo/city-data?lat=37.7749&lng=-122.4194&radius=300")
+                assert resp.status_code == 200
+                data = resp.json()
+                assert data["stats"]["buildings"] == 1
+                assert data["buildings"][0]["category"] == "residential"
+                assert data["buildings"][0]["height"] == 12.0
+
+    def test_city_data_requires_params(self):
+        client = TestClient(_make_app())
+        resp = client.get("/api/geo/city-data")
+        assert resp.status_code == 422  # Missing required params
+
+    def test_city_data_radius_validation(self):
+        client = TestClient(_make_app())
+        resp = client.get("/api/geo/city-data?lat=37.0&lng=-122.0&radius=10")
+        assert resp.status_code == 422  # Below minimum 50

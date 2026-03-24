@@ -13,7 +13,7 @@ from src.engine.tactical.correlator import (
     start_correlator,
     stop_correlator,
 )
-from src.engine.tactical.dossier import DossierStore, TargetDossier
+from tritium_lib.tracking.dossier import DossierStore, TargetDossier
 from src.engine.tactical.target_tracker import TargetTracker, TrackedTarget
 
 

@@ -12,7 +12,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src'))
 
-from engine.tactical.convoy_detector import ConvoyDetector
+from tritium_lib.tracking.convoy_detector import ConvoyDetector
 
 
 class MockHistory:

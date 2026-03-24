@@ -15,7 +15,7 @@ import time
 
 import pytest
 
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.simulation.upgrades import UpgradeSystem, ABILITIES
 from engine.comms.event_bus import EventBus
 
@@ -467,8 +467,8 @@ class TestEmpBehaviorIntegration:
     def test_behaviors_skips_emp_stunned_hostile(self):
         """A hostile drone that is EMP-stunned should not fire during
         behavior tick."""
-        from engine.simulation.behaviors import UnitBehaviors
-        from engine.simulation.combat import CombatSystem
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
 
         event_bus = EventBus()
         upgrade_system = UpgradeSystem(event_bus=event_bus)

@@ -19,7 +19,7 @@ import pytest
 
 from engine.comms.event_bus import EventBus
 from engine.simulation.fake_robot import FakeRobot
-from engine.simulation.state_machine import StateMachine
+from tritium_lib.sim_engine.core.state_machine import StateMachine
 
 
 @pytest.mark.unit

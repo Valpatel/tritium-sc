@@ -53,8 +53,8 @@ from engine.simulation.behavior.hostile import (
     _RETREAT_ZIGZAG_AMPLITUDE,
     _RETREAT_SPEED_FACTOR,
 )
-from engine.simulation.combat import CombatSystem
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.combat.combat import CombatSystem
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 class SimpleEventBus:

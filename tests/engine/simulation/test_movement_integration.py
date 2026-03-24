@@ -20,7 +20,7 @@ class TestControllerAssignment:
     """Engine assigns MovementController to mobile targets."""
 
     def test_rover_gets_controller(self):
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id="r-1", name="Rover-1", alliance="friendly",
             asset_type="rover", position=(0, 0), speed=2.0,
@@ -28,7 +28,7 @@ class TestControllerAssignment:
         assert t.movement is not None, "Rover should get a MovementController"
 
     def test_drone_gets_controller(self):
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id="d-1", name="Drone-1", alliance="friendly",
             asset_type="drone", position=(0, 0), speed=4.0,
@@ -36,7 +36,7 @@ class TestControllerAssignment:
         assert t.movement is not None
 
     def test_hostile_person_gets_controller(self):
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id="h-1", name="Hostile-1", alliance="hostile",
             asset_type="person", position=(0, 0), speed=3.0,
@@ -44,7 +44,7 @@ class TestControllerAssignment:
         assert t.movement is not None
 
     def test_turret_no_controller(self):
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id="t-1", name="Turret-1", alliance="friendly",
             asset_type="turret", position=(10, 10), speed=0.0,
@@ -52,7 +52,7 @@ class TestControllerAssignment:
         assert t.movement is None, "Turrets should NOT get a controller"
 
     def test_camera_no_controller(self):
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id="c-1", name="Cam-1", alliance="friendly",
             asset_type="camera", position=(5, 5), speed=0.0,
@@ -60,7 +60,7 @@ class TestControllerAssignment:
         assert t.movement is None
 
     def test_controller_inherits_speed(self):
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id="r-1", name="Rover-1", alliance="friendly",
             asset_type="rover", position=(0, 0), speed=5.0,
@@ -69,7 +69,7 @@ class TestControllerAssignment:
         assert t.movement.max_speed == 5.0
 
     def test_controller_position_matches_target(self):
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id="r-1", name="Rover-1", alliance="friendly",
             asset_type="rover", position=(10.0, 20.0), speed=2.0,
@@ -84,7 +84,7 @@ class TestControllerDrivenMovement:
 
     def test_controller_produces_smooth_movement(self):
         """With controller, speed ramps up instead of instant max."""
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id="r-1", name="Rover-1", alliance="friendly",
             asset_type="rover", position=(0.0, 0.0), speed=4.0,
@@ -98,7 +98,7 @@ class TestControllerDrivenMovement:
 
     def test_controller_decelerates_near_waypoint(self):
         """Speed should decrease as target approaches waypoint."""
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id="r-1", name="Rover-1", alliance="friendly",
             asset_type="rover", position=(0.0, 0.0), speed=4.0,
@@ -113,7 +113,7 @@ class TestControllerDrivenMovement:
 
     def test_controller_updates_target_heading(self):
         """Heading should update smoothly with controller."""
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id="r-1", name="Rover-1", alliance="friendly",
             asset_type="rover", position=(0.0, 0.0), speed=2.0,
@@ -125,7 +125,7 @@ class TestControllerDrivenMovement:
 
     def test_set_waypoints_updates_controller(self):
         """Setting waypoints on target should push them to controller."""
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id="r-1", name="Rover-1", alliance="friendly",
             asset_type="rover", position=(0.0, 0.0), speed=2.0,
@@ -143,7 +143,7 @@ class TestNonCombatantLegacyMovement:
 
     def test_neutral_person_no_controller(self):
         """Neutral people are non-combatants, no MovementController."""
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id="p-1", name="Person-1", alliance="neutral",
             asset_type="person", position=(0.0, 0.0), speed=1.0,
@@ -155,7 +155,7 @@ class TestNonCombatantLegacyMovement:
         assert t.position[0] > start_x, "Should move via legacy tick"
 
     def test_animal_no_controller(self):
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id="a-1", name="Cat-1", alliance="neutral",
             asset_type="animal", position=(0.0, 0.0), speed=0.5,
@@ -166,7 +166,7 @@ class TestNonCombatantLegacyMovement:
         assert t.position[0] > 0
 
     def test_neutral_vehicle_no_controller(self):
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id="v-1", name="Car-1", alliance="neutral",
             asset_type="vehicle", position=(0.0, 0.0), speed=2.0,
@@ -181,7 +181,7 @@ class TestEngineAddsController:
     def test_engine_add_rover_has_controller(self):
         from engine.comms.event_bus import EventBus
         from engine.simulation.engine import SimulationEngine
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         bus = EventBus()
         engine = SimulationEngine(bus, map_bounds=100)
         t = SimulationTarget(
@@ -194,7 +194,7 @@ class TestEngineAddsController:
     def test_engine_add_turret_no_controller(self):
         from engine.comms.event_bus import EventBus
         from engine.simulation.engine import SimulationEngine
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         bus = EventBus()
         engine = SimulationEngine(bus, map_bounds=100)
         t = SimulationTarget(
@@ -209,7 +209,7 @@ class TestToDict:
     """to_dict() works with movement controller targets."""
 
     def test_to_dict_includes_standard_fields(self):
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id="r-1", name="Rover-1", alliance="friendly",
             asset_type="rover", position=(0, 0), speed=2.0,
@@ -221,7 +221,7 @@ class TestToDict:
         assert d["is_combatant"] is True
 
     def test_to_dict_after_controller_movement(self):
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id="r-1", name="Rover-1", alliance="friendly",
             asset_type="rover", position=(0.0, 0.0), speed=4.0,

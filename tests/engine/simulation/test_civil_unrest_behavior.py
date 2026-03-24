@@ -11,8 +11,8 @@ import time
 import pytest
 from unittest.mock import MagicMock, patch
 
-from engine.simulation.target import SimulationTarget
-from engine.simulation.combat import CombatSystem
+from tritium_lib.sim_engine.core.entity import SimulationTarget
+from tritium_lib.sim_engine.combat.combat import CombatSystem
 
 
 def _make_event_bus():
@@ -47,7 +47,7 @@ class TestInstigatorActivationCycle:
 
     def test_instigator_starts_hidden(self):
         """Instigators start in the hidden state."""
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -65,7 +65,7 @@ class TestInstigatorActivationCycle:
 
     def test_hidden_to_activating_after_8s(self):
         """After 8s in hidden, instigator transitions to activating."""
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -93,7 +93,7 @@ class TestInstigatorActivationCycle:
 
     def test_activating_to_active_after_2s(self):
         """After 2s in activating, instigator transitions to active."""
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -121,7 +121,7 @@ class TestInstigatorActivationCycle:
 
     def test_active_to_hidden_after_5s(self):
         """After 5s in active, instigator transitions back to hidden."""
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -150,7 +150,7 @@ class TestInstigatorActivationCycle:
 
     def test_full_cycle(self):
         """Full cycle: hidden(8s) -> activating(2s) -> active(5s) -> hidden."""
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -191,7 +191,7 @@ class TestInstigatorVisibility:
 
     def test_instigator_hidden_is_not_combatant_visual(self):
         """When hidden, instigator acts like civilian -- no combat."""
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -221,7 +221,7 @@ class TestRoverDeEscalation:
 
     def test_rover_converts_rioter_after_3s(self):
         """Rover near rioter for 3s should convert them to civilian."""
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -249,7 +249,7 @@ class TestRoverFiringCancelsDeEscalation:
 
     def test_rover_firing_resets_timer(self):
         """When rover fires, de-escalation timer should reset."""
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -327,7 +327,7 @@ class TestDroneNeverFiresCivilUnrest:
 
     def test_drone_tracks_but_no_fire(self):
         """In civil_unrest mode, drones should not fire at crowd targets."""
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -352,7 +352,7 @@ class TestScoutMarksInstigator:
 
     def test_scout_signals_active_instigator(self):
         """Scout drone should emit contact signal for active instigators."""
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         from engine.simulation.comms import UnitComms, SIGNAL_CONTACT
         bus = _make_event_bus()
         combat = CombatSystem(bus)
@@ -387,7 +387,7 @@ class TestVehicleContactDamage:
 
     def test_vehicle_contact_damage(self):
         """Hostile vehicle close to friendly should deal contact damage."""
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -407,5 +407,5 @@ class TestVehicleContactDamage:
         # Vehicle is within 3m (distance = 2m) -- should deal contact/melee damage
         beh._rioter_behavior(vehicle, friendlies)
         # The vehicle should use melee_strike type -- verify weapon type mapping
-        from engine.simulation.behaviors import _WEAPON_TYPES
+        from tritium_lib.sim_engine.behavior.behaviors import _WEAPON_TYPES
         assert "rioter" in _WEAPON_TYPES

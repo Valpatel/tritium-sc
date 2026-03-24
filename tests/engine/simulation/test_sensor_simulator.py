@@ -14,8 +14,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from engine.comms.event_bus import EventBus
-from engine.simulation.sensors import SensorDevice, SensorSimulator
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.world.sensors import SensorDevice, SensorSimulator
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 # ---------------------------------------------------------------------------

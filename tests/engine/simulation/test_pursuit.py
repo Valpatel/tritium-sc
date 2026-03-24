@@ -36,8 +36,8 @@ pytest.skip(
 from unittest.mock import MagicMock
 
 from engine.comms.event_bus import EventBus
-from engine.simulation.combat import CombatSystem
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.combat.combat import CombatSystem
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 # ---------------------------------------------------------------------------

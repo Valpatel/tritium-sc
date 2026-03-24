@@ -10,19 +10,19 @@ per-unit state, preventing memory leaks during long play sessions.
 import pytest
 
 from engine.simulation.morale import MoraleSystem
-from engine.simulation.weapons import WeaponSystem, Weapon
+from tritium_lib.sim_engine.combat.weapons import WeaponSystem, Weapon
 from engine.simulation.pursuit import PursuitSystem
 from engine.simulation.upgrades import UpgradeSystem
 from engine.simulation.hostile_commander import HostileCommander, Objective
-from engine.simulation.unit_missions import UnitMissionSystem
-from engine.simulation.behaviors import UnitBehaviors
-from engine.simulation.cover import CoverSystem
-from engine.simulation.vision import VisionSystem
+from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
+from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
+from tritium_lib.sim_engine.world.cover import CoverSystem
+from tritium_lib.sim_engine.world.vision import VisionSystem
 from engine.simulation.lod import LODSystem
 from engine.simulation.stats import StatsTracker
-from engine.simulation.squads import SquadManager
-from engine.simulation.npc import NPCManager, NPCMission
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.combat.squads import SquadManager
+from tritium_lib.sim_engine.behavior.npc import NPCManager, NPCMission
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 pytestmark = pytest.mark.unit
 

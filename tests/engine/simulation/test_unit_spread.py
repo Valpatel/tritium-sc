@@ -28,7 +28,7 @@ from engine.simulation.scenario import (
     WaveDefinition,
     spread_defenders,
 )
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 # ---------------------------------------------------------------------------

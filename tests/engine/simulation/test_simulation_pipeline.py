@@ -25,7 +25,7 @@ import pytest
 
 from engine.comms.event_bus import EventBus
 from engine.simulation.engine import SimulationEngine
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.tactical.target_tracker import TargetTracker, TrackedTarget
 
 # Robot template lives under examples/robot-template/ (hyphen in dir name).

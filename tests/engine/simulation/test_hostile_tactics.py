@@ -19,9 +19,9 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from engine.comms.event_bus import EventBus
-from engine.simulation.behaviors import UnitBehaviors
-from engine.simulation.combat import CombatSystem
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
+from tritium_lib.sim_engine.combat.combat import CombatSystem
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 # ---------------------------------------------------------------------------
@@ -410,7 +410,7 @@ class TestReconning:
 
     def test_reconning_state_exists_in_hostile_fsm(self):
         """The hostile FSM should include a 'reconning' state."""
-        from engine.simulation.unit_states import create_hostile_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
         fsm = create_hostile_fsm()
         assert "reconning" in fsm._states, (
             f"Expected 'reconning' state in hostile FSM, got: {list(fsm._states.keys())}"
@@ -419,7 +419,7 @@ class TestReconning:
     def test_hostile_enters_reconning_when_enemies_far(self):
         """Hostile transitions to reconning when enemies detected at long range
         but not yet in weapon range, and no stationary targets nearby."""
-        from engine.simulation.unit_states import create_hostile_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
         fsm = create_hostile_fsm()
         enemy = _make_turret(pos=(50.0, 0.0))
 
@@ -441,7 +441,7 @@ class TestReconning:
 
     def test_reconning_transitions_to_advancing_when_clear(self):
         """Hostile goes back to advancing when no enemies detected."""
-        from engine.simulation.unit_states import create_hostile_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
         fsm = create_hostile_fsm()
 
         # Get past spawning -> advancing
@@ -474,7 +474,7 @@ class TestReconning:
     def test_reconning_transitions_to_flanking_for_turret(self):
         """From reconning, hostile should transition to flanking if it detects
         a stationary turret within range."""
-        from engine.simulation.unit_states import create_hostile_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
         fsm = create_hostile_fsm()
 
         # spawning -> advancing
@@ -506,7 +506,7 @@ class TestReconning:
 
     def test_reconning_transitions_to_engaging_in_range(self):
         """From reconning, hostile transitions to engaging when in weapon range."""
-        from engine.simulation.unit_states import create_hostile_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
         fsm = create_hostile_fsm()
 
         # spawning -> advancing -> reconning
@@ -565,7 +565,7 @@ class TestSuppressing:
 
     def test_suppressing_state_exists_in_hostile_fsm(self):
         """The hostile FSM should include a 'suppressing' state."""
-        from engine.simulation.unit_states import create_hostile_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
         fsm = create_hostile_fsm()
         assert "suppressing" in fsm._states, (
             f"Expected 'suppressing' state in hostile FSM, got: {list(fsm._states.keys())}"
@@ -574,7 +574,7 @@ class TestSuppressing:
     def test_hostile_enters_suppressing_with_flanking_ally(self):
         """When another hostile is flanking, a nearby hostile with weapon range
         should enter suppressing state."""
-        from engine.simulation.unit_states import create_hostile_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
         fsm = create_hostile_fsm()
 
         enemy = _make_turret(pos=(0.0, 0.0))
@@ -595,7 +595,7 @@ class TestSuppressing:
 
     def test_suppressing_transitions_to_engaging_no_ally_flanking(self):
         """When no ally is flanking, suppressing hostile reverts to engaging."""
-        from engine.simulation.unit_states import create_hostile_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
         fsm = create_hostile_fsm()
 
         enemy = _make_turret(pos=(0.0, 0.0))
@@ -627,7 +627,7 @@ class TestSuppressing:
 
     def test_suppressing_flees_on_low_health(self):
         """Even while suppressing, hostile flees if health drops."""
-        from engine.simulation.unit_states import create_hostile_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
         fsm = create_hostile_fsm()
 
         enemy = _make_turret(pos=(0.0, 0.0))
@@ -710,7 +710,7 @@ class TestRetreatingUnderFire:
 
     def test_retreating_under_fire_state_exists(self):
         """The hostile FSM should include a 'retreating_under_fire' state."""
-        from engine.simulation.unit_states import create_hostile_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
         fsm = create_hostile_fsm()
         assert "retreating_under_fire" in fsm._states, (
             f"Expected 'retreating_under_fire' state, got: {list(fsm._states.keys())}"
@@ -719,7 +719,7 @@ class TestRetreatingUnderFire:
     def test_hostile_enters_retreating_under_fire_when_damaged_in_combat(self):
         """Hostile in engaging state transitions to retreating_under_fire
         when health drops below threshold and there are nearby cover options."""
-        from engine.simulation.unit_states import create_hostile_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
         fsm = create_hostile_fsm()
 
         enemy = _make_turret(pos=(0.0, 0.0))
@@ -751,7 +751,7 @@ class TestRetreatingUnderFire:
     def test_retreating_under_fire_falls_back_to_fleeing_no_cover(self):
         """When no cover is available, retreating_under_fire is skipped and
         hostile goes to fleeing instead."""
-        from engine.simulation.unit_states import create_hostile_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
         fsm = create_hostile_fsm()
 
         enemy = _make_turret(pos=(0.0, 0.0))
@@ -784,7 +784,7 @@ class TestRetreatingUnderFire:
         """If enemies leave while retreating and health recovers, hostile goes
         back to advancing. Note: if health is still below flee threshold,
         the advancing state immediately transitions to fleeing."""
-        from engine.simulation.unit_states import create_hostile_fsm
+        from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
         fsm = create_hostile_fsm()
 
         enemy = _make_turret(pos=(0.0, 0.0))

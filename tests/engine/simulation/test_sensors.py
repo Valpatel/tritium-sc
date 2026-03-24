@@ -31,7 +31,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from engine.simulation.sensors import SensorDevice, SensorSimulator
+from tritium_lib.sim_engine.world.sensors import SensorDevice, SensorSimulator
 
 
 # ---------------------------------------------------------------------------

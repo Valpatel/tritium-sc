@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .target import SimulationTarget
+    from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 # Signal types
 SIGNAL_DISTRESS = "distress"

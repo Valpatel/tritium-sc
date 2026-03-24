@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Query
 
-from engine.tactical.heatmap import HeatmapEngine, VALID_LAYERS
+from tritium_lib.tracking.heatmap import HeatmapEngine, VALID_LAYERS
 
 router = APIRouter(prefix="/api/heatmap", tags=["heatmap"])
 

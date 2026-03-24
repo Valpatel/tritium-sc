@@ -27,7 +27,7 @@ from unittest.mock import patch
 
 import pytest
 
-from engine.simulation.target import (
+from tritium_lib.sim_engine.core.entity import (
     SimulationTarget,
     _COMBAT_PROFILES,
     _DRAIN_RATES,

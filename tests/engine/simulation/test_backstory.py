@@ -24,7 +24,7 @@ import pytest
 # Target under test (will fail on import until implemented)
 from engine.simulation.backstory import BackstoryGenerator
 
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.comms.event_bus import EventBus
 
 

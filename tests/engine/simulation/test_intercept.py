@@ -451,9 +451,9 @@ class TestBehaviorIntegrationLeadTargeting:
 
     def test_turret_fires_with_aim_pos(self):
         """Turret behavior should compute a lead point and pass aim_pos to fire()."""
-        from engine.simulation.combat import CombatSystem
-        from engine.simulation.behaviors import UnitBehaviors
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
 
         bus = _SimpleEventBus()
         combat = CombatSystem(bus)
@@ -488,9 +488,9 @@ class TestBehaviorIntegrationLeadTargeting:
 
     def test_rover_heading_points_to_intercept(self):
         """Rover behavior should aim heading toward predicted intercept point."""
-        from engine.simulation.combat import CombatSystem
-        from engine.simulation.behaviors import UnitBehaviors
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
 
         bus = _SimpleEventBus()
         combat = CombatSystem(bus)
@@ -529,9 +529,9 @@ class TestBehaviorIntegrationLeadTargeting:
 
     def test_drone_fires_with_lead(self):
         """Drone behavior should use lead targeting when firing."""
-        from engine.simulation.combat import CombatSystem
-        from engine.simulation.behaviors import UnitBehaviors
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
 
         bus = _SimpleEventBus()
         combat = CombatSystem(bus)

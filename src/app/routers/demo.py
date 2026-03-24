@@ -81,6 +81,9 @@ async def demo_start(request: Request):
 
     controller.start()
 
+    # NOTE: Demo asset seeding is handled by DemoController.start() internally
+    # via DemoController._seed_demo_assets(). No need to seed again here.
+
     # Auto-load terrain layer if cached data exists
     _try_load_terrain(request)
 
@@ -272,3 +275,10 @@ def _try_load_terrain(request: Request) -> None:
 
     except Exception as e:
         logger.debug("Terrain auto-load skipped: %s", e)
+
+
+
+# NOTE: _DEMO_ASSETS and _seed_demo_assets() are owned by
+# engine.synthetic.demo_mode.DemoController — the canonical source for
+# demo asset definitions and database seeding.  Removed from this router
+# to eliminate duplication.  DemoController.start() handles seeding.

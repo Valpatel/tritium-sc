@@ -9,8 +9,8 @@ import time
 
 import pytest
 
-from engine.simulation.spatial import SpatialGrid
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.spatial import SpatialGrid
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 pytestmark = pytest.mark.unit

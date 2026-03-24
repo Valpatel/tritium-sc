@@ -28,7 +28,7 @@ pytest.skip(
     allow_module_level=True,
 )
 
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.simulation.morale import MoraleSystem
 
 pytestmark = pytest.mark.unit

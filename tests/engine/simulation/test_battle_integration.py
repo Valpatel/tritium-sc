@@ -30,9 +30,9 @@ from engine.simulation.battle_integration import (
     default_combat_rules,
 )
 from engine.simulation.engine import SimulationEngine
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.tactical.correlator import TargetCorrelator
-from engine.tactical.dossier import DossierStore
+from tritium_lib.tracking.dossier import DossierStore
 from engine.tactical.geofence import GeofenceEngine, GeoZone
 from engine.tactical.investigation import InvestigationEngine
 from engine.tactical.target_tracker import TargetTracker

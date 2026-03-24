@@ -29,7 +29,7 @@ pytest.skip(
 
 from engine.comms.event_bus import EventBus
 from engine.simulation.comms import Signal, UnitComms
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 pytestmark = pytest.mark.unit
@@ -746,5 +746,5 @@ class TestCoordinatorCommsWiring:
 # ---------------------------------------------------------------------------
 
 def _make_combat(bus: EventBus):
-    from engine.simulation.combat import CombatSystem
+    from tritium_lib.sim_engine.combat.combat import CombatSystem
     return CombatSystem(bus)

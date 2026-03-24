@@ -6,12 +6,12 @@
 import math
 import pytest
 
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.simulation.terrain import TerrainMap
-from engine.simulation.spatial import SpatialGrid
-from engine.simulation.combat import CombatSystem
-from engine.simulation.behaviors import UnitBehaviors
-from engine.simulation.vision import SightingReport, VisibilityState, VisionSystem
+from tritium_lib.sim_engine.core.spatial import SpatialGrid
+from tritium_lib.sim_engine.combat.combat import CombatSystem
+from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
+from tritium_lib.sim_engine.world.vision import SightingReport, VisibilityState, VisionSystem
 
 
 # ---------------------------------------------------------------------------

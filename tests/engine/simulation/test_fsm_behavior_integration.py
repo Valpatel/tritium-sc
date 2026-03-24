@@ -14,9 +14,9 @@ import pytest
 from unittest.mock import MagicMock
 
 from engine.simulation.engine import SimulationEngine
-from engine.simulation.target import SimulationTarget
-from engine.simulation.state_machine import State, StateMachine, Transition
-from engine.simulation.unit_states import (
+from tritium_lib.sim_engine.core.entity import SimulationTarget
+from tritium_lib.sim_engine.core.state_machine import State, StateMachine, Transition
+from tritium_lib.sim_engine.behavior.unit_states import (
     create_turret_fsm,
     create_rover_fsm,
     create_drone_fsm,
@@ -398,12 +398,12 @@ class TestFSMDrivenBehavior:
 
     def _make_combat(self):
         """Create CombatSystem with mock EventBus."""
-        from engine.simulation.combat import CombatSystem
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
         bus = _make_bus()
         return CombatSystem(bus)
 
     def _make_behaviors(self):
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         return UnitBehaviors(self._make_combat())
 
     def test_turret_fires_in_engaging_state(self):

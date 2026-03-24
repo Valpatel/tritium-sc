@@ -20,7 +20,7 @@ from engine.simulation.upgrades import (
     Upgrade,
     UpgradeSystem,
 )
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 pytestmark = pytest.mark.unit

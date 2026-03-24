@@ -12,7 +12,7 @@ import math
 import pytest
 from unittest.mock import MagicMock
 
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 def _make_target(tid, x, y, alliance="hostile", asset_type="person",

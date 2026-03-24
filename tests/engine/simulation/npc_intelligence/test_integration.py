@@ -8,7 +8,7 @@ import time
 import pytest
 
 from engine.comms.event_bus import EventBus
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.simulation.npc_intelligence.brain import NPCBrain, NPCPersonality, NPCMemory
 from engine.simulation.npc_intelligence.npc_fsm import create_npc_fsm
 from engine.simulation.npc_intelligence.event_reactor import EventReactor

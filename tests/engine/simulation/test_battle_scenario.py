@@ -20,7 +20,7 @@ from engine.simulation.scenario import (
     WaveDefinition,
     load_battle_scenario,
 )
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.simulation.engine import SimulationEngine
 
 

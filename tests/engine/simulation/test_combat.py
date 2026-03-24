@@ -12,8 +12,8 @@ import time
 
 import pytest
 
-from engine.simulation.target import SimulationTarget, _COMBAT_PROFILES, _profile_key
-from engine.simulation.combat import CombatSystem, Projectile, HIT_RADIUS, MISS_OVERSHOOT
+from tritium_lib.sim_engine.core.entity import SimulationTarget, _COMBAT_PROFILES, _profile_key
+from tritium_lib.sim_engine.combat.combat import CombatSystem, Projectile, HIT_RADIUS, MISS_OVERSHOOT
 
 
 class SimpleEventBus:
@@ -431,7 +431,7 @@ class TestCombatSystemTick:
         )
         # Target very close — will be hit immediately
         # Empty inventory to test raw combat damage without armor
-        from engine.simulation.inventory import UnitInventory
+        from tritium_lib.sim_engine.core.inventory import UnitInventory
         target = SimulationTarget(
             target_id="h1", name="Hostile", alliance="hostile",
             asset_type="person", position=(1.0, 0.0), health=100.0,
@@ -1210,7 +1210,7 @@ class TestMortarIndirectFire:
 
     def test_mortar_to_dict_includes_arc_fields(self):
         """Mortar projectile to_dict includes is_mortar, z_height, arc_peak."""
-        from engine.simulation.combat import Projectile
+        from tritium_lib.sim_engine.combat.combat import Projectile
         proj = Projectile(
             id="test", source_id="t1", source_name="Turret",
             target_id="h1", position=(0.0, 0.0), target_pos=(50.0, 0.0),
@@ -1225,7 +1225,7 @@ class TestMortarIndirectFire:
 
     def test_non_mortar_to_dict_excludes_arc_fields(self):
         """Non-mortar projectile to_dict does not include arc fields."""
-        from engine.simulation.combat import Projectile
+        from tritium_lib.sim_engine.combat.combat import Projectile
         proj = Projectile(
             id="test", source_id="r1", source_name="Rover",
             target_id="h1", position=(0.0, 0.0), target_pos=(50.0, 0.0),

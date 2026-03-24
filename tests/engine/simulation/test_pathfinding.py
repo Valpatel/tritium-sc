@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 import networkx as nx
 import pytest
 
-from engine.simulation.pathfinding import plan_path
+from tritium_lib.sim_engine.world.pathfinding import plan_path
 from engine.tactical.obstacles import BuildingObstacles
 from engine.tactical.street_graph import StreetGraph
 

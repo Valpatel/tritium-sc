@@ -39,7 +39,7 @@ class FakeTracker:
 def setup():
     eb = FakeEventBus()
     tt = FakeTracker()
-    from engine.tactical.dwell_tracker import DwellTracker
+    from tritium_lib.tracking.dwell_tracker import DwellTracker
     dt = DwellTracker(eb, tt, threshold_s=5.0, radius_m=10.0)
     return dt, eb, tt
 

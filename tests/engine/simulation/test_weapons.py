@@ -19,8 +19,8 @@ import threading
 
 import pytest
 
-from engine.simulation.target import SimulationTarget
-from engine.simulation.weapons import (
+from tritium_lib.sim_engine.core.entity import SimulationTarget
+from tritium_lib.sim_engine.combat.weapons import (
     Weapon,
     WeaponSystem,
     _DEFAULT_WEAPONS,
@@ -427,7 +427,7 @@ class TestBackwardCompat:
 
     def test_combat_works_without_weapon_system(self):
         """Existing behavior: CombatSystem uses source target fields for damage/speed."""
-        from engine.simulation.combat import CombatSystem
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
 
         bus = SimpleEventBus()
         combat = CombatSystem(bus)
@@ -439,7 +439,7 @@ class TestBackwardCompat:
             weapon_cooldown=1.0, last_fired=0.0,
         )
         # Empty inventory to test raw damage without armor reduction
-        from engine.simulation.inventory import UnitInventory
+        from tritium_lib.sim_engine.core.inventory import UnitInventory
         target = SimulationTarget(
             target_id="h1", name="Hostile", alliance="hostile",
             asset_type="person", position=(1.0, 0.0), health=100.0,
@@ -457,7 +457,7 @@ class TestBackwardCompat:
 
     def test_combat_without_weapon_system_uses_default_speed(self):
         """Without weapon_system, projectile speed should be 80.0."""
-        from engine.simulation.combat import CombatSystem
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
 
         bus = SimpleEventBus()
         combat = CombatSystem(bus)

@@ -70,7 +70,7 @@ class ModelEvaluator:
         'Respond in JSON: {"reason": "...", "urgency": "high|medium|low"}'
     )
 
-    def __init__(self, ollama_host: str = "http://localhost:11434") -> None:
+    def __init__(self, ollama_host: str = "http://localhost:8081") -> None:
         self._host = ollama_host
         self._cache: dict[str, dict] = {}
 
@@ -180,23 +180,36 @@ class ModelEvaluator:
 
         start = time.monotonic()
         try:
+            # Use OpenAI-compatible API (llama-server) or ollama legacy
+            is_llama = any(p in self._host for p in [":8081", ":8082", ":8083"])
+            endpoint = "/v1/chat/completions" if is_llama else "/api/chat"
+            body = {
+                "model": model_name,
+                "messages": [
+                    {"role": "system", "content": "Respond with valid JSON only."},
+                    {"role": "user", "content": self.TEST_PROMPT},
+                ],
+            }
+            if is_llama:
+                body["max_tokens"] = 256
+                body["temperature"] = 0.7
+            else:
+                body["stream"] = False
+                body["options"] = {"temperature": 0.7, "num_predict": 256}
+
             resp = requests.post(
-                f"{self._host}/api/chat",
-                json={
-                    "model": model_name,
-                    "messages": [
-                        {"role": "system", "content": "Respond with valid JSON only."},
-                        {"role": "user", "content": self.TEST_PROMPT},
-                    ],
-                    "stream": False,
-                    "options": {"temperature": 0.7, "num_predict": 256},
-                },
+                f"{self._host}{endpoint}",
+                json=body,
                 timeout=60,
             )
             elapsed = time.monotonic() - start
             resp.raise_for_status()
             data = resp.json()
-            text = data.get("message", {}).get("content", "")
+            if is_llama:
+                choices = data.get("choices", [])
+                text = choices[0]["message"]["content"] if choices else ""
+            else:
+                text = data.get("message", {}).get("content", "")
 
             # Try parsing JSON
             json_valid = False
@@ -279,12 +292,16 @@ class ModelEvaluator:
         max_idx = size_order.index(max_size) if max_size in size_order else 3
 
         try:
-            resp = requests.get(f"{self._host}/api/tags", timeout=3)
+            # Try llama-server /v1/models first, then ollama /api/tags
+            is_llama = any(p in self._host for p in [":8081", ":8082", ":8083"])
+            endpoint = "/v1/models" if is_llama else "/api/tags"
+            resp = requests.get(f"{self._host}{endpoint}", timeout=3)
             if resp.status_code == 200:
                 data = resp.json()
+                raw_models = data.get("data", []) if is_llama else data.get("models", [])
                 models = []
-                for m in data.get("models", []):
-                    name = m["name"]
+                for m in raw_models:
+                    name = m.get("id", m.get("name", "")) if is_llama else m["name"]
                     cat = categorize_model(name)
                     if size_order.index(cat) <= max_idx:
                         # Skip vision-only models

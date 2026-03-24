@@ -18,7 +18,7 @@ from engine.simulation.ambient import (
     _DEFAULT_MAP_BOUNDS,
     _NEIGHBOR_NAMES,
 )
-from engine.simulation.target import SimulationTarget, _DRAIN_RATES
+from tritium_lib.sim_engine.core.entity import SimulationTarget, _DRAIN_RATES
 
 pytestmark = pytest.mark.unit
 

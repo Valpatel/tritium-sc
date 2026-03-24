@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from engine.tactical.target_reappearance import (
+from tritium_lib.tracking.target_reappearance import (
     TargetReappearanceMonitor,
     DepartureRecord,
     ReappearanceEvent,

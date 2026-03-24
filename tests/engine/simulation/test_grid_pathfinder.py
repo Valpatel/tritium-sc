@@ -73,32 +73,32 @@ def _path_enters_building(path, terrain_map):
 
 class TestMovementProfiles:
     def test_profiles_exist(self):
-        from engine.simulation.grid_pathfinder import PROFILES
+        from tritium_lib.sim_engine.world.grid_pathfinder import PROFILES
         assert "pedestrian" in PROFILES
         assert "light_vehicle" in PROFILES
         assert "heavy_vehicle" in PROFILES
         assert "aerial" in PROFILES
 
     def test_pedestrian_can_enter_buildings_at_high_cost(self):
-        from engine.simulation.grid_pathfinder import PROFILES
+        from tritium_lib.sim_engine.world.grid_pathfinder import PROFILES
         p = PROFILES["pedestrian"]
         assert p.building < 999.0  # passable but expensive
         assert p.building > 5.0    # much more costly than open terrain
 
     def test_light_vehicle_cannot_enter_buildings(self):
-        from engine.simulation.grid_pathfinder import PROFILES
+        from tritium_lib.sim_engine.world.grid_pathfinder import PROFILES
         p = PROFILES["light_vehicle"]
         assert p.building >= 999.0  # effectively impassable
 
     def test_heavy_vehicle_roads_only(self):
-        from engine.simulation.grid_pathfinder import PROFILES
+        from tritium_lib.sim_engine.world.grid_pathfinder import PROFILES
         p = PROFILES["heavy_vehicle"]
         assert p.road < 1.0        # fast on roads
         assert p.yard >= 999.0     # cannot go off-road
         assert p.building >= 999.0
 
     def test_aerial_low_cost_everywhere(self):
-        from engine.simulation.grid_pathfinder import PROFILES
+        from tritium_lib.sim_engine.world.grid_pathfinder import PROFILES
         p = PROFILES["aerial"]
         assert p.road <= 1.5
         assert p.yard <= 1.5
@@ -113,31 +113,31 @@ class TestMovementProfiles:
 
 class TestProfileForUnit:
     def test_hostile_person_is_pedestrian(self):
-        from engine.simulation.grid_pathfinder import profile_for_unit
+        from tritium_lib.sim_engine.world.grid_pathfinder import profile_for_unit
         assert profile_for_unit("person", "hostile") == "pedestrian"
 
     def test_rover_is_light_vehicle(self):
-        from engine.simulation.grid_pathfinder import profile_for_unit
+        from tritium_lib.sim_engine.world.grid_pathfinder import profile_for_unit
         assert profile_for_unit("rover", "friendly") == "light_vehicle"
 
     def test_apc_is_light_vehicle(self):
-        from engine.simulation.grid_pathfinder import profile_for_unit
+        from tritium_lib.sim_engine.world.grid_pathfinder import profile_for_unit
         assert profile_for_unit("apc", "friendly") == "light_vehicle"
 
     def test_tank_is_heavy_vehicle(self):
-        from engine.simulation.grid_pathfinder import profile_for_unit
+        from tritium_lib.sim_engine.world.grid_pathfinder import profile_for_unit
         assert profile_for_unit("tank", "friendly") == "heavy_vehicle"
 
     def test_drone_is_aerial(self):
-        from engine.simulation.grid_pathfinder import profile_for_unit
+        from tritium_lib.sim_engine.world.grid_pathfinder import profile_for_unit
         assert profile_for_unit("drone", "friendly") == "aerial"
 
     def test_scout_drone_is_aerial(self):
-        from engine.simulation.grid_pathfinder import profile_for_unit
+        from tritium_lib.sim_engine.world.grid_pathfinder import profile_for_unit
         assert profile_for_unit("scout_drone", "friendly") == "aerial"
 
     def test_unknown_type_falls_back_to_pedestrian(self):
-        from engine.simulation.grid_pathfinder import profile_for_unit
+        from tritium_lib.sim_engine.world.grid_pathfinder import profile_for_unit
         result = profile_for_unit("unknown_thing", "neutral")
         assert result == "pedestrian"
 
@@ -149,7 +149,7 @@ class TestProfileForUnit:
 class TestGridFindPath:
     def test_trivial_straight_line(self):
         """No obstacles — path goes roughly direct."""
-        from engine.simulation.grid_pathfinder import grid_find_path
+        from tritium_lib.sim_engine.world.grid_pathfinder import grid_find_path
         tm = TerrainMap(map_bounds=50.0, resolution=5.0)
         path = grid_find_path(tm, (-20.0, -20.0), (20.0, -20.0), "light_vehicle")
         assert path is not None
@@ -160,7 +160,7 @@ class TestGridFindPath:
 
     def test_routes_around_building_wall(self):
         """Building wall across middle — path must go around."""
-        from engine.simulation.grid_pathfinder import grid_find_path
+        from tritium_lib.sim_engine.world.grid_pathfinder import grid_find_path
         tm = _make_terrain_with_building_wall()
         # Go from south to north — direct path blocked by wall at y=0
         path = grid_find_path(tm, (0.0, -20.0), (0.0, 20.0), "light_vehicle")
@@ -170,7 +170,7 @@ class TestGridFindPath:
 
     def test_pedestrian_avoids_buildings_by_default(self):
         """Pedestrians should route around buildings even though they CAN enter."""
-        from engine.simulation.grid_pathfinder import grid_find_path
+        from tritium_lib.sim_engine.world.grid_pathfinder import grid_find_path
         tm = _make_terrain_with_building_wall()
         path = grid_find_path(tm, (0.0, -20.0), (0.0, 20.0), "pedestrian")
         assert path is not None
@@ -179,7 +179,7 @@ class TestGridFindPath:
 
     def test_heavy_vehicle_uses_roads(self):
         """Heavy vehicle (tank) can only travel on roads."""
-        from engine.simulation.grid_pathfinder import grid_find_path
+        from tritium_lib.sim_engine.world.grid_pathfinder import grid_find_path
         tm = _make_terrain_with_roads()
         # Start and end on roads
         path = grid_find_path(tm, (-40.0, 20.0), (20.0, -40.0), "heavy_vehicle")
@@ -191,7 +191,7 @@ class TestGridFindPath:
 
     def test_aerial_takes_short_path(self):
         """Aerial units can fly over buildings — path should be shorter."""
-        from engine.simulation.grid_pathfinder import grid_find_path
+        from tritium_lib.sim_engine.world.grid_pathfinder import grid_find_path
         tm = _make_terrain_with_building_wall()
         vehicle_path = grid_find_path(tm, (0.0, -20.0), (0.0, 20.0), "light_vehicle")
         aerial_path = grid_find_path(tm, (0.0, -20.0), (0.0, 20.0), "aerial")
@@ -206,7 +206,7 @@ class TestGridFindPath:
 
     def test_start_equals_end(self):
         """Start == end should return a single-point path."""
-        from engine.simulation.grid_pathfinder import grid_find_path
+        from tritium_lib.sim_engine.world.grid_pathfinder import grid_find_path
         tm = TerrainMap(map_bounds=50.0, resolution=5.0)
         path = grid_find_path(tm, (10.0, 10.0), (10.0, 10.0), "pedestrian")
         assert path is not None
@@ -214,7 +214,7 @@ class TestGridFindPath:
 
     def test_circuit_breaker(self):
         """A* should give up after max_iterations and return None or best-effort."""
-        from engine.simulation.grid_pathfinder import grid_find_path
+        from tritium_lib.sim_engine.world.grid_pathfinder import grid_find_path
         # Create a large open map with very low max_iterations
         tm = TerrainMap(map_bounds=200.0, resolution=5.0)
         # Very far apart, very low iteration budget
@@ -225,7 +225,7 @@ class TestGridFindPath:
 
     def test_no_path_possible(self):
         """Completely walled-off destination should return None."""
-        from engine.simulation.grid_pathfinder import grid_find_path
+        from tritium_lib.sim_engine.world.grid_pathfinder import grid_find_path
         tm = TerrainMap(map_bounds=50.0, resolution=5.0)
         # Surround (20, 20) with buildings
         for x in range(15, 26, 5):
@@ -236,7 +236,7 @@ class TestGridFindPath:
 
     def test_returns_world_coordinates(self):
         """Path waypoints should be in world coordinates, not grid indices."""
-        from engine.simulation.grid_pathfinder import grid_find_path
+        from tritium_lib.sim_engine.world.grid_pathfinder import grid_find_path
         tm = TerrainMap(map_bounds=50.0, resolution=5.0)
         path = grid_find_path(tm, (-20.0, 0.0), (20.0, 0.0), "pedestrian")
         assert path is not None
@@ -249,7 +249,7 @@ class TestGridFindPath:
 
     def test_diagonal_movement(self):
         """Path should use diagonal moves for efficiency."""
-        from engine.simulation.grid_pathfinder import grid_find_path
+        from tritium_lib.sim_engine.world.grid_pathfinder import grid_find_path
         tm = TerrainMap(map_bounds=50.0, resolution=5.0)
         path = grid_find_path(tm, (-20.0, -20.0), (20.0, 20.0), "pedestrian")
         assert path is not None
@@ -266,7 +266,7 @@ class TestGridFindPath:
 
 class TestSmoothPath:
     def test_removes_collinear_points(self):
-        from engine.simulation.grid_pathfinder import smooth_path
+        from tritium_lib.sim_engine.world.grid_pathfinder import smooth_path
         # 5 points all on a straight line
         path = [(0, 0), (5, 0), (10, 0), (15, 0), (20, 0)]
         smoothed = smooth_path(path)
@@ -276,7 +276,7 @@ class TestSmoothPath:
         assert smoothed[-1] == (20, 0)
 
     def test_preserves_corners(self):
-        from engine.simulation.grid_pathfinder import smooth_path
+        from tritium_lib.sim_engine.world.grid_pathfinder import smooth_path
         # L-shaped path: right then up
         path = [(0, 0), (5, 0), (10, 0), (10, 5), (10, 10)]
         smoothed = smooth_path(path)
@@ -287,15 +287,15 @@ class TestSmoothPath:
         assert smoothed[-1] == (10, 10)
 
     def test_empty_path(self):
-        from engine.simulation.grid_pathfinder import smooth_path
+        from tritium_lib.sim_engine.world.grid_pathfinder import smooth_path
         assert smooth_path([]) == []
 
     def test_single_point(self):
-        from engine.simulation.grid_pathfinder import smooth_path
+        from tritium_lib.sim_engine.world.grid_pathfinder import smooth_path
         assert smooth_path([(5, 5)]) == [(5, 5)]
 
     def test_two_points(self):
-        from engine.simulation.grid_pathfinder import smooth_path
+        from tritium_lib.sim_engine.world.grid_pathfinder import smooth_path
         assert smooth_path([(0, 0), (10, 10)]) == [(0, 0), (10, 10)]
 
 
@@ -345,7 +345,7 @@ class TestTerrainGetCost:
 class TestGridPathfinderIntegration:
     def test_light_vehicle_avoids_center_building(self):
         """Rover routes around a building block in the center."""
-        from engine.simulation.grid_pathfinder import grid_find_path
+        from tritium_lib.sim_engine.world.grid_pathfinder import grid_find_path
         tm = _make_terrain_with_roads()
         path = grid_find_path(tm, (-30.0, -30.0), (30.0, 30.0), "light_vehicle")
         assert path is not None
@@ -354,7 +354,7 @@ class TestGridPathfinderIntegration:
     def test_path_performance_budget(self):
         """A* on 81x81 grid should complete in < 5ms for typical paths."""
         import time
-        from engine.simulation.grid_pathfinder import grid_find_path
+        from tritium_lib.sim_engine.world.grid_pathfinder import grid_find_path
         tm = _make_terrain_with_building_wall()
         start = time.perf_counter()
         for _ in range(10):
@@ -364,7 +364,7 @@ class TestGridPathfinderIntegration:
 
     def test_multiple_profiles_same_terrain(self):
         """Different profiles should produce different paths on the same terrain."""
-        from engine.simulation.grid_pathfinder import grid_find_path
+        from tritium_lib.sim_engine.world.grid_pathfinder import grid_find_path
         tm = _make_terrain_with_roads()
         heavy_path = grid_find_path(tm, (-40.0, 20.0), (20.0, -40.0), "heavy_vehicle")
         light_path = grid_find_path(tm, (-40.0, 20.0), (20.0, -40.0), "light_vehicle")

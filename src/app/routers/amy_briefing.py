@@ -114,7 +114,8 @@ def _try_ollama_briefing(context: dict) -> str | None:
 
     Returns the generated text, or None if Ollama is unavailable.
     """
-    ollama_url = "http://localhost:11434/api/generate"
+    # Use llama-server (OpenAI-compatible) on port 8081
+    llm_url = "http://localhost:8081/v1/chat/completions"
 
     # Build a compact context summary for the LLM
     summary_parts = []
@@ -164,24 +165,22 @@ Write the briefing now. Start with "DAILY BRIEFING" and the current date/time.""
 
     payload = json.dumps({
         "model": "qwen2.5:7b",
-        "prompt": prompt,
-        "stream": False,
-        "options": {
-            "temperature": 0.7,
-            "num_predict": 512,
-        },
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 512,
+        "temperature": 0.7,
     }).encode("utf-8")
 
     try:
         req = urllib.request.Request(
-            ollama_url,
+            llm_url,
             data=payload,
             headers={"Content-Type": "application/json"},
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-            return data.get("response", "").strip()
+            choices = data.get("choices", [])
+            return choices[0]["message"]["content"].strip() if choices else None
     except (urllib.error.URLError, TimeoutError, Exception):
         return None
 

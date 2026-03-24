@@ -217,22 +217,21 @@ async def _query_ollama(prompt: str, model: str) -> str:
     """Query local Ollama instance for anomaly description."""
     import httpx
 
+    # Use llama-server (OpenAI-compatible) on port 8081
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
-            "http://localhost:11434/api/generate",
+            "http://localhost:8081/v1/chat/completions",
             json={
                 "model": model,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.3,
-                    "num_predict": 150,
-                },
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 150,
+                "temperature": 0.3,
             },
         )
         response.raise_for_status()
         data = response.json()
-        return data.get("response", "").strip()
+        choices = data.get("choices", [])
+        return choices[0]["message"]["content"].strip() if choices else ""
 
 
 def _classify_severity(anomaly_type: str, context: dict[str, Any]) -> str:

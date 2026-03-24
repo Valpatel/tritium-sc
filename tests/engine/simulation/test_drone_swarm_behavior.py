@@ -11,8 +11,8 @@ import time
 import pytest
 from unittest.mock import MagicMock, patch
 
-from engine.simulation.target import SimulationTarget
-from engine.simulation.combat import CombatSystem
+from tritium_lib.sim_engine.core.entity import SimulationTarget
+from tritium_lib.sim_engine.combat.combat import CombatSystem
 
 
 def _make_event_bus():
@@ -49,7 +49,7 @@ class TestBomberDiveSequence:
     """Test 17: Within 40m: diving state, altitude decreases 10m/s, speed halves."""
 
     def test_bomber_enters_diving_state_within_40m(self):
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -73,7 +73,7 @@ class TestBomberDiveSequence:
         assert bomber.instigator_state == "diving"
 
     def test_bomber_altitude_decreases_during_dive(self):
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -99,7 +99,7 @@ class TestBomberDiveSequence:
         assert bomber.altitude == pytest.approx(initial_alt - 1.0, abs=0.5)
 
     def test_bomber_speed_halved_during_dive(self):
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -128,7 +128,7 @@ class TestBomberKilledDuringDive:
     """Test 18: Eliminated during dive: no detonation damage."""
 
     def test_eliminated_bomber_no_detonation(self):
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -236,7 +236,7 @@ class TestAttackDroneStrafeRun:
     """Test 21: Attack drone approaches, fires, retreats."""
 
     def test_attack_drone_fires_at_target(self):
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -260,7 +260,7 @@ class TestAttackDroneStrafeRun:
         # Attack drone in range should fire
         beh._hostile_kid_behavior(attack_drone, friendlies)
         # The weapon type should be set for attack_swarm
-        from engine.simulation.behaviors import _WEAPON_TYPES
+        from tritium_lib.sim_engine.behavior.behaviors import _WEAPON_TYPES
         assert "attack_swarm" in _WEAPON_TYPES
 
 
@@ -268,7 +268,7 @@ class TestScoutDroneMarking:
     """Test 22: Scout in range emits SIGNAL_CONTACT for attack drones."""
 
     def test_scout_emits_signal_when_in_range(self):
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         from engine.simulation.comms import UnitComms, SIGNAL_CONTACT
         bus = _make_event_bus()
         combat = CombatSystem(bus)
@@ -300,7 +300,7 @@ class TestDroneAltitudeMatching:
     """Test 23: Friendly drone adjusts altitude to match hostile."""
 
     def test_friendly_drone_matches_hostile_altitude(self):
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -326,7 +326,7 @@ class TestMissileTurretPriorityAerial:
     """Test 24: Targets aerial before ground in drone swarm mode."""
 
     def test_missile_turret_prefers_aerial(self):
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -380,7 +380,7 @@ class TestEmpDisabledDroneFalls:
 
     def test_disabled_drone_altitude_loss(self):
         """Disabled drone should lose altitude."""
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -496,7 +496,7 @@ class TestAmmoDepletion:
     """Test 31: Missile turret fires 20, ammo reaches 0, can't fire."""
 
     def test_ammo_depletes_after_20_shots(self):
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         bus = _make_event_bus()
         combat = CombatSystem(bus)
         beh = UnitBehaviors(combat)
@@ -559,7 +559,7 @@ class TestEffectiveRange3D:
 
     def test_ground_targets_no_penalty(self):
         """Ground targets (altitude <= 5) have no range penalty."""
-        from engine.simulation.behaviors import _effective_range_3d
+        from tritium_lib.sim_engine.behavior.behaviors import _effective_range_3d
         # Ground attacker vs ground target: no penalty
         result = _effective_range_3d(
             attacker_altitude=0.0, target_altitude=0.0,
@@ -569,7 +569,7 @@ class TestEffectiveRange3D:
 
     def test_aa_penalty_for_non_missile_turret(self):
         """Non-missile turrets get 40% range reduction vs aerial targets."""
-        from engine.simulation.behaviors import _effective_range_3d
+        from tritium_lib.sim_engine.behavior.behaviors import _effective_range_3d
         result = _effective_range_3d(
             attacker_altitude=0.0, target_altitude=30.0,
             weapon_range=80.0, attacker_type="turret",
@@ -578,7 +578,7 @@ class TestEffectiveRange3D:
 
     def test_missile_turret_no_aa_penalty(self):
         """Missile turrets are exempt from AA penalty."""
-        from engine.simulation.behaviors import _effective_range_3d
+        from tritium_lib.sim_engine.behavior.behaviors import _effective_range_3d
         result = _effective_range_3d(
             attacker_altitude=0.0, target_altitude=30.0,
             weapon_range=150.0, attacker_type="missile_turret",
@@ -587,7 +587,7 @@ class TestEffectiveRange3D:
 
     def test_air_to_air_no_penalty(self):
         """Aerial attacker vs aerial target: no penalty."""
-        from engine.simulation.behaviors import _effective_range_3d
+        from tritium_lib.sim_engine.behavior.behaviors import _effective_range_3d
         result = _effective_range_3d(
             attacker_altitude=30.0, target_altitude=35.0,
             weapon_range=50.0, attacker_type="drone",

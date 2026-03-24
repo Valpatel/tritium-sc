@@ -12,7 +12,7 @@ import time
 import queue
 import pytest
 
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.simulation.hostile_commander import HostileCommander
 from engine.comms.event_bus import EventBus
 

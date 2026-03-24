@@ -434,7 +434,7 @@ class TestDifficultyGameModeIntegration:
 
     def _make_game_mode(self, with_friendlies=False):
         """Create a GameMode with a SimpleEventBus and mock engine."""
-        from engine.simulation.combat import CombatSystem
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
         from engine.simulation.game_mode import GameMode
 
         bus = SimpleEventBus()
@@ -498,7 +498,7 @@ class TestDifficultyWiringWaveComplete:
     """_on_wave_complete() calls difficulty.record_wave() with correct stats."""
 
     def _make_game_mode(self):
-        from engine.simulation.combat import CombatSystem
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
         from engine.simulation.game_mode import GameMode
 
         bus = SimpleEventBus()
@@ -579,7 +579,7 @@ class TestDifficultyWiringSpawn:
     """_spawn_wave_hostiles() applies difficulty adjustments to spawned units."""
 
     def _make_game_mode(self):
-        from engine.simulation.combat import CombatSystem
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
         from engine.simulation.game_mode import GameMode
 
         bus = SimpleEventBus()
@@ -665,7 +665,7 @@ class TestDifficultyWiringMixed:
     """_spawn_mixed_wave() also applies difficulty adjustments."""
 
     def _make_game_mode(self):
-        from engine.simulation.combat import CombatSystem
+        from tritium_lib.sim_engine.combat.combat import CombatSystem
         from engine.simulation.game_mode import GameMode
 
         bus = SimpleEventBus()
@@ -712,7 +712,7 @@ class _MockEngine:
         return list(self._targets)
 
     def add_friendly(self, target_id: str, max_health: float = 100.0) -> None:
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id=target_id,
             name=target_id,
@@ -728,7 +728,7 @@ class _MockEngine:
         self._targets.append(t)
 
     def spawn_hostile(self, **kwargs):
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         tid = f"h-{self._hostile_counter}"
         self._hostile_counter += 1
         t = SimulationTarget(

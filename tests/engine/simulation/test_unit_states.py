@@ -21,8 +21,8 @@ from __future__ import annotations
 
 import pytest
 
-from engine.simulation.state_machine import State, StateMachine
-from engine.simulation.unit_states import (
+from tritium_lib.sim_engine.core.state_machine import State, StateMachine
+from tritium_lib.sim_engine.behavior.unit_states import (
     create_drone_fsm,
     create_fsm_for_type,
     create_hostile_fsm,

@@ -7,10 +7,10 @@ import math
 import time
 import pytest
 
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.simulation.terrain import TerrainMap
-from engine.simulation.spatial import SpatialGrid
-from engine.simulation.vision import SightingReport, VisibilityState, VisionSystem
+from tritium_lib.sim_engine.core.spatial import SpatialGrid
+from tritium_lib.sim_engine.world.vision import SightingReport, VisibilityState, VisionSystem
 
 
 # ---------------------------------------------------------------------------
@@ -609,7 +609,7 @@ class TestRadioDetection:
 
     def test_radio_detected_within_range(self):
         """Target with bluetooth_mac within 100m is radio-detected."""
-        from engine.simulation.target import UnitIdentity
+        from tritium_lib.sim_engine.core.entity import UnitIdentity
         turret = _make_target("t1", "friendly", "turret", (0, 0))
         enemy = _make_target("h1", "hostile", "person", (0, 80))
         # Ensure enemy has a bluetooth MAC
@@ -621,7 +621,7 @@ class TestRadioDetection:
 
     def test_radio_not_detected_beyond_range(self):
         """Target at 110m is beyond 100m radio range."""
-        from engine.simulation.target import UnitIdentity
+        from tritium_lib.sim_engine.core.entity import UnitIdentity
         turret = _make_target("t1", "friendly", "turret", (0, 0))
         enemy = _make_target("h1", "hostile", "person", (0, 110))
         enemy.identity = UnitIdentity(bluetooth_mac="AA:BB:CC:DD:EE:FF")
@@ -642,7 +642,7 @@ class TestRadioDetection:
 
     def test_radio_requires_mac_or_cell_id(self):
         """Identity with no bluetooth/wifi/cell is not radio-detected."""
-        from engine.simulation.target import UnitIdentity
+        from tritium_lib.sim_engine.core.entity import UnitIdentity
         turret = _make_target("t1", "friendly", "turret", (0, 0))
         enemy = _make_target("h1", "hostile", "person", (0, 50))
         enemy.identity = UnitIdentity()  # empty identity, no MACs
@@ -653,7 +653,7 @@ class TestRadioDetection:
 
     def test_radio_signal_strength_close(self):
         """Signal strength near 1.0 at very close range."""
-        from engine.simulation.target import UnitIdentity
+        from tritium_lib.sim_engine.core.entity import UnitIdentity
         turret = _make_target("t1", "friendly", "turret", (0, 0))
         enemy = _make_target("h1", "hostile", "person", (0, 5))
         enemy.identity = UnitIdentity(wifi_mac="11:22:33:44:55:66")
@@ -664,7 +664,7 @@ class TestRadioDetection:
 
     def test_radio_signal_strength_far(self):
         """Signal strength weak at edge of range."""
-        from engine.simulation.target import UnitIdentity
+        from tritium_lib.sim_engine.core.entity import UnitIdentity
         turret = _make_target("t1", "friendly", "turret", (0, 0))
         enemy = _make_target("h1", "hostile", "person", (0, 90))
         enemy.identity = UnitIdentity(cell_id="310260123456789")
@@ -675,7 +675,7 @@ class TestRadioDetection:
 
     def test_radio_ignores_los(self):
         """Radio detection works through buildings (no LOS check)."""
-        from engine.simulation.target import UnitIdentity
+        from tritium_lib.sim_engine.core.entity import UnitIdentity
         terrain = TerrainMap(200.0)
         # Place building between turret and enemy
         terrain.set_cell(0, 5, "building")
@@ -691,7 +691,7 @@ class TestRadioDetection:
 
     def test_radio_keeps_strongest_signal(self):
         """When multiple friendlies detect same target, keep strongest signal."""
-        from engine.simulation.target import UnitIdentity
+        from tritium_lib.sim_engine.core.entity import UnitIdentity
         t1 = _make_target("t1", "friendly", "turret", (0, 0))
         t2 = _make_target("t2", "friendly", "turret", (0, 50))
         enemy = _make_target("h1", "hostile", "person", (0, 60))

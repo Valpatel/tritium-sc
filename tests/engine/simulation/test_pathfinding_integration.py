@@ -16,7 +16,7 @@ import pytest
 
 from engine.comms.event_bus import EventBus
 from engine.simulation.engine import SimulationEngine
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.tactical.obstacles import BuildingObstacles
 from engine.tactical.street_graph import StreetGraph
 

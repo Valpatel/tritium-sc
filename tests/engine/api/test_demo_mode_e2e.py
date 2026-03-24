@@ -20,7 +20,7 @@ import pytest
 
 from src.engine.comms.event_bus import EventBus
 from src.engine.tactical.target_tracker import TargetTracker
-from src.engine.tactical.dossier import DossierStore
+from tritium_lib.tracking.dossier import DossierStore
 from src.engine.tactical.correlator import TargetCorrelator
 
 

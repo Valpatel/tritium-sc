@@ -9,7 +9,7 @@ import pytest
 
 @pytest.fixture
 def scorer():
-    from engine.tactical.threat_scoring import ThreatScorer
+    from tritium_lib.tracking.threat_scoring import ThreatScorer
     return ThreatScorer()
 
 
@@ -51,7 +51,7 @@ class TestThreatScorer:
 
         # Simulate many evaluation cycles at the same position
         # Use a mock to simulate elapsed time
-        from engine.tactical.threat_scoring import BehaviorProfile
+        from tritium_lib.tracking.threat_scoring import BehaviorProfile
         profile = BehaviorProfile(target_id="ble_ccdd")
         profile.stationary_since = time.monotonic() - 600  # 10 minutes ago
         profile.stationary_position = (5, 5)
@@ -66,7 +66,7 @@ class TestThreatScorer:
 
     def test_zone_violation_increases_score(self):
         """Zone violations increase the zone score."""
-        from engine.tactical.threat_scoring import ThreatScorer
+        from tritium_lib.tracking.threat_scoring import ThreatScorer
 
         violation_called = [False]
 
@@ -87,7 +87,7 @@ class TestThreatScorer:
 
     def test_score_callback(self):
         """on_score_update callback fires on significant score changes."""
-        from engine.tactical.threat_scoring import ThreatScorer
+        from tritium_lib.tracking.threat_scoring import ThreatScorer
 
         callbacks = []
 

@@ -116,7 +116,7 @@ class TestReadinessEndpoint:
         assert "plugins" in names
 
     @pytest.mark.unit
-    def test_checklist_includes_ollama(self, bare_client):
+    def test_checklist_includes_llm(self, bare_client):
         data = bare_client.get("/api/system/readiness").json()
         names = [i["name"] for i in data["items"]]
-        assert "ollama" in names
+        assert "llm" in names  # was "ollama", migrated to llama-server

@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from engine.tactical.target_history import TargetHistory
+from tritium_lib.tracking.target_history import TargetHistory
 
 
 @pytest.mark.unit

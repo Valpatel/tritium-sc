@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from engine.tactical.vehicle_tracker import (
+from tritium_lib.tracking.vehicle_tracker import (
     VehicleBehavior,
     VehicleTrackingManager,
     VEHICLE_CLASSES,

@@ -21,8 +21,8 @@ import threading
 
 import pytest
 
-from engine.simulation.cover import CoverObject, CoverSystem
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.world.cover import CoverObject, CoverSystem
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 class SimpleEventBus:

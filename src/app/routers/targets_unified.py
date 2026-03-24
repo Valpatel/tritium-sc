@@ -641,7 +641,7 @@ async def get_target_predictions(
     if not horizon_list:
         horizon_list = [1, 5, 15]
 
-    from engine.tactical.target_prediction import predict_all_targets
+    from tritium_lib.tracking.target_prediction import predict_all_targets
 
     target_ids = [t.target_id for t in tracker.get_all()]
     predictions = predict_all_targets(target_ids, tracker.history, horizons=horizon_list)
@@ -685,7 +685,7 @@ async def get_single_target_predictions(
     if not horizon_list:
         horizon_list = [1, 5, 15]
 
-    from engine.tactical.target_prediction import predict_target
+    from tritium_lib.tracking.target_prediction import predict_target
     from engine.tactical.geo import local_to_latlng
 
     preds = predict_target(target_id, tracker.history, horizons=horizon_list)

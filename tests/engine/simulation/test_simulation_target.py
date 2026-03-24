@@ -9,7 +9,7 @@ import math
 
 import pytest
 
-from engine.simulation.target import SimulationTarget, _DRAIN_RATES
+from tritium_lib.sim_engine.core.entity import SimulationTarget, _DRAIN_RATES
 
 pytestmark = pytest.mark.unit
 

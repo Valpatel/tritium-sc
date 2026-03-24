@@ -15,15 +15,15 @@ import time
 
 import pytest
 
-from engine.simulation.state_machine import State, Transition, StateMachine
-from engine.simulation.unit_states import (
+from tritium_lib.sim_engine.core.state_machine import State, Transition, StateMachine
+from tritium_lib.sim_engine.behavior.unit_states import (
     create_turret_fsm,
     create_rover_fsm,
     create_drone_fsm,
     create_hostile_fsm,
     create_fsm_for_type,
 )
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 pytestmark = pytest.mark.unit

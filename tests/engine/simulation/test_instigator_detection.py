@@ -21,9 +21,9 @@ import threading
 
 import pytest
 
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.simulation.game_mode import GameMode, InstigatorDetector
-from engine.simulation.combat import CombatSystem
+from tritium_lib.sim_engine.combat.combat import CombatSystem
 from engine.simulation.engine import SimulationEngine
 
 pytestmark = pytest.mark.unit

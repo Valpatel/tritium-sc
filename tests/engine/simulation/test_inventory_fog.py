@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import pytest
 
-from engine.simulation.target import SimulationTarget
-from engine.simulation.inventory import (
+from tritium_lib.sim_engine.core.entity import SimulationTarget
+from tritium_lib.sim_engine.core.inventory import (
     ArmorItem,
     UnitInventory,
     WeaponItem,

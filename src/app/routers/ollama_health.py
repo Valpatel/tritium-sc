@@ -23,31 +23,63 @@ router = APIRouter(prefix="/api/health", tags=["health"])
 
 
 def _check_ollama_local() -> dict:
-    """Probe the local Ollama instance for health and model info."""
+    """Probe local LLM instances for health and model info.
+
+    Checks llama-server (ports 8081-8083) first, then ollama (11434) as fallback.
+    """
     import urllib.request
     import json
 
     result = {
         "status": "unreachable",
-        "url": "http://localhost:11434",
+        "url": "http://localhost:8081",
+        "backend": "unknown",
         "models": [],
         "model_count": 0,
         "gpu_available": False,
         "error": None,
     }
 
-    # Check if Ollama is responding
+    # Check llama-server instances first (ports 8081-8083)
+    for port in [8081, 8082, 8083]:
+        try:
+            req = urllib.request.Request(
+                f"http://localhost:{port}/v1/models",
+                method="GET",
+            )
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                data = json.loads(resp.read().decode())
+                models = data.get("data", [])
+                if models or resp.status == 200:
+                    result["status"] = "running"
+                    result["backend"] = "llama-server"
+                    result["url"] = f"http://localhost:{port}"
+                    result["model_count"] = result.get("model_count", 0) + len(models)
+                    for m in models:
+                        result["models"].append({
+                            "name": m.get("id", m.get("model", "")),
+                            "size": 0,
+                            "port": port,
+                            "backend": "llama-server",
+                        })
+        except Exception:
+            continue
+
+    # Also check ollama (legacy, port 11434)
     try:
         req = urllib.request.Request(
             "http://localhost:11434/api/tags",
             method="GET",
         )
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=3) as resp:
             data = json.loads(resp.read().decode())
             models = data.get("models", [])
-            result["status"] = "running"
-            result["model_count"] = len(models)
-            result["models"] = [
+            if result["status"] != "running":
+                result["status"] = "running"
+                result["backend"] = "ollama"
+                result["url"] = "http://localhost:11434"
+            result["model_count"] += len(models)
+            result["models"].extend([
                 {
                     "name": m.get("name", ""),
                     "size": m.get("size", 0),
@@ -55,14 +87,16 @@ def _check_ollama_local() -> dict:
                     "family": m.get("details", {}).get("family", ""),
                     "parameter_size": m.get("details", {}).get("parameter_size", ""),
                     "quantization": m.get("details", {}).get("quantization_level", ""),
+                    "backend": "ollama",
                 }
                 for m in models
-            ]
+            ])
     except Exception as e:
-        result["error"] = str(e)
-        return result
+        if result["status"] != "running":
+            result["error"] = str(e)
+            return result
 
-    # Check for running models (loaded into GPU/RAM)
+    # Check for running models via ollama /api/ps (if ollama available)
     try:
         req = urllib.request.Request(
             "http://localhost:11434/api/ps",

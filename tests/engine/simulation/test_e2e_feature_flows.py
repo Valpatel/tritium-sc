@@ -23,8 +23,8 @@ import pytest
 
 from engine.simulation.engine import SimulationEngine
 from engine.simulation.game_mode import GameMode, WaveConfig, WAVE_CONFIGS
-from engine.simulation.target import SimulationTarget
-from engine.simulation.vision import VisionSystem
+from tritium_lib.sim_engine.core.entity import SimulationTarget
+from tritium_lib.sim_engine.world.vision import VisionSystem
 from engine.comms.event_bus import EventBus
 
 
@@ -218,7 +218,7 @@ class TestRadioDetectionE2E:
         )
         hostile.apply_combat_profile()
         # The HOSTILE carries the phone (identity with bluetooth_mac)
-        from engine.simulation.target import UnitIdentity
+        from tritium_lib.sim_engine.core.entity import UnitIdentity
         hostile.identity = UnitIdentity(bluetooth_mac="AA:BB:CC:DD:EE:FF")
         engine.add_target(hostile)
 

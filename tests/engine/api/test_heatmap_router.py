@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from app.routers import heatmap as heatmap_module
 from app.routers.heatmap import router
-from engine.tactical.heatmap import HeatmapEngine
+from tritium_lib.tracking.heatmap import HeatmapEngine
 
 
 # ---------------------------------------------------------------------------

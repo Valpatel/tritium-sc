@@ -15,7 +15,7 @@ import pytest
 import math
 from unittest.mock import MagicMock
 
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 def _make_target(tid, x, y, alliance="friendly", asset_type="rover",
@@ -30,11 +30,11 @@ def _make_target(tid, x, y, alliance="friendly", asset_type="rover",
 
 class TestUnitMissionSystemImport:
     def test_import(self):
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         assert UnitMissionSystem is not None
 
     def test_create(self):
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         sys = UnitMissionSystem()
         assert sys is not None
 
@@ -43,7 +43,7 @@ class TestStarterMissions:
     """Test immediate starter mission assignment."""
 
     def test_friendly_gets_starter_mission(self):
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         sys = UnitMissionSystem()
         t = _make_target("r1", 0, 0, "friendly", "rover")
         mission = sys.assign_starter_mission(t)
@@ -53,7 +53,7 @@ class TestStarterMissions:
 
     def test_turret_gets_hold_mission(self):
         """Stationary turrets should get 'hold' missions."""
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         sys = UnitMissionSystem()
         t = _make_target("t1", 5, 5, "friendly", "turret", speed=0)
         mission = sys.assign_starter_mission(t)
@@ -61,7 +61,7 @@ class TestStarterMissions:
 
     def test_drone_gets_scout_mission(self):
         """Drones should get scout/patrol missions."""
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         sys = UnitMissionSystem()
         t = _make_target("d1", 0, 0, "friendly", "drone", speed=6)
         mission = sys.assign_starter_mission(t)
@@ -69,7 +69,7 @@ class TestStarterMissions:
 
     def test_rover_gets_patrol_mission(self):
         """Rovers should get patrol missions."""
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         sys = UnitMissionSystem()
         t = _make_target("r1", 0, 0, "friendly", "rover", speed=3)
         mission = sys.assign_starter_mission(t)
@@ -77,7 +77,7 @@ class TestStarterMissions:
 
     def test_mission_has_waypoints(self):
         """Patrol/scout missions should include waypoints."""
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         sys = UnitMissionSystem()
         t = _make_target("r1", 0, 0, "friendly", "rover", speed=3)
         mission = sys.assign_starter_mission(t)
@@ -87,7 +87,7 @@ class TestStarterMissions:
 
     def test_hostile_gets_mission(self):
         """Hostiles should also get missions."""
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         sys = UnitMissionSystem()
         t = _make_target("h1", 20, 20, "hostile", "person", speed=1.5)
         mission = sys.assign_starter_mission(t)
@@ -96,7 +96,7 @@ class TestStarterMissions:
 
     def test_neutral_gets_mission(self):
         """Neutrals should get civilian missions."""
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         sys = UnitMissionSystem()
         t = _make_target("n1", 10, 10, "neutral", "person", speed=1.2)
         mission = sys.assign_starter_mission(t)
@@ -109,7 +109,7 @@ class TestBackstoryGeneration:
 
     def test_scripted_backstory(self):
         """Scripted fallback should produce a backstory immediately."""
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         sys = UnitMissionSystem()
         t = _make_target("r1", 0, 0, "friendly", "rover")
         story = sys.generate_backstory_scripted(t)
@@ -118,7 +118,7 @@ class TestBackstoryGeneration:
 
     def test_backstory_varies_by_type(self):
         """Different unit types should get different backstories."""
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         sys = UnitMissionSystem()
         rover = _make_target("r1", 0, 0, "friendly", "rover")
         drone = _make_target("d1", 0, 0, "friendly", "drone", speed=6)
@@ -133,7 +133,7 @@ class TestBackstoryGeneration:
         assert len(stories) >= 2
 
     def test_backstory_for_hostile(self):
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         sys = UnitMissionSystem()
         t = _make_target("h1", 20, 20, "hostile", "person")
         story = sys.generate_backstory_scripted(t)
@@ -141,7 +141,7 @@ class TestBackstoryGeneration:
         assert len(story) > 20
 
     def test_backstory_for_neutral(self):
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         sys = UnitMissionSystem()
         t = _make_target("n1", 10, 10, "neutral", "person")
         story = sys.generate_backstory_scripted(t)
@@ -150,7 +150,7 @@ class TestBackstoryGeneration:
 
     def test_llm_prompt_generation(self):
         """Should be able to generate an LLM prompt for backstory."""
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         sys = UnitMissionSystem()
         t = _make_target("r1", 0, 0, "friendly", "rover")
         prompt = sys.build_backstory_prompt(t)
@@ -163,7 +163,7 @@ class TestTickIntegration:
 
     def test_tick_assigns_missions_to_idle_units(self):
         """Idle friendly units should get missions during tick."""
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         sys = UnitMissionSystem()
         targets = {}
         # Create idle friendly rover with no waypoints
@@ -177,7 +177,7 @@ class TestTickIntegration:
 
     def test_tick_does_not_reassign_active_units(self):
         """Units with active waypoints should not be reassigned."""
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         sys = UnitMissionSystem()
         targets = {}
         r = _make_target("r1", 0, 0, "friendly", "rover")
@@ -194,7 +194,7 @@ class TestTickIntegration:
 
     def test_patrol_loops(self):
         """Patrol missions should loop — when target reaches end, restart."""
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         sys = UnitMissionSystem()
         targets = {}
         r = _make_target("r1", 0, 0, "friendly", "rover")
@@ -218,7 +218,7 @@ class TestLLMBackstoryAsync:
 
     def test_request_llm_backstory(self):
         """Should queue an LLM backstory request."""
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         sys = UnitMissionSystem()
         t = _make_target("r1", 0, 0, "friendly", "rover")
         sys.request_llm_backstory(t)
@@ -226,7 +226,7 @@ class TestLLMBackstoryAsync:
 
     def test_backstory_stored_after_generation(self):
         """After generation, backstory should be stored."""
-        from engine.simulation.unit_missions import UnitMissionSystem
+        from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
         sys = UnitMissionSystem()
         t = _make_target("r1", 0, 0, "friendly", "rover")
         # Simulate completed backstory

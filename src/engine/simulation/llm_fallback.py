@@ -18,14 +18,17 @@ import urllib.request
 from datetime import datetime
 
 
-def check_ollama_available(host: str = "http://localhost:11434") -> bool:
-    """Check if Ollama API is reachable."""
-    try:
-        req = urllib.request.Request(f"{host}/api/tags")
-        with urllib.request.urlopen(req, timeout=2) as resp:
-            return resp.status == 200
-    except Exception:
-        return False
+def check_ollama_available(host: str = "http://localhost:8081") -> bool:
+    """Check if LLM server is reachable (llama-server or ollama)."""
+    # Try llama-server /health first
+    for endpoint in ["/health", "/v1/models", "/api/tags"]:
+        try:
+            req = urllib.request.Request(f"{host}{endpoint}")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                return resp.status == 200
+        except Exception:
+            continue
+    return False
 
 
 # -- Thought templates by category ------------------------------------------

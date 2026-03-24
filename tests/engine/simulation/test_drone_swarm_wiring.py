@@ -25,7 +25,7 @@ import pytest
 from engine.simulation.engine import SimulationEngine
 from engine.simulation.infrastructure import InfrastructureHealth
 from engine.simulation.swarm import SwarmBehavior
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 class SimpleEventBus:

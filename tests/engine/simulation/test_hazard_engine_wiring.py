@@ -20,7 +20,7 @@ import pytest
 from engine.comms.event_bus import EventBus
 from engine.simulation.hazards import HazardManager
 from engine.simulation.engine import SimulationEngine
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 pytestmark = pytest.mark.unit

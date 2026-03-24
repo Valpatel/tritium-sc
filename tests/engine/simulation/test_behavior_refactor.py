@@ -23,8 +23,8 @@ import time
 import pytest
 
 from engine.comms.event_bus import EventBus
-from engine.simulation.combat import CombatSystem
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.combat.combat import CombatSystem
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 pytestmark = pytest.mark.unit
 
@@ -254,17 +254,17 @@ class TestCoordinatorDelegation:
 # ---------------------------------------------------------------------------
 
 class TestBackwardCompatibility:
-    """from engine.simulation.behaviors import UnitBehaviors must still work."""
+    """from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors must still work."""
 
     def test_old_import_path(self):
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         _, combat = _bus_and_combat()
         ub = UnitBehaviors(combat)
         assert ub is not None
 
     def test_old_import_has_same_interface(self):
         """UnitBehaviors and BehaviorCoordinator share the same public API."""
-        from engine.simulation.behaviors import UnitBehaviors
+        from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
         from engine.simulation.behavior.coordinator import BehaviorCoordinator
         # Both must have tick, set_obstacles, clear_dodge_state
         for attr in ("tick", "set_obstacles", "clear_dodge_state"):

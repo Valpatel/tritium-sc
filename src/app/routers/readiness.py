@@ -140,15 +140,21 @@ def _build_checklist(request: Request) -> list[dict[str, Any]]:
     try:
         import urllib.request
 
-        req = urllib.request.Request("http://localhost:11434/api/tags", method="GET")
+        # Check llama-server first (preferred), then ollama (legacy)
+        req = urllib.request.Request("http://localhost:8081/health", method="GET")
         with urllib.request.urlopen(req, timeout=2) as resp:
-            items.append(_check_item("ollama", "green", "Running at localhost:11434"))
+            items.append(_check_item("llm", "green", "llama-server running at localhost:8081"))
     except Exception:
-        items.append(_check_item(
-            "ollama", "yellow",
-            "Not reachable at localhost:11434",
-            hint="curl -fsSL https://ollama.com/install.sh | sh && ollama serve",
-        ))
+        try:
+            req = urllib.request.Request("http://localhost:11434/api/tags", method="GET")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                items.append(_check_item("llm", "yellow", "ollama running (legacy) — migrate to llama-server"))
+        except Exception:
+            items.append(_check_item(
+                "llm", "yellow",
+                "No LLM server reachable (8081 or 11434)",
+                hint="Start llama-server on port 8081 or run ollama serve",
+            ))
 
     # 8. Amy AI commander
     amy = getattr(request.app.state, "amy", None)

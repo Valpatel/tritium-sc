@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .target import SimulationTarget
+    from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 # Health fraction below which degradation begins
 _DEGRADATION_THRESHOLD = 0.5
