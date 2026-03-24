@@ -23,9 +23,9 @@ import time
 
 import pytest
 
-from engine.simulation.target import SimulationTarget
-from engine.simulation.combat import CombatSystem, HIT_RADIUS
-from engine.simulation.inventory import (
+from tritium_lib.sim_engine.core.entity import SimulationTarget
+from tritium_lib.sim_engine.combat.combat import CombatSystem, HIT_RADIUS
+from tritium_lib.sim_engine.core.inventory import (
     InventoryItem,
     UnitInventory,
     build_loadout,
@@ -34,7 +34,7 @@ from engine.simulation.inventory import (
 ArmorItem = InventoryItem
 WeaponItem = InventoryItem
 ConsumableItem = InventoryItem
-from engine.simulation.weapons import WeaponSystem
+from tritium_lib.sim_engine.combat.weapons import WeaponSystem
 
 
 class SimpleEventBus:
@@ -566,11 +566,14 @@ class TestBuildLoadout:
         assert inv is not None
         assert len(inv.items) > 0
 
-    def test_neutral_no_loadout(self):
-        """Neutral persons should get None or empty inventory."""
+    def test_neutral_no_weapons(self):
+        """Neutral persons carry devices but no weapons."""
         inv = build_loadout("n1", "person", "neutral")
-        # Neutrals are non-combatants, should get None or empty
-        assert inv is None or len(inv.items) == 0
+        # Neutrals carry phones/watches for BLE tracking but no weapons
+        if inv is not None:
+            weapons = [i for i in inv.items if i.item_type == "weapon"]
+            assert len(weapons) == 0
+            assert inv.active_weapon_id is None
 
     def test_turret_loadout(self):
         """Turrets should get appropriate loadout."""

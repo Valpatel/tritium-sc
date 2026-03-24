@@ -127,7 +127,8 @@ function clearAllTimers() {
 // ============================================================
 
 const storeCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8');
-const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8');
+const eventsCode = fs.readFileSync(__dirname + '/../../../tritium-lib/web/events.js', 'utf8');
+const libWsCode = fs.readFileSync(__dirname + '/../../../tritium-lib/web/websocket.js', 'utf8');
 const wsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
 
 // Shared bridge object for capturing EventBus emissions from inside the VM.
@@ -149,20 +150,30 @@ function createFreshContext() {
         clearTimeout: mockClearTimeout,
         WebSocket: MockWebSocket,
         _bridge,
+        fetch: () => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }),
+        performance: { now: () => Date.now() },
+        setInterval: (fn, ms) => { return 999; },
+        clearInterval: () => {},
+        parseInt, parseFloat, isNaN, isFinite, Boolean, RegExp,
+        Promise, NaN,
     });
     // Make window === ctx so that window.warHandleFoo resolves to ctx.warHandleFoo
     ctx.window = ctx;
     ctx.window.location = { protocol: 'http:', host: 'localhost:8000' };
 
-    // Load store (strip export)
-    const storeStripped = storeCode.replace(/^export\s+/gm, '');
+    // Load store (strip export + import)
+    const storeStripped = storeCode.replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, '');
     vm.runInContext(storeStripped, ctx);
 
     // Load events (strip export)
     const eventsStripped = eventsCode.replace(/^export\s+/gm, '');
     vm.runInContext(eventsStripped, ctx);
 
-    // Load websocket (strip import/export)
+    // Load lib websocket base class (strip export)
+    const libWsStripped = libWsCode.replace(/^export\s+/gm, '');
+    vm.runInContext(libWsStripped, ctx);
+
+    // Load websocket (strip import/export — extends TritiumWebSocket from lib)
     const wsStripped = wsCode
         .replace(/^import\s+.*$/gm, '')
         .replace(/^export\s+/gm, '');
@@ -1454,8 +1465,10 @@ console.log('\n--- Edge Cases ---');
     assert(!_bridge.hitCalled, 'warCombatAddHitEffect NOT called when warHandle* available');
 
     createdSockets[0]._simulateMessage({ type: 'game_elimination', data: {} });
-    assert(_bridge.handleElimCalled, 'warHandleTargetEliminated preferred for game_elimination (includes audio)');
-    assert(!_bridge.elimCalled, 'warCombatAddEliminationEffect NOT called when warHandle* available');
+    assert(_bridge.handleElimCalled, 'warHandleTargetEliminated called for game_elimination (audio hooks)');
+    // warCombatAddEliminationEffect is now called unconditionally for visual effects + kill feed
+    // (both audio handle* and visual combat* fire — see websocket.js comment at line 506)
+    assert(_bridge.elimCalled, 'warCombatAddEliminationEffect also called (visual effect + kill feed)');
 
     createdSockets[0]._simulateMessage({ type: 'elimination_streak', data: {} });
     assert(_bridge.handleStreakCalled, 'warHandleEliminationStreak preferred for elimination_streak (includes audio)');
@@ -2624,24 +2637,24 @@ console.log('\n--- State Refresh on Connect ---');
     const wsCode2 = fs.readFileSync(
         __dirname + '/../../src/frontend/js/command/websocket.js', 'utf8'
     );
-    // onopen handler must call _refreshState
+    // onOpen callback (passed to TritiumWebSocket) must call _refreshState
     assert(
         wsCode2.includes('this._refreshState()'),
-        'onopen handler calls this._refreshState()'
+        'onOpen callback calls this._refreshState()'
     );
-    // Verify it's in the onopen block (after 'ws:connected' emit)
+    // Verify it's in the onOpen callback block (after 'ws:connected' emit)
     const lines = wsCode2.split('\n');
     let inOnOpen = false;
     let foundRefresh = false;
     for (const line of lines) {
-        if (line.includes('this._ws.onopen')) inOnOpen = true;
+        if (line.includes('onOpen:') || line.includes('this._ws.onopen')) inOnOpen = true;
         if (inOnOpen && line.includes('this._refreshState()')) {
             foundRefresh = true;
             break;
         }
-        if (inOnOpen && line.includes('this._ws.onclose')) break;
+        if (inOnOpen && (line.includes('onClose:') || line.includes('this._ws.onclose'))) break;
     }
-    assert(foundRefresh, '_refreshState() is called inside onopen handler');
+    assert(foundRefresh, '_refreshState() is called inside onOpen callback');
 })();
 
 (function testRefreshStateSetsGamePhase() {

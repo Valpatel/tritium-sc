@@ -24,9 +24,9 @@ if TYPE_CHECKING:
     from engine.comms.event_bus import EventBus
 
 from engine.simulation.npc_intelligence.brain import NPCBrain
-from engine.simulation.target import SimulationTarget
-from engine.simulation.unit_states import create_hostile_fsm
-from engine.simulation.movement import MovementController
+from tritium_lib.sim_engine.core.entity import SimulationTarget
+from tritium_lib.sim_engine.behavior.unit_states import create_hostile_fsm
+from tritium_lib.sim_engine.core.movement import MovementController
 
 
 # Radicalization thresholds

@@ -319,7 +319,7 @@ class TestModelRouterInfer:
         router = self._router_with_mock_fleet()
         messages = [{"role": "user", "content": "Hello"}]
 
-        with patch("engine.inference.model_router.ollama_chat") as mock_chat:
+        with patch("tritium_lib.inference.model_router.ollama_chat") as mock_chat:
             mock_chat.return_value = {
                 "message": {"content": "Hi there!"},
             }
@@ -340,7 +340,7 @@ class TestModelRouterInfer:
                 raise ConnectionError("Host down")
             return {"message": {"content": "Fallback response"}}
 
-        with patch("engine.inference.model_router.ollama_chat", side_effect=side_effect):
+        with patch("tritium_lib.inference.model_router.ollama_chat", side_effect=side_effect):
             result = router.infer(TaskType.CHAT, messages)
             assert result["message"]["content"] == "Fallback response"
             assert call_count == 2
@@ -350,7 +350,7 @@ class TestModelRouterInfer:
         router = self._router_with_mock_fleet()
         messages = [{"role": "user", "content": "Hello"}]
 
-        with patch("engine.inference.model_router.ollama_chat", side_effect=ConnectionError("Down")):
+        with patch("tritium_lib.inference.model_router.ollama_chat", side_effect=ConnectionError("Down")):
             with pytest.raises(AllHostsFailedError):
                 router.infer(TaskType.SIMPLE_THINK, messages)
 
@@ -362,7 +362,7 @@ class TestModelRouterInfer:
         ])
         messages = [{"role": "user", "content": "Hello"}]
 
-        with patch("engine.inference.model_router.ollama_chat") as mock_chat:
+        with patch("tritium_lib.inference.model_router.ollama_chat") as mock_chat:
             mock_chat.return_value = {"message": {"content": "OK"}}
             result = router.infer(TaskType.SIMPLE_THINK, messages)
             assert result["message"]["content"] == "OK"
@@ -375,7 +375,7 @@ class TestModelRouterInfer:
         router = self._router_with_mock_fleet()
         messages = [{"role": "user", "content": "What do you see?", "images": ["base64data"]}]
 
-        with patch("engine.inference.model_router.ollama_chat") as mock_chat:
+        with patch("tritium_lib.inference.model_router.ollama_chat") as mock_chat:
             mock_chat.return_value = {"message": {"content": "I see a room"}}
             result = router.infer(TaskType.VISION, messages)
             assert result["message"]["content"] == "I see a room"
@@ -385,7 +385,7 @@ class TestModelRouterInfer:
         router = self._router_with_mock_fleet()
         messages = [{"role": "user", "content": "Hello"}]
 
-        with patch("engine.inference.model_router.ollama_chat") as mock_chat:
+        with patch("tritium_lib.inference.model_router.ollama_chat") as mock_chat:
             mock_chat.return_value = {"message": {"content": "OK"}}
             result = router.infer(TaskType.SIMPLE_THINK, messages)
             # Result should include metadata about which model was used
@@ -418,7 +418,7 @@ class TestModelRouterStaticFallback:
         )
         messages = [{"role": "user", "content": "Hello"}]
 
-        with patch("engine.inference.model_router.ollama_chat") as mock_chat:
+        with patch("tritium_lib.inference.model_router.ollama_chat") as mock_chat:
             mock_chat.return_value = {"message": {"content": "OK"}}
             router.infer(TaskType.CHAT, messages)
             call_kwargs = mock_chat.call_args[1] if mock_chat.call_args[1] else {}
@@ -464,7 +464,7 @@ class TestModelRouterFleetHosts:
                 raise ConnectionError("Host 1 down")
             return {"message": {"content": "From host 2"}}
 
-        with patch("engine.inference.model_router.ollama_chat", side_effect=track_calls):
+        with patch("tritium_lib.inference.model_router.ollama_chat", side_effect=track_calls):
             result = router.infer(TaskType.SIMPLE_THINK, messages)
             assert len(hosts_tried) == 2
             assert result["message"]["content"] == "From host 2"

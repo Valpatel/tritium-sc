@@ -174,7 +174,7 @@ const panelUtilsPlain = panelUtilsCode
 vm.runInContext(panelUtilsPlain, ctx);
 
 // Load EventBus
-const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8');
+const eventsCode = fs.readFileSync(__dirname + '/../../../tritium-lib/web/events.js', 'utf8');
 const eventsPlain = eventsCode
     .replace(/^export\s+/gm, '')
     .replace(/^import\s+.*$/gm, '');
@@ -188,7 +188,16 @@ const panelPlain = panelCode
     .replace(/^export\s+/gm, '');
 vm.runInContext(panelPlain + '\nvar _Panel = Panel; var _PanelManager = PanelManager;', ctx);
 
-// Load LayoutManager
+// Load lib's base LayoutManager (extended by SC's LayoutManager)
+const baseLayoutCode = fs.readFileSync(__dirname + '/../../../tritium-lib/web/layout-manager.js', 'utf8');
+const baseLayoutPlain = baseLayoutCode
+    .replace(/^export\s+class\s+LayoutManager/gm, 'class BaseLayoutManager')
+    .replace(/^export\s+/gm, '')
+    .replace(/^import\s+.*$/gm, '')
+    .replace(/\bDEFAULT_STORAGE_KEY\b/g, 'LM_BASE_STORAGE_KEY');
+vm.runInContext(baseLayoutPlain, ctx);
+
+// Load SC's LayoutManager (extends BaseLayoutManager)
 const layoutCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/layout-manager.js', 'utf8');
 const layoutPlain = layoutCode
     .replace(/^import\s+.*$/gm, '')

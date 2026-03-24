@@ -491,7 +491,7 @@ async def sim_spawn(request: Request, body: SpawnRequest):
     if body.alliance == "hostile":
         target = engine.spawn_hostile(name=body.name, position=pos)
     else:
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         import uuid
         _SPEEDS = {
             "rover": 2.0, "drone": 4.0, "turret": 0.0, "person": 1.5,

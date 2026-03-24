@@ -66,35 +66,35 @@ from typing import TYPE_CHECKING
 
 from .ambient import AmbientSpawner
 from .backstory import BackstoryGenerator
-from .behaviors import UnitBehaviors
+from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
 from .lod import LODSystem, LODTier
-from .combat import CombatSystem
+from tritium_lib.sim_engine.combat.combat import CombatSystem
 from .comms import UnitComms
-from .cover import CoverSystem
+from tritium_lib.sim_engine.world.cover import CoverSystem
 from .crowd_density import CrowdDensityTracker
 from .hazards import HazardManager
 from .hostile_commander import HostileCommander
 from .degradation import DegradationSystem
 from .infrastructure import InfrastructureHealth
-from .unit_missions import UnitMissionSystem
+from tritium_lib.sim_engine.behavior.unit_missions import UnitMissionSystem
 from .game_mode import GameMode, InstigatorDetector
 from .morale import MoraleSystem
-from .npc import NPCManager
+from tritium_lib.sim_engine.behavior.npc import NPCManager
 from .pursuit import PursuitSystem
 from .replay import ReplayRecorder
-from .sensors import SensorSimulator
+from tritium_lib.sim_engine.world.sensors import SensorSimulator
 from .spectator import SpectatorMode
-from .squads import SquadManager
+from tritium_lib.sim_engine.combat.squads import SquadManager
 from .stats import StatsTracker
-from .target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from .terrain import TerrainMap
 from .swarm import SwarmBehavior
-from .unit_states import create_fsm_for_type
+from tritium_lib.sim_engine.behavior.unit_states import create_fsm_for_type
 from .upgrades import UpgradeSystem
-from .spatial import SpatialGrid
-from .vision import VisionSystem
+from tritium_lib.sim_engine.core.spatial import SpatialGrid
+from tritium_lib.sim_engine.world.vision import VisionSystem
 from .objectives import ObjectiveTracker
-from .weapons import WeaponSystem
+from tritium_lib.sim_engine.combat.weapons import WeaponSystem
 
 try:
     from tritium_lib.sim_engine.core.npc_thinker import NPCThinker
@@ -377,7 +377,7 @@ class SimulationEngine:
             if target.inventory is not None:
                 active_wp = target.inventory.get_active_weapon()
                 if active_wp is not None:
-                    from .weapons import Weapon
+                    from tritium_lib.sim_engine.combat.weapons import Weapon
                     self.weapon_system.assign_weapon(
                         target.target_id,
                         Weapon(
@@ -666,7 +666,7 @@ class SimulationEngine:
 
         Tries street graph -> grid A* -> direct, returning at least [end].
         """
-        from .pathfinding import plan_path
+        from tritium_lib.sim_engine.world.pathfinding import plan_path
         path = plan_path(
             start, end, unit_type,
             street_graph=self._street_graph,

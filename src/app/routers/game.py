@@ -144,7 +144,7 @@ async def place_unit(unit: PlaceUnit, request: Request):
             f"map bounds (±{bounds}m).",
         )
 
-    from engine.simulation.target import SimulationTarget
+    from tritium_lib.sim_engine.core.entity import SimulationTarget
 
     is_turret = "turret" in unit.asset_type
     is_graphling = unit.asset_type == "graphling"

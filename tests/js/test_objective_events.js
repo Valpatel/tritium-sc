@@ -63,7 +63,8 @@ class MockWebSocket {
 // ============================================================
 
 const storeCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8');
-const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8');
+const eventsCode = fs.readFileSync(__dirname + '/../../../tritium-lib/web/events.js', 'utf8');
+const libWsCode = fs.readFileSync(__dirname + '/../../../tritium-lib/web/websocket.js', 'utf8');
 const wsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
 const hudCode = fs.readFileSync(__dirname + '/../../src/frontend/js/war-hud.js', 'utf8');
 
@@ -124,12 +125,15 @@ function createFreshContext() {
     vm.runInContext(hudStripped, ctx);
 
     // Load store.js (defines TritiumStore)
-    vm.runInContext(storeCode.replace(/^export\s+/gm, ''), ctx);
+    vm.runInContext(storeCode.replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 
     // Load events.js (defines EventBus)
     vm.runInContext(eventsCode.replace(/^export\s+/gm, ''), ctx);
 
-    // Load websocket.js (defines WebSocketManager)
+    // Load lib websocket base class (strip export)
+    vm.runInContext(libWsCode.replace(/^export\s+/gm, ''), ctx);
+
+    // Load websocket.js (defines WebSocketManager — extends TritiumWebSocket)
     const wsStripped = wsCode
         .replace(/^import\s+.*$/gm, '')
         .replace(/^export\s+/gm, '');

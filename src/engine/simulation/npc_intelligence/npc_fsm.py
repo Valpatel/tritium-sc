@@ -14,7 +14,7 @@ rubberneck, panic.
 
 from __future__ import annotations
 
-from engine.simulation.state_machine import State, StateMachine
+from tritium_lib.sim_engine.core.state_machine import State, StateMachine
 
 
 # ============================================================================

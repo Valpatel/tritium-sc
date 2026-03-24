@@ -30,8 +30,8 @@ import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from engine.simulation.state_machine import StateMachine
-from engine.simulation.unit_states import create_fsm_for_type
+from tritium_lib.sim_engine.core.state_machine import StateMachine
+from tritium_lib.sim_engine.behavior.unit_states import create_fsm_for_type
 
 if TYPE_CHECKING:
     from engine.comms.event_bus import EventBus

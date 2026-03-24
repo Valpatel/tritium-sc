@@ -14,39 +14,106 @@ VENV="$SCRIPT_DIR/.venv/bin/python3"
 TOTAL_PASS=0; TOTAL_FAIL=0; TOTAL_SKIP=0
 START_TIME=$(date +%s)
 
+# CPU-friendly: run at lower priority so other processes aren't starved.
+# nice -n 10 lowers scheduling priority; ionice -c 2 -n 6 lowers I/O priority.
+# This makes tests take ~10-20% longer but keeps the system responsive.
+NICE_PREFIX="nice -n 10"
+if command -v ionice &>/dev/null; then
+    NICE_PREFIX="nice -n 10 ionice -c 2 -n 6"
+fi
+
+# Limit parallel operations to half of CPU cores (min 2)
+MAX_JOBS=$(( $(nproc 2>/dev/null || echo 4) / 2 ))
+[ "$MAX_JOBS" -lt 2 ] && MAX_JOBS=2
+export PYTEST_XDIST_AUTO_NUM_WORKERS="$MAX_JOBS"
+
+# --- Gentle mode (--gentle flag) ---
+# Gentle mode: lower priority, stricter fail-fast, tighter timeouts
+GENTLE=false
+GENTLE_PYTEST_ARGS=""
+# Default pytest resource guards for non-gentle mode
+PYTEST_RESOURCE_ARGS="--maxfail=20"
+
 info()  { echo -e "${CYAN}[INFO]${NC} $*"; }
 pass()  { echo -e "${GREEN}[PASS]${NC} $*"; TOTAL_PASS=$((TOTAL_PASS + 1)); }
 fail()  { echo -e "${RED}[FAIL]${NC} $*"; TOTAL_FAIL=$((TOTAL_FAIL + 1)); }
 warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 header() { echo -e "\n${BOLD}${CYAN}━━━ $* ━━━${NC}"; }
 
+# Gentle mode: pause between tiers/sub-tiers to let the system breathe
+gentle_pause() {
+    if $GENTLE; then
+        info "Gentle mode: pausing 2s..."
+        sleep 2
+    else
+        sleep 1
+    fi
+}
+
+# Resource monitoring — prevent OOM kills and swap exhaustion
+resource_check() {
+    local context="${1:-}"
+    if [ ! -f /proc/meminfo ]; then return; fi
+    local mem_available swap_used swap_total load
+    mem_available=$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo)
+    swap_used=$(awk '/SwapTotal/{t=$2} /SwapFree/{f=$2} END{print int((t-f)/1024)}' /proc/meminfo)
+    swap_total=$(awk '/SwapTotal/{print int($2/1024)}' /proc/meminfo)
+    load=$(awk '{print $1}' /proc/loadavg)
+
+    if [ -n "$context" ]; then
+        info "Resources [$context]: ${mem_available}MB avail, swap ${swap_used}/${swap_total}MB, load $load"
+    fi
+
+    # Warn if memory is critically low
+    if [ "$mem_available" -lt 4096 ]; then
+        warn "LOW MEMORY: Only ${mem_available}MB available — test performance may suffer"
+    fi
+
+    # Abort if swap is >90% used and memory is critically low
+    if [ "$swap_total" -gt 0 ]; then
+        local swap_pct=$(( swap_used * 100 / swap_total ))
+        if [ "$swap_pct" -gt 90 ] && [ "$mem_available" -lt 2048 ]; then
+            warn "CRITICAL: Swap ${swap_pct}% used, only ${mem_available}MB RAM free"
+            warn "Consider closing other applications before continuing"
+        fi
+    fi
+}
+
 # Tier functions
 tier1_syntax() {
     header "Tier 1: Syntax Check"
-    local ok=0 err=0 py_count=0 js_count=0
+    local py_count js_count err=0
+    local py_err_file js_err_file
+    py_err_file=$(mktemp)
+    js_err_file=$(mktemp)
 
-    # Python: all .py files under src/ (dynamic discovery)
-    while IFS= read -r f; do
-        py_count=$((py_count + 1))
-        if python3 -m py_compile "$f" 2>/dev/null; then
-            ok=$((ok + 1))
-        else
+    # Python: batch compile with limited parallelism
+    py_count=$(find "$SCRIPT_DIR/src/" -name '*.py' -not -path '*/__pycache__/*' -not -name '*.pyc' | wc -l)
+    find "$SCRIPT_DIR/src/" -name '*.py' -not -path '*/__pycache__/*' -not -name '*.pyc' | sort | \
+        xargs -P "$MAX_JOBS" -I{} sh -c 'nice -n 10 python3 -m py_compile "$1" 2>/dev/null || echo "$1" >> '"$py_err_file" _ {}
+
+    # JS: batch check with limited parallelism
+    js_count=$(find "$SCRIPT_DIR/src/frontend/js/" -name '*.js' -not -path '*/node_modules/*' | wc -l)
+    find "$SCRIPT_DIR/src/frontend/js/" -name '*.js' -not -path '*/node_modules/*' | sort | \
+        xargs -P "$MAX_JOBS" -I{} sh -c 'nice -n 10 node --check "$1" 2>/dev/null || echo "$1" >> '"$js_err_file" _ {}
+
+    # Report errors
+    if [ -s "$py_err_file" ]; then
+        while IFS= read -r f; do
             fail "py_compile: ${f#$SCRIPT_DIR/}"
             err=$((err + 1))
-        fi
-    done < <(find "$SCRIPT_DIR/src/" -name '*.py' -not -path '*/__pycache__/*' -not -name '*.pyc' | sort)
-
-    # JS: all .js files under src/frontend/js/ (dynamic discovery)
-    while IFS= read -r f; do
-        js_count=$((js_count + 1))
-        if node --check "$f" 2>/dev/null; then
-            ok=$((ok + 1))
-        else
+        done < "$py_err_file"
+    fi
+    if [ -s "$js_err_file" ]; then
+        while IFS= read -r f; do
             fail "node --check: ${f#$SCRIPT_DIR/}"
             err=$((err + 1))
-        fi
-    done < <(find "$SCRIPT_DIR/src/frontend/js/" -name '*.js' -not -path '*/node_modules/*' | sort)
+        done < "$js_err_file"
+    fi
 
+    rm -f "$py_err_file" "$js_err_file"
+
+    local ok=$(( py_count + js_count - err ))
     if [ $err -eq 0 ]; then
         pass "Syntax: $ok files OK ($py_count Python, $js_count JS)"
     else
@@ -56,29 +123,111 @@ tier1_syntax() {
 
 tier2_unit() {
     header "Tier 2: Unit Tests (pytest)"
-    if $VENV -m pytest "$SCRIPT_DIR/tests/amy/" "$SCRIPT_DIR/tests/engine/" -m unit --tb=short -q 2>&1; then
-        pass "Unit tests"
-    else
-        fail "Unit tests"
+    resource_check "before unit tests"
+
+    # Split into 3 sequential sub-tiers to reduce peak memory and allow
+    # the system to reclaim resources between chunks:
+    #   2a: engine/simulation (heaviest: ~3100 tests, ~270s)
+    #   2b: engine/* except simulation (~4900 tests)
+    #   2c: amy (~830 tests)
+    local sim_ok=0 engine_ok=0 amy_ok=0
+
+    # --- Sub-tier 2a: simulation (heaviest) ---
+    info "Tier 2a: engine/simulation unit tests (~3100 tests)..."
+    if $NICE_PREFIX $VENV -m pytest \
+        "$SCRIPT_DIR/tests/engine/simulation/" \
+        -m unit --tb=short -q $PYTEST_RESOURCE_ARGS $GENTLE_PYTEST_ARGS 2>&1; then
+        sim_ok=1
     fi
+    gentle_pause
+    resource_check "after simulation tests"
+
+    # --- Sub-tier 2b: remaining engine tests ---
+    info "Tier 2b: engine (non-simulation) unit tests (~4900 tests)..."
+    if $NICE_PREFIX $VENV -m pytest \
+        "$SCRIPT_DIR/tests/engine/actions/" \
+        "$SCRIPT_DIR/tests/engine/addons/" \
+        "$SCRIPT_DIR/tests/engine/api/" \
+        "$SCRIPT_DIR/tests/engine/audio/" \
+        "$SCRIPT_DIR/tests/engine/backup/" \
+        "$SCRIPT_DIR/tests/engine/comms/" \
+        "$SCRIPT_DIR/tests/engine/inference/" \
+        "$SCRIPT_DIR/tests/engine/intelligence/" \
+        "$SCRIPT_DIR/tests/engine/layers/" \
+        "$SCRIPT_DIR/tests/engine/nodes/" \
+        "$SCRIPT_DIR/tests/engine/perception/" \
+        "$SCRIPT_DIR/tests/engine/plugins/" \
+        "$SCRIPT_DIR/tests/engine/scenarios/" \
+        "$SCRIPT_DIR/tests/engine/synthetic/" \
+        "$SCRIPT_DIR/tests/engine/tactical/" \
+        "$SCRIPT_DIR/tests/engine/testing/" \
+        "$SCRIPT_DIR/tests/engine/units/" \
+        -m unit --tb=short -q $PYTEST_RESOURCE_ARGS $GENTLE_PYTEST_ARGS 2>&1; then
+        engine_ok=1
+    fi
+    gentle_pause
+    resource_check "after engine tests"
+
+    # --- Sub-tier 2c: amy ---
+    info "Tier 2c: amy unit tests (~830 tests)..."
+    if $NICE_PREFIX $VENV -m pytest \
+        "$SCRIPT_DIR/tests/amy/" \
+        -m unit --tb=short -q $PYTEST_RESOURCE_ARGS $GENTLE_PYTEST_ARGS 2>&1; then
+        amy_ok=1
+    fi
+
+    # Report results
+    if [ $sim_ok -eq 1 ] && [ $engine_ok -eq 1 ] && [ $amy_ok -eq 1 ]; then
+        pass "Unit tests (simulation + engine + amy)"
+    else
+        [ $sim_ok -eq 0 ] && fail "Simulation unit tests"
+        [ $engine_ok -eq 0 ] && fail "Engine unit tests"
+        [ $amy_ok -eq 0 ] && fail "Amy unit tests"
+    fi
+
+    resource_check "after all unit tests"
 }
 
 tier3_js() {
     header "Tier 3: JS Tests"
+    resource_check "before JS tests"
     local js_err=0
-    for jstest in test_war_math.js test_war_audio.js test_war_fog.js test_war_fx.js test_fsm_state.js test_geo_math.js test_panel_manager.js test_layout_manager.js test_mesh_panel.js test_game_hud.js test_amy_panel.js test_units_panel.js test_alerts_panel.js test_menu_bar.js test_game_panel.js test_audio_panel.js test_cameras_panel.js test_escalation_panel.js test_events_panel.js test_scenarios_panel.js test_search_panel.js test_system_panel.js test_tak_panel.js test_patrol_panel.js test_videos_panel.js test_zones_panel.js test_events.js test_store.js test_websocket.js test_unit_icons.js test_unit_types.js test_tactical_labels.js test_input.js test_map_render.js test_command_bar.js test_main.js test_map3d.js test_label_collision.js test_war_combat.js test_war_events.js test_war_hud.js test_map_interaction.js test_unit_command.js test_vision_system.js test_mission_modal.js test_camera_pan.js test_war_hud_modes.js test_game_over.js test_setup_mode.js test_map_overlays.js test_kill_feed.js test_chat.js test_morale_markers.js test_stats_panel.js test_sensors_panel.js test_cinematic_squads.js test_hazard_events.js test_hazard_overlay.js test_crowd_role_icons.js test_bonus_objectives.js test_hostile_intel.js test_crowd_density_overlay.js test_hostile_objectives.js test_objective_events.js test_unit_signals.js test_morale_visuals.js test_cover_visuals.js test_squad_lines.js test_replay_panel.js test_context_menu.js test_device_controls.js test_hover_effects.js test_inventory_panel.js test_map_layers.js test_patrol_routes.js test_unit_inspector.js test_upgrades.js test_analytics.js test_device_modal.js test_feature_flows.js test_gis_layers.js test_graphlings_panel.js test_map_overlays_new.js test_map_positions.js test_mesh_layer.js test_minimap_panel.js test_models.js test_player.js test_scenarios_safety.js test_thought_bubbles.js test_timeline_panel.js test_war_editor.js test_comm_link_layer.js; do
-        if [ -f "$SCRIPT_DIR/tests/js/$jstest" ]; then
-            if node "$SCRIPT_DIR/tests/js/$jstest"; then
-                pass "JS $jstest"
+    local batch_runner="$SCRIPT_DIR/tests/js/run-all.js"
+
+    if [ -f "$batch_runner" ]; then
+        # Parallel batch runner: discovers all test_*.js, runs with controlled
+        # concurrency (~4x faster than sequential).
+        local batch_output
+        batch_output=$($NICE_PREFIX node "$batch_runner" --concurrency "$MAX_JOBS" 2>&1) || true
+
+        # Parse BATCH_PASS / BATCH_FAIL / BATCH_SKIP lines into test.sh format
+        while IFS= read -r line; do
+            case "$line" in
+                BATCH_PASS:*)
+                    pass "JS ${line#BATCH_PASS: }" ;;
+                BATCH_FAIL:*)
+                    fail "JS ${line#BATCH_FAIL: }"
+                    js_err=$((js_err + 1)) ;;
+                BATCH_SKIP:*)
+                    warn "JS test not found: ${line#BATCH_SKIP: }"
+                    TOTAL_SKIP=$((TOTAL_SKIP + 1)) ;;
+                BATCH_SUMMARY:*)
+                    info "${line#BATCH_SUMMARY: }" ;;
+            esac
+        done <<< "$batch_output"
+    else
+        # Fallback: sequential execution (no batch runner available)
+        for jstest in "$SCRIPT_DIR"/tests/js/test_*.js; do
+            local name
+            name=$(basename "$jstest")
+            if $NICE_PREFIX node "$jstest"; then
+                pass "JS $name"
             else
-                fail "JS $jstest"
+                fail "JS $name"
                 js_err=$((js_err + 1))
             fi
-        else
-            warn "JS test not found: tests/js/$jstest"
-            TOTAL_SKIP=$((TOTAL_SKIP + 1))
-        fi
-    done
+        done
+    fi
 }
 
 tier4_vision() {
@@ -154,7 +303,7 @@ tier7_visual() {
 
 tier8_lib() {
     header "Tier 8: Test Infrastructure Tests"
-    if $VENV -m pytest "$SCRIPT_DIR/tests/lib/" -m unit --tb=short -q 2>&1; then
+    if $NICE_PREFIX $VENV -m pytest "$SCRIPT_DIR/tests/lib/" -m unit --tb=short -q 2>&1; then
         pass "Test infrastructure tests"
     else
         fail "Test infrastructure tests"
@@ -164,7 +313,7 @@ tier8_lib() {
 tier8b_ros2() {
     header "Tier 8b: ROS2 Robot Tests"
     if [ -d "$SCRIPT_DIR/examples/ros2-robot/tests" ]; then
-        if python3 -m pytest "$SCRIPT_DIR/examples/ros2-robot/tests/" --tb=short -q 2>&1; then
+        if $NICE_PREFIX python3 -m pytest "$SCRIPT_DIR/examples/ros2-robot/tests/" --tb=short -q 2>&1; then
             pass "ROS2 robot tests"
         else
             fail "ROS2 robot tests"
@@ -396,14 +545,49 @@ summary() {
 
 # Main — disable set -e for tier functions so failures don't kill the script
 main() {
+    # Pre-parse flags that modify behavior before the mode switch
+    local args=()
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --gentle)
+                GENTLE=true
+                NICE_PREFIX="nice -n 15"
+                if command -v ionice &>/dev/null; then
+                    NICE_PREFIX="nice -n 15 ionice -c 3"
+                fi
+                MAX_JOBS=2
+                export PYTEST_XDIST_AUTO_NUM_WORKERS="$MAX_JOBS"
+                # Gentle: tighter timeout, lower maxfail, stop-on-first for early bail
+                GENTLE_PYTEST_ARGS="--timeout=15"
+                PYTEST_RESOURCE_ARGS="--maxfail=5"
+                info "Gentle mode: nice -n 15, ionice idle, timeout=15s, maxfail=5"
+                shift
+                ;;
+            --resource-report)
+                resource_check "system status"
+                echo "CPU cores: $(nproc 2>/dev/null || echo unknown)"
+                echo "MAX_JOBS: $MAX_JOBS"
+                echo "NICE_PREFIX: $NICE_PREFIX"
+                echo "GENTLE: $GENTLE"
+                exit 0
+                ;;
+            *)
+                args+=("$1")
+                shift
+                ;;
+        esac
+    done
+    set -- "${args[@]+"${args[@]}"}"
+
     header "TRITIUM-SC Test Suite"
+    resource_check "startup"
 
     set +e
     case "${1:-}" in
         ""|fast)
-            tier1_syntax; tier2_unit; tier3_js; tier8_lib; tier8b_ros2 ;;
+            tier1_syntax; gentle_pause; tier2_unit; gentle_pause; tier3_js; gentle_pause; tier8_lib; gentle_pause; tier8b_ros2 ;;
         all)
-            tier1_syntax; tier2_unit; tier3_js; tier4_vision; tier4_gameplay; tier5_e2e; tier6_battle; tier7_visual; tier8_lib; tier8b_ros2; tier9_integration; tier10_quality; tier11_smoke; tier13_ux; tier14_defects; tier15_alignment; tier16_layer_isolation; tier17_ui_isolation; tier18_defense; tier19_user_stories; tier20_ui_overlap; tier21_panel_coverage; tier22_combat_effects ;;
+            tier1_syntax; gentle_pause; tier2_unit; gentle_pause; tier3_js; gentle_pause; tier4_vision; gentle_pause; tier4_gameplay; gentle_pause; tier5_e2e; gentle_pause; tier6_battle; gentle_pause; tier7_visual; gentle_pause; tier8_lib; gentle_pause; tier8b_ros2; gentle_pause; tier9_integration; gentle_pause; tier10_quality; gentle_pause; tier11_smoke; gentle_pause; tier13_ux; gentle_pause; tier14_defects; gentle_pause; tier15_alignment; gentle_pause; tier16_layer_isolation; gentle_pause; tier17_ui_isolation; gentle_pause; tier18_defense; gentle_pause; tier19_user_stories; gentle_pause; tier20_ui_overlap; gentle_pause; tier21_panel_coverage; gentle_pause; tier22_combat_effects ;;
         1) tier1_syntax ;;
         2) tier2_unit ;;
         3) tier3_js ;;
@@ -445,7 +629,10 @@ main() {
         --panels) tier21_panel_coverage ;;
         --combat) tier22_combat_effects ;;
         docs|--docs) tier_docs ;;
-        *) echo "Usage: $0 [all|fast|1-22|docs|--dist|--visual|--gameplay|--battle|--integration|--quality|--smoke|--layout|--ux|--defects|--alignment|--layers|--ui-isolation|--defense|--user-stories|--overlap|--panels|--docs]"; exit 1 ;;
+        *) echo "Usage: $0 [--gentle] [--resource-report] [all|fast|1-22|docs|--dist|--visual|--gameplay|--battle|--integration|--quality|--smoke|--layout|--ux|--defects|--alignment|--layers|--ui-isolation|--defense|--user-stories|--overlap|--panels|--docs]"
+           echo "  --gentle          Lower priority, tighter timeouts (15s), maxfail=5"
+           echo "  --resource-report Show memory/CPU/swap status and exit"
+           exit 1 ;;
     esac
     set -e
 

@@ -2,6 +2,7 @@
 // Copyright 2026 Valpatel Software LLC
 // Licensed under AGPL-3.0 — see LICENSE for details.
 // LayoutManager -- named layout save/recall for the panel system.
+// Extends tritium-lib's base LayoutManager with SC-specific panel interaction.
 // Built-in presets (commander, observer, tactical, battle) are constants.
 // User layouts persist to localStorage.
 //
@@ -12,13 +13,14 @@
 //   lm.saveCurrent('my-layout');
 
 import { EventBus } from './events.js';
+import { LayoutManager as BaseLayoutManager } from '/lib/layout-manager.js';
 
 const STORAGE_KEY = 'tritium-user-layouts';
 
-export class LayoutManager {
+export class LayoutManager extends BaseLayoutManager {
     constructor(panelManager) {
+        super(LayoutManager.BUILTIN_LAYOUTS, { storageKey: STORAGE_KEY });
         this._pm = panelManager;
-        this._userLayouts = this._loadUserLayouts();
         this._currentName = null;
     }
 
@@ -92,8 +94,8 @@ export class LayoutManager {
             }
         }
 
-        this._userLayouts[key] = { panels };
-        this._saveUserLayouts();
+        this._custom[key] = { panels };
+        this._saveToStorage();
         this._currentName = key;
     }
 
@@ -103,7 +105,7 @@ export class LayoutManager {
      */
     apply(name) {
         const key = name.trim().toLowerCase();
-        const layout = LayoutManager.BUILTIN_LAYOUTS[key] || this._userLayouts[key];
+        const layout = LayoutManager.BUILTIN_LAYOUTS[key] || this._custom[key];
         if (!layout) {
             console.warn(`[LayoutManager] Unknown layout: ${name}`);
             return;
@@ -159,10 +161,10 @@ export class LayoutManager {
             console.warn(`[LayoutManager] Cannot delete built-in layout: ${key}`);
             return false;
         }
-        if (!this._userLayouts[key]) return false;
+        if (!this._custom[key]) return false;
 
-        delete this._userLayouts[key];
-        this._saveUserLayouts();
+        delete this._custom[key];
+        this._saveToStorage();
         if (this._currentName === key) this._currentName = null;
         return true;
     }
@@ -176,7 +178,7 @@ export class LayoutManager {
         for (const name of Object.keys(LayoutManager.BUILTIN_LAYOUTS)) {
             list.push({ name, builtin: true });
         }
-        for (const name of Object.keys(this._userLayouts)) {
+        for (const name of Object.keys(this._custom)) {
             list.push({ name, builtin: false });
         }
         return list;
@@ -189,7 +191,7 @@ export class LayoutManager {
      */
     exportJSON(name) {
         const key = name.trim().toLowerCase();
-        const layout = LayoutManager.BUILTIN_LAYOUTS[key] || this._userLayouts[key];
+        const layout = LayoutManager.BUILTIN_LAYOUTS[key] || this._custom[key];
         if (!layout) return null;
         return JSON.stringify({ name: key, layout }, null, 2);
     }
@@ -207,34 +209,12 @@ export class LayoutManager {
                 return null;
             }
             const key = data.name.trim().toLowerCase();
-            this._userLayouts[key] = data.layout;
-            this._saveUserLayouts();
+            this._custom[key] = data.layout;
+            this._saveToStorage();
             return key;
         } catch (e) {
             console.error('[LayoutManager] Failed to parse layout JSON:', e);
             return null;
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Private: localStorage persistence
-    // ------------------------------------------------------------------
-
-    _loadUserLayouts() {
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (!raw) return {};
-            return JSON.parse(raw);
-        } catch (_) {
-            return {};
-        }
-    }
-
-    _saveUserLayouts() {
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(this._userLayouts));
-        } catch (_) {
-            // localStorage might be full or unavailable
         }
     }
 }

@@ -1123,7 +1123,7 @@ async def report_sighting(request: Request):
     if engine is None:
         return {"error": "No simulation engine"}
     body = await request.json()
-    from engine.simulation.vision import SightingReport
+    from tritium_lib.sim_engine.world.vision import SightingReport
     report = SightingReport(
         observer_id=body.get("observer_id", "unknown"),
         target_id=body.get("target_id", ""),

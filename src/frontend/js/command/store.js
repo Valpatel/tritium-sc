@@ -2,11 +2,29 @@
 // Copyright 2026 Valpatel Software LLC
 // Licensed under AGPL-3.0 — see LICENSE for details.
 // TritiumStore -- single source of truth for all UI state
+// Imports ReactiveStore base class from tritium-lib for subscriber infrastructure.
 // Usage:
 //   import { TritiumStore } from './store.js';
 //   TritiumStore.set('game.phase', 'active');
 //   const unsub = TritiumStore.on('game.phase', (val, old) => console.log(val));
 //   unsub();  // unsubscribe
+
+import { ReactiveStore } from '/lib/store.js';
+
+// Internal ReactiveStore instance — provides subscriber management (on/_listeners).
+// SC's TritiumStore delegates on() to this instance and adds wildcard ('*') support
+// and domain-specific methods on top.
+// In Node.js test sandboxes the import line is stripped; ReactiveStore may be
+// pre-loaded into the vm context, or we fall back to a minimal inline shim.
+const _ReactiveStore = typeof ReactiveStore !== 'undefined' ? ReactiveStore : class {
+    constructor() { this._listeners = new Map(); }
+    on(path, fn) {
+        if (!this._listeners.has(path)) this._listeners.set(path, new Set());
+        this._listeners.get(path).add(fn);
+        return () => this._listeners.get(path)?.delete(fn);
+    }
+};
+const _base = new _ReactiveStore();
 
 export const TritiumStore = {
     // Map/viewport state
@@ -146,20 +164,21 @@ export const TritiumStore = {
     },
 
     // -----------------------------------------------------------------------
-    // Subscriber system
+    // Subscriber system — delegates to lib ReactiveStore for listener storage
     // -----------------------------------------------------------------------
-    _listeners: new Map(),
+
+    /** Expose _listeners from the lib's ReactiveStore base for test introspection */
+    get _listeners() { return _base._listeners; },
 
     /**
      * Subscribe to changes at a dot-path.
+     * Delegates to lib ReactiveStore.on() for listener management.
      * @param {string} path - e.g. 'game.phase', 'amy.state', or '*' for all
      * @param {Function} fn - callback(newValue, oldValue) or callback(path, value) for '*'
      * @returns {Function} unsubscribe function
      */
     on(path, fn) {
-        if (!this._listeners.has(path)) this._listeners.set(path, new Set());
-        this._listeners.get(path).add(fn);
-        return () => this._listeners.get(path)?.delete(fn);
+        return _base.on(path, fn);
     },
 
     /**

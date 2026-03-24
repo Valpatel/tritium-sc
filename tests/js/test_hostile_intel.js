@@ -74,7 +74,8 @@ class MockWebSocket {
 // ============================================================
 
 const storeCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8');
-const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8');
+const eventsCode = fs.readFileSync(__dirname + '/../../../tritium-lib/web/events.js', 'utf8');
+const libWsCode = fs.readFileSync(__dirname + '/../../../tritium-lib/web/websocket.js', 'utf8');
 const wsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
 const hudCode = fs.readFileSync(__dirname + '/../../src/frontend/js/war-hud.js', 'utf8');
 
@@ -98,11 +99,14 @@ function createWsContext() {
         },
     });
 
-    const storeStripped = storeCode.replace(/^export\s+/gm, '');
+    const storeStripped = storeCode.replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, '');
     vm.runInContext(storeStripped, ctx);
 
     const eventsStripped = eventsCode.replace(/^export\s+/gm, '');
     vm.runInContext(eventsStripped, ctx);
+
+    // Load lib websocket base class (strip export)
+    vm.runInContext(libWsCode.replace(/^export\s+/gm, ''), ctx);
 
     const wsStripped = wsCode
         .replace(/^import\s+.*$/gm, '')

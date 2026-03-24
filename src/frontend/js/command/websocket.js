@@ -3,6 +3,7 @@
 // Licensed under AGPL-3.0 — see LICENSE for details.
 // WebSocketManager -- manages connection to /ws/live with auto-reconnect
 // Routes incoming messages to TritiumStore and EventBus
+// Extends TritiumWebSocket (tritium-lib) for connect/reconnect/keepalive/banner.
 //
 // Usage:
 //   import { WebSocketManager } from './websocket.js';
@@ -12,96 +13,46 @@
 
 import { TritiumStore } from './store.js';
 import { EventBus } from './events.js';
+import { TritiumWebSocket } from '/lib/websocket.js';
 
-export class WebSocketManager {
+export class WebSocketManager extends TritiumWebSocket {
     constructor() {
-        this._ws = null;
-        this._reconnectTimer = null;
-        this._reconnectDelay = 1000;
-        this._maxDelay = 16000;
-        this._disconnectedBanner = null;
-        this._pingTimer = null;
-        this._PING_INTERVAL_MS = 25000; // send client ping every 25s (server expects pong within 90s)
-    }
-
-    /**
-     * Open a WebSocket connection to the server.
-     * Auto-reconnects on close with exponential backoff.
-     */
-    connect() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const url = `${protocol}//${window.location.host}/ws/live`;
-        console.log(`%c[WS] Connecting to ${url}`, 'color: #fcee0a;');
-
-        try {
-            this._ws = new WebSocket(url);
-
-            this._ws.onopen = () => {
+        super(url, {
+            initialDelay: 1000,
+            maxDelay: 16000,
+            pingInterval: 25000,
+            onOpen: () => {
                 console.log('%c[WS] Connected', 'color: #05ffa1;');
                 TritiumStore.set('connection.status', 'connected');
-                this._reconnectDelay = 1000;
-                this._hideDisconnectedBanner();
                 EventBus.emit('ws:connected');
                 // Sync full state on every connect (covers initial load and
                 // reconnects — events may have been missed during the gap).
                 this._refreshState();
-                // Start client-side keepalive pings to prevent server from
-                // closing us as stale (server expects pong within 90s).
-                this._startPingKeepalive();
-            };
-
-            this._ws.onclose = () => {
+            },
+            onClose: () => {
                 console.log('%c[WS] Disconnected', 'color: #ff2a6d;');
                 TritiumStore.set('connection.status', 'disconnected');
-                this._stopPingKeepalive();
-                this._showDisconnectedBanner();
                 EventBus.emit('ws:disconnected');
-                this._scheduleReconnect();
-            };
-
-            this._ws.onerror = (e) => {
+            },
+            onError: (e) => {
                 console.error('[WS] Error:', e);
                 TritiumStore.set('connection.status', 'error');
-            };
-
-            this._ws.onmessage = (event) => {
-                try {
-                    const msg = JSON.parse(event.data);
-                    this._handleMessage(msg);
-                } catch (e) {
-                    console.error('[WS] Parse error:', e);
-                }
-            };
-        } catch (e) {
-            console.error('[WS] Connection failed:', e);
-            this._scheduleReconnect();
-        }
-    }
-
-    /**
-     * Send a JSON message over the WebSocket.
-     * Silently drops if not connected.
-     * @param {Object} data
-     */
-    send(data) {
-        if (this._ws?.readyState === WebSocket.OPEN) {
-            this._ws.send(JSON.stringify(data));
-        }
+            },
+        });
     }
 
     /**
      * Close the WebSocket connection. Does not auto-reconnect.
+     * Unlike the base class, allows reconnecting later via connect().
      */
     disconnect() {
-        clearTimeout(this._reconnectTimer);
-        this._reconnectTimer = null;
-        this._stopPingKeepalive();
-        if (this._ws) {
-            // Remove onclose to prevent auto-reconnect
-            this._ws.onclose = null;
-            this._ws.close();
-            this._ws = null;
-        }
+        super.disconnect();
+        // Allow subsequent connect() calls — base class sets _destroyed
+        // to permanently prevent reconnection, but SC supports
+        // disconnect/connect cycling.
+        this._destroyed = false;
         TritiumStore.set('connection.status', 'disconnected');
     }
 
@@ -109,7 +60,7 @@ export class WebSocketManager {
      * @returns {boolean} true if the WebSocket is open
      */
     get connected() {
-        return this._ws?.readyState === WebSocket.OPEN;
+        return this.isConnected;
     }
 
     // -----------------------------------------------------------------------
@@ -204,84 +155,6 @@ export class WebSocketManager {
         }
     }
 
-    _scheduleReconnect() {
-        clearTimeout(this._reconnectTimer);
-        const delay = this._reconnectDelay;
-        console.log(`%c[WS] Reconnecting in ${delay / 1000}s...`, 'color: #fcee0a;');
-        this._reconnectTimer = setTimeout(() => {
-            // Exponential backoff: 1s -> 2s -> 4s -> 8s -> 16s (cap)
-            this._reconnectDelay = Math.min(this._reconnectDelay * 2, this._maxDelay);
-            this.connect();
-        }, delay);
-    }
-
-    /**
-     * Show a fixed "DISCONNECTED" banner at the top of the viewport.
-     * Idempotent — safe to call multiple times.
-     */
-    _showDisconnectedBanner() {
-        if (typeof document === 'undefined') return;
-        if (this._disconnectedBanner) return;
-        const banner = document.createElement('div');
-        banner.id = 'ws-disconnected-banner';
-        banner.style.cssText = [
-            'position: fixed',
-            'top: 0',
-            'left: 0',
-            'right: 0',
-            'z-index: 99999',
-            'background: #ff2a6d',
-            'color: #fff',
-            'text-align: center',
-            'padding: 6px 12px',
-            'font-family: monospace',
-            'font-size: 13px',
-            'font-weight: bold',
-            'letter-spacing: 2px',
-            'text-transform: uppercase',
-            'box-shadow: 0 2px 8px rgba(255,42,109,0.5)',
-        ].join(';');
-        banner.textContent = '// DISCONNECTED -- reconnecting...';
-        document.body.appendChild(banner);
-        this._disconnectedBanner = banner;
-    }
-
-    /**
-     * Remove the "DISCONNECTED" banner when connection is restored.
-     */
-    _hideDisconnectedBanner() {
-        if (this._disconnectedBanner) {
-            this._disconnectedBanner.remove();
-            this._disconnectedBanner = null;
-        }
-    }
-
-    /**
-     * Start a client-side ping interval that sends {"type":"ping"} every 25s.
-     * The server records pong timestamps for each client; if a client misses
-     * 3 consecutive server pings (90s), the server closes the connection.
-     * This keepalive ensures the client sends traffic regularly so the server
-     * always sees recent activity and never considers the connection stale.
-     */
-    _startPingKeepalive() {
-        this._stopPingKeepalive();
-        this._pingTimer = setInterval(() => {
-            if (this._ws?.readyState === WebSocket.OPEN) {
-                this.send({ type: 'ping' });
-            }
-        }, this._PING_INTERVAL_MS);
-    }
-
-    /**
-     * Stop the client-side ping keepalive interval.
-     */
-    _stopPingKeepalive() {
-        if (this._pingTimer) {
-            clearInterval(this._pingTimer);
-            this._pingTimer = null;
-        }
-    }
-
     /**
      * Fetch full game state and unit positions from the REST API.
      * Called on every WS connect to fill gaps from missed events during
@@ -328,6 +201,7 @@ export class WebSocketManager {
 
     /**
      * Route an incoming WebSocket message to the store and event bus.
+     * Overrides TritiumWebSocket._handleMessage for SC-specific routing.
      * @param {Object} msg - parsed JSON message
      */
     _handleMessage(msg) {

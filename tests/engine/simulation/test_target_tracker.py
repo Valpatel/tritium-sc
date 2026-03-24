@@ -215,7 +215,7 @@ class TestPruneStale:
 
         # Mock time.monotonic to jump forward past STALE_TIMEOUT
         real_mono = time.monotonic
-        with patch("engine.tactical.target_tracker.time") as mock_time:
+        with patch("tritium_lib.tracking.target_tracker.time") as mock_time:
             mock_time.monotonic.return_value = real_mono() + tracker.STALE_TIMEOUT + 1.0
             result = tracker.get_all()
         assert len(result) == 0
@@ -230,7 +230,7 @@ class TestPruneStale:
         })
 
         real_mono = time.monotonic
-        with patch("engine.tactical.target_tracker.time") as mock_time:
+        with patch("tritium_lib.tracking.target_tracker.time") as mock_time:
             # Jump to just before sim timeout
             mock_time.monotonic.return_value = real_mono() + tracker.SIM_STALE_TIMEOUT - 1.0
             result = tracker.get_all()
@@ -247,7 +247,7 @@ class TestPruneStale:
         })
 
         real_mono = time.monotonic
-        with patch("engine.tactical.target_tracker.time") as mock_time:
+        with patch("tritium_lib.tracking.target_tracker.time") as mock_time:
             mock_time.monotonic.return_value = real_mono() + tracker.SIM_STALE_TIMEOUT + 1.0
             result = tracker.get_all()
         assert len(result) == 0

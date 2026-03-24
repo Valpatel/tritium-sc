@@ -89,10 +89,14 @@ function createFreshContext() {
     const ctx = vm.createContext(sandbox);
 
     const storeCode = fs.readFileSync('src/frontend/js/command/store.js', 'utf-8');
-    vm.runInContext(storeCode.replace(/^export\s+/gm, ''), ctx);
+    vm.runInContext(storeCode.replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 
-    const eventsCode = fs.readFileSync('src/frontend/js/command/events.js', 'utf-8');
+    const eventsCode = fs.readFileSync(__dirname + '/../../../tritium-lib/web/events.js', 'utf-8');
     vm.runInContext(eventsCode.replace(/^export\s+/gm, '').replace(/^import\s.*$/gm, ''), ctx);
+
+    // Load lib websocket base class
+    const libWsCode = fs.readFileSync(__dirname + '/../../../tritium-lib/web/websocket.js', 'utf-8');
+    vm.runInContext(libWsCode.replace(/^export\s+/gm, ''), ctx);
 
     const wsCode = fs.readFileSync('src/frontend/js/command/websocket.js', 'utf-8');
     vm.runInContext(

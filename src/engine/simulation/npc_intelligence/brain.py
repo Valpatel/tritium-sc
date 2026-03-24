@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from engine.simulation.state_machine import StateMachine
+from tritium_lib.sim_engine.core.state_machine import StateMachine
 from .npc_fsm import create_npc_fsm
 
 

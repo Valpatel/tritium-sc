@@ -183,7 +183,7 @@ async def get_traffic_density(request: Request):
     """Get current traffic density and NPC population stats."""
     from datetime import datetime
 
-    from engine.simulation.npc import NPC_VEHICLE_TYPES, traffic_density
+    from tritium_lib.sim_engine.behavior.npc import NPC_VEHICLE_TYPES, traffic_density
 
     mgr = _get_npc_manager(request)
     hour = datetime.now().hour

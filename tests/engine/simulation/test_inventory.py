@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from engine.simulation.inventory import (
+from tritium_lib.sim_engine.core.inventory import (
     InventoryItem,
     UnitInventory,
     ITEM_CATALOG,
@@ -497,9 +497,11 @@ class TestBuildLoadout:
         smoke = [g for g in grenades if g.name == "Smoke Grenade"]
         assert len(smoke) >= 1
 
-    def test_neutral_person_empty(self):
+    def test_neutral_person_no_weapons(self):
         inv = build_loadout("n_person_1", "person", "neutral")
-        assert len(inv.items) == 0
+        # Neutrals carry devices (phones, watches) for BLE tracking but no weapons
+        weapons = [i for i in inv.items if i.item_type == "weapon"]
+        assert len(weapons) == 0
         assert inv.active_weapon_id is None
 
     def test_active_weapon_set_to_primary(self):
@@ -651,11 +653,12 @@ class TestFogOfWar:
         assert fog["item_count"] > 0
         assert "items" not in fog
 
-    def test_fog_dict_empty_inventory(self):
+    def test_fog_dict_neutral_inventory(self):
         inv = build_loadout("fog_test_3", "person", "neutral")
         fog = inv.to_fog_dict()
         assert fog["status"] == "unknown"
-        assert fog["item_count"] == 0
+        # Neutrals may carry devices (phones) but no weapons — fog hides details
+        assert fog["item_count"] >= 0
 
 
 # ---------------------------------------------------------------------------

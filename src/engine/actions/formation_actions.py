@@ -64,7 +64,7 @@ def register_formation_actions(
         engine: The SimulationEngine providing squad_manager and targets.
     """
     from engine.actions.lua_registry import ActionDef
-    from engine.simulation.squads import Squad
+    from tritium_lib.sim_engine.combat.squads import Squad
 
     # -- formation(type, id1, id2, ...) --------------------------------
 

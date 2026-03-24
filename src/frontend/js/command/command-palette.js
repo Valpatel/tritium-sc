@@ -5,12 +5,15 @@
 // Open with Ctrl+K or / (when not focused on input).
 // Searchable list of all actions: open panel, toggle layer, start demo, etc.
 //
+// Extends tritium-lib's fuzzyScore for search; SC owns command list + DOM rendering.
+//
 // Usage:
 //   import { initCommandPalette } from './command-palette.js';
 //   initCommandPalette(panelManager, mapActions);
 
 import { EventBus } from './events.js';
 import { _esc } from './panel-utils.js';
+import { fuzzyScore } from '/lib/command-palette.js';
 
 let _overlay = null;
 let _input = null;
@@ -141,27 +144,14 @@ function _filterCommands(query) {
         return;
     }
     const q = query.toLowerCase().trim();
-    const terms = q.split(/\s+/);
 
     _filtered = _commands
         .map(cmd => {
-            const text = `${cmd.category} ${cmd.label}`.toLowerCase();
-            let score = 0;
-            let allMatch = true;
-            for (const term of terms) {
-                const idx = text.indexOf(term);
-                if (idx === -1) {
-                    allMatch = false;
-                    break;
-                }
-                // Prefer earlier matches
-                score += (100 - idx);
-                // Bonus for matching at word boundary
-                if (idx === 0 || text[idx - 1] === ' ') score += 50;
-            }
-            return { cmd, score, match: allMatch };
+            const text = `${cmd.category} ${cmd.label}`;
+            const score = fuzzyScore(q, text);
+            return { cmd, score };
         })
-        .filter(r => r.match)
+        .filter(r => r.score > 0)
         .sort((a, b) => b.score - a.score)
         .map(r => r.cmd);
 }
@@ -282,10 +272,10 @@ function _buildCommands(panelManager, mapActions) {
 
         // Battle controls
         if (mapActions.beginWar) {
-            cmds.push({ category: 'GAME', label: 'Begin Battle', shortcut: 'B', action: mapActions.beginWar });
+            cmds.push({ category: 'SIMULATION', label: 'Begin Battle', shortcut: 'B', action: mapActions.beginWar });
         }
         if (mapActions.resetGame) {
-            cmds.push({ category: 'GAME', label: 'Reset Game', action: mapActions.resetGame });
+            cmds.push({ category: 'SIMULATION', label: 'Reset Battle', action: mapActions.resetGame });
         }
     }
 
@@ -330,4 +320,3 @@ function _buildCommands(panelManager, mapActions) {
 
     return cmds;
 }
-
