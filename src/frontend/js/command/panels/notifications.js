@@ -6,8 +6,8 @@
 // with severity colors. Click to navigate to related entity.
 // Subscribes to: WebSocket notification:new events
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 const SEVERITY_COLORS = {
     critical: '#ff2a6d',

@@ -6,7 +6,7 @@
 // and sensor coverage overlays. Exports as PNG with timestamp watermark.
 // Hotkey: Ctrl+Shift+P (enhanced) vs P (basic canvas snapshot from war.js)
 
-import { EventBus } from '../events.js';
+import { EventBus } from '/lib/events.js';
 
 /**
  * Capture the full tactical area including MapLibre canvas, SVG overlays,

@@ -4,8 +4,8 @@
 // Federation Site Status Panel — shows connected federation sites with
 // sync status, shared target count, last sync timestamp, and connection health.
 
-import { EventBus } from '../events.js';
-import { _esc, _timeAgo } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc, _timeAgo } from '/lib/utils.js';
 
 const REFRESH_INTERVAL_MS = 10000; // Refresh every 10s
 

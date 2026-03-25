@@ -7,8 +7,8 @@
 // category badges, and version info. Fetches from /api/addons/ and posts
 // enable/disable to /api/addons/{id}/enable and /api/addons/{id}/disable.
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 import { reloadAddon, discoverAddons } from '../addon-loader.js';
 
 const POLL_INTERVAL_MS = 10000;

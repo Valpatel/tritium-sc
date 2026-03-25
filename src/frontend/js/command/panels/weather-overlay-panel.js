@@ -5,7 +5,7 @@
 // Shows current weather data and lets operators toggle the overlay on/off.
 
 import { TritiumStore } from '../store.js';
-import { EventBus } from '../events.js';
+import { EventBus } from '/lib/events.js';
 import { weatherOverlay } from './weather-overlay.js';
 
 const REFRESH_MS = 30000;

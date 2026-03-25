@@ -5,7 +5,7 @@
 // for a selected dossier. Source-colored markers, click for details.
 // Fetches from /api/dossiers/{id} and renders a scrollable timeline.
 
-import { _esc, _timeAgo } from '../panel-utils.js';
+import { _esc, _timeAgo } from '/lib/utils.js';
 
 // Source -> color mapping for timeline markers
 const SOURCE_COLORS = {

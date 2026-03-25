@@ -6,7 +6,7 @@
 // Connects to SSE /api/graphlings/thoughts for real-time updates.
 
 import { TritiumStore } from '../store.js';
-import { _esc } from '../panel-utils.js';
+import { _esc } from '/lib/utils.js';
 
 
 // Emotion to CSS class mapping

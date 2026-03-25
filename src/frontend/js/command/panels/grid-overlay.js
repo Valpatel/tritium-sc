@@ -10,7 +10,7 @@
  *   - MGRS-style grid zones (approximate, for display only)
  */
 
-import { EventBus } from '../events.js';
+import { EventBus } from '/lib/events.js';
 import { TritiumStore } from '../store.js';
 
 // Grid overlay state

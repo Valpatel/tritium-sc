@@ -6,8 +6,8 @@
 // and WiFi vs BLE contribution indicators.
 // Backend API: /api/indoor (positions, position/{id}, status)
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 const REFRESH_INTERVAL_MS = 5000;

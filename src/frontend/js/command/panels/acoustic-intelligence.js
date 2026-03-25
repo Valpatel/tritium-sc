@@ -5,8 +5,8 @@
 // expanding ring visualization, and source localization.
 // Backend API: /api/acoustic (classify, timeline, localizations, stats)
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 const SEVERITY_COLORS = {

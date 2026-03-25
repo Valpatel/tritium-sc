@@ -4,8 +4,8 @@
 // Sensor Health Panel — grid showing all sensors with health indicators,
 // sighting rate sparklines, last-seen timestamps, and degraded alerts.
 
-import { EventBus } from '../events.js';
-import { _esc, _timeAgo } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc, _timeAgo } from '/lib/utils.js';
 
 const REFRESH_INTERVAL = 10000; // 10s
 

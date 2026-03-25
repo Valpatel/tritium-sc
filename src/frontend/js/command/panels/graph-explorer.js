@@ -6,8 +6,8 @@
 // edges labeled by relationship. Click to select, double-click to expand,
 // drag to rearrange, scroll to zoom, right-drag to pan.
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 // ---------------------------------------------------------------------------
 // Constants

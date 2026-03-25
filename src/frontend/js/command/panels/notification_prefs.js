@@ -6,7 +6,7 @@
 // Uses NotificationRule from tritium-lib via the /api/notifications/preferences API.
 
 
-import { _esc } from '../panel-utils.js';
+import { _esc } from '/lib/utils.js';
 const SEVERITY_OPTIONS = ['debug', 'info', 'warning', 'error', 'critical'];
 const SEVERITY_COLORS = {
     debug:    '#888',

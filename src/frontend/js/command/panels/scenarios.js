@@ -6,8 +6,8 @@
 // launches test runs with live progress.
 // Uses /api/scenarios endpoints.
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 export const ScenariosPanelDef = {

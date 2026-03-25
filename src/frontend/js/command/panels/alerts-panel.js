@@ -5,8 +5,8 @@
 // Sources: geofence, BLE, LPR, threat feeds, federation, acoustic, sensor health.
 // Backend API: /api/alerts/unified
 
-import { EventBus } from '../events.js';
-import { _esc, _timeAgo } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc, _timeAgo } from '/lib/utils.js';
 
 const REFRESH_INTERVAL = 15000; // 15s
 const MAX_ALERTS = 200;

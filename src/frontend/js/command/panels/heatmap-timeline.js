@@ -6,8 +6,8 @@
 // how activity patterns change over hours or days. Fetches time-bucketed
 // heatmap snapshots and animates through them.
 
-import { EventBus } from '../events.js';
-import { _esc, _fetchJson } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc, _fetchJson } from '/lib/utils.js';
 
 const LAYERS = [
     { id: 'all', label: 'ALL ACTIVITY' },

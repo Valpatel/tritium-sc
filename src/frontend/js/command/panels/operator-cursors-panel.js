@@ -6,7 +6,7 @@
 // with a simple enable/disable UI and connected-operator list.
 
 import { TritiumStore } from '../store.js';
-import { EventBus } from '../events.js';
+import { EventBus } from '/lib/events.js';
 
 const POLL_MS = 3000;
 

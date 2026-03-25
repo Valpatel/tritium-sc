@@ -6,9 +6,9 @@
 // Fetches from /api/dossiers, /api/dossiers/search, /api/dossiers/{id}.
 // Supports filtering, sorting, tags, notes, merge, position trail mini-map.
 
-import { EventBus } from '../events.js';
+import { EventBus } from '/lib/events.js';
 import { TritiumStore } from '../store.js';
-import { _esc, _timeAgo } from '../panel-utils.js';
+import { _esc, _timeAgo } from '/lib/utils.js';
 
 
 

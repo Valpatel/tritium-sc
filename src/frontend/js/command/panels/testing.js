@@ -5,8 +5,8 @@
 // Shows test pass/fail/skip counts with trend arrows, module breakdown,
 // untested modules, and coverage gaps. Polls /api/testing/report.
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 function _arrow(delta) {

@@ -4,7 +4,7 @@
 // Security Audit Trail Panel — shows recent security events: failed auth,
 // rate limit hits, CORS rejections, CSP violations, server errors.
 
-import { _esc, _timeAgo } from '../panel-utils.js';
+import { _esc, _timeAgo } from '/lib/utils.js';
 
 
 function _severityBadge(severity) {

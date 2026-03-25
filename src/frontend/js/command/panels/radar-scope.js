@@ -6,8 +6,8 @@
 // cardinal directions, and live track dots with trails.
 // Fetches from /api/radar/tracks every 1s. Canvas 2D rendered.
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 // ============================================================
 // Constants

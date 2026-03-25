@@ -5,7 +5,7 @@
 // Quick visual of what each device can do: BLE, WiFi, Camera, Audio, Mesh, GPS.
 // Auto-refreshes every 15s. Data from /api/fleet/devices and /api/fleet/nodes.
 
-import { _esc, _timeAgo } from '../panel-utils.js';
+import { _esc, _timeAgo } from '/lib/utils.js';
 
 // Capability columns with icons and detection heuristics
 const CAPABILITIES = [

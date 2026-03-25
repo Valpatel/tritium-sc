@@ -10,8 +10,8 @@
 // - Operator chat (inline)
 // - Recent collaboration activity feed
 
-import { EventBus } from '../events.js';
-import { _esc, _timeAgo } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc, _timeAgo } from '/lib/utils.js';
 
 const POLL_MS = 6000;
 const CHAT_POLL_MS = 4000;

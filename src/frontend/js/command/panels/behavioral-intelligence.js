@@ -5,8 +5,8 @@
 // relationships, anomaly feed, and alert management.
 // Backend API: /api/patterns/ (GET patterns, relationships, anomalies, alerts)
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const SEVERITY_COLORS = {

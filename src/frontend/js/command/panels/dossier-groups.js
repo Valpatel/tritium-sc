@@ -6,9 +6,9 @@
 // icon with a count badge, reducing visual clutter for correlated targets.
 // Provides a toggle and a live view of active dossier groups.
 
-import { EventBus } from '../events.js';
+import { EventBus } from '/lib/events.js';
 import { TritiumStore } from '../store.js';
-import { _esc } from '../panel-utils.js';
+import { _esc } from '/lib/utils.js';
 
 
 // State

@@ -6,7 +6,7 @@
 // Subscribes to: alerts
 
 import { TritiumStore } from '../store.js';
-import { _esc } from '../panel-utils.js';
+import { _esc } from '/lib/utils.js';
 
 export const AlertsPanelDef = {
     id: 'alerts',

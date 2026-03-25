@@ -8,7 +8,7 @@
  * Used for briefings, operational planning, and marking areas of interest.
  */
 
-import { EventBus } from '../events.js';
+import { EventBus } from '/lib/events.js';
 import { TritiumStore } from '../store.js';
 
 let _panel = null;

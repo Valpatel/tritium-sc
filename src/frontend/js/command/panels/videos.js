@@ -5,8 +5,8 @@
 // Browse NVR channels, dates, and video files. Stream MP4 with
 // detection annotation overlay. Uses /api/videos/* endpoints.
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 function formatBytes(bytes) {

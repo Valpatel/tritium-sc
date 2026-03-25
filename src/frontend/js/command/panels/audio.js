@@ -5,8 +5,8 @@
 // Sound effects browser, volume control, mute toggle.
 // Lists effects from /api/audio/effects, click to preview.
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 const CATEGORIES = ['all', 'combat', 'ambient', 'ui', 'voice', 'alert'];
 

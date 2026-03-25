@@ -5,8 +5,8 @@
 // with timeline view, person grouping, confidence scores, and camera snapshots.
 // Backend API: /api/reid (matches, stats, persons)
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 // ---------------------------------------------------------------------------

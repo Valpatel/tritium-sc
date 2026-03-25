@@ -5,8 +5,8 @@
 // question input for tactical queries, cognitive layer activity display.
 
 import { TritiumStore } from '../store.js';
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 function _ts() {

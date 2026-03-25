@@ -6,8 +6,8 @@
 // Auto-opens on game state change, auto-hides when idle.
 
 import { TritiumStore } from '../store.js';
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 // ============================================================

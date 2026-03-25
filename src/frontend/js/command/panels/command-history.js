@@ -4,8 +4,8 @@
 // Fleet Command History Panel — audit log of all commands sent to edge devices.
 // Shows command, target device/group, timestamp, and result (acked/failed/timeout).
 
-import { EventBus } from '../events.js';
-import { _esc, _timeAgo } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc, _timeAgo } from '/lib/utils.js';
 
 
 function _resultBadge(result) {

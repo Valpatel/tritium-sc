@@ -5,8 +5,8 @@
 // Displays device list with online/offline/stale status badges,
 // battery level bars, sighting counts, uptime. Auto-refreshes every 10s.
 
-import { EventBus } from '../events.js';
-import { _esc, _timeAgo } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc, _timeAgo } from '/lib/utils.js';
 
 
 

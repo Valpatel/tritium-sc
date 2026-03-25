@@ -5,8 +5,8 @@
 // Displays live BLE device and WiFi network tracking from tritium-edge sensor nodes.
 // Subscribes to edge:ble_update and edge:wifi_update EventBus events for live updates.
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 // ============================================================

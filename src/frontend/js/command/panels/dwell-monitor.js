@@ -4,8 +4,8 @@
 // Dwell Monitor Panel — shows targets that are loitering/dwelling in one location.
 // Displays active dwell events with timer, severity, and history.
 
-import { EventBus } from '../events.js';
-import { _esc, _timeAgo } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc, _timeAgo } from '/lib/utils.js';
 
 
 function _severityColor(severity) {

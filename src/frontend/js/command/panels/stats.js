@@ -6,8 +6,8 @@
 // Polls /api/game/stats every 3 seconds during active game phases.
 
 import { TritiumStore } from '../store.js';
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 // ============================================================
 // Pure helper functions -- exposed via window.BattleStatsHelpers

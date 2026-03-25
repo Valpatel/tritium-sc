@@ -5,8 +5,8 @@
 // Grid layout showing 2x2 or 3x3 camera feeds simultaneously.
 // Per-camera detection overlays. Click any feed to expand full-size.
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 export const MultiCameraPanelDef = {

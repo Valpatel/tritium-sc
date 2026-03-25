@@ -6,8 +6,8 @@
 // "Conference Room: 3 people, 5 devices"
 // Auto-refreshes from /api/floorplans/{id}/occupancy
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 const REFRESH_INTERVAL = 5000; // ms
 

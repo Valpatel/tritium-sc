@@ -5,8 +5,8 @@
 // Backend API: /api/automation/rules (GET/POST/PUT/DELETE)
 // Supports triggers, conditions (9 operators), and actions (6 types).
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 const TRIGGER_EXAMPLES = [
     'ble:new_device', 'ble:suspicious_device', 'ble:*',

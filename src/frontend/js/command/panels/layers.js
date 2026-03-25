@@ -5,8 +5,8 @@
 // Google Earth-style layer browser with categorized toggles, color swatches,
 // data source info, and descriptions. Makes the map understandable.
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 // Mesh layer state reference (populated at runtime from mesh-layer.js global)
 function _getMeshState() {

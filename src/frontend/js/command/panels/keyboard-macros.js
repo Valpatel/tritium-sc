@@ -8,7 +8,7 @@
  * set mode) and replay with a single key. Macros persist in localStorage.
  */
 
-import { EventBus } from '../events.js';
+import { EventBus } from '/lib/events.js';
 
 const STORAGE_KEY = 'tritium_keyboard_macros';
 const MAX_MACROS = 20;

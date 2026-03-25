@@ -5,8 +5,8 @@
 // Displays live sensor network activations: motion detectors, door sensors,
 // tripwires. Subscribes to sensor:triggered and sensor:cleared EventBus events.
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 // ============================================================

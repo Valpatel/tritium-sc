@@ -6,7 +6,7 @@
  * status updates, and receive alerts on movement or state changes.
  */
 
-import { EventBus } from '../events.js';
+import { EventBus } from '/lib/events.js';
 import { TritiumStore } from '../store.js';
 
 let _panel = null;

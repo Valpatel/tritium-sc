@@ -6,9 +6,9 @@
 // show both side-by-side, confirm merge, combine signals into one dossier,
 // and remove the duplicate.
 
-import { EventBus } from '../events.js';
+import { EventBus } from '/lib/events.js';
 import { TritiumStore } from '../store.js';
-import { _esc } from '../panel-utils.js';
+import { _esc } from '/lib/utils.js';
 
 
 let _primaryId = null;

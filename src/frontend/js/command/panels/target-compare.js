@@ -6,9 +6,9 @@
 // and position trails side-by-side. Useful for deciding if two
 // targets should be merged (same physical entity, different sensor IDs).
 
-import { EventBus } from '../events.js';
+import { EventBus } from '/lib/events.js';
 import { TritiumStore } from '../store.js';
-import { _esc } from '../panel-utils.js';
+import { _esc } from '/lib/utils.js';
 
 
 // Selected target IDs for comparison

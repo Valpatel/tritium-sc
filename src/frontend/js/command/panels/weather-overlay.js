@@ -6,7 +6,7 @@
 // Auto-refreshes every 10 minutes, updates on significant map pan.
 
 import { TritiumStore } from '../store.js';
-import { EventBus } from '../events.js';
+import { EventBus } from '/lib/events.js';
 
 // Weather icon CSS classes (text-based, no emoji)
 const WEATHER_ICONS = {

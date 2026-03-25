@@ -5,8 +5,8 @@
 // Backend API: /api/convoys
 // Polls for active convoys and renders member groups, heading, speed, suspicious score.
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 const SCORE_COLORS = {
     low: '#05ffa1',     // green — low suspicion

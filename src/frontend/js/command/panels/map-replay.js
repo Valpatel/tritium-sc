@@ -7,8 +7,8 @@
 // with target movement trails.
 
 import { TritiumStore } from '../store.js';
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 const SPEED_OPTIONS = [0.25, 0.5, 1, 2, 4, 8, 16];
 const TRAIL_MAX_POINTS = 200;

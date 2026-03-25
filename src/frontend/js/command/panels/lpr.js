@@ -5,8 +5,8 @@
 // management, plate search, and watchlist match alerts.
 // Backend API: /api/lpr (detections, watchlist, search, stats)
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 // Priority-based color coding

@@ -5,8 +5,8 @@
 // CRUD via /api/missions. Supports objective tracking, asset assignment,
 // geofence zone definition, and lifecycle management (start/pause/complete/abort).
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 const STATUS_COLORS = {

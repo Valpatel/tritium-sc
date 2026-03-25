@@ -5,8 +5,8 @@
 // Backend API: /api/intelligence/edge-metrics
 // Polls every 10 seconds for updated metrics.
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 export const EdgeIntelligencePanelDef = {

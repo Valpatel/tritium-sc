@@ -7,7 +7,7 @@
 // Feeds replay frames back into TritiumStore so the map re-renders them.
 
 import { TritiumStore } from '../store.js';
-import { EventBus } from '../events.js';
+import { EventBus } from '/lib/events.js';
 
 /**
  * Format seconds as M:SS.

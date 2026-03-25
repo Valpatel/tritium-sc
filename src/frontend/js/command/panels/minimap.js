@@ -6,7 +6,7 @@
 // Renders via a dedicated canvas. Click to pan the main map.
 // Fully managed by PanelManager: resizable, draggable, togglable.
 
-import { EventBus } from '../events.js';
+import { EventBus } from '/lib/events.js';
 import { TritiumStore } from '../store.js';
 
 const ALLIANCE_COLORS = {

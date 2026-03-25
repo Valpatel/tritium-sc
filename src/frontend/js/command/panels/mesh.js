@@ -7,8 +7,8 @@
 // Enhanced for real Meshtastic hardware: 250+ nodes, signal quality, battery, environment
 
 import { TritiumStore } from '../store.js';
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 const MESH_MSG_LIMIT = 228;

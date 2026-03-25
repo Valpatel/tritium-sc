@@ -8,7 +8,7 @@
  * and selected targets to all connected operators.
  */
 
-import { EventBus } from '../events.js';
+import { EventBus } from '/lib/events.js';
 import { TritiumStore } from '../store.js';
 import { getMapState } from '../map-maplibre.js';
 

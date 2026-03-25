@@ -7,9 +7,9 @@
 // Subscribes to: units (Map), map.selectedUnitId
 
 import { TritiumStore } from '../store.js';
-import { EventBus } from '../events.js';
+import { EventBus } from '/lib/events.js';
 import { DeviceControlRegistry, DeviceAPI } from '../device-modal.js';
-import { _esc } from '../panel-utils.js';
+import { _esc } from '/lib/utils.js';
 
 
 function _resolveModalType(unit) {

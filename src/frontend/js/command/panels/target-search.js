@@ -5,8 +5,8 @@
 // Search and filter tracked targets by name, MAC, source, alliance.
 // Uses /api/targets/search, /api/targets/filter, /api/targets/stats endpoints.
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 export const TargetSearchPanelDef = {
     id: 'target-search',

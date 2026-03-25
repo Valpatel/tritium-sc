@@ -4,8 +4,8 @@
 // Device Manager Panel — remote OTA, reboot, config, and screenshot for edge devices
 // Displays device list with per-device controls for fleet management operations.
 
-import { EventBus } from '../events.js';
-import { _esc, _timeAgo } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc, _timeAgo } from '/lib/utils.js';
 
 
 

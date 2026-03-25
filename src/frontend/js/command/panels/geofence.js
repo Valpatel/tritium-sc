@@ -6,8 +6,8 @@
 // Emits geofence:drawZone to enter polygon drawing mode on the map.
 // Emits zone:selected when a geofence zone is clicked (for map highlighting).
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 const TYPE_COLORS = {

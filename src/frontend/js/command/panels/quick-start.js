@@ -5,7 +5,7 @@
 // Appears on first load to orient new users. Explains what Tritium is,
 // shows how to enable demo mode, and links to key panels.
 
-import { EventBus } from '../events.js';
+import { EventBus } from '/lib/events.js';
 
 const QUICK_START_DISMISSED_KEY = 'tritium.quickstart.dismissed';
 

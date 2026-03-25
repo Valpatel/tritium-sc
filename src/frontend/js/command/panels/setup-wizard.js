@@ -5,8 +5,8 @@
 // Walks the user through: map center, demo mode, MQTT broker, default layout.
 // Stores config in localStorage via ConfigStore.
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 const CONFIG_KEY = 'tritium.config';
 const WIZARD_COMPLETE_KEY = 'tritium.wizard.complete';

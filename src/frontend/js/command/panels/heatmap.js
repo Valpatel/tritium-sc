@@ -6,8 +6,8 @@
 // Color gradient: transparent (no activity) -> cyan (low) -> yellow (medium) -> magenta (high)
 // Controls: layer selector, time window slider, opacity slider, auto-refresh.
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 // Time window presets (minutes)
 const TIME_WINDOWS = [

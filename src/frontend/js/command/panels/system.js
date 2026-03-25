@@ -5,8 +5,8 @@
 // NVR discovery, camera CRUD, telemetry health, fleet summary.
 // Uses /api/discovery/*, /api/cameras/*, /api/telemetry/* endpoints.
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 export const SystemPanelDef = {

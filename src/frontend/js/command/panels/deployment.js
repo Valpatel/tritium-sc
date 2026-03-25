@@ -5,7 +5,7 @@
 // Shows all Tritium services (SC server, MQTT broker, Meshtastic bridge,
 // Ollama, edge fleet) with start/stop buttons and live status updates.
 
-import { _esc } from '../panel-utils.js';
+import { _esc } from '/lib/utils.js';
 
 
 function _stateColor(state) {

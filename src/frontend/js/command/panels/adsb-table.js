@@ -5,8 +5,8 @@
 // squawk highlighting, auto-refresh, and click-to-center map interaction.
 // Backend API: GET /api/sdr/adsb -> { tracks: [...], count: N }
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 // ============================================================

@@ -4,8 +4,8 @@
 // WiFi Fingerprint Panel
 // Shows WiFi-BLE correlation links, probe fingerprints, and device dossier enrichment.
 
-import { EventBus } from '../events.js';
-import { _esc } from '../panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 
 
 const REFRESH_INTERVAL_MS = 10000;
