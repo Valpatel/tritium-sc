@@ -12,7 +12,7 @@ import logging
 import uuid
 from typing import Any, Optional
 
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 log = logging.getLogger(__name__)
 

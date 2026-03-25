@@ -30,7 +30,7 @@ logger = logging.getLogger("fake_robots")
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 try:
     import paho.mqtt.client as mqtt

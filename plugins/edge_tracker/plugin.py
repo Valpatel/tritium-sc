@@ -52,7 +52,7 @@ except ImportError:  # pragma: no cover
 from engine.tactical.ble_classifier import BLEClassifier
 from engine.tactical.sensor_health_monitor import SensorHealthMonitor
 from engine.tactical.target_handoff import HandoffTracker, HandoffEvent
-from engine.tactical.trilateration import TrilaterationEngine
+from tritium_lib.tracking.trilateration import TrilaterationEngine
 
 # Indoor/outdoor transition detector
 try:

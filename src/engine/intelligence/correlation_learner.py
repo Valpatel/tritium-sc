@@ -374,7 +374,7 @@ class LearnedStrategy:
         import math
 
         try:
-            from engine.tactical.correlation_strategies import StrategyScore
+            from tritium_lib.tracking.correlation_strategies import StrategyScore
         except ImportError:
             # Fallback dataclass if import fails
             from dataclasses import dataclass
