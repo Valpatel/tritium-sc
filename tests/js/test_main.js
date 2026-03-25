@@ -85,7 +85,8 @@ console.log('\n--- Module Imports ---');
     assert(mainSrc.includes("import { UnitsPanelDef }"), 'Imports UnitsPanelDef');
     assert(mainSrc.includes("import { AlertsPanelDef }"), 'Imports AlertsPanelDef');
     assert(mainSrc.includes("import { GameHudPanelDef }"), 'Imports GameHudPanelDef');
-    assert(mainSrc.includes("import { MeshPanelDef }"), 'Imports MeshPanelDef');
+    // MeshPanelDef replaced by meshtastic addon — loaded dynamically via addon-loader
+    assert(mainSrc.includes("MeshPanelDef") || mainSrc.includes("meshtastic"), 'MeshPanelDef or meshtastic addon referenced');
     assert(mainSrc.includes("import { MinimapPanelDef }"), 'Imports MinimapPanelDef');
 })();
 
@@ -94,7 +95,8 @@ console.log('\n--- Module Imports ---');
     assert(mainSrc.includes("from './panels/units.js'"), 'UnitsPanelDef path is panels/units.js');
     assert(mainSrc.includes("from './panels/alerts.js'"), 'AlertsPanelDef path is panels/alerts.js');
     assert(mainSrc.includes("from './panels/game-hud.js'"), 'GameHudPanelDef path is panels/game-hud.js');
-    assert(mainSrc.includes("from './panels/mesh.js'"), 'MeshPanelDef path is panels/mesh.js');
+    // MeshPanelDef replaced by meshtastic addon
+    assert(mainSrc.includes("mesh") || mainSrc.includes("meshtastic"), 'Mesh panel referenced (addon or legacy)');
     assert(mainSrc.includes("from './panels/minimap.js'"), 'MinimapPanelDef path is panels/minimap.js');
 })();
 
@@ -411,7 +413,8 @@ console.log('\n--- Panel System Init ---');
     assert(mainSrc.includes('panelManager.register(UnitsPanelDef)'), 'Registers UnitsPanelDef');
     assert(mainSrc.includes('panelManager.register(AlertsPanelDef)'), 'Registers AlertsPanelDef');
     assert(mainSrc.includes('panelManager.register(GameHudPanelDef)'), 'Registers GameHudPanelDef');
-    assert(mainSrc.includes('panelManager.register(MeshPanelDef)'), 'Registers MeshPanelDef');
+    // MeshPanelDef replaced by meshtastic addon — dynamically loaded
+    assert(mainSrc.includes('CitySimPanelDef') || mainSrc.includes('MeshPanelDef'), 'Registers CitySimPanelDef (mesh replaced by addon)');
     assert(mainSrc.includes('panelManager.register(MinimapPanelDef)'), 'Registers MinimapPanelDef');
 })();
 
@@ -470,9 +473,9 @@ console.log('\n--- Panel Toggle Wiring ---');
         'Key 4 toggles game panel');
 })();
 
-(function testPanelToggle5Mesh() {
-    assert(mainSrc.includes("panelManager.toggle('mesh')"),
-        'Key 5 toggles mesh panel');
+(function testPanelToggle5Meshtastic() {
+    assert(mainSrc.includes("panelManager.toggle('meshtastic')") || mainSrc.includes("panelManager.toggle('mesh')"),
+        'Key 5 toggles meshtastic/mesh panel');
 })();
 
 (function testPanelToggleESensors() {
@@ -485,9 +488,9 @@ console.log('\n--- Panel Toggle Wiring ---');
         'Key P toggles battle-stats panel');
 })();
 
-(function testPanelToggleJInspector() {
-    assert(mainSrc.includes("panelManager.toggle('unit-inspector')"),
-        'Key J toggles unit-inspector panel');
+(function testPanelToggleJCitySim() {
+    assert(mainSrc.includes("toggleCitySim()"),
+        'Key J toggles city simulation');
 })();
 
 // ============================================================

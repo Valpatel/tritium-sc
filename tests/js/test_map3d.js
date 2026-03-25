@@ -621,13 +621,18 @@ console.log('\n--- Material Setup ---');
 })();
 
 (function testBuildingMaterials() {
-    assertContains(source, "materials.building = new THREE.MeshBasicMaterial", 'Building wall material defined');
-    assertContains(source, "materials.buildingRoof = new THREE.MeshBasicMaterial", 'Building roof material defined');
+    assertContains(source, "materials.building = new THREE.MeshStandardMaterial", 'Building wall material defined');
+    assertContains(source, "materials.buildingRoof = new THREE.MeshStandardMaterial", 'Building roof material defined');
     assertContains(source, "materials.buildingEdge = new THREE.LineBasicMaterial", 'Building edge material defined');
+    assertContains(source, "materials.buildingResidential", 'Residential building material defined');
+    assertContains(source, "materials.buildingCommercial", 'Commercial building material defined');
+    assertContains(source, "materials.buildingWindow", 'Building window material defined');
 })();
 
 (function testRoadMaterial() {
     assertContains(source, "materials.road = new THREE.MeshBasicMaterial", 'Road surface material defined');
+    assertContains(source, "materials.roadPrimary", 'Primary road material defined');
+    assertContains(source, "materials.roadFootway", 'Footway road material defined');
 })();
 
 (function testEffectRingMaterial() {
@@ -1139,13 +1144,34 @@ console.log('\n--- Buildings and Roads ---');
 })();
 
 (function testBuildingVerticalEdges() {
-    assertContains(source, 'for (let i = 0; i < outlineGround.length - 1; i += 3)', 'Vertical edges drawn every 3rd vertex');
+    assertContains(source, 'outlineGround[i].clone(), outlineRoof[i].clone()', 'Vertical edges connect ground to roof');
 })();
 
 (function testRoadRibbonWidth() {
-    assertContains(source, "const isPrimary = ['primary', 'secondary', 'trunk', 'motorway', 'tertiary']",
-        'Road class detection for primary roads');
-    assertContains(source, 'const width = isPrimary ? 3.0 : 1.5', 'Primary roads 3m wide, others 1.5m');
+    assertContains(source, "primaryTypes", 'Road class detection uses primaryTypes set');
+    assertContains(source, "road.width", 'Road uses OSM width data');
+    assertContains(source, "footTypes", 'Footway types distinguished from vehicle roads');
+})();
+
+(function testCityFeatureRenderers() {
+    assertContains(source, 'function _buildTrees', 'Tree renderer defined');
+    assertContains(source, 'function _buildLanduse', 'Land use renderer defined');
+    assertContains(source, 'function _buildWater', 'Water renderer defined');
+    assertContains(source, 'function _buildBarriers', 'Barrier renderer defined');
+})();
+
+(function testCityDataEndpoint() {
+    assertContains(source, '/api/geo/city-data', 'Uses comprehensive city data endpoint');
+})();
+
+(function testBuildingCategories() {
+    assertContains(source, 'categoryMats', 'Building materials vary by category');
+    assertContains(source, 'bldg.category', 'Buildings use category from backend');
+})();
+
+(function testBuildingWindows() {
+    assertContains(source, 'buildingWindow', 'Window material used for building windows');
+    assertContains(source, 'winSpacing', 'Windows spaced along building walls');
 })();
 
 // ============================================================

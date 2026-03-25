@@ -98,7 +98,7 @@ class TestScenarioDescription:
         assert "description" in SCENARIO_DESCRIPTION
         assert "actors" in SCENARIO_DESCRIPTION
         assert "demonstrated_capabilities" in SCENARIO_DESCRIPTION
-        assert "geofence_zone" in SCENARIO_DESCRIPTION
+        assert "geofence_zones" in SCENARIO_DESCRIPTION
 
     def test_has_three_actors(self):
         assert len(SCENARIO_DESCRIPTION["actors"]) == 3

@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from amy.brain.instinct import InstinctLayer
-from engine.tactical.vehicle_tracker import VehicleBehavior, VehicleTrackingManager
+from tritium_lib.tracking.vehicle_tracker import VehicleBehavior, VehicleTrackingManager
 
 
 def _make_commander(vehicle_mgr=None):

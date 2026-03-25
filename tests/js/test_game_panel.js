@@ -139,7 +139,7 @@ const sandbox = {
 const ctx = vm.createContext(sandbox);
 
 // Load events.js (EventBus)
-const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8');
+const eventsCode = fs.readFileSync(__dirname + '/../../../tritium-lib/web/events.js', 'utf8');
 const eventsPlain = eventsCode
     .replace(/^export\s+/gm, '')
     .replace(/^import\s+.*$/gm, '');
@@ -173,7 +173,7 @@ console.log('\n--- GameHudPanelDef structure ---');
 })();
 
 (function testHasTitle() {
-    assert(GameHudPanelDef.title === 'GAME STATUS', 'GameHudPanelDef.title is "GAME STATUS"');
+    assert(GameHudPanelDef.title === 'BATTLE STATUS', 'GameHudPanelDef.title is "BATTLE STATUS"');
 })();
 
 (function testHasCreate() {

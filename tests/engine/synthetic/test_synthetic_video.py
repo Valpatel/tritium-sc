@@ -663,7 +663,7 @@ class TestSimulationTargetCompat:
     """Test that renderers work with actual SimulationTarget objects."""
 
     def test_bird_eye_with_sim_target(self):
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id="sim-rover-1",
             name="Rover Alpha",
@@ -677,7 +677,7 @@ class TestSimulationTargetCompat:
         assert _color_present(frame, FRIENDLY_GREEN)
 
     def test_battle_with_sim_targets(self):
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         friendly = SimulationTarget(
             target_id="turret-1",
             name="Turret Alpha",
@@ -704,7 +704,7 @@ class TestSimulationTargetCompat:
         assert _color_present(frame, HOSTILE_RED)
 
     def test_neighborhood_with_sim_target(self):
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         t = SimulationTarget(
             target_id="pedestrian-1",
             name="Neighbor",

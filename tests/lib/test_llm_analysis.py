@@ -175,24 +175,27 @@ class TestFleetGenerate:
             assert "llm_analysis" in clusters
 
     def test_generate_method_on_fleet(self):
-        """OllamaFleet.generate() sends POST to /api/generate endpoint."""
+        """OllamaFleet.generate() sends POST to /v1/chat/completions (llama-server)."""
         from engine.inference.fleet import OllamaFleet, FleetHost
 
-        fleet = OllamaFleet(auto_discover=False)
-        # Manually add a fake host
+        with patch.object(OllamaFleet, "_discover"):
+            fleet = OllamaFleet(auto_discover=False)
+        # Manually add a fake host (llama-server backend is default)
         fleet._hosts = [
             FleetHost(
-                url="http://localhost:11434",
+                url="http://localhost:8081",
                 name="localhost",
                 models=["qwen2.5:7b"],
                 latency_ms=10.0,
             )
         ]
 
-        # Mock the urllib request
+        # Mock the urllib request — llama-server returns OpenAI format
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_resp = MagicMock()
-            mock_resp.read.return_value = b'{"response": "test analysis"}'
+            mock_resp.read.return_value = json.dumps({
+                "choices": [{"message": {"content": "test analysis"}}]
+            }).encode()
             mock_resp.__enter__ = MagicMock(return_value=mock_resp)
             mock_resp.__exit__ = MagicMock(return_value=False)
             mock_urlopen.return_value = mock_resp
@@ -206,7 +209,8 @@ class TestFleetGenerate:
         """generate() returns empty string when no host has the model."""
         from engine.inference.fleet import OllamaFleet
 
-        fleet = OllamaFleet(auto_discover=False)
+        with patch.object(OllamaFleet, "_discover"):
+            fleet = OllamaFleet(auto_discover=False)
         fleet._hosts = []  # No hosts
 
         result = fleet.generate(model="qwen2.5:7b", prompt="test")
@@ -450,13 +454,14 @@ class TestFleetChat:
     """Verify OllamaFleet.chat() multimodal method."""
 
     def test_chat_sends_multimodal_request(self):
-        """fleet.chat() sends correct payload to /api/chat with images."""
+        """fleet.chat() sends correct payload to /v1/chat/completions with images."""
         from engine.inference.fleet import OllamaFleet, FleetHost
 
-        fleet = OllamaFleet(auto_discover=False)
+        with patch.object(OllamaFleet, "_discover"):
+            fleet = OllamaFleet(auto_discover=False)
         fleet._hosts = [
             FleetHost(
-                url="http://localhost:11434",
+                url="http://localhost:8081",
                 name="localhost",
                 models=["llava:7b"],
                 latency_ms=10.0,
@@ -466,7 +471,7 @@ class TestFleetChat:
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_resp = MagicMock()
             mock_resp.read.return_value = json.dumps({
-                "message": {"content": "I see a broken layout"}
+                "choices": [{"message": {"content": "I see a broken layout"}}]
             }).encode()
             mock_resp.__enter__ = MagicMock(return_value=mock_resp)
             mock_resp.__exit__ = MagicMock(return_value=False)
@@ -481,25 +486,25 @@ class TestFleetChat:
             assert result == "I see a broken layout"
             mock_urlopen.assert_called_once()
 
-            # Verify the request payload sent to /api/chat
+            # Verify the request payload sent to /v1/chat/completions
             req_obj = mock_urlopen.call_args[0][0]
             payload = json.loads(req_obj.data.decode())
             assert payload["model"] == "llava:7b"
-            assert payload["stream"] is False
             assert len(payload["messages"]) == 1
             assert payload["messages"][0]["role"] == "user"
             assert payload["messages"][0]["content"] == "What is wrong?"
             assert payload["messages"][0]["images"] == ["abc123base64data"]
-            assert "/api/chat" in req_obj.full_url
+            assert "/v1/chat/completions" in req_obj.full_url
 
     def test_chat_without_images(self):
         """fleet.chat() works without images (text-only chat)."""
         from engine.inference.fleet import OllamaFleet, FleetHost
 
-        fleet = OllamaFleet(auto_discover=False)
+        with patch.object(OllamaFleet, "_discover"):
+            fleet = OllamaFleet(auto_discover=False)
         fleet._hosts = [
             FleetHost(
-                url="http://localhost:11434",
+                url="http://localhost:8081",
                 name="localhost",
                 models=["qwen2.5:7b"],
                 latency_ms=10.0,
@@ -509,7 +514,7 @@ class TestFleetChat:
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_resp = MagicMock()
             mock_resp.read.return_value = json.dumps({
-                "message": {"content": "Analysis complete"}
+                "choices": [{"message": {"content": "Analysis complete"}}]
             }).encode()
             mock_resp.__enter__ = MagicMock(return_value=mock_resp)
             mock_resp.__exit__ = MagicMock(return_value=False)
@@ -527,7 +532,8 @@ class TestFleetChat:
         """chat() returns empty string when no host has the model."""
         from engine.inference.fleet import OllamaFleet
 
-        fleet = OllamaFleet(auto_discover=False)
+        with patch.object(OllamaFleet, "_discover"):
+            fleet = OllamaFleet(auto_discover=False)
         fleet._hosts = []
 
         result = fleet.chat(model="llava:7b", prompt="test")
@@ -537,10 +543,11 @@ class TestFleetChat:
         """chat() returns empty string on network error."""
         from engine.inference.fleet import OllamaFleet, FleetHost
 
-        fleet = OllamaFleet(auto_discover=False)
+        with patch.object(OllamaFleet, "_discover"):
+            fleet = OllamaFleet(auto_discover=False)
         fleet._hosts = [
             FleetHost(
-                url="http://localhost:11434",
+                url="http://localhost:8081",
                 name="localhost",
                 models=["llava:7b"],
                 latency_ms=10.0,

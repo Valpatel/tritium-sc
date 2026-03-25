@@ -31,7 +31,25 @@ function assertIncludes(arr, val, msg) {
 // ============================================================
 
 function readSource(relPath) {
-    return fs.readFileSync(path.join(__dirname, '..', '..', relPath), 'utf8');
+    const scPath = path.join(__dirname, '..', '..', relPath);
+    // If reading a re-export stub, try the tritium-lib source instead
+    // Many SC simulation files were moved to tritium-lib and replaced with re-export stubs
+    const libMap = {
+        'src/engine/simulation/target.py': '../tritium-lib/src/tritium_lib/sim_engine/core/entity.py',
+        // engine.py is NOT a re-export stub — it's the real SC engine file, no mapping needed
+        'src/engine/simulation/game_mode.py': '../tritium-lib/src/tritium_lib/sim_engine/game/game_mode.py',
+        'src/engine/simulation/behaviors.py': '../tritium-lib/src/tritium_lib/sim_engine/core/entity.py',
+        'src/engine/simulation/combat.py': '../tritium-lib/src/tritium_lib/sim_engine/combat/combat.py',
+        'src/engine/simulation/vision.py': '../tritium-lib/src/tritium_lib/sim_engine/world/vision.py',
+    };
+    {
+        const libRel = libMap[relPath];
+        if (libRel) {
+            const libPath = path.join(__dirname, '..', '..', libRel);
+            if (fs.existsSync(libPath)) return fs.readFileSync(libPath, 'utf8');
+        }
+    }
+    return fs.readFileSync(scPath, 'utf8');
 }
 
 function sourceContains(relPath, pattern) {

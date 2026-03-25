@@ -16,8 +16,8 @@ import math
 import pytest
 from unittest.mock import MagicMock, patch
 
-from engine.simulation.squads import Squad, SquadManager, FORMATION_SPACING
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.combat.squads import Squad, SquadManager, FORMATION_SPACING
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 
 
 # ---------------------------------------------------------------------------

@@ -31,7 +31,7 @@ function assert(cond, msg) {
 // Read source files
 const mapSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/map.js', 'utf8');
 const storeSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8');
-const eventsSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8');
+const eventsSrc = fs.readFileSync(__dirname + '/../../../tritium-lib/web/events.js', 'utf8');
 
 // ============================================================
 // 1. _drawCrowdDensity function exists

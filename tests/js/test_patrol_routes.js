@@ -27,7 +27,10 @@ function assert(cond, msg) {
 // Read source files
 const mapSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/map-maplibre.js', 'utf8');
 const wsSrc = fs.readFileSync(__dirname + '/../../src/frontend/js/command/websocket.js', 'utf8');
-const targetPy = fs.readFileSync(__dirname + '/../../src/engine/simulation/target.py', 'utf8');
+// SimulationTarget was moved to tritium-lib; target.py is a re-export stub
+const _libTargetPath = __dirname + '/../../../tritium-lib/src/tritium_lib/sim_engine/core/entity.py';
+const _scTargetPath = __dirname + '/../../src/engine/simulation/target.py';
+const targetPy = fs.existsSync(_libTargetPath) ? fs.readFileSync(_libTargetPath, 'utf8') : fs.readFileSync(_scTargetPath, 'utf8');
 
 // ============================================================
 // 1. GeoJSON source and layer constants

@@ -90,7 +90,7 @@ class TestBootIntegration:
 
     def test_simulation_bridge_data_format(self):
         """Verify SimulationTarget.to_dict() has all fields the frontend needs."""
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
 
         target = SimulationTarget(
             target_id="test-001",
@@ -249,7 +249,7 @@ class TestBootIntegration:
         from amy.commander import EventBus
         from engine.tactical.target_tracker import TargetTracker
         from engine.simulation import SimulationEngine
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         from engine.tactical.escalation import ThreatClassifier, AutoDispatcher
 
         bus = EventBus()
@@ -418,7 +418,7 @@ class TestBootIntegration:
         from amy.commander import EventBus
         from engine.tactical.target_tracker import TargetTracker
         from engine.simulation import SimulationEngine
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         from engine.tactical.escalation import ThreatClassifier, AutoDispatcher
 
         bus = EventBus()

@@ -296,7 +296,7 @@ class MockTrilaterationEngine:
         self._results = {}
 
     def set_result(self, mac, lat, lon, confidence, anchors_used=3):
-        from engine.tactical.trilateration import PositionResult
+        from tritium_lib.tracking.trilateration import PositionResult
         self._results[mac.upper()] = PositionResult(
             lat=lat, lon=lon, confidence=confidence,
             anchors_used=anchors_used,

@@ -171,7 +171,7 @@ class TestSimTargetGeoIntegration:
     def test_to_dict_includes_latlng(self):
         init_reference(TEST_LAT, TEST_LNG)
 
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         target = SimulationTarget(
             target_id="test-1",
             name="Test Rover",
@@ -193,7 +193,7 @@ class TestSimTargetGeoIntegration:
     def test_to_dict_at_origin(self):
         init_reference(TEST_LAT, TEST_LNG)
 
-        from engine.simulation.target import SimulationTarget
+        from tritium_lib.sim_engine.core.entity import SimulationTarget
         target = SimulationTarget(
             target_id="test-2",
             name="Origin",

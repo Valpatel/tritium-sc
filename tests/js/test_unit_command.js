@@ -120,7 +120,7 @@ const sandbox = {
 const ctx = vm.createContext(sandbox);
 
 // Load EventBus
-const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8')
+const eventsCode = fs.readFileSync(__dirname + '/../../../tritium-lib/web/events.js', 'utf8')
     .replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, '');
 vm.runInContext(eventsCode, ctx);
 

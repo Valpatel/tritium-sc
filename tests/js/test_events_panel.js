@@ -66,7 +66,7 @@ const sandbox = {
 
 const ctx = vm.createContext(sandbox);
 
-vm.runInContext(fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
+vm.runInContext(fs.readFileSync(__dirname + '/../../../tritium-lib/web/events.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 vm.runInContext(fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 
 const evtCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/events.js', 'utf8');
@@ -112,7 +112,7 @@ console.log('\n--- Filter options ---');
 (function() { const html = EventsPanelDef.create({}).innerHTML; assert(html.includes('value="alert"'), 'Has ALERTS filter'); })();
 (function() { const html = EventsPanelDef.create({}).innerHTML; assert(html.includes('>ALL<'), 'ALL filter has label'); })();
 (function() { const html = EventsPanelDef.create({}).innerHTML; assert(html.includes('>COMBAT<'), 'COMBAT filter has label'); })();
-(function() { const html = EventsPanelDef.create({}).innerHTML; assert(html.includes('>GAME<'), 'GAME filter has label'); })();
+(function() { const html = EventsPanelDef.create({}).innerHTML; assert(html.includes('>BATTLE<'), 'BATTLE filter has label'); })();
 (function() { const html = EventsPanelDef.create({}).innerHTML; assert(html.includes('>AMY<'), 'AMY filter has label'); })();
 (function() { const html = EventsPanelDef.create({}).innerHTML; assert(html.includes('>ALERTS<'), 'ALERTS filter has label'); })();
 

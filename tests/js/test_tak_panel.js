@@ -73,7 +73,7 @@ const sandbox = {
 
 const ctx = vm.createContext(sandbox);
 
-vm.runInContext(fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
+vm.runInContext(fs.readFileSync(__dirname + '/../../../tritium-lib/web/events.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 vm.runInContext(fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 
 const takCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/tak.js', 'utf8');

@@ -65,7 +65,7 @@ const sandbox = {
 
 const ctx = vm.createContext(sandbox);
 
-vm.runInContext(fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
+vm.runInContext(fs.readFileSync(__dirname + '/../../../tritium-lib/web/events.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 vm.runInContext(fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 
 const searchCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/search.js', 'utf8');
@@ -79,7 +79,7 @@ const SearchPanelDef = ctx.SearchPanelDef;
 console.log('\n--- SearchPanelDef structure ---');
 
 (function() { assert(SearchPanelDef.id === 'search', 'id is "search"'); })();
-(function() { assert(SearchPanelDef.title === 'INTEL', 'title is "INTEL"'); })();
+(function() { assert(SearchPanelDef.title === 'TARGET SEARCH', 'title is "TARGET SEARCH"'); })();
 (function() { assert(typeof SearchPanelDef.create === 'function', 'create is a function'); })();
 (function() { assert(typeof SearchPanelDef.mount === 'function', 'mount is a function'); })();
 (function() { assert(typeof SearchPanelDef.unmount === 'function', 'unmount is a function'); })();

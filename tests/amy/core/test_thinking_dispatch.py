@@ -16,7 +16,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from engine.actions.lua_motor import MotorOutput, parse_motor_output
-from engine.simulation.target import SimulationTarget
+from tritium_lib.sim_engine.core.entity import SimulationTarget
 from engine.simulation.engine import SimulationEngine
 from amy.brain.thinking import ThinkingThread
 

@@ -31,7 +31,9 @@ function loadModule(relPath) {
         .replace(/^import\s+.*$/gm, '');
 }
 
-const eventsCode = loadModule('src/frontend/js/command/events.js');
+const eventsCode = fs.readFileSync(__dirname + '/../../../tritium-lib/web/events.js', 'utf8')
+    .replace(/^export\s+/gm, '')
+    .replace(/^import\s+.*$/gm, '');
 const storeCode = loadModule('src/frontend/js/command/store.js');
 const deviceModalCode = loadModule('src/frontend/js/command/device-modal.js');
 
@@ -129,6 +131,8 @@ const sandbox = {
     document: mockDoc,
     window: { location: { host: 'localhost:8000' } },
     fetch: mockFetch,
+    // _esc imported from panel-utils.js — provide in sandbox
+    _esc: (s) => { if (s == null) return ''; return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); },
 };
 
 const ctx = vm.createContext(sandbox);

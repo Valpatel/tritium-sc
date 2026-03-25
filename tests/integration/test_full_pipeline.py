@@ -28,7 +28,7 @@ import pytest
 from src.engine.comms.event_bus import EventBus
 from src.engine.tactical.ble_classifier import BLEClassifier
 from src.engine.tactical.correlator import TargetCorrelator
-from src.engine.tactical.dossier import DossierStore
+from tritium_lib.tracking.dossier import DossierStore
 from src.engine.tactical.dossier_manager import DossierManager
 from src.engine.tactical.enrichment import EnrichmentPipeline
 from src.engine.tactical.escalation import ThreatClassifier

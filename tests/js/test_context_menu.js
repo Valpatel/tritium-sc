@@ -159,7 +159,7 @@ const sandbox = {
 const ctx = vm.createContext(sandbox);
 
 // Load EventBus
-const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8')
+const eventsCode = fs.readFileSync(__dirname + '/../../../tritium-lib/web/events.js', 'utf8')
     .replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, '');
 vm.runInContext(eventsCode, ctx);
 
@@ -227,7 +227,7 @@ console.log('\n--- Menu items with no unit selected ---');
     const items = ContextMenu.getMenuItems(null);
     const labels = items.map(i => i.label);
     assert(labels.includes('DROP MARKER'), 'No-selection menu has DROP MARKER');
-    assert(labels.includes('SUGGEST TO AMY: INVESTIGATE'), 'No-selection menu has SUGGEST TO AMY: INVESTIGATE');
+    assert(labels.includes('SUGGEST TO COMMANDER: INVESTIGATE'), 'No-selection menu has SUGGEST TO COMMANDER: INVESTIGATE');
     assert(labels.includes('CANCEL'), 'No-selection menu has CANCEL');
 })();
 
@@ -246,8 +246,8 @@ console.log('\n--- Menu items with no unit selected ---');
 
 (function testInvestigateAction() {
     const items = ContextMenu.getMenuItems(null);
-    const inv = items.find(i => i.label === 'SUGGEST TO AMY: INVESTIGATE');
-    assert(inv && inv.action === 'suggest_investigate', 'SUGGEST TO AMY: INVESTIGATE has action "suggest_investigate"');
+    const inv = items.find(i => i.label === 'SUGGEST TO COMMANDER: INVESTIGATE');
+    assert(inv && inv.action === 'suggest_investigate', 'SUGGEST TO COMMANDER: INVESTIGATE has action "suggest_investigate"');
 })();
 
 // ============================================================

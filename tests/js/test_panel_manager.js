@@ -184,7 +184,7 @@ const panelUtilsPlain = panelUtilsCode
 vm.runInContext(panelUtilsPlain, ctx);
 
 // Load EventBus first (panel-manager.js imports it)
-const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8');
+const eventsCode = fs.readFileSync(__dirname + '/../../../tritium-lib/web/events.js', 'utf8');
 // Strip ES module import/export syntax for Node.js vm
 const eventsPlain = eventsCode
     .replace(/^export\s+/gm, '')

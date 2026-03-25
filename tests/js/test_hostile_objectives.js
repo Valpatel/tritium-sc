@@ -33,7 +33,7 @@ const mapSource = fs.readFileSync(
 const storeSrc = fs.readFileSync(
     path.join(__dirname, '../../src/frontend/js/command/store.js'), 'utf8');
 const eventsSrc = fs.readFileSync(
-    path.join(__dirname, '../../src/frontend/js/command/events.js'), 'utf8');
+    path.join(__dirname, '../../../tritium-lib/web/events.js'), 'utf8');
 
 
 // ============================================================

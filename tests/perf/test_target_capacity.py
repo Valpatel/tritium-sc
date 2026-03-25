@@ -122,7 +122,7 @@ class TestTargetCapacity:
 
         try:
             from engine.tactical.correlator import TargetCorrelator
-            from engine.tactical.dossier import DossierStore
+            from tritium_lib.tracking.dossier import DossierStore
 
             correlator = TargetCorrelator(
                 tracker,

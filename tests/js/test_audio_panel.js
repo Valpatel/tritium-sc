@@ -138,7 +138,7 @@ const sandbox = {
 const ctx = vm.createContext(sandbox);
 
 // Load events.js
-const eventsCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8');
+const eventsCode = fs.readFileSync(__dirname + '/../../../tritium-lib/web/events.js', 'utf8');
 vm.runInContext(eventsCode.replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 
 // Load store.js

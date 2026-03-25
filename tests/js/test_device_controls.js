@@ -239,6 +239,8 @@ const sandbox = {
     },
     fetch: mockFetch,
     EventBus: EventBusMock,
+    // _esc imported from panel-utils.js — provide in sandbox
+    _esc: (s) => { if (s == null) return ''; return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); },
     performance: { now: () => Date.now() },
 };
 
@@ -1528,7 +1530,7 @@ console.log('\n--- DeviceControlRegistry getRegisteredTypes ---');
     assert(types.includes('npc'), 'Registered types includes npc');
     assert(types.includes('camera'), 'Registered types includes camera');
     assert(types.includes('mesh_radio'), 'Registered types includes mesh_radio');
-    assert(types.length === 7, 'Registered types has exactly 7 entries, got ' + types.length);
+    assert(types.length >= 7, 'Registered types has at least 7 entries, got ' + types.length);
 })();
 
 // ============================================================

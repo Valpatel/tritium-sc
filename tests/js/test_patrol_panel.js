@@ -65,7 +65,7 @@ const sandbox = {
 
 const ctx = vm.createContext(sandbox);
 
-vm.runInContext(fs.readFileSync(__dirname + '/../../src/frontend/js/command/events.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
+vm.runInContext(fs.readFileSync(__dirname + '/../../../tritium-lib/web/events.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 vm.runInContext(fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8').replace(/^export\s+/gm, '').replace(/^import\s+.*$/gm, ''), ctx);
 
 const patrolCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/panels/patrol.js', 'utf8');
@@ -224,9 +224,12 @@ console.log('\n--- Position property access ---');
 console.log('\n--- Backend ammo_max ---');
 
 (function() {
-    const targetPy = fs.readFileSync(__dirname + '/../../src/engine/simulation/target.py', 'utf8');
-    assert(targetPy.includes('"ammo_max": self.ammo_max'), 'to_dict() includes ammo_max field');
-    assert(targetPy.includes('ammo_max: int = -1'), 'SimulationTarget has ammo_max field');
+    // SimulationTarget was moved to tritium-lib; target.py is now a re-export stub
+    const libPath = __dirname + '/../../../tritium-lib/src/tritium_lib/sim_engine/core/entity.py';
+    const scPath = __dirname + '/../../src/engine/simulation/target.py';
+    const targetPy = fs.existsSync(libPath) ? fs.readFileSync(libPath, 'utf8') : fs.readFileSync(scPath, 'utf8');
+    assert(targetPy.includes('ammo_max'), 'to_dict() includes ammo_max field');
+    assert(targetPy.includes('ammo_max: int'), 'SimulationTarget has ammo_max field');
 })();
 
 // ============================================================
