@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/fusion", tags=["fusion"])
 
 
+def _get_fusion_engine(request: Request):
+    """Get FusionEngine from app state, or None."""
+    return getattr(request.app.state, "fusion_engine", None)
+
+
 def _get_fusion_metrics(request: Request):
     """Get FusionMetrics from app state, or None."""
     return getattr(request.app.state, "fusion_metrics", None)
@@ -105,3 +110,45 @@ async def fusion_weight_recommendations(request: Request):
         result["current_weights"] = dict(correlator.weights)
 
     return result
+
+
+@router.get("/engine")
+async def fusion_engine_status(request: Request):
+    """FusionEngine overview — snapshot of the full fusion pipeline state.
+
+    Returns target counts, dossier counts, correlation counts,
+    zone counts, and per-source target breakdowns.  This endpoint
+    exercises the new tritium-lib FusionEngine that wraps the
+    existing TargetTracker with correlation, heatmap, and dossier
+    capabilities.
+    """
+    engine = _get_fusion_engine(request)
+    if engine is None:
+        return {
+            "engine_available": False,
+            "error": "FusionEngine not initialized",
+        }
+
+    try:
+        snapshot = engine.get_snapshot()
+        result = snapshot.to_dict()
+        result["engine_available"] = True
+
+        # Add source breakdown
+        by_source: dict[str, int] = {}
+        for ft in snapshot.targets:
+            src = ft.target.source or "unknown"
+            by_source[src] = by_source.get(src, 0) + 1
+        result["targets_by_source"] = by_source
+
+        # Multi-source targets (confirmed by 2+ sensors)
+        multi = engine.get_multi_source_targets(min_sources=2)
+        result["multi_source_count"] = len(multi)
+
+        return result
+    except Exception as e:
+        logger.warning("FusionEngine snapshot error: %s", e)
+        return {
+            "engine_available": True,
+            "error": str(e),
+        }

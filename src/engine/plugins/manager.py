@@ -42,6 +42,8 @@ class PluginManager:
         self._configured: set[str] = set()
         self._started: set[str] = set()
         self._failed: set[str] = set()
+        self._failure_reasons: dict[str, str] = {}
+        self._load_errors: list[dict] = []  # errors from file loading (pre-registration)
 
     # ------------------------------------------------------------------
     # Registration
@@ -105,7 +107,12 @@ class PluginManager:
         return found
 
     def _load_plugins_from_file(self, path: Path) -> list[PluginInterface]:
-        """Load plugin classes from a Python file."""
+        """Load plugin classes from a Python file.
+
+        Each plugin file is loaded in isolation — if it fails to import
+        (missing dependency, syntax error, etc.), the error is logged and
+        other plugins continue loading normally.
+        """
         plugins: list[PluginInterface] = []
         module_name = f"_tritium_plugin_{path.stem}"
 
@@ -131,11 +138,52 @@ class PluginManager:
                         logger.debug(f"Discovered plugin: {instance.plugin_id} from {path}")
                     except Exception as e:
                         logger.warning(f"Failed to instantiate plugin from {path}: {e}")
+                        self._load_errors.append({
+                            "file": str(path),
+                            "class": _name,
+                            "error": str(e),
+                            "error_type": type(e).__name__,
+                        })
 
+        except ModuleNotFoundError as e:
+            missing_pkg = e.name or "unknown"
+            logger.warning(
+                f"Plugin file {path.name} failed to load: "
+                f"missing package '{missing_pkg}' — install it with: "
+                f"pip install {missing_pkg}"
+            )
+            self._load_errors.append({
+                "file": str(path),
+                "error": str(e),
+                "error_type": "ModuleNotFoundError",
+                "missing_package": missing_pkg,
+            })
+        except ImportError as e:
+            missing_pkg = e.name or "unknown"
+            logger.warning(
+                f"Plugin file {path.name} failed to load: "
+                f"import error for '{missing_pkg}' — {e}"
+            )
+            self._load_errors.append({
+                "file": str(path),
+                "error": str(e),
+                "error_type": "ImportError",
+                "missing_package": missing_pkg,
+            })
         except SyntaxError as e:
             logger.warning(f"Syntax error in plugin file {path}: {e}")
+            self._load_errors.append({
+                "file": str(path),
+                "error": str(e),
+                "error_type": "SyntaxError",
+            })
         except Exception as e:
             logger.warning(f"Failed to load plugin from {path}: {e}")
+            self._load_errors.append({
+                "file": str(path),
+                "error": str(e),
+                "error_type": type(e).__name__,
+            })
         finally:
             sys.modules.pop(module_name, None)
 
@@ -192,10 +240,12 @@ class PluginManager:
             # Check if all dependencies are present
             missing = [d for d in plugin.dependencies if d not in self._plugins]
             if missing:
+                reason = f"missing dependencies: {missing}"
                 logger.warning(
-                    f"Plugin '{pid}' has missing dependencies: {missing}. Skipping."
+                    f"Plugin '{pid}' has {reason}. Skipping."
                 )
                 self._failed.add(pid)
+                self._failure_reasons[pid] = reason
                 continue
 
             try:
@@ -204,8 +254,10 @@ class PluginManager:
                 self._configured.add(pid)
                 logger.debug(f"Plugin configured: {pid}")
             except Exception as e:
+                reason = f"configure failed: {e}"
                 logger.error(f"Plugin '{pid}' failed to configure: {e}")
                 self._failed.add(pid)
+                self._failure_reasons[pid] = reason
 
     def start_all(self) -> dict[str, bool]:
         """Start all configured plugins in dependency order.
@@ -224,14 +276,16 @@ class PluginManager:
                 continue
 
             # Skip if a dependency failed
-            dep_failed = any(
-                d in self._failed for d in plugin.dependencies
-            )
-            if dep_failed:
+            failed_deps = [
+                d for d in plugin.dependencies if d in self._failed
+            ]
+            if failed_deps:
+                reason = f"dependency failed: {failed_deps}"
                 logger.warning(
-                    f"Plugin '{pid}' skipped — dependency failed."
+                    f"Plugin '{pid}' skipped — {reason}."
                 )
                 self._failed.add(pid)
+                self._failure_reasons[pid] = reason
                 results[pid] = False
                 continue
 
@@ -241,8 +295,10 @@ class PluginManager:
                 results[pid] = True
                 logger.info(f"Plugin started: {pid}")
             except Exception as e:
+                reason = f"start failed: {e}"
                 logger.error(f"Plugin '{pid}' failed to start: {e}")
                 self._failed.add(pid)
+                self._failure_reasons[pid] = reason
                 results[pid] = False
 
         return results
@@ -282,7 +338,7 @@ class PluginManager:
             else:
                 status = "registered"
 
-            result.append({
+            entry = {
                 "id": pid,
                 "name": plugin.name,
                 "version": plugin.version,
@@ -290,7 +346,11 @@ class PluginManager:
                 "dependencies": list(plugin.dependencies),
                 "status": status,
                 "healthy": plugin.healthy if pid in self._started else False,
-            })
+            }
+            if pid in self._failure_reasons:
+                entry["failure_reason"] = self._failure_reasons[pid]
+
+            result.append(entry)
         return result
 
     def health_check(self) -> dict[str, bool]:
@@ -299,6 +359,18 @@ class PluginManager:
             pid: self._plugins[pid].healthy
             for pid in self._started
         }
+
+    def get_load_errors(self) -> list[dict]:
+        """Return errors encountered during plugin file loading.
+
+        These are pre-registration errors (import failures, syntax errors,
+        missing packages) that prevented plugins from even being discovered.
+        """
+        return list(self._load_errors)
+
+    def get_failure_reasons(self) -> dict[str, str]:
+        """Return failure reasons for plugins that failed to configure or start."""
+        return dict(self._failure_reasons)
 
     # ------------------------------------------------------------------
     # Dependency resolution

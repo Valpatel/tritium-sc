@@ -451,6 +451,7 @@ def _start_plugins(app, amy_instance, sim_engine) -> object | None:
         failed = sum(1 for v in results.values() if not v)
 
         # Build detailed start report
+        failure_reasons = mgr.get_failure_reasons()
         for pid, success in results.items():
             entry = {"id": pid}
             plugin = mgr.get_plugin(pid)
@@ -460,16 +461,35 @@ def _start_plugins(app, amy_instance, sim_engine) -> object | None:
             if success:
                 discovery_report["plugins_started"].append(entry)
             else:
+                if pid in failure_reasons:
+                    entry["reason"] = failure_reasons[pid]
                 discovery_report["plugins_failed"].append(entry)
 
+        # Include load errors (files that failed to import at all)
+        load_errors = mgr.get_load_errors()
+        if load_errors:
+            discovery_report["load_errors"] = load_errors
+
         # Log summary with individual plugin status
+        if load_errors:
+            logger.warning(f"Plugin load errors: {len(load_errors)} file(s) failed to import")
+            for err in load_errors:
+                pkg = err.get("missing_package")
+                if pkg:
+                    logger.warning(f"  {err['file']}: missing package '{pkg}'")
+                else:
+                    logger.warning(f"  {err['file']}: {err['error_type']}: {err['error']}")
+
         if started > 0 or failed > 0:
             logger.info(f"Plugins: {started} started, {failed} failed out of {len(results)} total")
             for pid, success in results.items():
                 status = "OK" if success else "FAILED"
                 plugin = mgr.get_plugin(pid)
                 pname = plugin.name if plugin else pid
-                logger.info(f"  [{status}] {pname} ({pid})")
+                reason_str = ""
+                if not success and pid in failure_reasons:
+                    reason_str = f" — {failure_reasons[pid]}"
+                logger.info(f"  [{status}] {pname} ({pid}){reason_str}")
 
         # Store report for health panel
         app.state.plugin_discovery_report = discovery_report
@@ -778,6 +798,12 @@ def _shutdown_subsystems(amy_instance, sim_engine, mqtt_bridge, app: FastAPI) ->
     if syn_cam is not None:
         logger.info("Stopping synthetic camera...")
         syn_cam.stop()
+
+    # 2.6. FusionEngine (stop correlator before tracker/Amy go away)
+    _fusion = getattr(getattr(app, "state", None), "fusion_engine", None)
+    if _fusion is not None:
+        logger.info("Stopping FusionEngine...")
+        _fusion.shutdown()
 
     # 3. Simulation engine
     if sim_engine is not None:
@@ -1100,6 +1126,37 @@ async def lifespan(app: FastAPI):
             logger.info("GeofenceEngine wired to EventBus (no tracker yet)")
     except Exception as e:
         logger.warning(f"GeofenceEngine wiring failed: {e}")
+
+    # FusionEngine — unified multi-sensor pipeline from tritium-lib.
+    # Wraps the existing TargetTracker (Amy's or standalone) and adds
+    # correlation, heatmap, dossier, and network analysis capabilities.
+    try:
+        from tritium_lib.fusion import FusionEngine as _FusionEngine
+
+        _fusion_tracker = amy_instance.target_tracker if amy_instance else None
+        _fusion_bus = amy_instance.event_bus if amy_instance else (
+            sim_engine.event_bus if sim_engine is not None else None
+        )
+        _fusion_geofence = getattr(app.state, "geofence_engine", None)
+
+        fusion_engine = _FusionEngine(
+            event_bus=_fusion_bus,
+            tracker=_fusion_tracker,
+            geofence=_fusion_geofence,
+        )
+        app.state.fusion_engine = fusion_engine
+
+        # Expose sub-components so existing routers (fusion_dashboard) work
+        app.state.fusion_metrics = fusion_engine.fusion_metrics
+        app.state.correlator = fusion_engine.correlator
+
+        logger.info(
+            "FusionEngine initialized (tracker=%s, geofence=%s)",
+            "amy" if _fusion_tracker is not None else "standalone",
+            "wired" if _fusion_geofence is not None else "internal",
+        )
+    except Exception as e:
+        logger.warning(f"FusionEngine failed to initialize: {e}")
 
     # Plugin system — discover, configure, and start all plugins
     plugin_manager = _start_plugins(app, amy_instance, sim_engine)
