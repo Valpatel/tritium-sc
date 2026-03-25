@@ -873,7 +873,7 @@ class SimulationEngine:
 
         if backstory_on:
             try:
-                from engine.inference.fleet import OllamaFleet
+                from tritium_lib.inference.fleet import OllamaFleet
                 fleet = OllamaFleet(auto_discover=True)
                 self._backstory_generator = BackstoryGenerator(
                     fleet=fleet,

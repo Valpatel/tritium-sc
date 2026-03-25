@@ -231,7 +231,7 @@ class RobotThinker:
 
         try:
             if self._model_router is not None:
-                from .model_router import TaskType
+                from tritium_lib.inference.model_router import TaskType
                 response = self._model_router.infer(
                     TaskType.SIMPLE_THINK, messages,
                 )

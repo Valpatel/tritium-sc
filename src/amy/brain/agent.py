@@ -128,7 +128,7 @@ class Agent:
         try:
             router = getattr(self.commander, "model_router", None)
             if router is not None:
-                from engine.inference.model_router import TaskType
+                from tritium_lib.inference.model_router import TaskType
                 has_images = bool(image_base64)
                 task_type = router.classify_task(
                     messages=self.history,

@@ -98,8 +98,8 @@ def create_amy(settings=None, simulation_engine=None) -> "Commander":
     fleet_enabled = getattr(settings, "fleet_enabled", False) if settings else False
     if fleet_enabled:
         try:
-            from engine.inference.fleet import OllamaFleet
-            from engine.inference.model_router import ModelRouter, ModelProfile
+            from tritium_lib.inference.fleet import OllamaFleet
+            from tritium_lib.inference.model_router import ModelRouter, ModelProfile
             fleet_auto = getattr(settings, "fleet_auto_discover", True) if settings else True
             fleet = OllamaFleet(auto_discover=fleet_auto)
             print(f"  [Amy] Fleet: {fleet.status()}")

@@ -429,7 +429,7 @@ def _get_mission_director(engine):
         ollama_host = settings.ollama_host
         if settings.fleet_enabled:
             try:
-                from engine.inference.fleet import OllamaFleet
+                from tritium_lib.inference.fleet import OllamaFleet
                 fleet = OllamaFleet(auto_discover=settings.fleet_auto_discover)
                 if fleet.hosts:
                     ollama_host = fleet.hosts[0].url

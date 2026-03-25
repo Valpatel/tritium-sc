@@ -102,7 +102,7 @@ class TestCommanderModelRouter:
 
     def test_commander_with_router(self):
         from amy.commander import Commander
-        from engine.inference.model_router import ModelRouter
+        from tritium_lib.inference.model_router import ModelRouter
         from tests.amy.conftest import MockSensorNode
         node = MockSensorNode()
         router = ModelRouter.from_static()
@@ -120,7 +120,7 @@ class TestModelRouterBattlespace:
     """ModelRouter classification based on battlespace state."""
 
     def test_empty_battlespace_simple(self):
-        from engine.inference.model_router import ModelRouter, TaskType
+        from tritium_lib.inference.model_router import ModelRouter, TaskType
         router = ModelRouter()
         tt = router.classify_task(
             messages=[{"role": "user", "content": "What do you do?"}],
@@ -129,7 +129,7 @@ class TestModelRouterBattlespace:
         assert tt == TaskType.SIMPLE_THINK
 
     def test_hostiles_complex(self):
-        from engine.inference.model_router import ModelRouter, TaskType
+        from tritium_lib.inference.model_router import ModelRouter, TaskType
         router = ModelRouter()
         tt = router.classify_task(
             messages=[{"role": "user", "content": "What do you do?"}],
@@ -138,7 +138,7 @@ class TestModelRouterBattlespace:
         assert tt == TaskType.COMPLEX_REASON
 
     def test_images_vision(self):
-        from engine.inference.model_router import ModelRouter, TaskType
+        from tritium_lib.inference.model_router import ModelRouter, TaskType
         router = ModelRouter()
         tt = router.classify_task(
             messages=[{"role": "user", "content": "Describe."}],
@@ -147,7 +147,7 @@ class TestModelRouterBattlespace:
         assert tt == TaskType.VISION
 
     def test_chat_explicit(self):
-        from engine.inference.model_router import ModelRouter, TaskType
+        from tritium_lib.inference.model_router import ModelRouter, TaskType
         router = ModelRouter()
         tt = router.classify_task(
             messages=[{"role": "user", "content": "Hey Amy"}],

@@ -22,27 +22,27 @@ class TestTaskType:
     """TaskType — inference task classification."""
 
     def test_simple_think_exists(self):
-        from engine.inference.model_router import TaskType
+        from tritium_lib.inference.model_router import TaskType
         assert TaskType.SIMPLE_THINK is not None
 
     def test_complex_reason_exists(self):
-        from engine.inference.model_router import TaskType
+        from tritium_lib.inference.model_router import TaskType
         assert TaskType.COMPLEX_REASON is not None
 
     def test_vision_exists(self):
-        from engine.inference.model_router import TaskType
+        from tritium_lib.inference.model_router import TaskType
         assert TaskType.VISION is not None
 
     def test_code_gen_exists(self):
-        from engine.inference.model_router import TaskType
+        from tritium_lib.inference.model_router import TaskType
         assert TaskType.CODE_GEN is not None
 
     def test_chat_exists(self):
-        from engine.inference.model_router import TaskType
+        from tritium_lib.inference.model_router import TaskType
         assert TaskType.CHAT is not None
 
     def test_all_values_unique(self):
-        from engine.inference.model_router import TaskType
+        from tritium_lib.inference.model_router import TaskType
         values = [t.value for t in TaskType]
         assert len(values) == len(set(values))
 
@@ -56,7 +56,7 @@ class TestModelProfile:
     """ModelProfile — model capability metadata."""
 
     def test_construction(self):
-        from engine.inference.model_router import ModelProfile
+        from tritium_lib.inference.model_router import ModelProfile
         p = ModelProfile(
             name="gemma3:4b",
             capabilities={"text"},
@@ -68,7 +68,7 @@ class TestModelProfile:
         assert "text" in p.capabilities
 
     def test_has_capability(self):
-        from engine.inference.model_router import ModelProfile
+        from tritium_lib.inference.model_router import ModelProfile
         p = ModelProfile(
             name="llava:7b",
             capabilities={"text", "vision"},
@@ -81,7 +81,7 @@ class TestModelProfile:
         assert not p.has_capability("code")
 
     def test_defaults(self):
-        from engine.inference.model_router import ModelProfile
+        from tritium_lib.inference.model_router import ModelProfile
         p = ModelProfile(name="test:1b")
         assert p.capabilities == {"text"}
         assert p.speed == "fast"
@@ -89,7 +89,7 @@ class TestModelProfile:
         assert p.priority == 10
 
     def test_to_dict(self):
-        from engine.inference.model_router import ModelProfile
+        from tritium_lib.inference.model_router import ModelProfile
         p = ModelProfile(name="gemma3:4b", capabilities={"text", "code"})
         d = p.to_dict()
         assert d["name"] == "gemma3:4b"
@@ -107,12 +107,12 @@ class TestModelRouterInit:
     """ModelRouter — initialization and profile registration."""
 
     def test_construction_no_fleet(self):
-        from engine.inference.model_router import ModelRouter
+        from tritium_lib.inference.model_router import ModelRouter
         router = ModelRouter()
         assert router is not None
 
     def test_construction_with_profiles(self):
-        from engine.inference.model_router import ModelRouter, ModelProfile
+        from tritium_lib.inference.model_router import ModelRouter, ModelProfile
         profiles = [
             ModelProfile(name="gemma3:4b", capabilities={"text"}, priority=1),
             ModelProfile(name="llava:7b", capabilities={"text", "vision"}, priority=2),
@@ -121,13 +121,13 @@ class TestModelRouterInit:
         assert len(router.profiles) == 2
 
     def test_register_profile(self):
-        from engine.inference.model_router import ModelRouter, ModelProfile
+        from tritium_lib.inference.model_router import ModelRouter, ModelProfile
         router = ModelRouter()
         router.register(ModelProfile(name="test:1b"))
         assert len(router.profiles) == 1
 
     def test_register_replaces_existing(self):
-        from engine.inference.model_router import ModelRouter, ModelProfile
+        from tritium_lib.inference.model_router import ModelRouter, ModelProfile
         router = ModelRouter()
         router.register(ModelProfile(name="test:1b", priority=10))
         router.register(ModelProfile(name="test:1b", priority=1))
@@ -135,19 +135,19 @@ class TestModelRouterInit:
         assert router.profiles[0].priority == 1
 
     def test_unregister(self):
-        from engine.inference.model_router import ModelRouter, ModelProfile
+        from tritium_lib.inference.model_router import ModelRouter, ModelProfile
         router = ModelRouter()
         router.register(ModelProfile(name="test:1b"))
         router.unregister("test:1b")
         assert len(router.profiles) == 0
 
     def test_unregister_missing_no_error(self):
-        from engine.inference.model_router import ModelRouter
+        from tritium_lib.inference.model_router import ModelRouter
         router = ModelRouter()
         router.unregister("nonexistent")  # Should not raise
 
     def test_get_profile(self):
-        from engine.inference.model_router import ModelRouter, ModelProfile
+        from tritium_lib.inference.model_router import ModelRouter, ModelProfile
         router = ModelRouter()
         router.register(ModelProfile(name="gemma3:4b"))
         p = router.get_profile("gemma3:4b")
@@ -155,7 +155,7 @@ class TestModelRouterInit:
         assert p.name == "gemma3:4b"
 
     def test_get_profile_missing(self):
-        from engine.inference.model_router import ModelRouter
+        from tritium_lib.inference.model_router import ModelRouter
         router = ModelRouter()
         assert router.get_profile("nonexistent") is None
 
@@ -169,7 +169,7 @@ class TestModelRouterClassify:
     """ModelRouter.classify_task — infer TaskType from context."""
 
     def test_classify_simple_think(self):
-        from engine.inference.model_router import ModelRouter, TaskType
+        from tritium_lib.inference.model_router import ModelRouter, TaskType
         router = ModelRouter()
         tt = router.classify_task(messages=[
             {"role": "user", "content": "What do you do next?"},
@@ -177,7 +177,7 @@ class TestModelRouterClassify:
         assert tt == TaskType.SIMPLE_THINK
 
     def test_classify_complex_reason_battlespace(self):
-        from engine.inference.model_router import ModelRouter, TaskType
+        from tritium_lib.inference.model_router import ModelRouter, TaskType
         router = ModelRouter()
         tt = router.classify_task(messages=[
             {"role": "user", "content": "What do you do next?"},
@@ -185,7 +185,7 @@ class TestModelRouterClassify:
         assert tt == TaskType.COMPLEX_REASON
 
     def test_classify_vision_with_images(self):
-        from engine.inference.model_router import ModelRouter, TaskType
+        from tritium_lib.inference.model_router import ModelRouter, TaskType
         router = ModelRouter()
         tt = router.classify_task(messages=[
             {"role": "user", "content": "Describe what you see."},
@@ -193,7 +193,7 @@ class TestModelRouterClassify:
         assert tt == TaskType.VISION
 
     def test_classify_chat_with_transcript(self):
-        from engine.inference.model_router import ModelRouter, TaskType
+        from tritium_lib.inference.model_router import ModelRouter, TaskType
         router = ModelRouter()
         tt = router.classify_task(messages=[
             {"role": "user", "content": "Hey Amy, how are you?"},
@@ -201,7 +201,7 @@ class TestModelRouterClassify:
         assert tt == TaskType.CHAT
 
     def test_classify_code_gen(self):
-        from engine.inference.model_router import ModelRouter, TaskType
+        from tritium_lib.inference.model_router import ModelRouter, TaskType
         router = ModelRouter()
         tt = router.classify_task(messages=[
             {"role": "user", "content": "Generate a patrol routine"},
@@ -209,7 +209,7 @@ class TestModelRouterClassify:
         assert tt == TaskType.CODE_GEN
 
     def test_classify_defaults_simple(self):
-        from engine.inference.model_router import ModelRouter, TaskType
+        from tritium_lib.inference.model_router import ModelRouter, TaskType
         router = ModelRouter()
         tt = router.classify_task(messages=[
             {"role": "user", "content": "What do you do next?"},
@@ -226,7 +226,7 @@ class TestModelRouterSelect:
     """ModelRouter.select_chain — ordered model/host fallback chain."""
 
     def _router_with_profiles(self):
-        from engine.inference.model_router import ModelRouter, ModelProfile
+        from tritium_lib.inference.model_router import ModelRouter, ModelProfile
         profiles = [
             ModelProfile(name="orca-mini:3b", capabilities={"text"}, speed="fast", priority=1),
             ModelProfile(name="gemma3:4b", capabilities={"text", "code"}, speed="fast", priority=2),
@@ -236,7 +236,7 @@ class TestModelRouterSelect:
         return ModelRouter(profiles=profiles)
 
     def test_select_simple_prefers_fast(self):
-        from engine.inference.model_router import TaskType
+        from tritium_lib.inference.model_router import TaskType
         router = self._router_with_profiles()
         chain = router.select_chain(TaskType.SIMPLE_THINK)
         assert len(chain) >= 1
@@ -244,21 +244,21 @@ class TestModelRouterSelect:
         assert chain[0].name == "orca-mini:3b"
 
     def test_select_vision_requires_vision(self):
-        from engine.inference.model_router import TaskType
+        from tritium_lib.inference.model_router import TaskType
         router = self._router_with_profiles()
         chain = router.select_chain(TaskType.VISION)
         for profile in chain:
             assert "vision" in profile.capabilities
 
     def test_select_code_gen_requires_code(self):
-        from engine.inference.model_router import TaskType
+        from tritium_lib.inference.model_router import TaskType
         router = self._router_with_profiles()
         chain = router.select_chain(TaskType.CODE_GEN)
         for profile in chain:
             assert "code" in profile.capabilities
 
     def test_select_complex_prefers_larger(self):
-        from engine.inference.model_router import TaskType
+        from tritium_lib.inference.model_router import TaskType
         router = self._router_with_profiles()
         chain = router.select_chain(TaskType.COMPLEX_REASON)
         # Complex reasoning should prefer quality over speed
@@ -267,7 +267,7 @@ class TestModelRouterSelect:
         assert chain[0].name != "orca-mini:3b"
 
     def test_select_chat_returns_text_capable(self):
-        from engine.inference.model_router import TaskType
+        from tritium_lib.inference.model_router import TaskType
         router = self._router_with_profiles()
         chain = router.select_chain(TaskType.CHAT)
         assert len(chain) >= 1
@@ -275,13 +275,13 @@ class TestModelRouterSelect:
             assert "text" in profile.capabilities
 
     def test_select_empty_profiles_returns_empty(self):
-        from engine.inference.model_router import ModelRouter, TaskType
+        from tritium_lib.inference.model_router import ModelRouter, TaskType
         router = ModelRouter()
         chain = router.select_chain(TaskType.SIMPLE_THINK)
         assert chain == []
 
     def test_select_no_matching_capability(self):
-        from engine.inference.model_router import ModelRouter, ModelProfile, TaskType
+        from tritium_lib.inference.model_router import ModelRouter, ModelProfile, TaskType
         router = ModelRouter(profiles=[
             ModelProfile(name="text-only:1b", capabilities={"text"}),
         ])
@@ -298,7 +298,7 @@ class TestModelRouterInfer:
     """ModelRouter.infer — call LLM with automatic fallback."""
 
     def _router_with_mock_fleet(self):
-        from engine.inference.model_router import ModelRouter, ModelProfile
+        from tritium_lib.inference.model_router import ModelRouter, ModelProfile
         profiles = [
             ModelProfile(name="gemma3:4b", capabilities={"text"}, priority=1),
             ModelProfile(name="llava:7b", capabilities={"text", "vision"}, priority=2),
@@ -315,7 +315,7 @@ class TestModelRouterInfer:
         return router
 
     def test_infer_success(self):
-        from engine.inference.model_router import TaskType
+        from tritium_lib.inference.model_router import TaskType
         router = self._router_with_mock_fleet()
         messages = [{"role": "user", "content": "Hello"}]
 
@@ -328,7 +328,7 @@ class TestModelRouterInfer:
             mock_chat.assert_called_once()
 
     def test_infer_fallback_on_failure(self):
-        from engine.inference.model_router import TaskType
+        from tritium_lib.inference.model_router import TaskType
         router = self._router_with_mock_fleet()
         messages = [{"role": "user", "content": "Hello"}]
 
@@ -346,7 +346,7 @@ class TestModelRouterInfer:
             assert call_count == 2
 
     def test_infer_all_fail_raises(self):
-        from engine.inference.model_router import TaskType, AllHostsFailedError
+        from tritium_lib.inference.model_router import TaskType, AllHostsFailedError
         router = self._router_with_mock_fleet()
         messages = [{"role": "user", "content": "Hello"}]
 
@@ -356,7 +356,7 @@ class TestModelRouterInfer:
 
     def test_infer_no_fleet_uses_direct(self):
         """Without a fleet, infer() uses the first profile's model directly."""
-        from engine.inference.model_router import ModelRouter, ModelProfile, TaskType
+        from tritium_lib.inference.model_router import ModelRouter, ModelProfile, TaskType
         router = ModelRouter(profiles=[
             ModelProfile(name="gemma3:4b", capabilities={"text"}, priority=1),
         ])
@@ -371,7 +371,7 @@ class TestModelRouterInfer:
             assert call_args[1].get("model") == "gemma3:4b" or call_args[0][0] == "gemma3:4b"
 
     def test_infer_vision_passes_images(self):
-        from engine.inference.model_router import TaskType
+        from tritium_lib.inference.model_router import TaskType
         router = self._router_with_mock_fleet()
         messages = [{"role": "user", "content": "What do you see?", "images": ["base64data"]}]
 
@@ -381,7 +381,7 @@ class TestModelRouterInfer:
             assert result["message"]["content"] == "I see a room"
 
     def test_infer_records_model_used(self):
-        from engine.inference.model_router import TaskType
+        from tritium_lib.inference.model_router import TaskType
         router = self._router_with_mock_fleet()
         messages = [{"role": "user", "content": "Hello"}]
 
@@ -401,7 +401,7 @@ class TestModelRouterStaticFallback:
     """ModelRouter with static config — backwards compatible with current Amy."""
 
     def test_static_config(self):
-        from engine.inference.model_router import ModelRouter
+        from tritium_lib.inference.model_router import ModelRouter
         router = ModelRouter.from_static(
             chat_model="gemma3:4b",
             deep_model="llava:7b",
@@ -410,7 +410,7 @@ class TestModelRouterStaticFallback:
         assert len(router.profiles) >= 2
 
     def test_static_infer_uses_host(self):
-        from engine.inference.model_router import ModelRouter, TaskType
+        from tritium_lib.inference.model_router import ModelRouter, TaskType
         router = ModelRouter.from_static(
             chat_model="gemma3:4b",
             deep_model="llava:7b",
@@ -436,7 +436,7 @@ class TestModelRouterFleetHosts:
     """ModelRouter with fleet — host rotation on failure."""
 
     def test_tries_multiple_hosts(self):
-        from engine.inference.model_router import ModelRouter, ModelProfile, TaskType
+        from tritium_lib.inference.model_router import ModelRouter, ModelProfile, TaskType
         profiles = [
             ModelProfile(name="gemma3:4b", capabilities={"text"}, priority=1),
         ]

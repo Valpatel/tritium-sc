@@ -509,7 +509,7 @@ class ThinkingThread:
             def _call_llm():
                 router = getattr(commander, "model_router", None)
                 if router is not None:
-                    from engine.inference.model_router import TaskType
+                    from tritium_lib.inference.model_router import TaskType
                     hostile_count_inner = len(tracker.get_hostiles()) if tracker else 0
                     active_threats_inner = 0
                     classifier_inner = getattr(commander, "threat_classifier", None)

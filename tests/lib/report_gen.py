@@ -25,7 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from engine.inference.fleet import OllamaFleet
+from tritium_lib.inference.fleet import OllamaFleet
 from tests.lib.results_db import ResultsDB
 
 

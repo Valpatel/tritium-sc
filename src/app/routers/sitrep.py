@@ -272,7 +272,7 @@ def _llm_enhance_sitrep(sitrep: dict) -> Optional[str]:
         Natural language summary string, or None if unavailable.
     """
     try:
-        from engine.inference.fleet import OllamaFleet
+        from tritium_lib.inference.fleet import OllamaFleet
         fleet = OllamaFleet(auto_discover=False)
         if fleet.count == 0:
             return None

@@ -40,7 +40,7 @@ def _get_fleet():
     """Get OllamaFleet instance, or None if unavailable."""
     try:
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../src"))
-        from engine.inference.fleet import OllamaFleet
+        from tritium_lib.inference.fleet import OllamaFleet
         fleet = OllamaFleet(auto_discover=False)
         if fleet.count == 0:
             return None

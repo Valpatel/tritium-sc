@@ -75,7 +75,7 @@ class NPCIntelligencePlugin(PluginInterface):
         try:
             from app.config import settings
             if settings.fleet_enabled:
-                from engine.inference.fleet import OllamaFleet
+                from tritium_lib.inference.fleet import OllamaFleet
                 fleet = OllamaFleet(auto_discover=settings.fleet_auto_discover)
                 fleet_hosts = [h.url for h in fleet.hosts]
         except Exception:

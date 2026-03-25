@@ -21,19 +21,19 @@ class TestFleetHost:
     """FleetHost — reachable Ollama instance."""
 
     def test_construction(self):
-        from engine.inference.fleet import FleetHost
+        from tritium_lib.inference.fleet import FleetHost
         h = FleetHost(url="http://localhost:11434", name="localhost")
         assert h.url == "http://localhost:11434"
         assert h.name == "localhost"
 
     def test_defaults(self):
-        from engine.inference.fleet import FleetHost
+        from tritium_lib.inference.fleet import FleetHost
         h = FleetHost(url="http://x:11434", name="x")
         assert h.models == []
         assert h.latency_ms == 0.0
 
     def test_has_model_exact(self):
-        from engine.inference.fleet import FleetHost
+        from tritium_lib.inference.fleet import FleetHost
         h = FleetHost(
             url="http://x:11434", name="x",
             models=["gemma3:4b", "llava:7b"],
@@ -42,7 +42,7 @@ class TestFleetHost:
         assert h.has_model("llava:7b")
 
     def test_has_model_prefix(self):
-        from engine.inference.fleet import FleetHost
+        from tritium_lib.inference.fleet import FleetHost
         h = FleetHost(
             url="http://x:11434", name="x",
             models=["llava:7b", "llava:13b"],
@@ -50,7 +50,7 @@ class TestFleetHost:
         assert h.has_model("llava")  # Prefix match
 
     def test_has_model_missing(self):
-        from engine.inference.fleet import FleetHost
+        from tritium_lib.inference.fleet import FleetHost
         h = FleetHost(
             url="http://x:11434", name="x",
             models=["gemma3:4b"],
@@ -58,7 +58,7 @@ class TestFleetHost:
         assert not h.has_model("llava:7b")
 
     def test_has_model_empty(self):
-        from engine.inference.fleet import FleetHost
+        from tritium_lib.inference.fleet import FleetHost
         h = FleetHost(url="http://x:11434", name="x")
         assert not h.has_model("anything")
 
@@ -72,14 +72,14 @@ class TestOllamaFleetInit:
     """OllamaFleet — initialization with mocked network."""
 
     def test_construction_no_discover(self):
-        from engine.inference.fleet import OllamaFleet
+        from tritium_lib.inference.fleet import OllamaFleet
         with patch.object(OllamaFleet, '_discover'):
             fleet = OllamaFleet.__new__(OllamaFleet)
             fleet._hosts = []
             assert fleet.count == 0
 
     def test_hosts_property(self):
-        from engine.inference.fleet import OllamaFleet, FleetHost
+        from tritium_lib.inference.fleet import OllamaFleet, FleetHost
         fleet = OllamaFleet.__new__(OllamaFleet)
         fleet._hosts = [
             FleetHost(url="http://a:11434", name="a"),
@@ -89,7 +89,7 @@ class TestOllamaFleetInit:
         assert len(fleet.hosts) == 2
 
     def test_hosts_is_copy(self):
-        from engine.inference.fleet import OllamaFleet, FleetHost
+        from tritium_lib.inference.fleet import OllamaFleet, FleetHost
         fleet = OllamaFleet.__new__(OllamaFleet)
         fleet._hosts = [FleetHost(url="http://a:11434", name="a")]
         hosts = fleet.hosts
@@ -106,7 +106,7 @@ class TestOllamaFleetFiltering:
     """OllamaFleet.hosts_with_model — filter by capability."""
 
     def _fleet_with_hosts(self):
-        from engine.inference.fleet import OllamaFleet, FleetHost
+        from tritium_lib.inference.fleet import OllamaFleet, FleetHost
         fleet = OllamaFleet.__new__(OllamaFleet)
         fleet._hosts = [
             FleetHost(
@@ -166,13 +166,13 @@ class TestOllamaFleetStatus:
     """OllamaFleet.status — human-readable fleet report."""
 
     def test_status_empty(self):
-        from engine.inference.fleet import OllamaFleet
+        from tritium_lib.inference.fleet import OllamaFleet
         fleet = OllamaFleet.__new__(OllamaFleet)
         fleet._hosts = []
         assert "0 hosts" in fleet.status().lower() or "no" in fleet.status().lower()
 
     def test_status_with_hosts(self):
-        from engine.inference.fleet import OllamaFleet, FleetHost
+        from tritium_lib.inference.fleet import OllamaFleet, FleetHost
         fleet = OllamaFleet.__new__(OllamaFleet)
         fleet._hosts = [
             FleetHost(
@@ -196,7 +196,7 @@ class TestOllamaFleetTailscale:
     """OllamaFleet._scan_tailscale — Tailscale peer discovery."""
 
     def test_scan_finds_peers(self):
-        from engine.inference.fleet import OllamaFleet
+        from tritium_lib.inference.fleet import OllamaFleet
         fleet = OllamaFleet.__new__(OllamaFleet)
         fleet._hosts = []
 
@@ -220,7 +220,7 @@ class TestOllamaFleetTailscale:
             assert not any("offline-host" in h for h in hosts)
 
     def test_scan_tailscale_not_installed(self):
-        from engine.inference.fleet import OllamaFleet
+        from tritium_lib.inference.fleet import OllamaFleet
         fleet = OllamaFleet.__new__(OllamaFleet)
         fleet._hosts = []
 
@@ -229,7 +229,7 @@ class TestOllamaFleetTailscale:
             assert hosts == set()
 
     def test_scan_tailscale_timeout(self):
-        from engine.inference.fleet import OllamaFleet
+        from tritium_lib.inference.fleet import OllamaFleet
         import subprocess
 
         fleet = OllamaFleet.__new__(OllamaFleet)
@@ -249,7 +249,7 @@ class TestOllamaFleetConf:
     """OllamaFleet discovery from conf file."""
 
     def test_conf_parsing(self):
-        from engine.inference.fleet import OllamaFleet
+        from tritium_lib.inference.fleet import OllamaFleet
         fleet = OllamaFleet.__new__(OllamaFleet)
         fleet._hosts = []
 
@@ -258,7 +258,7 @@ gb10-02
 agx-02:11434
 # commented-out-host
 """
-        with patch("engine.inference.fleet.CONF_PATH") as mock_path:
+        with patch("tritium_lib.inference.fleet.CONF_PATH") as mock_path:
             mock_path.exists.return_value = True
             mock_path.read_text.return_value = conf_content
 

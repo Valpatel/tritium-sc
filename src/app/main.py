@@ -185,7 +185,7 @@ def _create_simulation_engine():
     try:
         from engine.perception.vision import set_ollama_host
         if settings.fleet_enabled:
-            from engine.inference.fleet import LLMFleet
+            from tritium_lib.inference.fleet import LLMFleet
             fleet = LLMFleet(auto_discover=settings.fleet_auto_discover)
             if fleet.hosts:
                 set_ollama_host(fleet.hosts[0].url)

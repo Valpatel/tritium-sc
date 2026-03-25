@@ -129,7 +129,7 @@ def _check_ollama_local() -> dict:
 def _check_ollama_fleet() -> dict | None:
     """Check OllamaFleet for multi-host status."""
     try:
-        from engine.inference.fleet import OllamaFleet
+        from tritium_lib.inference.fleet import OllamaFleet
         fleet = OllamaFleet(auto_discover=False)
         if fleet.count == 0:
             return None

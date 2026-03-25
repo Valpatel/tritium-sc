@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from engine.inference.fleet import FleetHost, OllamaFleet
+    from tritium_lib.inference.fleet import FleetHost, OllamaFleet
     from engine.comms.event_bus import EventBus
     from tritium_lib.sim_engine.core.entity import SimulationTarget
 

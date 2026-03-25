@@ -46,7 +46,7 @@ class TestFleetStatusEndpoint:
 
     def test_with_router_returns_enabled(self):
         from amy.router import fleet_status
-        from engine.inference.model_router import ModelRouter, ModelProfile
+        from tritium_lib.inference.model_router import ModelRouter, ModelProfile
         request = MagicMock()
         amy_mock = MagicMock()
         router = ModelRouter.from_static()
@@ -58,8 +58,8 @@ class TestFleetStatusEndpoint:
 
     def test_with_fleet_hosts(self):
         from amy.router import fleet_status
-        from engine.inference.model_router import ModelRouter
-        from engine.inference.fleet import FleetHost
+        from tritium_lib.inference.model_router import ModelRouter
+        from tritium_lib.inference.fleet import FleetHost
         request = MagicMock()
         amy_mock = MagicMock()
         router = ModelRouter.from_static()
@@ -99,8 +99,8 @@ class TestFleetModelsEndpoint:
 
     def test_with_fleet_models(self):
         from amy.router import fleet_models
-        from engine.inference.model_router import ModelRouter
-        from engine.inference.fleet import FleetHost
+        from tritium_lib.inference.model_router import ModelRouter
+        from tritium_lib.inference.fleet import FleetHost
         request = MagicMock()
         amy_mock = MagicMock()
         router = ModelRouter.from_static()

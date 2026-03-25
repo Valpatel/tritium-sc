@@ -176,7 +176,7 @@ class TestFleetGenerate:
 
     def test_generate_method_on_fleet(self):
         """OllamaFleet.generate() sends POST to /v1/chat/completions (llama-server)."""
-        from engine.inference.fleet import OllamaFleet, FleetHost
+        from tritium_lib.inference.fleet import OllamaFleet, FleetHost
 
         with patch.object(OllamaFleet, "_discover"):
             fleet = OllamaFleet(auto_discover=False)
@@ -207,7 +207,7 @@ class TestFleetGenerate:
 
     def test_generate_no_host_returns_empty(self):
         """generate() returns empty string when no host has the model."""
-        from engine.inference.fleet import OllamaFleet
+        from tritium_lib.inference.fleet import OllamaFleet
 
         with patch.object(OllamaFleet, "_discover"):
             fleet = OllamaFleet(auto_discover=False)
@@ -455,7 +455,7 @@ class TestFleetChat:
 
     def test_chat_sends_multimodal_request(self):
         """fleet.chat() sends correct payload to /v1/chat/completions with images."""
-        from engine.inference.fleet import OllamaFleet, FleetHost
+        from tritium_lib.inference.fleet import OllamaFleet, FleetHost
 
         with patch.object(OllamaFleet, "_discover"):
             fleet = OllamaFleet(auto_discover=False)
@@ -498,7 +498,7 @@ class TestFleetChat:
 
     def test_chat_without_images(self):
         """fleet.chat() works without images (text-only chat)."""
-        from engine.inference.fleet import OllamaFleet, FleetHost
+        from tritium_lib.inference.fleet import OllamaFleet, FleetHost
 
         with patch.object(OllamaFleet, "_discover"):
             fleet = OllamaFleet(auto_discover=False)
@@ -530,7 +530,7 @@ class TestFleetChat:
 
     def test_chat_no_host_returns_empty(self):
         """chat() returns empty string when no host has the model."""
-        from engine.inference.fleet import OllamaFleet
+        from tritium_lib.inference.fleet import OllamaFleet
 
         with patch.object(OllamaFleet, "_discover"):
             fleet = OllamaFleet(auto_discover=False)
@@ -541,7 +541,7 @@ class TestFleetChat:
 
     def test_chat_handles_error_gracefully(self):
         """chat() returns empty string on network error."""
-        from engine.inference.fleet import OllamaFleet, FleetHost
+        from tritium_lib.inference.fleet import OllamaFleet, FleetHost
 
         with patch.object(OllamaFleet, "_discover"):
             fleet = OllamaFleet(auto_discover=False)

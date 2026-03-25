@@ -224,7 +224,7 @@ class TestRobotThinkerCycle:
     def test_think_cycle_uses_model_router(self):
         """When a model_router is provided, uses it for inference."""
         from engine.inference.robot_thinker import RobotThinker
-        from engine.inference.model_router import ModelRouter, ModelProfile, TaskType
+        from tritium_lib.inference.model_router import ModelRouter, ModelProfile, TaskType
 
         mock_router = MagicMock()
         mock_router.infer.return_value = {
