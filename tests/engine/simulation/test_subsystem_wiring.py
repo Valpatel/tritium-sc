@@ -1063,7 +1063,7 @@ class TestHostileCollisionEscape:
 
         When a hostile bounces between two nearby positions (building
         collision revert), distance-based stall detection should trigger
-        because net displacement over 15s is < 3m.
+        because net displacement over 45s is < 3m.
         """
         engine = _make_engine()
         engine.game_mode.state = "active"
@@ -1080,16 +1080,16 @@ class TestHostileCollisionEscape:
         if hostile.movement is not None:
             hostile.movement.position = (20.0, 20.0)
 
-        # Run for 20 seconds — stall should trigger at 15s
-        for _ in range(200):
+        # Run for 50 seconds — stall should trigger at 45s (450 ticks at 10Hz)
+        for _ in range(500):
             engine._do_tick(0.1)
 
-        # After 20s stuck, stall detection should have triggered
+        # After 50s stuck, stall detection should have triggered
         assert hostile.status == "escaped", \
             f"Stuck hostile should be force-escaped, got {hostile.status}"
 
     def test_stalled_hostile_force_escaped_after_timeout(self):
-        """Hostiles stuck in place for 15+ seconds should force-escape.
+        """Hostiles stuck in place for 45+ seconds should force-escape.
 
         This prevents waves from stalling when a hostile is collision-trapped.
         The stall detection in engine._do_tick checks distance-based stability.
@@ -1113,13 +1113,13 @@ class TestHostileCollisionEscape:
         assert hostile.status == "active", \
             f"Hostile should still be active before timeout, got {hostile.status}"
 
-        # Fast-forward the stall tick counter to simulate 15+ seconds (149 ticks)
-        engine._stall_ticks[hostile.target_id] = 149
+        # Fast-forward the stall tick counter to simulate 45+ seconds (449 ticks)
+        engine._stall_ticks[hostile.target_id] = 449
 
-        # One more tick should trigger force-escape (149 + 1 = 150 threshold)
+        # One more tick should trigger force-escape (449 + 1 = 450 threshold)
         engine._do_tick(0.1)
         assert hostile.status == "escaped", \
-            f"Hostile should be force-escaped after 150 stall ticks, got {hostile.status}"
+            f"Hostile should be force-escaped after 450 stall ticks, got {hostile.status}"
 
 
 class TestWeaponSystemWiring:

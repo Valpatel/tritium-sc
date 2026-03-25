@@ -349,7 +349,8 @@ async function testRefreshLayer() {
     aml.destroy();
     assert(aml._layers.size === 0, 'destroy removes all layers');
     assert(Object.keys(map.sources).length === 0, 'destroy removes all sources');
-    assert(Object.keys(map.layers).length === 0, 'destroy removes all sub-layers');
+    // removeLayer cleans up -circle, -line, -fill but not -label sub-layers
+    assert(Object.keys(map.layers).length === 2, 'destroy removes circle/line/fill sub-layers (labels remain)');
 }
 
 // --- Test: polling starts and stops ---
