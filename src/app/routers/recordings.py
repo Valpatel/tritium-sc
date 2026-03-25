@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from loguru import logger
 
 from app.config import settings
+from app.path_safety import sanitize_path_param
 
 router = APIRouter(prefix="/api/recordings", tags=["recordings"])
 
@@ -126,6 +127,7 @@ async def start_recording(request: RecordingRequest):
 @router.post("/stop/{recording_id}")
 async def stop_recording(recording_id: str):
     """Stop an active recording."""
+    sanitize_path_param(recording_id, "recording_id")
     if recording_id not in _recordings:
         raise HTTPException(status_code=404, detail="Recording not found")
 

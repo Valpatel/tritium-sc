@@ -26,6 +26,7 @@ from pydantic import BaseModel
 
 from app.auth import require_auth
 from app.config import settings
+from app.path_safety import sanitize_path_param
 from engine.backup.backup import BackupManager
 
 
@@ -236,6 +237,7 @@ async def restore_backup(file: UploadFile = File(...)):
 @router.get("/download/{backup_id}")
 async def download_backup(backup_id: str):
     """Download a specific backup archive by ID."""
+    sanitize_path_param(backup_id, "backup_id")
     mgr = _shared_manager()
     path = mgr.get_backup_path(backup_id)
 

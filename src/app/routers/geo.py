@@ -25,6 +25,7 @@ from loguru import logger
 from pydantic import BaseModel
 
 from app.config import settings
+from app.path_safety import sanitize_path_param
 
 router = APIRouter(prefix="/api/geo", tags=["geo"])
 
@@ -222,6 +223,9 @@ async def get_tile(z: int, x: int, y: int):
     """
     if z < 0 or z > 22:
         raise HTTPException(status_code=400, detail="Zoom level must be 0-22")
+    sanitize_path_param(str(z), "z")
+    sanitize_path_param(str(x), "x")
+    sanitize_path_param(str(y), "y")
 
     # Check disk cache
     cache_path = _TILE_CACHE / str(z) / str(x) / f"{y}.jpg"
@@ -276,6 +280,9 @@ async def get_terrain_tile(z: int, x: int, y: int):
     """
     if z < 0 or z > 15:
         raise HTTPException(status_code=400, detail="Terrain tile zoom must be 0-15")
+    sanitize_path_param(str(z), "z")
+    sanitize_path_param(str(x), "x")
+    sanitize_path_param(str(y), "y")
 
     cache_path = _TERRAIN_CACHE / str(z) / str(x) / f"{y}.png"
     if cache_path.exists():
@@ -495,6 +502,9 @@ async def get_road_tile(z: int, x: int, y: int):
     """
     if z < 0 or z > 22:
         raise HTTPException(status_code=400, detail="Zoom level must be 0-22")
+    sanitize_path_param(str(z), "z")
+    sanitize_path_param(str(x), "x")
+    sanitize_path_param(str(y), "y")
 
     cache_path = _ROAD_TILE_CACHE / str(z) / str(x) / f"{y}.png"
     if cache_path.exists():

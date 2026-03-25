@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from loguru import logger
 
 from app.config import settings
+from app.path_safety import sanitize_path_param
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -431,6 +432,7 @@ async def generate_hyperlapse(
 @router.get("/hyperlapse/{channel}/{date}/video")
 async def get_hyperlapse_video(channel: int, date: str):
     """Stream the generated hyperlapse video."""
+    sanitize_path_param(date, "date")
     from fastapi.responses import FileResponse
 
     video_path = settings.recordings_path / ".cache" / "hyperlapse" / f"hyperlapse_ch{channel}_{date}.mp4"
@@ -481,6 +483,8 @@ async def detect_single_frame(
     frame: int = Query(0, description="Frame number to analyze"),
 ):
     """Run detection on a single frame from a video."""
+    sanitize_path_param(date, "date")
+    sanitize_path_param(filename, "filename")
     video_paths = get_video_paths(channel, date)
     video_path = next((p for p in video_paths if p.name == filename), None)
 

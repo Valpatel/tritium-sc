@@ -19,6 +19,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.path_safety import sanitize_path_param
 from engine.scenarios.frame_gen import _CACHE_DIR
 from engine.scenarios.library import ScenarioLibrary
 from engine.scenarios.runner import ScenarioRunner
@@ -251,6 +252,7 @@ async def start_run(body: RunRequest):
 @router.get("/run/{run_id}")
 async def get_run(run_id: str):
     """Get run status and results."""
+    sanitize_path_param(run_id, "run_id")
     # Check active runs first
     with _active_lock:
         active = _active_runs.get(run_id)

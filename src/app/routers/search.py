@@ -24,6 +24,7 @@ from pydantic import BaseModel
 from loguru import logger
 
 from app.config import settings
+from app.path_safety import sanitize_path_param
 
 router = APIRouter(prefix="/api/search", tags=["search"])
 
@@ -202,6 +203,7 @@ async def list_vehicles(
 @router.get("/thumbnail/{thumbnail_id}")
 async def get_thumbnail(thumbnail_id: str):
     """Get a thumbnail image."""
+    sanitize_path_param(thumbnail_id, "thumbnail_id")
     # Search in all category directories
     for category in ["person", "vehicle", "animal"]:
         path = THUMBNAILS_DIR / category / f"{thumbnail_id}.jpg"
@@ -570,6 +572,7 @@ async def get_detection_trends(
 @router.get("/target/{thumbnail_id}")
 async def get_target_detail(thumbnail_id: str):
     """Get detailed information about a specific target."""
+    sanitize_path_param(thumbnail_id, "thumbnail_id")
     store = get_vector_store()
     labels = load_json(LABELS_PATH, {})
     merges = load_json(MERGES_PATH, {"merged_into": {}, "groups": {}})
