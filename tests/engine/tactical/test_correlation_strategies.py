@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from src.engine.tactical.correlation_strategies import (
+from tritium_lib.tracking.correlation_strategies import (
     CorrelationStrategy,
     DossierStrategy,
     SignalPatternStrategy,
