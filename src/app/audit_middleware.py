@@ -81,11 +81,9 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
 
 
 def _get_client_ip(request: Request) -> str:
-    """Get client IP from request, respecting X-Forwarded-For."""
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    """Get client IP from request using trusted proxy validation."""
+    from app.client_ip import get_client_ip
+    return get_client_ip(request)
 
 
 def _log_request(method: str, path: str, status: int, duration_ms: float, client_ip: str) -> None:

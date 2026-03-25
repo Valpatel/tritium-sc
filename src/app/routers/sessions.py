@@ -236,9 +236,8 @@ async def create_session(req: CreateSessionRequest, request: Request):
         raise HTTPException(400, f"Invalid role: {req.role}. Valid: {[r.value for r in UserRole]}")
 
     color = req.color or _ROLE_COLORS.get(role, "#00f0ff")
-    client_ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-    if not client_ip:
-        client_ip = request.client.host if request.client else "unknown"
+    from app.client_ip import get_client_ip
+    client_ip = get_client_ip(request)
 
     with _lock:
         _prune_stale_sessions()
