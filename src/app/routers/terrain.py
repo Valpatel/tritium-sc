@@ -450,7 +450,7 @@ async def process_terrain_area(req: GeoProcessRequest):
 
     except Exception as e:
         logger.error("Terrain processing failed: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Terrain processing failed")
     finally:
         _processing = False
 

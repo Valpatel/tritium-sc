@@ -688,4 +688,4 @@ async def analyze_video_for_annotations(channel: int, date: str, filename: str):
 
     except Exception as e:
         logger.error(f"Analysis failed for {filename}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Video analysis failed")

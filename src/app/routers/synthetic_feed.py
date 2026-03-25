@@ -26,6 +26,7 @@ import cv2
 import numpy as np
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response, StreamingResponse
+from loguru import logger
 from pydantic import BaseModel
 
 from engine.synthetic.video_gen import (
@@ -328,7 +329,8 @@ async def create_synthetic_camera(request: CreateFeedRequest):
     try:
         result = _manager.create_feed(config)
     except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        logger.warning(f"Synthetic feed creation conflict: {e}")
+        raise HTTPException(status_code=409, detail="Feed already exists or invalid configuration")
     return result
 
 
@@ -337,8 +339,8 @@ async def delete_synthetic_camera(feed_id: str):
     """Delete a synthetic camera feed."""
     try:
         _manager.delete_feed(feed_id)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Feed not found")
     return {"status": "deleted", "feed_id": feed_id}
 
 
@@ -347,8 +349,8 @@ async def get_snapshot(feed_id: str):
     """Get a single JPEG snapshot from a synthetic camera."""
     try:
         jpeg = _manager.get_snapshot(feed_id)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Feed not found")
     return Response(content=jpeg, media_type="image/jpeg")
 
 

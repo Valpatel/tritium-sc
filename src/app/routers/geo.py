@@ -1660,7 +1660,8 @@ async def import_kml(body: KMLImportRequest):
     try:
         return kml_to_geojson(body.kml)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid KML: {e}")
+        logger.warning(f"Invalid KML conversion: {e}")
+        raise HTTPException(status_code=400, detail="Invalid KML input")
 
 
 @router.post("/export/kml")
@@ -1676,7 +1677,8 @@ async def export_kml(body: KMLExportRequest):
         kml_text = geojson_to_kml(body.geojson)
         return {"kml": kml_text}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"KML export failed: {e}")
+        logger.warning(f"KML export failed: {e}")
+        raise HTTPException(status_code=400, detail="KML export failed")
 
 
 @router.get("/convert/mgrs")
@@ -1702,14 +1704,16 @@ async def convert_mgrs(
             lat_out, lng_out = mgrs_to_latlng(mgrs)
             return {"lat": lat_out, "lng": lng_out, "mgrs": mgrs}
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            logger.warning(f"MGRS conversion failed: {e}")
+            raise HTTPException(status_code=400, detail="Invalid MGRS coordinate")
 
     if lat is not None and lng is not None:
         try:
             mgrs_str = latlng_to_mgrs(lat, lng, precision=precision)
             return {"lat": lat, "lng": lng, "mgrs": mgrs_str}
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            logger.warning(f"MGRS conversion failed: {e}")
+            raise HTTPException(status_code=400, detail="Invalid coordinate values")
 
     raise HTTPException(
         status_code=400,
@@ -1746,7 +1750,8 @@ async def convert_utm(
                 "band": band,
             }
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            logger.warning(f"UTM conversion failed: {e}")
+            raise HTTPException(status_code=400, detail="Invalid UTM coordinates")
 
     if lat is not None and lng is not None:
         try:
@@ -1760,7 +1765,8 @@ async def convert_utm(
                 "band": b,
             }
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            logger.warning(f"UTM conversion failed: {e}")
+            raise HTTPException(status_code=400, detail="Invalid coordinate values")
 
     raise HTTPException(
         status_code=400,

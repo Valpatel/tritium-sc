@@ -425,7 +425,7 @@ async def generate_hyperlapse(
         }
     except Exception as e:
         logger.error(f"Hyperlapse generation failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Hyperlapse generation failed")
 
 
 @router.get("/hyperlapse/{channel}/{date}/video")
@@ -511,4 +511,4 @@ async def detect_single_frame(
         }
     except Exception as e:
         logger.error(f"Detection failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Detection failed")

@@ -12,6 +12,7 @@ Exposes registered data-provider layers for map rendering:
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
+from loguru import logger
 from pydantic import BaseModel
 
 from engine.plugins.data_provider import Bounds
@@ -87,4 +88,5 @@ async def get_layer_data(
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Layer not found: {name}")
     except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Layer data fetch failed for '{name}': {e}")
+        raise HTTPException(status_code=500, detail="Layer data unavailable")
