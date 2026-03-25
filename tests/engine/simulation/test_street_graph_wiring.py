@@ -210,7 +210,7 @@ class TestMainLifespanWiring:
         eb = EventBus()
         eng = SimulationEngine(eb, map_bounds=200.0)
 
-        from engine.tactical.obstacles import BuildingObstacles
+        from tritium_lib.tracking.obstacles import BuildingObstacles
         obstacles = BuildingObstacles()
         obstacles.load(37.7749, -122.4194, radius_m=300)
         if obstacles.polygons:

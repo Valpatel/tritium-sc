@@ -12,7 +12,7 @@
 //   ws.send({ type: 'ping' });
 
 import { TritiumStore } from './store.js';
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
 import { TritiumWebSocket } from '/lib/websocket.js';
 
 export class WebSocketManager extends TritiumWebSocket {
@@ -1087,6 +1087,15 @@ export class WebSocketManager extends TritiumWebSocket {
                     TritiumStore.set('game.signals', signals);
                 }
                 EventBus.emit('unit:signal', d);
+                break;
+            }
+
+            // -- City-sim sensor bridge sightings --------------------------
+            case 'sim_sighting_batch': {
+                const items = msg.data || [];
+                if (Array.isArray(items)) {
+                    EventBus.emit('sim:sightings', items);
+                }
                 break;
             }
 

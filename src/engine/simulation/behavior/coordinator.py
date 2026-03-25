@@ -31,7 +31,7 @@ from .rover import RoverBehavior
 from .hostile import HostileBehavior
 
 if TYPE_CHECKING:
-    from engine.tactical.obstacles import BuildingObstacles
+    from tritium_lib.tracking.obstacles import BuildingObstacles
     from ..combat import CombatSystem
     from ..comms import UnitComms
     from ..target import SimulationTarget

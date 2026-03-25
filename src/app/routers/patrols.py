@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 
 from app.auth import require_auth
 
-from engine.tactical.patrol import PatrolManager
+from tritium_lib.tracking.patrol import PatrolManager
 
 router = APIRouter(prefix="/api/patrols", tags=["patrols"])
 

@@ -45,7 +45,7 @@ from .base import nearest_in_range
 from ..pursuit import PursuitSystem
 
 if TYPE_CHECKING:
-    from engine.tactical.obstacles import BuildingObstacles
+    from tritium_lib.tracking.obstacles import BuildingObstacles
     from ..combat import CombatSystem
     from ..comms import UnitComms
     from ..target import SimulationTarget

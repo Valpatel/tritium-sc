@@ -19,7 +19,7 @@ from app.routers.patrols import router
 
 def _make_client():
     """Create a fresh TestClient with an isolated PatrolManager."""
-    from engine.tactical.patrol import PatrolManager
+    from tritium_lib.tracking.patrol import PatrolManager
 
     app = FastAPI()
     app.include_router(router)

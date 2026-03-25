@@ -7,11 +7,11 @@
 //
 // Include via: <script type="module" src="/static/js/command/main.js"></script>
 
-import { _esc } from './panel-utils.js';
+import { _esc } from '/lib/utils.js';
 import { TritiumStore } from './store.js';
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
 import { WebSocketManager } from './websocket.js';
-import { initMap, destroyMap, toggleSatellite, toggleRoads, toggleGrid, toggleBuildings, toggleFog, toggleTerrain, toggleUnits, toggleLabels, toggleModels, toggleWaterways, toggleParks, toggleMesh, toggleMeshNodes, toggleMeshLinks, toggleMeshCoverage, toggleThoughts, toggleAllLayers, setAllLayers, toggleTracers, toggleExplosions, toggleParticles, toggleHitFlashes, toggleFloatingText, toggleKillFeed, toggleScreenFx, toggleBanners, toggleLayerHud, toggleHealthBars, toggleSelectionFx, getMapState, centerOnAction, resetCamera, zoomIn, zoomOut, toggleTilt, setLayers, setMapMode, toggleSquadHulls, toggleAutoFollow, toggleGeoLayers, togglePatrolRoutes, toggleWeaponRange, toggleHeatmap, toggleSwarmHull, toggleHazardZones, toggleHostileObjectives, toggleCrowdDensity, toggleCoverPoints, toggleUnitSignals, toggleHostileIntel, togglePredictionCones, toggleCoverageOverlap, toggleGeofenceZones } from './map-maplibre.js';
+import { initMap, destroyMap, toggleSatellite, toggleRoads, toggleGrid, toggleBuildings, toggleFog, toggleTerrain, toggleUnits, toggleLabels, toggleModels, toggleWaterways, toggleParks, toggleMesh, toggleMeshNodes, toggleMeshLinks, toggleMeshCoverage, toggleThoughts, toggleAllLayers, setAllLayers, toggleTracers, toggleExplosions, toggleParticles, toggleHitFlashes, toggleFloatingText, toggleKillFeed, toggleScreenFx, toggleBanners, toggleLayerHud, toggleHealthBars, toggleSelectionFx, getMapState, centerOnAction, resetCamera, zoomIn, zoomOut, toggleTilt, setLayers, setMapMode, toggleSquadHulls, toggleAutoFollow, toggleGeoLayers, togglePatrolRoutes, toggleWeaponRange, toggleHeatmap, toggleSwarmHull, toggleHazardZones, toggleHostileObjectives, toggleCrowdDensity, toggleCoverPoints, toggleUnitSignals, toggleHostileIntel, togglePredictionCones, toggleCoverageOverlap, toggleGeofenceZones, toggleCitySim, getCitySimStats, cycleSimTimeScale, spawnEmergencyVehicle, toggleRoadGraph, toggleBloom } from './map-maplibre.js';
 import { PanelManager } from './panel-manager.js';
 import { LayoutManager } from './layout-manager.js';
 import { createMenuBar, focusSaveInput } from './menu-bar.js';
@@ -19,6 +19,15 @@ import { AmyPanelDef } from './panels/amy.js';
 import { UnitsPanelDef } from './panels/units.js';
 import { AlertsPanelDef } from './panels/alerts.js';
 import { GameHudPanelDef } from './panels/game-hud.js';
+import { CitySimPanelDef } from './panels/city-sim.js';
+import { SimulationContainerDef } from './panels/simulation-container.js';
+import { SensorsContainerDef } from './panels/sensors-container.js';
+import { IntelligenceContainerDef } from './panels/intelligence-container.js';
+import { CommsContainerDef } from './panels/comms-container.js';
+import { TacticalContainerDef } from './panels/tactical-container.js';
+import { FleetContainerDef } from './panels/fleet-container.js';
+import { CommanderContainerDef } from './panels/commander-container.js';
+import { SystemContainerDef } from './panels/system-container.js';
 // MeshPanelDef replaced by meshtastic addon's unified tabbed panel
 // import { MeshPanelDef } from './panels/mesh.js';
 import { AudioPanelDef } from './panels/audio.js';
@@ -162,6 +171,14 @@ function init() {
             zoom: data.zoom,
             radius: data.radius,
         });
+    });
+
+    // Forward city-sim sensor bridge sightings to backend via WebSocket
+    EventBus.on('sim:sighting_batch', ({ sightings, detections }) => {
+        const batch = [...sightings, ...detections];
+        if (batch.length > 0) {
+            ws.send({ type: 'sim_sighting_batch', data: batch });
+        }
     });
 
     // Connection status indicator
@@ -691,7 +708,8 @@ function _showWelcomeTooltip() {
     `;
     tip.innerHTML = `
         <div style="color:#00f0ff;font-weight:bold;font-size:12px;margin-bottom:8px;letter-spacing:0.5px">WELCOME TO TRITIUM</div>
-        <div style="margin-bottom:6px">Click <span style="color:#05ffa1;font-weight:bold">GAME &gt; Start Demo</span> to see targets.</div>
+        <div style="margin-bottom:6px">Click <span style="color:#05ffa1;font-weight:bold">SIM &gt; Start Demo</span> to see targets.</div>
+        <div style="margin-bottom:6px">Press <span style="color:#fcee0a;font-weight:bold">J</span> for city simulation with traffic.</div>
         <div style="margin-bottom:6px">Click targets on the map to <span style="color:#00f0ff">inspect</span> them.</div>
         <div style="margin-bottom:10px">Press <span style="color:#fcee0a;font-weight:bold">?</span> for keyboard shortcuts.</div>
         <button id="welcome-dismiss" style="
@@ -720,8 +738,8 @@ function _showWelcomeTooltip() {
 
     tip.querySelector('#welcome-dismiss').addEventListener('click', dismiss);
 
-    // Auto-dismiss after 15 seconds
-    setTimeout(dismiss, 15000);
+    // Auto-dismiss after 8 seconds
+    setTimeout(dismiss, 8000);
 }
 
 // ---------------------------------------------------------------------------
@@ -737,6 +755,15 @@ function initPanelSystem(container) {
     panelManager.register(UnitsPanelDef);
     panelManager.register(AlertsPanelDef);
     panelManager.register(GameHudPanelDef);
+    panelManager.register(CitySimPanelDef);
+    panelManager.register(SimulationContainerDef);
+    panelManager.register(SensorsContainerDef);
+    panelManager.register(IntelligenceContainerDef);
+    panelManager.register(CommsContainerDef);
+    panelManager.register(TacticalContainerDef);
+    panelManager.register(FleetContainerDef);
+    panelManager.register(CommanderContainerDef);
+    panelManager.register(SystemContainerDef);
     // MeshPanelDef replaced by meshtastic addon — loaded dynamically via addon-loader
     panelManager.register(AudioPanelDef);
     panelManager.register(EscalationPanelDef);
@@ -940,6 +967,9 @@ function initPanelSystem(container) {
             toggleGrid: () => (_activeMapModule ? _activeMapModule.toggleGrid() : toggleGrid()),
             toggleFog: () => (_activeMapModule ? _activeMapModule.toggleFog() : toggleFog()),
             toggleTerrain: () => (_activeMapModule ? _activeMapModule.toggleTerrain() : toggleTerrain()),
+            toggleAssetCoverage: () => (_activeMapModule ? _activeMapModule.toggleAssetCoverage() : null),
+            toggleEditMode: () => (_activeMapModule ? _activeMapModule.toggleEditMode() : null),
+            isEditMode: () => (_activeMapModule ? _activeMapModule.isEditMode() : false),
             toggleUnits: () => (_activeMapModule ? _activeMapModule.toggleUnits() : toggleUnits()),
             toggleLabels: () => (_activeMapModule ? _activeMapModule.toggleLabels() : toggleLabels()),
             toggleModels: () => (_activeMapModule ? _activeMapModule.toggleModels() : toggleModels()),
@@ -947,6 +977,14 @@ function initPanelSystem(container) {
             toggleParks: () => (_activeMapModule ? _activeMapModule.toggleParks() : toggleParks()),
             toggleTilt: () => (_activeMapModule ? _activeMapModule.toggleTilt() : toggleTilt()),
             toggleBuildings: () => (_activeMapModule ? _activeMapModule.toggleBuildings() : toggleBuildings()),
+            toggleTrees: () => (_activeMapModule?.toggleTrees ? _activeMapModule.toggleTrees() : null),
+            toggleWater: () => (_activeMapModule?.toggleWater ? _activeMapModule.toggleWater() : null),
+            toggleBarriers: () => (_activeMapModule?.toggleBarriers ? _activeMapModule.toggleBarriers() : null),
+            toggleEntrances: () => (_activeMapModule?.toggleEntrances ? _activeMapModule.toggleEntrances() : null),
+            togglePOIs: () => (_activeMapModule?.togglePOIs ? _activeMapModule.togglePOIs() : null),
+            toggleRoadGraph: () => (_activeMapModule?.toggleRoadGraph ? _activeMapModule.toggleRoadGraph() : null),
+            toggleCitySim: () => toggleCitySim(),
+            getCitySimStats: () => getCitySimStats(),
             toggleMesh: () => (_activeMapModule ? _activeMapModule.toggleMesh() : toggleMesh()),
             toggleMeshNodes: () => (_activeMapModule ? _activeMapModule.toggleMeshNodes() : toggleMeshNodes()),
             toggleMeshLinks: () => (_activeMapModule ? _activeMapModule.toggleMeshLinks() : toggleMeshLinks()),
@@ -1711,6 +1749,13 @@ function initKeyboard() {
             EventBus.emit('map:drawCancel', {});
         }
 
+        // Shift+E: Toggle edit mode (asset placement/editing)
+        if (e.key === 'E' && e.shiftKey) {
+            e.preventDefault();
+            _mapActions?.toggleEditMode?.();
+            return;
+        }
+
         switch (e.key) {
             case '?':
                 document.getElementById('help-overlay').hidden =
@@ -1818,13 +1863,21 @@ function initKeyboard() {
                 break;
             case 'j':
             case 'J':
-                if (panelManager) panelManager.toggle('unit-inspector');
+                _mapActions ? _mapActions.toggleCitySim() : toggleCitySim();
                 break;
             case '[':
-                _mapActions ? _mapActions.zoomOut() : zoomOut();
+                _mapActions ? _mapActions.cycleSimTimeScale() : cycleSimTimeScale();
                 break;
             case ']':
-                _mapActions ? _mapActions.zoomIn() : zoomIn();
+                _mapActions ? _mapActions.spawnEmergencyVehicle() : spawnEmergencyVehicle();
+                break;
+            case '\\':
+                // Start a protest at city center (backslash key)
+                EventBus.emit('city-sim:start-protest', {
+                    plazaCenter: { x: 0, z: 0 },
+                    participantCount: 50,
+                    legitimacy: 0.3,
+                });
                 break;
             case 'u':
             case 'U':

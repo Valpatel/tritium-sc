@@ -911,7 +911,7 @@ async def lifespan(app: FastAPI):
             # Load real-world geo data (roads + buildings) for 3D renderer
             try:
                 from engine.tactical.street_graph import StreetGraph
-                from engine.tactical.obstacles import BuildingObstacles
+                from tritium_lib.tracking.obstacles import BuildingObstacles
 
                 if settings.map_center_lat != 0.0 or settings.map_center_lng != 0.0:
                     sg = StreetGraph()

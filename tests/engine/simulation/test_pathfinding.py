@@ -15,7 +15,7 @@ import networkx as nx
 import pytest
 
 from tritium_lib.sim_engine.world.pathfinding import plan_path
-from engine.tactical.obstacles import BuildingObstacles
+from tritium_lib.tracking.obstacles import BuildingObstacles
 from engine.tactical.street_graph import StreetGraph
 
 

@@ -14,7 +14,7 @@ import pytest
 import networkx as nx
 
 from engine.tactical.street_graph import StreetGraph
-from engine.tactical.obstacles import BuildingObstacles
+from tritium_lib.tracking.obstacles import BuildingObstacles
 
 pytestmark = pytest.mark.unit
 

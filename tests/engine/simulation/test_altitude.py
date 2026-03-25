@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from tritium_lib.sim_engine.core.entity import SimulationTarget
-from engine.tactical.obstacles import BuildingObstacles
+from tritium_lib.tracking.obstacles import BuildingObstacles
 
 
 # ---------------------------------------------------------------------------

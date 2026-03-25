@@ -265,11 +265,61 @@ async def handle_client_message(websocket: WebSocket, message: dict):
         # Client sends a new JWT token to extend the session without reconnecting.
         # Expected: {"type": "token_refresh", "token": "<new_jwt>"}
         await _handle_token_refresh(websocket, message)
+    elif msg_type == "sim_sighting_batch":
+        # City-sim sensor bridge: batch of synthetic BLE/WiFi sightings + detections
+        _handle_sim_sighting_batch(message)
     else:
         await manager.send_to(
             websocket,
             {"type": "error", "message": f"Unknown message type: {msg_type}"},
         )
+
+
+def _handle_sim_sighting_batch(message: dict) -> None:
+    """Ingest a batch of synthetic BLE/WiFi sightings from the city-sim sensor bridge.
+
+    Each item in ``data`` has a ``type`` field: ``ble_sighting``, ``wifi_sighting``,
+    or ``detection``.  BLE and WiFi sightings are forwarded to the TargetTracker so
+    they appear in the unified target list alongside real sensor data.
+    """
+    global _target_tracker
+    batch = message.get("data")
+    if not batch or not isinstance(batch, list):
+        return
+    tracker = _target_tracker
+    if tracker is None:
+        return
+
+    for item in batch:
+        stype = item.get("type", "")
+        if stype == "ble_sighting":
+            tracker.update_from_ble({
+                "mac": item.get("mac", ""),
+                "name": item.get("target_id", ""),
+                "rssi": item.get("rssi", -80),
+                "position": item.get("position"),
+                "device_type": item.get("device_class", "ble_device"),
+                "source": "city_sim",
+            })
+        elif stype == "wifi_sighting":
+            # Route WiFi as BLE with wifi_ prefix to keep unique IDs
+            mac = item.get("mac", "")
+            tracker.update_from_ble({
+                "mac": f"wifi_{mac}",
+                "name": item.get("ssid") or item.get("target_id", ""),
+                "rssi": item.get("rssi", -80),
+                "position": item.get("position"),
+                "device_type": "wifi_ap",
+                "source": "city_sim",
+            })
+        elif stype == "detection":
+            tracker.update_from_detection({
+                "target_id": item.get("target_id", ""),
+                "class": item.get("class", "unknown"),
+                "confidence": item.get("confidence", 0.5),
+                "position": item.get("position"),
+                "source": "city_sim",
+            })
 
 
 def _handle_viewport_update(message: dict) -> None:

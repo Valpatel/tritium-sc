@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
-from engine.tactical.obstacles import BuildingObstacles
+from tritium_lib.tracking.obstacles import BuildingObstacles
 
 
 # ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@
 import math
 import pytest
 
-from engine.tactical.patrol import PatrolManager, PatrolRoute
+from tritium_lib.tracking.patrol import PatrolManager, PatrolRoute
 from engine.comms.event_bus import EventBus
 
 

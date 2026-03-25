@@ -26,7 +26,11 @@
  */
 
 import { TritiumStore } from './store.js';
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
+import { CitySimManager } from './sim/city-sim-manager.js';
+import { getScenarioById, loadScenario } from './sim/scenario-loader.js';
+import { LODManager } from './sim/lod-manager.js';
+import { WeatherVFX } from './sim/weather-vfx.js';
 
 // ============================================================
 // Constants
@@ -80,6 +84,8 @@ const _state = {
     scene: null,
     camera: null,
     renderer: null,
+    composer: null,
+    bloomEnabled: true,
     clock: null,
     container: null,
 
@@ -147,6 +153,12 @@ const _state = {
     satReloadTimer: null,
     noLocationSet: false,
 
+    // City simulation
+    citySim: new CitySimManager(),
+    lodManager: new LODManager(),
+    weatherVFX: new WeatherVFX(),
+    roadGraphGroup: null,
+
     // Zones
     zones: [],
 
@@ -182,7 +194,17 @@ function _updateLayerHud() {
     if (_state.showUnits !== false) layers.push('UNITS');
     const tilt = _state.cam?.tiltTarget > 70 ? '2D' : '3D';
     const zoom = _state.cam?.zoom ? Math.round(_state.cam.zoom) : '?';
-    _state.layerHud.textContent = `${tilt} z${zoom} | ${layers.join(' + ') || 'ALL OFF'}`;
+
+    // Add city sim stats if running
+    let simInfo = '';
+    if (_state.citySim?.running) {
+        const s = _state.citySim.getStats();
+        if (s) {
+            simInfo = ` | SIM: ${s.vehicles}v ${s.pedestriansActive || 0}p ${s.avgSpeedKmh}km/h ${s.timeOfDay || ''}`;
+        }
+    }
+
+    _state.layerHud.textContent = `${tilt} z${zoom} | ${layers.join(' + ') || 'ALL OFF'}${simInfo}`;
 }
 
 function fadeToward(current, target, speed, dt) {
@@ -260,6 +282,9 @@ export function initMap() {
     if (canvas2d) canvas2d.style.display = 'none';
     _state.container.prepend(_state.renderer.domElement);
 
+    // Post-processing: bloom (UnrealBloomPass)
+    _initBloom();
+
     // Layer status HUD overlay (top-center of map)
     _state.layerHud = document.createElement('div');
     _state.layerHud.id = 'map-layer-hud';
@@ -320,6 +345,28 @@ export function initMap() {
     _state.unsubs.push(
         EventBus.on('units:updated', _onUnitsUpdated),
         EventBus.on('map:mode', _onMapMode),
+        EventBus.on('city-sim:toggle', () => toggleCitySim()),
+        EventBus.on('city-sim:add-vehicles', (count) => {
+            if (_state.citySim?.loaded) {
+                _state.citySim.initRendering(THREE, _state.scene);
+                _state.citySim.spawnVehicles(count || 10);
+            }
+        }),
+        EventBus.on('city-sim:add-peds', (count) => {
+            if (_state.citySim?.loaded) {
+                _state.citySim.initRendering(THREE, _state.scene);
+                _state.citySim.spawnPedestrians(count || 10);
+            }
+        }),
+        EventBus.on('city-sim:load-scenario', (scenarioId) => {
+            if (_state.citySim?.loaded) {
+                const scenario = getScenarioById(scenarioId);
+                if (scenario) {
+                    _state.citySim.initRendering(THREE, _state.scene);
+                    loadScenario(_state.citySim, scenario);
+                }
+            }
+        }),
         EventBus.on('unit:dispatch-mode', _onDispatchMode),
         EventBus.on('unit:dispatched', _onDispatched),
     );
@@ -372,6 +419,9 @@ export function destroyMap() {
     _state.scene = null;
     _state.camera = null;
     _state.renderer = null;
+    _state.composer = null;
+    _state.bloomPass = null;
+    _state.renderPass = null;
     _state.unitMeshes = {};
     _state.initialized = false;
 
@@ -552,36 +602,138 @@ function _initMaterials() {
         side: THREE.DoubleSide, depthWrite: false,
     });
 
-    // Building wall material — semi-transparent dark blue with edge glow
-    _state.materials.building = new THREE.MeshBasicMaterial({
-        color: 0x0a0a2e,
-        transparent: true,
-        opacity: 0.55,
-        fog: false,
-        side: THREE.DoubleSide,
+    // Building wall materials — per-category cyberpunk colors
+    _state.materials.building = new THREE.MeshStandardMaterial({
+        color: 0x1a1a3e, roughness: 0.7, metalness: 0.2,
+        transparent: true, opacity: 0.75, side: THREE.DoubleSide,
     });
-    // Building roof material — slightly lighter, more visible from above
-    _state.materials.buildingRoof = new THREE.MeshBasicMaterial({
-        color: 0x0d1030,
-        transparent: true,
-        opacity: 0.7,
-        fog: false,
+    _state.materials.buildingResidential = new THREE.MeshStandardMaterial({
+        color: 0x2a1a1a, roughness: 0.8, metalness: 0.1,
+        transparent: true, opacity: 0.75, side: THREE.DoubleSide,
     });
-    // Building outline material — bright cyan edges for cyberpunk look
-    _state.materials.buildingEdge = new THREE.LineBasicMaterial({
-        color: 0x00f0ff,
-        transparent: true,
-        opacity: 0.6,
+    _state.materials.buildingCommercial = new THREE.MeshStandardMaterial({
+        color: 0x1a2a3a, roughness: 0.5, metalness: 0.3,
+        transparent: true, opacity: 0.78, side: THREE.DoubleSide,
+    });
+    _state.materials.buildingIndustrial = new THREE.MeshStandardMaterial({
+        color: 0x2a2a1a, roughness: 0.9, metalness: 0.2,
+        transparent: true, opacity: 0.7, side: THREE.DoubleSide,
+    });
+    _state.materials.buildingCivic = new THREE.MeshStandardMaterial({
+        color: 0x1a1a2a, roughness: 0.5, metalness: 0.4,
+        transparent: true, opacity: 0.8, side: THREE.DoubleSide,
+    });
+    _state.materials.buildingReligious = new THREE.MeshStandardMaterial({
+        color: 0x2a1a2a, roughness: 0.6, metalness: 0.3,
+        transparent: true, opacity: 0.8, side: THREE.DoubleSide,
+    });
+    _state.materials.buildingUtility = new THREE.MeshStandardMaterial({
+        color: 0x1a1a1a, roughness: 0.9, metalness: 0.1,
+        transparent: true, opacity: 0.6, side: THREE.DoubleSide,
     });
 
-    // Road surface material
-    _state.materials.road = new THREE.MeshBasicMaterial({
-        color: 0x3a3a4a,
-        transparent: true,
-        opacity: 0.5,
-        side: THREE.DoubleSide,
-        depthWrite: false,
+    // Building roof material
+    _state.materials.buildingRoof = new THREE.MeshStandardMaterial({
+        color: 0x151530, roughness: 0.8, metalness: 0.1,
+        transparent: true, opacity: 0.8,
     });
+
+    // Building outline — bright cyan edges for cyberpunk look
+    _state.materials.buildingEdge = new THREE.LineBasicMaterial({
+        color: 0x00f0ff, transparent: true, opacity: 0.5,
+    });
+
+    // Building window material — emissive yellow-orange glow
+    _state.materials.buildingWindow = new THREE.MeshBasicMaterial({
+        color: 0xffdd44, transparent: true, opacity: 0.7,
+        side: THREE.DoubleSide, depthWrite: false,
+    });
+
+    // Road surface materials
+    _state.materials.road = new THREE.MeshBasicMaterial({
+        color: 0x3a3a4a, transparent: true, opacity: 0.5,
+        side: THREE.DoubleSide, depthWrite: false,
+    });
+    _state.materials.roadPrimary = new THREE.MeshBasicMaterial({
+        color: 0x444455, transparent: true, opacity: 0.6,
+        side: THREE.DoubleSide, depthWrite: false,
+    });
+    _state.materials.roadFootway = new THREE.MeshBasicMaterial({
+        color: 0x555566, transparent: true, opacity: 0.35,
+        side: THREE.DoubleSide, depthWrite: false,
+    });
+
+    // Land use materials
+    _state.materials.parkGround = new THREE.MeshBasicMaterial({
+        color: 0x0a2a0a, transparent: true, opacity: 0.4,
+        side: THREE.DoubleSide, depthWrite: false,
+    });
+    _state.materials.waterSurface = new THREE.MeshBasicMaterial({
+        color: 0x0044aa, transparent: true, opacity: 0.45,
+        side: THREE.DoubleSide, depthWrite: false,
+    });
+    _state.materials.waterEdge = new THREE.LineBasicMaterial({
+        color: 0x0088ff, transparent: true, opacity: 0.5,
+    });
+
+    // Tree materials
+    _state.materials.treeTrunk = new THREE.MeshStandardMaterial({
+        color: 0x3a2820, roughness: 0.9, metalness: 0.0,
+    });
+    _state.materials.treeCrown = new THREE.MeshStandardMaterial({
+        color: 0x1a4a1a, roughness: 0.8, metalness: 0.0,
+        transparent: true, opacity: 0.8,
+    });
+
+    // Barrier material
+    _state.materials.barrier = new THREE.MeshStandardMaterial({
+        color: 0x444444, roughness: 0.8, metalness: 0.1,
+        transparent: true, opacity: 0.6,
+    });
+
+    // Entrance/door material — bright indicator
+    _state.materials.entrance = new THREE.MeshBasicMaterial({
+        color: 0x05ffa1, transparent: true, opacity: 0.8,
+    });
+
+    // POI marker material
+    _state.materials.poi = new THREE.MeshBasicMaterial({
+        color: 0xfcee0a, transparent: true, opacity: 0.7,
+    });
+}
+
+// ============================================================
+// Bloom post-processing
+// ============================================================
+
+function _initBloom() {
+    if (typeof THREE.EffectComposer === 'undefined' ||
+        typeof THREE.RenderPass === 'undefined' ||
+        typeof THREE.UnrealBloomPass === 'undefined') {
+        console.warn('[MAP3D] Bloom post-processing not available — missing Three.js addons');
+        _state.bloomEnabled = false;
+        return;
+    }
+
+    const w = _state.container.clientWidth;
+    const h = _state.container.clientHeight;
+
+    const composer = new THREE.EffectComposer(_state.renderer);
+
+    const renderPass = new THREE.RenderPass(_state.scene, _state.camera);
+    composer.addPass(renderPass);
+
+    const bloomPass = new THREE.UnrealBloomPass(
+        new THREE.Vector2(w, h),
+        0.3,   // strength — subtle glow
+        0.4,   // radius
+        0.85   // threshold — only bright emissive objects bloom
+    );
+    composer.addPass(bloomPass);
+
+    _state.composer = composer;
+    _state.bloomPass = bloomPass;
+    _state.renderPass = renderPass;
 }
 
 // ============================================================
@@ -1194,9 +1346,39 @@ function _renderLoop() {
     _updateDispatchArrows();
     _checkSatelliteTileReload();
 
-    // Render
+    // City simulation tick + vehicle rendering
+    if (_state.citySim?.running) {
+        _state.citySim.tick(_state.dt);
+        _state.citySim.updateRendering(gameToThree);
+        _updateCongestionOverlay();
+    }
+
+    // LOD updates based on camera position (game coords: x=East, y=North)
+    if (_state.lodManager?.sectors?.size > 0 && _state.cam) {
+        _state.lodManager.updateLOD(_state.cam.x, _state.cam.y);
+    }
+
+    // Weather scene updates
+    if (_state.citySim?.weather && _state.citySim.running) {
+        const w = _state.citySim.weather;
+        // Update window emissive intensity based on time of day
+        if (_state.materials?.buildingWindow) {
+            _state.materials.buildingWindow.emissiveIntensity = w.windowEmissive;
+            _state.materials.buildingWindow.opacity = w.isNight ? 0.9 : 0.5;
+        }
+        // Update weather VFX (rain particles, street lights)
+        const camX = _state.cam?.x || 0;
+        const camZ = _state.cam?.z || 0;
+        _state.weatherVFX.update(_state.dt, w, camX, -camZ);
+    }
+
+    // Render (bloom composer or direct)
     if (_state.renderer && _state.scene && _state.camera) {
-        _state.renderer.render(_state.scene, _state.camera);
+        if (_state.bloomEnabled && _state.composer) {
+            _state.composer.render();
+        } else {
+            _state.renderer.render(_state.scene, _state.camera);
+        }
     }
 
     // Minimap
@@ -1230,6 +1412,7 @@ function _handleResize() {
     if (w === 0 || h === 0) return;
 
     _state.renderer.setSize(w, h);
+    if (_state.composer) _state.composer.setSize(w, h);
     const aspect = w / h;
     const zoom = _state.cam.zoom;
     _state.camera.left = -zoom * aspect;
@@ -1827,6 +2010,7 @@ function _fetchZones() {
 // ============================================================
 
 async function _loadOverlayData() {
+    // Load legacy overlay first (startup-cached roads/buildings)
     try {
         const resp = await fetch('/api/geo/overlay');
         if (resp.ok) {
@@ -1836,55 +2020,198 @@ async function _loadOverlayData() {
         console.warn('[MAP3D] Overlay fetch failed:', e.message);
     }
 
-    // Always try Microsoft Building Footprints for visual overlay
-    // (satellite-derived, much better alignment than OSM data)
+    // Try comprehensive city data endpoint (buildings, roads, trees, landuse, barriers, water)
     if (_state.geoCenter) {
         const { lat, lng } = _state.geoCenter;
-        // Use same coordinate conversion as satellite tiles for consistency
-        const R = 6378137;  // WGS84 equatorial radius (matches satellite tile conversion)
-        const latRad = lat * Math.PI / 180;
-        const cosFactor = Math.cos(latRad);
-        const convertToLocal = (rawBuildings) => rawBuildings.map(b => ({
-            polygon: b.polygon.map(([plat, plng]) => [
-                (plng - lng) * Math.PI / 180 * R * cosFactor,
-                (plat - lat) * Math.PI / 180 * R,
-            ]),
-            height: b.tags?.height ? parseFloat(b.tags.height) || 8 : 8,
-        }));
 
-        // Try Microsoft satellite-derived footprints first
         try {
-            const resp = await fetch(`/api/geo/msft-buildings?lat=${lat}&lng=${lng}&radius=500`);
+            const resp = await fetch(`/api/geo/city-data?lat=${lat}&lng=${lng}&radius=500`);
             if (resp.ok) {
-                const rawBuildings = await resp.json();
-                if (rawBuildings.length > 0) {
-                    _state.overlayData = _state.overlayData || {};
-                    _state.overlayData.buildings = convertToLocal(rawBuildings);
-                    console.log(`[MAP3D] Fetched ${rawBuildings.length} Microsoft buildings (satellite-aligned)`);
+                const cityData = await resp.json();
+                _state.overlayData = _state.overlayData || {};
+
+                // City data is already in local meters from backend
+                if (cityData.buildings?.length) {
+                    _state.overlayData.buildings = cityData.buildings;
+                    console.log(`[MAP3D] City data: ${cityData.buildings.length} buildings`);
+                }
+                if (cityData.roads?.length) {
+                    _state.overlayData.roads = cityData.roads;
+                    console.log(`[MAP3D] City data: ${cityData.roads.length} roads`);
+                }
+                if (cityData.trees?.length) {
+                    _state.overlayData.trees = cityData.trees;
+                    console.log(`[MAP3D] City data: ${cityData.trees.length} trees`);
+                }
+                if (cityData.landuse?.length) {
+                    _state.overlayData.landuse = cityData.landuse;
+                }
+                if (cityData.water?.length) {
+                    _state.overlayData.water = cityData.water;
+                }
+                if (cityData.barriers?.length) {
+                    _state.overlayData.barriers = cityData.barriers;
+                }
+                if (cityData.entrances?.length) {
+                    _state.overlayData.entrances = cityData.entrances;
+                }
+                if (cityData.pois?.length) {
+                    _state.overlayData.pois = cityData.pois;
+                }
+                if (cityData.furniture?.length) {
+                    _state.overlayData.furniture = cityData.furniture;
+                }
+
+                // Build road network graph for simulation
+                if (cityData.roads?.length) {
+                    _state.citySim.roadNetwork = null;  // Reset
+                    _state.citySim.cityData = cityData;
+                    const { RoadNetwork } = await import('./sim/road-network.js');
+                    _state.citySim.roadNetwork = new RoadNetwork();
+                    _state.citySim.roadNetwork.buildFromOSM(cityData.roads);
+                    _state.citySim.loaded = true;
+                    const stats = _state.citySim.roadNetwork.stats();
+                    console.log(
+                        `[MAP3D] Road graph: ${stats.nodes} nodes, ${stats.edges} edges, ` +
+                        `${stats.totalLengthM}m total`
+                    );
+
+                    // Initialize rendering and spawn entities
+                    if (_state.scene && stats.edges > 0) {
+                        _state.citySim.initRendering(THREE, _state.scene);
+                        _state.citySim.spawnVehicles(Math.min(100, stats.edges * 2));
+                        _state.citySim.spawnPedestrians(Math.min(50, stats.edges));
+
+                        // Initialize weather VFX with street lights at intersections
+                        const lightPositions = WeatherVFX.generateLightPositions(
+                            _state.citySim.roadNetwork, gameToThree
+                        );
+                        _state.weatherVFX.init(THREE, _state.scene, lightPositions);
+                    }
                 }
             }
         } catch (e) {
-            console.warn('[MAP3D] Microsoft buildings fetch failed:', e.message);
+            console.warn('[MAP3D] City data fetch failed, trying fallbacks:', e.message);
         }
 
-        // Fallback to OSM Overpass if Microsoft didn't return results
+        // Fallback: Microsoft Buildings → OSM Buildings if city-data didn't provide buildings
         if (!_state.overlayData?.buildings?.length) {
+            const R = 6378137;
+            const latRad = lat * Math.PI / 180;
+            const cosFactor = Math.cos(latRad);
+            const convertToLocal = (rawBuildings) => rawBuildings.map(b => ({
+                polygon: b.polygon.map(([plat, plng]) => [
+                    (plng - lng) * Math.PI / 180 * R * cosFactor,
+                    (plat - lat) * Math.PI / 180 * R,
+                ]),
+                height: b.tags?.height ? parseFloat(b.tags.height) || 8 : 8,
+            }));
+
             try {
-                const resp = await fetch(`/api/geo/buildings?lat=${lat}&lng=${lng}&radius=500`);
+                const resp = await fetch(`/api/geo/msft-buildings?lat=${lat}&lng=${lng}&radius=500`);
                 if (resp.ok) {
                     const rawBuildings = await resp.json();
-                    _state.overlayData = _state.overlayData || {};
-                    _state.overlayData.buildings = convertToLocal(rawBuildings);
-                    console.log(`[MAP3D] Fetched ${rawBuildings.length} buildings from OSM (fallback)`);
+                    if (rawBuildings.length > 0) {
+                        _state.overlayData = _state.overlayData || {};
+                        _state.overlayData.buildings = convertToLocal(rawBuildings);
+                        console.log(`[MAP3D] Fallback: ${rawBuildings.length} Microsoft buildings`);
+                    }
                 }
-            } catch (e) {
-                console.warn('[MAP3D] OSM buildings fallback failed:', e.message);
+            } catch (e) { /* silent */ }
+
+            if (!_state.overlayData?.buildings?.length) {
+                try {
+                    const resp = await fetch(`/api/geo/buildings?lat=${lat}&lng=${lng}&radius=500`);
+                    if (resp.ok) {
+                        const rawBuildings = await resp.json();
+                        _state.overlayData = _state.overlayData || {};
+                        _state.overlayData.buildings = convertToLocal(rawBuildings);
+                        console.log(`[MAP3D] Fallback: ${rawBuildings.length} OSM buildings`);
+                    }
+                } catch (e) { /* silent */ }
             }
         }
     }
 
     _buildBuildings();
-    _buildRoads();
+    await _buildRoads();
+    _buildTrees();
+    _buildLanduse();
+    _buildWater();
+    _buildBarriers();
+    _buildEntrances();
+    _buildPOIs();
+    _buildFurniture();
+    _loadElevation();
+}
+
+async function _loadElevation() {
+    if (!_state.geoCenter) return;
+    const { lat, lng } = _state.geoCenter;
+
+    try {
+        const resp = await fetch(`/api/geo/elevation-grid?lat=${lat}&lng=${lng}&radius=400&resolution=64`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (!data.grid?.length) return;
+
+        _buildTerrainMesh(data);
+    } catch (e) {
+        console.warn('[MAP3D] Elevation load failed:', e.message);
+    }
+}
+
+function _buildTerrainMesh(elevData) {
+    const { grid, resolution, radius, min_elev, max_elev } = elevData;
+    if (!grid.length || resolution < 2) return;
+
+    // Remove existing terrain mesh if any
+    if (_state.terrainMesh) {
+        _state.scene.remove(_state.terrainMesh);
+        _state.terrainMesh.geometry.dispose();
+        _state.terrainMesh.material.dispose();
+    }
+
+    const size = radius * 2;
+    const geo = new THREE.PlaneGeometry(size, size, resolution - 1, resolution - 1);
+    const pos = geo.attributes.position;
+
+    // Normalize elevation: map min_elev→0, scale so terrain is visible but not overwhelming
+    const elevRange = max_elev - min_elev;
+    const elevScale = elevRange > 0 ? Math.min(elevRange * 0.5, 20.0) / elevRange : 0;
+
+    for (let i = 0; i < pos.count; i++) {
+        const h = grid[i] !== undefined ? (grid[i] - min_elev) * elevScale : 0;
+        pos.setZ(i, h);
+    }
+
+    geo.computeVertexNormals();
+
+    // Rotate to XZ plane (PlaneGeometry is in XY by default)
+    geo.rotateX(-Math.PI / 2);
+
+    const mat = new THREE.MeshStandardMaterial({
+        color: 0x1a2a1a,
+        roughness: 0.95,
+        metalness: 0.0,
+        transparent: true,
+        opacity: 0.3,
+        wireframe: false,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+    });
+
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.y = -0.1;  // Slightly below ground plane
+    mesh.receiveShadow = true;
+
+    _state.scene.add(mesh);
+    _state.terrainMesh = mesh;
+
+    console.log(
+        `[MAP3D] Terrain: ${resolution}x${resolution} mesh, ` +
+        `elevation ${min_elev.toFixed(0)}-${max_elev.toFixed(0)}m (scale: ${elevScale.toFixed(2)})`
+    );
 }
 
 function _buildBuildings() {
@@ -1894,12 +2221,52 @@ function _buildBuildings() {
     const group = new THREE.Group();
     group.name = 'buildings';
 
+    // Material lookup by category
+    const categoryMats = {
+        residential: _state.materials.buildingResidential,
+        commercial: _state.materials.buildingCommercial,
+        industrial: _state.materials.buildingIndustrial,
+        civic: _state.materials.buildingCivic,
+        religious: _state.materials.buildingReligious,
+        utility: _state.materials.buildingUtility,
+    };
+
+    // Deterministic hash for per-building variation
+    const bldgHash = (id) => ((id * 2654435761) >>> 0) % 1000 / 1000;
+
     for (const bldg of buildings) {
         const poly = bldg.polygon;
         if (!poly || poly.length < 3) continue;
 
-        // Building height: use tag data if available, else default 8m
         const height = bldg.height || 8;
+        const category = bldg.category || 'residential';
+        const hash = bldgHash(bldg.id || 0);
+
+        // Material selection: use building colour tag, else category default with hash variation
+        let wallMat;
+        if (bldg.colour) {
+            // OSM building:colour — create tinted material
+            const tinted = (categoryMats[category] || _state.materials.building).clone();
+            try {
+                const c = new THREE.Color(bldg.colour);
+                tinted.color.lerp(c, 0.5);  // Blend OSM colour with base
+            } catch (_) { /* invalid colour string */ }
+            wallMat = tinted;
+        } else {
+            // Hash-based variation: slightly shift hue/brightness per building
+            const baseMat = categoryMats[category] || _state.materials.building;
+            if (hash > 0.7) {
+                // 30% of buildings get a slight color variation
+                const varied = baseMat.clone();
+                const hsl = {};
+                varied.color.getHSL(hsl);
+                hsl.l = Math.max(0.05, Math.min(0.3, hsl.l + (hash - 0.85) * 0.15));
+                varied.color.setHSL(hsl.h, hsl.s, hsl.l);
+                wallMat = varied;
+            } else {
+                wallMat = baseMat;
+            }
+        }
 
         // Create 2D shape from polygon (game coordinates)
         const shape = new THREE.Shape();
@@ -1911,30 +2278,25 @@ function _buildBuildings() {
         shape.closePath();
 
         // Extrude into 3D building
-        const extrudeSettings = {
-            depth: height,
-            bevelEnabled: false,
-        };
-        const extGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-
-        // ExtrudeGeometry creates shape in XY, extrudes along Z.
-        // We need: shape in XZ (ground), extrude along Y (up).
-        // Rotate -90deg around X to put XY→XZ, then Z extrusion becomes Y.
-        const wallMesh = new THREE.Mesh(extGeo, _state.materials.building);
+        const extGeo = new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false });
+        // ExtrudeGeometry: shape in XY, extrudes along Z → rotate to XZ ground, Y up
+        const wallMesh = new THREE.Mesh(extGeo, wallMat);
         wallMesh.rotation.x = -Math.PI / 2;
         wallMesh.position.y = 0;
+        wallMesh.castShadow = true;
+        wallMesh.receiveShadow = true;
         group.add(wallMesh);
 
-        // Roof cap (flat on top) — use ShapeGeometry for clean top
+        // Roof cap
         const roofGeo = new THREE.ShapeGeometry(shape);
         const roofMesh = new THREE.Mesh(roofGeo, _state.materials.buildingRoof);
         roofMesh.rotation.x = -Math.PI / 2;
         roofMesh.position.y = height;
+        roofMesh.receiveShadow = true;
         group.add(roofMesh);
 
-        // Cyan edge outlines at ground level and roofline
-        const outlineGround = [];
-        const outlineRoof = [];
+        // Edge outlines (ground + roofline + verticals)
+        const outlineGround = [], outlineRoof = [];
         for (const [gx, gy] of poly) {
             const tp = gameToThree(gx, gy);
             outlineGround.push(new THREE.Vector3(tp.x, 0.15, tp.z));
@@ -1944,69 +2306,363 @@ function _buildBuildings() {
             outlineGround.push(outlineGround[0].clone());
             outlineRoof.push(outlineRoof[0].clone());
         }
+        group.add(new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints(outlineGround), _state.materials.buildingEdge));
+        group.add(new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints(outlineRoof), _state.materials.buildingEdge));
+        for (let i = 0; i < outlineGround.length - 1; i += Math.max(2, Math.floor(outlineGround.length / 6))) {
+            group.add(new THREE.Line(
+                new THREE.BufferGeometry().setFromPoints([outlineGround[i].clone(), outlineRoof[i].clone()]),
+                _state.materials.buildingEdge));
+        }
 
-        // Ground outline
-        const groundLineGeo = new THREE.BufferGeometry().setFromPoints(outlineGround);
-        group.add(new THREE.Line(groundLineGeo, _state.materials.buildingEdge));
+        // Windows — skip utility/low buildings
+        if (height > 4 && category !== 'utility') {
+            const floors = Math.floor(height / 3);
+            // Walk polygon edges to place windows on walls
+            for (let ei = 0; ei < poly.length - 1; ei++) {
+                const [ax, ay] = poly[ei];
+                const [bx, by] = poly[(ei + 1) % poly.length];
+                const wallLen = Math.sqrt((bx - ax) ** 2 + (by - ay) ** 2);
+                if (wallLen < 3) continue;
 
-        // Roofline outline
-        const roofLineGeo = new THREE.BufferGeometry().setFromPoints(outlineRoof);
-        group.add(new THREE.Line(roofLineGeo, _state.materials.buildingEdge));
+                // Direction along wall & perpendicular (outward normal)
+                const dx = (bx - ax) / wallLen;
+                const dy = (by - ay) / wallLen;
+                // Normal pointing outward (left-hand for CW winding)
+                const nx = -dy, ny = dx;
 
-        // Vertical corner edges (every 3rd vertex to avoid clutter)
-        for (let i = 0; i < outlineGround.length - 1; i += 3) {
-            const verts = [outlineGround[i].clone(), outlineRoof[i].clone()];
-            const vertGeo = new THREE.BufferGeometry().setFromPoints(verts);
-            group.add(new THREE.Line(vertGeo, _state.materials.buildingEdge));
+                const winSpacing = category === 'commercial' ? 2.5 : 3.5;
+                const numWins = Math.max(1, Math.floor((wallLen - 2) / winSpacing));
+
+                for (let f = 0; f < floors; f++) {
+                    const wy = f * 3 + 2;
+                    if (wy > height - 1.5) break;
+                    for (let w = 0; w < numWins; w++) {
+                        // Deterministic skip for variety
+                        const wHash = bldgHash((bldg.id || 0) + ei * 100 + f * 10 + w);
+                        if (wHash > 0.65) continue;
+
+                        const t = (w + 1) / (numWins + 1);
+                        const wx = ax + dx * wallLen * t + nx * 0.05;
+                        const wz = ay + dy * wallLen * t + ny * 0.05;
+                        const tp = gameToThree(wx, wz);
+
+                        const winGeo = new THREE.PlaneGeometry(1.0, 1.2);
+                        const winMesh = new THREE.Mesh(winGeo, _state.materials.buildingWindow);
+                        winMesh.position.set(tp.x, wy, tp.z);
+                        // Rotate window to face outward along wall normal
+                        winMesh.rotation.y = Math.atan2(nx, ny);
+                        group.add(winMesh);
+                    }
+                }
+            }
         }
     }
 
-    _state.scene.add(group);
-    _state.buildingGroup = group;
-    console.log(`[MAP3D] Buildings: ${buildings.length} extruded 3D meshes`);
+    // Always use LOD manager for consistent rendering path (fixes n=51 discontinuity)
+    // The individual meshes in `group` above are NOT used — LOD handles everything.
+    // categoryMats already declared above
+
+    _state.lodManager = new LODManager();
+    for (const bldg of buildings) {
+        _state.lodManager.assignSector(bldg);
+    }
+
+    const lodRoot = _state.lodManager.buildGeometry(THREE, gameToThree, _state.materials, categoryMats);
+    _state.scene.add(lodRoot);
+    _state.buildingGroup = lodRoot;
+
+    const lodStats = _state.lodManager.getStats();
+    console.log(`[MAP3D] Buildings: ${buildings.length} in ${lodStats.sectors} LOD sectors`);
 }
 
-function _buildRoads() {
+async function _buildRoads() {
     const roads = _state.overlayData?.roads;
     if (!roads?.length) return;
 
     const group = new THREE.Group();
     group.name = 'roads';
 
+    const primaryTypes = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary',
+        'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link']);
+    const footTypes = new Set(['footway', 'cycleway', 'path', 'pedestrian']);
+
     for (const road of roads) {
-        const isPrimary = ['primary', 'secondary', 'trunk', 'motorway', 'tertiary'].includes(road.class);
-        const width = isPrimary ? 3.0 : 1.5;
+        const roadClass = road.class || 'residential';
+        const isPrimary = primaryTypes.has(roadClass);
+        const isFoot = footTypes.has(roadClass);
+        // Use actual width from OSM data if available
+        const width = road.width || (isPrimary ? 5.0 : isFoot ? 1.5 : 3.0);
 
         const points = (road.points || []).map(([gx, gy]) => {
             const tp = gameToThree(gx, gy);
-            return new THREE.Vector3(tp.x, 0.05, tp.z);
+            return new THREE.Vector3(tp.x, road.bridge ? 3.0 : 0.05, tp.z);
         });
 
         if (points.length < 2) continue;
 
-        // Thin line (always visible even at distance)
-        const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
-        const lineMat = new THREE.LineBasicMaterial({
-            color: isPrimary ? 0x445566 : 0x334455,
-            transparent: true,
-            opacity: isPrimary ? 0.6 : 0.4,
-        });
-        group.add(new THREE.Line(lineGeo, lineMat));
+        // Road ribbon with proper width
+        const mat = isPrimary ? _state.materials.roadPrimary
+            : isFoot ? _state.materials.roadFootway
+            : _state.materials.road;
+        const ribbon = _createRoadRibbon(points, width, mat);
+        if (ribbon) group.add(ribbon);
 
-        // Flat ribbon mesh for wider primary roads
-        if (isPrimary && points.length >= 2) {
-            const ribbon = _createRoadRibbon(points, width);
-            if (ribbon) group.add(ribbon);
+        // Center line for primary roads
+        if (isPrimary && !isFoot) {
+            const lineGeo = new THREE.BufferGeometry().setFromPoints(
+                points.map(p => new THREE.Vector3(p.x, p.y + 0.02, p.z)));
+            const lineMat = new THREE.LineBasicMaterial({
+                color: 0xccaa00, transparent: true, opacity: 0.3,
+            });
+            group.add(new THREE.Line(lineGeo, lineMat));
+        }
+
+        // Bridge pillars
+        if (road.bridge) {
+            for (let i = 0; i < points.length; i += 4) {
+                const p = points[i];
+                const pillarGeo = new THREE.CylinderGeometry(0.15, 0.2, 3.0, 6);
+                const pillar = new THREE.Mesh(pillarGeo, _state.materials.barrier);
+                pillar.position.set(p.x, 1.5, p.z);
+                group.add(pillar);
+            }
+        }
+    }
+
+    // Lane markings — center lines on multi-lane roads, dashed
+    const markingGeos = [];
+    const markingMat = new THREE.MeshBasicMaterial({
+        color: 0xccaa00, transparent: true, opacity: 0.3,
+        side: THREE.DoubleSide, depthWrite: false,
+    });
+
+    for (const road of roads) {
+        const roadClass = road.class || 'residential';
+        const isMultiLane = (road.lanes || 2) > 1;
+        const isFoot = new Set(['footway', 'cycleway', 'path', 'pedestrian']).has(roadClass);
+        if (!isMultiLane || isFoot) continue;
+
+        const pts = (road.points || []);
+        if (pts.length < 2) continue;
+
+        // Dashed center line
+        const DASH = 2, GAP = 3;
+        for (let i = 0; i < pts.length - 1; i++) {
+            const [ax, ay] = pts[i];
+            const [bx, by] = pts[i + 1];
+            const segLen = Math.sqrt((bx - ax) ** 2 + (by - ay) ** 2);
+            if (segLen < DASH + GAP) continue;
+
+            const dx = (bx - ax) / segLen;
+            const dy = (by - ay) / segLen;
+            const numDashes = Math.floor(segLen / (DASH + GAP));
+
+            for (let d = 0; d < numDashes; d++) {
+                const startT = d * (DASH + GAP);
+                const cx = ax + dx * (startT + DASH / 2);
+                const cy = ay + dy * (startT + DASH / 2);
+                const tp = gameToThree(cx, cy);
+                const angle = Math.atan2(dx, dy);
+
+                const dashGeo = new THREE.PlaneGeometry(0.15, DASH);
+                dashGeo.rotateX(-Math.PI / 2);
+                dashGeo.rotateY(angle);
+                dashGeo.translate(tp.x, (road.bridge ? 3.02 : 0.06), tp.z);
+                markingGeos.push(dashGeo);
+            }
+        }
+    }
+
+    // Crosswalks at intersections (degree >= 3)
+    const crosswalkGeos = [];
+    const crosswalkMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff, transparent: true, opacity: 0.5,
+        side: THREE.DoubleSide, depthWrite: false,
+    });
+
+    const rn = _state.citySim?.roadNetwork;
+    if (rn) {
+        for (const nodeId in rn.nodes) {
+            const node = rn.nodes[nodeId];
+            if (node.degree < 3) continue;
+
+            const edgeIndices = rn.adjList[nodeId] || [];
+            for (const ei of edgeIndices) {
+                const edge = rn.edges[ei];
+                if (!edge) continue;
+
+                // Direction from intersection toward the road
+                const isFrom = edge.from === nodeId;
+                const dx = isFrom ? (edge.bx - edge.ax) : (edge.ax - edge.bx);
+                const dz = isFrom ? (edge.bz - edge.az) : (edge.az - edge.bz);
+                const len = Math.sqrt(dx * dx + dz * dz);
+                if (len < 1) continue;
+
+                const dirX = dx / len;
+                const dirZ = dz / len;
+                const perpX = -dirZ;
+                const perpZ = dirX;
+
+                // Road width estimate
+                const roadWidth = edge.laneWidth * edge.lanesPerDir * 2;
+                const offset = roadWidth / 2 + 1.5; // offset from intersection center
+
+                const cx = node.x + dirX * offset;
+                const cz = node.z + dirZ * offset;
+                const tp = gameToThree(cx, cz);
+                const angle = Math.atan2(dirX, dirZ);
+
+                // 7 white stripes across the road
+                const STRIPE_COUNT = 7;
+                const STRIPE_W = 1.2;
+                const STRIPE_H = 0.4;
+                const totalSpan = roadWidth - 0.5;
+                const spacing = totalSpan / (STRIPE_COUNT - 1);
+                const startOffset = -totalSpan / 2;
+
+                for (let s = 0; s < STRIPE_COUNT; s++) {
+                    const off = startOffset + s * spacing;
+                    const sx = tp.x + perpX * off;
+                    const sz = tp.z + perpZ * off;
+
+                    const stripeGeo = new THREE.PlaneGeometry(STRIPE_W, STRIPE_H);
+                    stripeGeo.rotateX(-Math.PI / 2);
+                    stripeGeo.rotateY(angle);
+                    stripeGeo.translate(sx, 0.07, sz);
+                    crosswalkGeos.push(stripeGeo);
+                }
+            }
+        }
+    }
+
+    if (markingGeos.length > 0 || crosswalkGeos.length > 0) {
+        const { mergeGeometries } = await import('three/addons/utils/BufferGeometryUtils.js');
+        if (markingGeos.length > 0) {
+            const merged = mergeGeometries(markingGeos, false);
+            if (merged) {
+                group.add(new THREE.Mesh(merged, markingMat));
+            }
+        }
+        if (crosswalkGeos.length > 0) {
+            const merged = mergeGeometries(crosswalkGeos, false);
+            if (merged) {
+                group.add(new THREE.Mesh(merged, crosswalkMat));
+            }
         }
     }
 
     _state.scene.add(group);
     _state.roadGroup = group;
     _state.roadGroup.visible = _state.showRoads;
-    console.log(`[MAP3D] Roads: ${roads.length} segments`);
+    console.log(`[MAP3D] Roads: ${roads.length} segments, ${markingGeos.length} lane markings, ${crosswalkGeos.length} crosswalk stripes`);
+
+    // Build congestion overlay on top of roads
+    _buildCongestionOverlay();
 }
 
-function _createRoadRibbon(points, width) {
+/**
+ * Build congestion overlay — one colored line segment per road network edge.
+ * Colors update each frame based on CitySimManager congestion data.
+ */
+function _buildCongestionOverlay() {
+    const rn = _state.citySim?.roadNetwork;
+    if (!rn || rn.edges.length === 0) return;
+
+    const edges = rn.edges;
+    const positions = [];
+    const colors = [];
+
+    // Store edge-to-index mapping for per-frame color updates
+    _state.congestionEdgeMap = new Map(); // edgeId → index into vertex array
+
+    for (let i = 0; i < edges.length; i++) {
+        const edge = edges[i];
+        const tpA = gameToThree(edge.ax, edge.az);
+        const tpB = gameToThree(edge.bx, edge.bz);
+
+        _state.congestionEdgeMap.set(edge.id, i);
+
+        // Two vertices per edge (line segment)
+        positions.push(tpA.x, 0.15, tpA.z);
+        positions.push(tpB.x, 0.15, tpB.z);
+
+        // Default: transparent gray (no data)
+        colors.push(0.3, 0.3, 0.3);
+        colors.push(0.3, 0.3, 0.3);
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+    const mat = new THREE.LineBasicMaterial({
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.7,
+        linewidth: 1,
+        depthWrite: false,
+    });
+
+    _state.congestionMesh = new THREE.LineSegments(geo, mat);
+    _state.congestionMesh.name = 'congestion-overlay';
+    _state.congestionMesh.frustumCulled = false;
+    _state.congestionMesh.visible = true;
+    _state.scene.add(_state.congestionMesh);
+
+    console.log(`[MAP3D] Congestion overlay: ${edges.length} edge segments`);
+}
+
+/**
+ * Update congestion overlay colors from CitySimManager data.
+ */
+function _updateCongestionOverlay() {
+    if (!_state.congestionMesh || !_state.citySim) return;
+
+    const congestion = _state.citySim.getCongestionData();
+    if (!congestion || congestion.size === 0) {
+        _state.congestionMesh.visible = false;
+        return;
+    }
+
+    _state.congestionMesh.visible = true;
+    const colorAttr = _state.congestionMesh.geometry.getAttribute('color');
+    const arr = colorAttr.array;
+
+    // Reset all to dim gray
+    for (let i = 0; i < arr.length; i += 3) {
+        arr[i] = 0.15; arr[i + 1] = 0.15; arr[i + 2] = 0.15;
+    }
+
+    // Color edges with congestion data
+    for (const [edgeId, data] of congestion) {
+        const idx = _state.congestionEdgeMap?.get(edgeId);
+        if (idx === undefined) continue;
+
+        let r, g, b;
+        if (data.ratio > 0.7) {
+            // Free flow — green
+            r = 0.02; g = 1.0; b = 0.4;
+        } else if (data.ratio > 0.3) {
+            // Slow — yellow to orange
+            const t = (data.ratio - 0.3) / 0.4;
+            r = 1.0; g = 0.6 + t * 0.4; b = 0.0;
+        } else {
+            // Congested — red
+            r = 1.0; g = 0.1; b = 0.1;
+        }
+
+        // Both vertices of the line segment
+        const vi = idx * 6; // 2 vertices * 3 components
+        arr[vi] = r;     arr[vi + 1] = g;     arr[vi + 2] = b;
+        arr[vi + 3] = r; arr[vi + 4] = g; arr[vi + 5] = b;
+    }
+
+    colorAttr.needsUpdate = true;
+}
+
+function _createRoadRibbon(points, width, material) {
     const positions = [];
     const half = width / 2;
 
@@ -2021,8 +2677,8 @@ function _createRoadRibbon(points, width) {
         // Perpendicular in XZ plane
         const perp = new THREE.Vector3(-dir.z, 0, dir.x);
         positions.push(
-            p.x + perp.x * half, 0.04, p.z + perp.z * half,
-            p.x - perp.x * half, 0.04, p.z - perp.z * half,
+            p.x + perp.x * half, p.y || 0.04, p.z + perp.z * half,
+            p.x - perp.x * half, p.y || 0.04, p.z - perp.z * half,
         );
     }
 
@@ -2037,7 +2693,351 @@ function _createRoadRibbon(points, width) {
     geo.setIndex(indices);
     geo.computeVertexNormals();
 
-    return new THREE.Mesh(geo, _state.materials.road);
+    return new THREE.Mesh(geo, material || _state.materials.road);
+}
+
+// ============================================================
+// City features: trees, land use, barriers, water
+// ============================================================
+
+function _buildTrees() {
+    const trees = _state.overlayData?.trees;
+    if (!trees?.length) return;
+
+    const group = new THREE.Group();
+    group.name = 'trees';
+
+    // Instanced meshes for performance
+    const maxTrees = Math.min(trees.length, 2000);
+    const trunkGeo = new THREE.CylinderGeometry(0.15, 0.2, 3.0, 5);
+    const crownGeo = new THREE.SphereGeometry(1.0, 6, 5);
+    const trunkMesh = new THREE.InstancedMesh(trunkGeo, _state.materials.treeTrunk, maxTrees);
+    const crownMesh = new THREE.InstancedMesh(crownGeo, _state.materials.treeCrown, maxTrees);
+    trunkMesh.castShadow = true;
+    crownMesh.castShadow = true;
+
+    const dummy = new THREE.Object3D();
+    let count = 0;
+
+    for (let i = 0; i < maxTrees; i++) {
+        const tree = trees[i];
+        const tp = gameToThree(tree.pos[0], tree.pos[1]);
+        const h = tree.height || 6;
+        const isNeedle = tree.leaf_type === 'needleleaved';
+        const crownR = isNeedle ? h * 0.2 : h * 0.35;
+        const trunkH = h * 0.45;
+
+        // Trunk
+        dummy.position.set(tp.x, trunkH / 2, tp.z);
+        dummy.scale.set(1, trunkH / 3, 1);
+        dummy.updateMatrix();
+        trunkMesh.setMatrixAt(count, dummy.matrix);
+
+        // Crown
+        dummy.position.set(tp.x, trunkH + crownR * 0.6, tp.z);
+        dummy.scale.set(crownR, crownR * (isNeedle ? 1.5 : 1.0), crownR);
+        dummy.updateMatrix();
+        crownMesh.setMatrixAt(count, dummy.matrix);
+
+        count++;
+    }
+
+    trunkMesh.count = count;
+    crownMesh.count = count;
+    trunkMesh.instanceMatrix.needsUpdate = true;
+    crownMesh.instanceMatrix.needsUpdate = true;
+
+    group.add(trunkMesh);
+    group.add(crownMesh);
+    _state.scene.add(group);
+    _state.treeGroup = group;
+    console.log(`[MAP3D] Trees: ${count} instanced`);
+}
+
+function _buildLanduse() {
+    const landuse = _state.overlayData?.landuse;
+    if (!landuse?.length) return;
+
+    const group = new THREE.Group();
+    group.name = 'landuse';
+
+    const parkTypes = new Set(['park', 'garden', 'grass', 'meadow', 'recreation_ground', 'forest']);
+
+    for (const lu of landuse) {
+        const poly = lu.polygon;
+        if (!poly || poly.length < 3) continue;
+
+        const isPark = parkTypes.has(lu.type);
+        if (!isPark) continue;  // Only render parks/green for now
+
+        const shape = new THREE.Shape();
+        for (let i = 0; i < poly.length; i++) {
+            const [gx, gy] = poly[i];
+            if (i === 0) shape.moveTo(gx, gy);
+            else shape.lineTo(gx, gy);
+        }
+        shape.closePath();
+
+        const geo = new THREE.ShapeGeometry(shape);
+        const mesh = new THREE.Mesh(geo, _state.materials.parkGround);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.y = 0.02;
+        group.add(mesh);
+    }
+
+    _state.scene.add(group);
+    _state.landuseGroup = group;
+    console.log(`[MAP3D] Land use: ${landuse.length} zones`);
+}
+
+function _buildWater() {
+    const water = _state.overlayData?.water;
+    if (!water?.length) return;
+
+    const group = new THREE.Group();
+    group.name = 'water';
+
+    for (const w of water) {
+        const poly = w.polygon;
+        if (!poly || poly.length < 3) continue;
+
+        const shape = new THREE.Shape();
+        for (let i = 0; i < poly.length; i++) {
+            const [gx, gy] = poly[i];
+            if (i === 0) shape.moveTo(gx, gy);
+            else shape.lineTo(gx, gy);
+        }
+        shape.closePath();
+
+        const geo = new THREE.ShapeGeometry(shape);
+        const mesh = new THREE.Mesh(geo, _state.materials.waterSurface);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.y = 0.03;
+        group.add(mesh);
+
+        // Water edge outline
+        const edgePts = poly.map(([gx, gy]) => {
+            const tp = gameToThree(gx, gy);
+            return new THREE.Vector3(tp.x, 0.04, tp.z);
+        });
+        if (edgePts.length > 0) edgePts.push(edgePts[0].clone());
+        group.add(new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints(edgePts), _state.materials.waterEdge));
+    }
+
+    _state.scene.add(group);
+    _state.waterGroup = group;
+    console.log(`[MAP3D] Water: ${water.length} bodies`);
+}
+
+function _buildBarriers() {
+    const barriers = _state.overlayData?.barriers;
+    if (!barriers?.length) return;
+
+    const group = new THREE.Group();
+    group.name = 'barriers';
+
+    for (const bar of barriers) {
+        const pts = bar.points;
+        if (!pts || pts.length < 2) continue;
+        const h = bar.height || 1.5;
+        const thick = 0.15;
+
+        for (let i = 0; i < pts.length - 1; i++) {
+            const [ax, ay] = pts[i];
+            const [bx, by] = pts[i + 1];
+            const len = Math.sqrt((bx - ax) ** 2 + (by - ay) ** 2);
+            if (len < 0.1) continue;
+
+            const cx = (ax + bx) / 2, cy = (ay + by) / 2;
+            const angle = Math.atan2(bx - ax, by - ay);
+            const tp = gameToThree(cx, cy);
+
+            const geo = new THREE.BoxGeometry(thick, h, len);
+            const mesh = new THREE.Mesh(geo, _state.materials.barrier);
+            mesh.position.set(tp.x, h / 2, tp.z);
+            mesh.rotation.y = angle;
+            group.add(mesh);
+        }
+    }
+
+    _state.scene.add(group);
+    _state.barrierGroup = group;
+    console.log(`[MAP3D] Barriers: ${barriers.length} segments`);
+}
+
+function _buildEntrances() {
+    const entrances = _state.overlayData?.entrances;
+    if (!entrances?.length) return;
+
+    const group = new THREE.Group();
+    group.name = 'entrances';
+
+    // Instanced small door indicators
+    const maxEntrances = Math.min(entrances.length, 500);
+    const doorGeo = new THREE.BoxGeometry(0.8, 2.0, 0.15);
+    const doorMesh = new THREE.InstancedMesh(doorGeo, _state.materials.entrance, maxEntrances);
+    doorMesh.count = maxEntrances;
+
+    const dummy = new THREE.Object3D();
+    for (let i = 0; i < maxEntrances; i++) {
+        const e = entrances[i];
+        const tp = gameToThree(e.pos[0], e.pos[1]);
+        dummy.position.set(tp.x, 1.0, tp.z);
+        dummy.updateMatrix();
+        doorMesh.setMatrixAt(i, dummy.matrix);
+    }
+    doorMesh.instanceMatrix.needsUpdate = true;
+    group.add(doorMesh);
+
+    _state.scene.add(group);
+    _state.entranceGroup = group;
+    console.log(`[MAP3D] Entrances: ${maxEntrances} door indicators`);
+}
+
+function _buildPOIs() {
+    const pois = _state.overlayData?.pois;
+    if (!pois?.length) return;
+
+    const group = new THREE.Group();
+    group.name = 'pois';
+
+    // Instanced small marker diamonds
+    const maxPois = Math.min(pois.length, 300);
+    const poiGeo = new THREE.OctahedronGeometry(0.4, 0);
+    const poiMesh = new THREE.InstancedMesh(poiGeo, _state.materials.poi, maxPois);
+    poiMesh.count = maxPois;
+
+    const dummy = new THREE.Object3D();
+    for (let i = 0; i < maxPois; i++) {
+        const p = pois[i];
+        const tp = gameToThree(p.pos[0], p.pos[1]);
+        dummy.position.set(tp.x, 1.5, tp.z);
+        dummy.scale.set(1, 1.5, 1);
+        dummy.updateMatrix();
+        poiMesh.setMatrixAt(i, dummy.matrix);
+    }
+    poiMesh.instanceMatrix.needsUpdate = true;
+    group.add(poiMesh);
+
+    _state.scene.add(group);
+    _state.poiGroup = group;
+    console.log(`[MAP3D] POIs: ${maxPois} markers`);
+}
+
+function _buildFurniture() {
+    const furniture = _state.overlayData?.furniture;
+    if (!furniture?.length) return;
+
+    const group = new THREE.Group();
+    group.name = 'furniture';
+
+    // Sort items by type
+    const byType = { bench: [], hydrant: [], lamp: [], bin: [] };
+    for (const f of furniture) {
+        if (byType[f.type]) byType[f.type].push(f);
+    }
+
+    const dummy = new THREE.Object3D();
+
+    // Benches — brown boxes
+    if (byType.bench.length > 0) {
+        const geo = new THREE.BoxGeometry(1.5, 0.5, 0.5);
+        const mat = new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.8 });
+        const mesh = new THREE.InstancedMesh(geo, mat, byType.bench.length);
+        mesh.count = byType.bench.length;
+        mesh.castShadow = true;
+        mesh.frustumCulled = false;
+        for (let i = 0; i < byType.bench.length; i++) {
+            const tp = gameToThree(byType.bench[i].pos[0], byType.bench[i].pos[1]);
+            dummy.position.set(tp.x, 0.25, tp.z);
+            dummy.scale.set(1, 1, 1);
+            dummy.rotation.set(0, 0, 0);
+            dummy.updateMatrix();
+            mesh.setMatrixAt(i, dummy.matrix);
+        }
+        mesh.instanceMatrix.needsUpdate = true;
+        group.add(mesh);
+    }
+
+    // Hydrants — red cylinders
+    if (byType.hydrant.length > 0) {
+        const geo = new THREE.CylinderGeometry(0.15, 0.15, 0.6, 6);
+        const mat = new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 0.5 });
+        const mesh = new THREE.InstancedMesh(geo, mat, byType.hydrant.length);
+        mesh.count = byType.hydrant.length;
+        mesh.castShadow = true;
+        mesh.frustumCulled = false;
+        for (let i = 0; i < byType.hydrant.length; i++) {
+            const tp = gameToThree(byType.hydrant[i].pos[0], byType.hydrant[i].pos[1]);
+            dummy.position.set(tp.x, 0.3, tp.z);
+            dummy.scale.set(1, 1, 1);
+            dummy.rotation.set(0, 0, 0);
+            dummy.updateMatrix();
+            mesh.setMatrixAt(i, dummy.matrix);
+        }
+        mesh.instanceMatrix.needsUpdate = true;
+        group.add(mesh);
+    }
+
+    // Lamps — dark gray poles with sphere on top
+    if (byType.lamp.length > 0) {
+        const poleGeo = new THREE.CylinderGeometry(0.08, 0.08, 4, 6);
+        const poleMat = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.6 });
+        const poleMesh = new THREE.InstancedMesh(poleGeo, poleMat, byType.lamp.length);
+        poleMesh.count = byType.lamp.length;
+        poleMesh.castShadow = true;
+        poleMesh.frustumCulled = false;
+
+        const bulbGeo = new THREE.SphereGeometry(0.2, 6, 4);
+        const bulbMat = new THREE.MeshBasicMaterial({ color: 0xffffcc });
+        const bulbMesh = new THREE.InstancedMesh(bulbGeo, bulbMat, byType.lamp.length);
+        bulbMesh.count = byType.lamp.length;
+        bulbMesh.frustumCulled = false;
+
+        for (let i = 0; i < byType.lamp.length; i++) {
+            const tp = gameToThree(byType.lamp[i].pos[0], byType.lamp[i].pos[1]);
+            // Pole
+            dummy.position.set(tp.x, 2, tp.z);
+            dummy.scale.set(1, 1, 1);
+            dummy.rotation.set(0, 0, 0);
+            dummy.updateMatrix();
+            poleMesh.setMatrixAt(i, dummy.matrix);
+            // Bulb on top
+            dummy.position.set(tp.x, 4.1, tp.z);
+            dummy.updateMatrix();
+            bulbMesh.setMatrixAt(i, dummy.matrix);
+        }
+        poleMesh.instanceMatrix.needsUpdate = true;
+        bulbMesh.instanceMatrix.needsUpdate = true;
+        group.add(poleMesh);
+        group.add(bulbMesh);
+    }
+
+    // Bins — dark green cylinders
+    if (byType.bin.length > 0) {
+        const geo = new THREE.CylinderGeometry(0.2, 0.2, 0.8, 6);
+        const mat = new THREE.MeshStandardMaterial({ color: 0x006400, roughness: 0.7 });
+        const mesh = new THREE.InstancedMesh(geo, mat, byType.bin.length);
+        mesh.count = byType.bin.length;
+        mesh.castShadow = true;
+        mesh.frustumCulled = false;
+        for (let i = 0; i < byType.bin.length; i++) {
+            const tp = gameToThree(byType.bin[i].pos[0], byType.bin[i].pos[1]);
+            dummy.position.set(tp.x, 0.4, tp.z);
+            dummy.scale.set(1, 1, 1);
+            dummy.rotation.set(0, 0, 0);
+            dummy.updateMatrix();
+            mesh.setMatrixAt(i, dummy.matrix);
+        }
+        mesh.instanceMatrix.needsUpdate = true;
+        group.add(mesh);
+    }
+
+    _state.scene.add(group);
+    _state.furnitureGroup = group;
+    const total = furniture.length;
+    console.log(`[MAP3D] Furniture: ${total} items (${byType.bench.length} benches, ${byType.hydrant.length} hydrants, ${byType.lamp.length} lamps, ${byType.bin.length} bins)`);
 }
 
 
@@ -2138,6 +3138,154 @@ export function toggleBuildings() {
 }
 
 /**
+ * Toggle tree visibility.
+ */
+export function toggleTrees() {
+    if (_state.treeGroup) {
+        _state.treeGroup.visible = !_state.treeGroup.visible;
+        console.log(`[MAP3D] Trees ${_state.treeGroup.visible ? 'ON' : 'OFF'}`);
+    }
+}
+
+/**
+ * Toggle water visibility.
+ */
+export function toggleWater() {
+    if (_state.waterGroup) {
+        _state.waterGroup.visible = !_state.waterGroup.visible;
+        console.log(`[MAP3D] Water ${_state.waterGroup.visible ? 'ON' : 'OFF'}`);
+    }
+}
+
+/**
+ * Toggle barrier visibility.
+ */
+export function toggleBarriers() {
+    if (_state.barrierGroup) {
+        _state.barrierGroup.visible = !_state.barrierGroup.visible;
+        console.log(`[MAP3D] Barriers ${_state.barrierGroup.visible ? 'ON' : 'OFF'}`);
+    }
+}
+
+/**
+ * Toggle entrance visibility.
+ */
+export function toggleEntrances() {
+    if (_state.entranceGroup) {
+        _state.entranceGroup.visible = !_state.entranceGroup.visible;
+        console.log(`[MAP3D] Entrances ${_state.entranceGroup.visible ? 'ON' : 'OFF'}`);
+    }
+}
+
+/**
+ * Toggle POI visibility.
+ */
+export function togglePOIs() {
+    if (_state.poiGroup) {
+        _state.poiGroup.visible = !_state.poiGroup.visible;
+        console.log(`[MAP3D] POIs ${_state.poiGroup.visible ? 'ON' : 'OFF'}`);
+    }
+}
+
+/**
+ * Toggle terrain mesh visibility.
+ */
+export function toggleTerrain() {
+    if (_state.terrainMesh) {
+        _state.terrainMesh.visible = !_state.terrainMesh.visible;
+        console.log(`[MAP3D] Terrain ${_state.terrainMesh.visible ? 'ON' : 'OFF'}`);
+    }
+}
+
+/**
+ * Toggle city simulation on/off. If not loaded, loads city data first.
+ */
+export async function toggleCitySim() {
+    if (_state.citySim?.running) {
+        _state.citySim.clearVehicles();
+        _state.citySim.anomalyDetector?.reset();
+        console.log('[MAP3D] City sim stopped');
+        EventBus.emit('city-sim:stopped');
+        return;
+    }
+
+    // Load city data if not already loaded
+    if (!_state.citySim?.loaded) {
+        if (!_state.geoCenter) {
+            console.warn('[MAP3D] No geo reference — cannot start city sim');
+            return;
+        }
+        console.log('[MAP3D] Loading city data for simulation...');
+        const ok = await _state.citySim.loadCityData(
+            _state.geoCenter.lat, _state.geoCenter.lng, 400
+        );
+        if (!ok) {
+            console.warn('[MAP3D] Failed to load city data for sim');
+            return;
+        }
+    }
+
+    const stats = _state.citySim.roadNetwork?.stats();
+    if (stats?.edges > 0) {
+        _state.citySim.initRendering(THREE, _state.scene);
+        _state.citySim.spawnVehicles(Math.min(100, stats.edges * 2));
+        _state.citySim.spawnPedestrians(Math.min(50, stats.edges));
+        console.log(`[MAP3D] City sim started`);
+        EventBus.emit('city-sim:started');
+    }
+}
+
+/**
+ * Get city simulation stats.
+ */
+export function getCitySimStats() {
+    return _state.citySim?.getStats() || null;
+}
+
+/**
+ * Cycle through simulation time scales: 1x → 10x → 60x → 300x → pause → 1x.
+ */
+export function cycleSimTimeScale() {
+    if (!_state.citySim) return;
+    const scales = [1, 10, 60, 300, 0];  // 0 = pause
+    const current = _state.citySim.timeScale;
+    const idx = scales.indexOf(current);
+    const next = scales[(idx + 1) % scales.length];
+    _state.citySim.timeScale = next;
+    console.log(`[MAP3D] Sim time scale: ${next === 0 ? 'PAUSED' : next + 'x'}`);
+}
+
+/**
+ * Set simulation time scale directly.
+ * @param {number} scale — 0=pause, 1=realtime, 60=1min/sec, etc.
+ */
+export function setSimTimeScale(scale) {
+    if (!_state.citySim) return;
+    _state.citySim.timeScale = scale;
+}
+
+/**
+ * Toggle road graph debug overlay (intersection nodes + edges).
+ */
+export function toggleRoadGraph() {
+    if (_state.roadGraphGroup) {
+        _state.roadGraphGroup.visible = !_state.roadGraphGroup.visible;
+        console.log(`[MAP3D] Road graph ${_state.roadGraphGroup.visible ? 'ON' : 'OFF'}`);
+        return;
+    }
+
+    // Build debug overlay on first toggle
+    if (_state.citySim?.loaded) {
+        const group = _state.citySim.buildDebugOverlay(THREE, gameToThree);
+        if (group) {
+            _state.scene.add(group);
+            _state.roadGraphGroup = group;
+            console.log('[MAP3D] Road graph debug overlay created');
+        }
+    }
+}
+
+/**
  * Toggle grid overlay on/off.
  */
 export function toggleGrid() {
@@ -2149,6 +3297,12 @@ export function toggleGrid() {
 /**
  * Toggle fog of war density.
  */
+export function toggleBloom() {
+    _state.bloomEnabled = !_state.bloomEnabled;
+    console.log(`%c[MAP3D] Bloom ${_state.bloomEnabled ? 'ON' : 'OFF'}`, 'color: #00f0ff;');
+    return _state.bloomEnabled;
+}
+
 export function toggleFog() {
     if (_state.scene) {
         if (_state.scene.fog && _state.scene.fog.density > 0) {
@@ -2182,6 +3336,14 @@ export function getMapState() {
         showRoads: !!_state.showRoads,
         showGrid: _state.showGrid !== false,
         showBuildings: _state.buildingGroup ? _state.buildingGroup.visible : false,
+        showTrees: _state.treeGroup ? _state.treeGroup.visible : false,
+        showWater: _state.waterGroup ? _state.waterGroup.visible : false,
+        showBarriers: _state.barrierGroup ? _state.barrierGroup.visible : false,
+        showEntrances: _state.entranceGroup ? _state.entranceGroup.visible : false,
+        showPOIs: _state.poiGroup ? _state.poiGroup.visible : false,
+        showTerrain: _state.terrainMesh ? _state.terrainMesh.visible : false,
+        showRoadGraph: _state.roadGraphGroup ? _state.roadGraphGroup.visible : false,
+        showCitySim: _state.citySim?.running || false,
         showUnits: _state.showUnits !== false,
         tiltMode: _state.cam.tiltTarget > 70 ? 'top-down' : 'tilted',
     };
