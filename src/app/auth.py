@@ -247,10 +247,48 @@ api_key_store = APIKeyStore()
 
 
 def _get_secret_key() -> str:
-    """Get JWT secret key, generating one if not configured."""
+    """Get JWT secret key, generating one if not configured.
+
+    Priority:
+      1. Explicit config (auth_secret_key setting / env var)
+      2. Persisted auto-generated key (~/.tritium/jwt_secret)
+      3. Ephemeral key (last resort, logged as warning)
+    """
     if settings.auth_secret_key:
         return settings.auth_secret_key
-    # Generate ephemeral key (valid only for this server session)
+
+    # Try to load or create a persistent key file
+    from pathlib import Path
+    secret_path = Path.home() / ".tritium" / "jwt_secret"
+    try:
+        if secret_path.exists():
+            key = secret_path.read_text().strip()
+            if key:
+                if not hasattr(_get_secret_key, "_logged_persistent"):
+                    logger.warning(
+                        "Using auto-generated JWT secret from %s — "
+                        "set AUTH_SECRET_KEY for production deployments",
+                        secret_path,
+                    )
+                    _get_secret_key._logged_persistent = True
+                return key
+        # Generate and persist a new key
+        secret_path.parent.mkdir(parents=True, exist_ok=True)
+        key = secrets.token_hex(32)
+        secret_path.write_text(key + "\n")
+        secret_path.chmod(0o600)
+        logger.warning(
+            "Generated JWT secret and saved to %s — "
+            "set AUTH_SECRET_KEY for production deployments",
+            secret_path,
+        )
+        _get_secret_key._logged_persistent = True
+        return key
+    except OSError as exc:
+        # Filesystem issues (read-only, permissions, etc.) — fall back to ephemeral
+        logger.warning("Cannot read/write %s (%s) — falling back to ephemeral key", secret_path, exc)
+
+    # Ephemeral fallback (tokens won't survive restart)
     if not hasattr(_get_secret_key, "_ephemeral"):
         _get_secret_key._ephemeral = secrets.token_hex(32)
         logger.warning("No auth_secret_key configured — using ephemeral key (tokens won't survive restart)")

@@ -910,7 +910,7 @@ async def lifespan(app: FastAPI):
 
             # Load real-world geo data (roads + buildings) for 3D renderer
             try:
-                from engine.tactical.street_graph import StreetGraph
+                from tritium_lib.tracking.street_graph import StreetGraph
                 from tritium_lib.tracking.obstacles import BuildingObstacles
 
                 if settings.map_center_lat != 0.0 or settings.map_center_lng != 0.0:
@@ -1257,11 +1257,18 @@ app = FastAPI(
 )
 
 # CORS middleware — restrict origins in production via CORS_ALLOWED_ORIGINS env var
-_cors_origins = (
-    [o.strip() for o in settings.cors_allowed_origins.split(",") if o.strip()]
-    if settings.cors_allowed_origins
-    else ["*"]
-)
+if settings.cors_allowed_origins:
+    _cors_origins = [o.strip() for o in settings.cors_allowed_origins.split(",") if o.strip()]
+elif settings.auth_enabled:
+    # Auth enabled but no explicit origins — restrict to localhost (not wildcard)
+    _cors_origins = ["http://localhost:8000", "https://localhost:8000"]
+    logger.warning(
+        "CORS: auth_enabled=True but no CORS_ALLOWED_ORIGINS set — "
+        "restricting to localhost. Set CORS_ALLOWED_ORIGINS for remote access."
+    )
+else:
+    # Dev mode (auth disabled) — allow everything
+    _cors_origins = ["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
