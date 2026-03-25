@@ -23,7 +23,7 @@
  */
 
 import { TritiumStore } from './store.js';
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
 
 const ELLIPSE_SOURCE_ID = 'tritium-prediction-ellipses';
 const ELLIPSE_FILL_LAYER_ID = 'tritium-prediction-ellipses-fill';

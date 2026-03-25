@@ -18,7 +18,7 @@
  *   initMissionModal() — setup function
  */
 
-import { _esc } from './panel-utils.js';
+import { _esc } from '/lib/utils.js';
 
 // -- Constants -----------------------------------------------------------------
 

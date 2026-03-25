@@ -75,9 +75,16 @@ async def refresh(request: RefreshRequest):
             detail="Invalid refresh token",
         )
 
+    subject = payload.get("sub")
+    if not subject:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token missing subject claim",
+        )
+
     return TokenResponse(
-        access_token=create_access_token(payload["sub"], payload.get("role", "user")),
-        refresh_token=create_refresh_token(payload["sub"]),
+        access_token=create_access_token(subject, payload.get("role", "user")),
+        refresh_token=create_refresh_token(subject),
         expires_in=settings.auth_access_token_expire_minutes * 60,
     )
 

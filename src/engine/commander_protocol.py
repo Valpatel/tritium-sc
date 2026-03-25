@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from engine.comms.event_bus import EventBus
-    from engine.tactical.target_tracker import TargetTracker
+    from tritium_lib.tracking.target_tracker import TargetTracker
     from engine.simulation.engine import SimulationEngine
 
 

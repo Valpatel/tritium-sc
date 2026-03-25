@@ -38,6 +38,58 @@ async def plugin_health(request: Request):
     return mgr.health_check()
 
 
+@router.get("/status")
+async def plugin_status(request: Request):
+    """Plugin status summary — which plugins loaded vs failed and why.
+
+    Returns a single object with loaded, failed, and load_error counts
+    plus details for diagnosing plugin issues at a glance.
+    """
+    mgr = _get_manager(request)
+
+    result = {
+        "loaded": [],
+        "failed": [],
+        "load_errors": [],
+        "summary": {
+            "total_registered": 0,
+            "running": 0,
+            "failed": 0,
+            "load_errors": 0,
+        },
+    }
+
+    if mgr is None:
+        return result
+
+    plugins = mgr.list_plugins()
+    for p in plugins:
+        entry = {
+            "id": p["id"],
+            "name": p["name"],
+            "version": p["version"],
+            "status": p["status"],
+        }
+        if p["status"] == "failed":
+            entry["failure_reason"] = p.get("failure_reason", "unknown")
+            result["failed"].append(entry)
+        else:
+            entry["healthy"] = p.get("healthy", False)
+            result["loaded"].append(entry)
+
+    load_errors = mgr.get_load_errors()
+    result["load_errors"] = load_errors
+
+    result["summary"] = {
+        "total_registered": len(plugins),
+        "running": sum(1 for p in plugins if p["status"] == "running"),
+        "failed": len(result["failed"]),
+        "load_errors": len(load_errors),
+    }
+
+    return result
+
+
 @router.get("/discovery")
 async def plugin_discovery_report(request: Request):
     """Plugin auto-discovery report from boot.

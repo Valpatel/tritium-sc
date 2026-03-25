@@ -26,28 +26,44 @@ if TYPE_CHECKING:
 logger = logging.getLogger("synthetic.data_generators")
 
 # ── BLE device pool ─────────────────────────────────────────────────────
+# Each device has a "placement" key that controls positioning behavior:
+#   "building" — stationary inside a building (IoT devices, home electronics)
+#   "mobile"   — walking speed random walk (phones, wearables, tablets)
+#   "vehicle"  — driving speed, moves along roads (automotive)
+#   "roaming"  — slow drift, occasionally disappears (trackers, unknowns)
 
 _BLE_DEVICE_POOL: list[dict[str, str]] = [
-    {"name": "iPhone-Matt", "mac": "AA:BB:CC:11:22:01", "type": "phone"},
-    {"name": "Galaxy-S24", "mac": "AA:BB:CC:11:22:02", "type": "phone"},
-    {"name": "Pixel-9", "mac": "AA:BB:CC:11:22:03", "type": "phone"},
-    {"name": "AirPods-Pro", "mac": "AA:BB:CC:11:22:04", "type": "audio"},
-    {"name": "WH-1000XM5", "mac": "AA:BB:CC:11:22:05", "type": "audio"},
-    {"name": "Apple-Watch-7", "mac": "AA:BB:CC:11:22:06", "type": "wearable"},
-    {"name": "Fitbit-Charge", "mac": "AA:BB:CC:11:22:07", "type": "wearable"},
-    {"name": "Tile-Mate", "mac": "AA:BB:CC:11:22:08", "type": "tracker"},
-    {"name": "AirTag", "mac": "AA:BB:CC:11:22:09", "type": "tracker"},
-    {"name": "Ring-Doorbell", "mac": "AA:BB:CC:11:22:0A", "type": "iot"},
-    {"name": "Nest-Thermostat", "mac": "AA:BB:CC:11:22:0B", "type": "iot"},
-    {"name": "Echo-Dot", "mac": "AA:BB:CC:11:22:0C", "type": "iot"},
-    {"name": "", "mac": "DD:EE:FF:11:22:01", "type": "unknown"},
-    {"name": "", "mac": "DD:EE:FF:11:22:02", "type": "unknown"},
-    {"name": "", "mac": "DD:EE:FF:11:22:03", "type": "unknown"},
-    {"name": "", "mac": "DD:EE:FF:11:22:04", "type": "unknown"},
-    {"name": "JBL-Flip6", "mac": "AA:BB:CC:11:22:0D", "type": "audio"},
-    {"name": "iPad-Air", "mac": "AA:BB:CC:11:22:0E", "type": "tablet"},
-    {"name": "Surface-Go", "mac": "AA:BB:CC:11:22:0F", "type": "tablet"},
-    {"name": "Tesla-Key", "mac": "AA:BB:CC:11:22:10", "type": "automotive"},
+    {"name": "iPhone-Matt", "mac": "AA:BB:CC:11:22:01", "type": "phone", "placement": "mobile"},
+    {"name": "Galaxy-S24", "mac": "AA:BB:CC:11:22:02", "type": "phone", "placement": "mobile"},
+    {"name": "Pixel-9", "mac": "AA:BB:CC:11:22:03", "type": "phone", "placement": "mobile"},
+    {"name": "AirPods-Pro", "mac": "AA:BB:CC:11:22:04", "type": "audio", "placement": "mobile"},
+    {"name": "WH-1000XM5", "mac": "AA:BB:CC:11:22:05", "type": "audio", "placement": "mobile"},
+    {"name": "Apple-Watch-7", "mac": "AA:BB:CC:11:22:06", "type": "wearable", "placement": "mobile"},
+    {"name": "Fitbit-Charge", "mac": "AA:BB:CC:11:22:07", "type": "wearable", "placement": "mobile"},
+    {"name": "Tile-Mate", "mac": "AA:BB:CC:11:22:08", "type": "tracker", "placement": "roaming"},
+    {"name": "AirTag", "mac": "AA:BB:CC:11:22:09", "type": "tracker", "placement": "roaming"},
+    {"name": "Ring-Doorbell", "mac": "AA:BB:CC:11:22:0A", "type": "iot", "placement": "building"},
+    {"name": "Nest-Thermostat", "mac": "AA:BB:CC:11:22:0B", "type": "iot", "placement": "building"},
+    {"name": "Echo-Dot", "mac": "AA:BB:CC:11:22:0C", "type": "iot", "placement": "building"},
+    {"name": "", "mac": "DD:EE:FF:11:22:01", "type": "unknown", "placement": "roaming"},
+    {"name": "", "mac": "DD:EE:FF:11:22:02", "type": "unknown", "placement": "roaming"},
+    {"name": "", "mac": "DD:EE:FF:11:22:03", "type": "unknown", "placement": "roaming"},
+    {"name": "", "mac": "DD:EE:FF:11:22:04", "type": "unknown", "placement": "roaming"},
+    {"name": "JBL-Flip6", "mac": "AA:BB:CC:11:22:0D", "type": "audio", "placement": "building"},
+    {"name": "iPad-Air", "mac": "AA:BB:CC:11:22:0E", "type": "tablet", "placement": "mobile"},
+    {"name": "Surface-Go", "mac": "AA:BB:CC:11:22:0F", "type": "tablet", "placement": "building"},
+    {"name": "Tesla-Key", "mac": "AA:BB:CC:11:22:10", "type": "automotive", "placement": "vehicle"},
+]
+
+# Fixed building positions — offsets from scanner center (lat/lng degrees).
+# Each represents a realistic building location near the demo neighborhood.
+# ~0.0003 degrees ≈ 30m, so these are within a few blocks.
+_BUILDING_POSITIONS: list[tuple[float, float]] = [
+    (0.0004, -0.0002),   # building NE — Ring Doorbell at entrance
+    (-0.0001, 0.0003),   # building NW — Nest Thermostat inside
+    (0.0002, 0.0005),    # building E  — Echo Dot inside
+    (-0.0003, -0.0004),  # building SW — JBL speaker in living room
+    (0.0005, 0.0001),    # building SE — Surface tablet on desk
 ]
 
 # ── Meshtastic node pool ────────────────────────────────────────────────
@@ -150,30 +166,76 @@ class BLEScanGenerator(_BaseGenerator):
         self._rng = random.Random(42)
         # Per-device position offsets that drift over time (simulates movement)
         self._device_offsets: dict[str, tuple[float, float]] = {}
+        # Building position assignments (mac -> fixed offset index)
+        self._building_assignments: dict[str, int] = {}
+        self._next_building_idx = 0
+
+    def _assign_building(self, mac: str) -> tuple[float, float]:
+        """Assign a fixed building position to an IoT device."""
+        if mac not in self._building_assignments:
+            self._building_assignments[mac] = self._next_building_idx % len(_BUILDING_POSITIONS)
+            self._next_building_idx += 1
+        idx = self._building_assignments[mac]
+        return _BUILDING_POSITIONS[idx]
 
     def _tick(self) -> None:
         assert self._event_bus is not None
         self._rotate_devices()
         devices = []
         for dev in self._active_devices:
-            rssi = self._rng.randint(-90, -30)
             mac = dev["mac"]
+            placement = dev.get("placement", "mobile")
 
-            # Drift the device position offset slightly each tick
-            # to simulate targets moving around the scanner area
-            if mac not in self._device_offsets:
-                self._device_offsets[mac] = (
-                    self._rng.uniform(-0.0003, 0.0003),
-                    self._rng.uniform(-0.0003, 0.0003),
-                )
-            old_dlat, old_dlng = self._device_offsets[mac]
-            # Random walk: ~1-3 m per tick (walking speed)
-            old_dlat += self._rng.gauss(0, 0.000015)
-            old_dlng += self._rng.gauss(0, 0.000015)
-            # Clamp to ~50m radius around the scanner
-            old_dlat = max(-0.0005, min(0.0005, old_dlat))
-            old_dlng = max(-0.0005, min(0.0005, old_dlng))
-            self._device_offsets[mac] = (old_dlat, old_dlng)
+            if placement == "building":
+                # Stationary inside a building — fixed position, strong RSSI
+                rssi = self._rng.randint(-55, -30)
+                bld_offset = self._assign_building(mac)
+                dlat, dlng = bld_offset
+            elif placement == "vehicle":
+                # Driving speed — faster drift along a direction
+                rssi = self._rng.randint(-70, -40)
+                if mac not in self._device_offsets:
+                    self._device_offsets[mac] = (
+                        self._rng.uniform(-0.0003, 0.0003),
+                        self._rng.uniform(-0.0003, 0.0003),
+                    )
+                old_dlat, old_dlng = self._device_offsets[mac]
+                old_dlat += self._rng.gauss(0, 0.00005)
+                old_dlng += self._rng.gauss(0, 0.00005)
+                old_dlat = max(-0.002, min(0.002, old_dlat))
+                old_dlng = max(-0.002, min(0.002, old_dlng))
+                self._device_offsets[mac] = (old_dlat, old_dlng)
+                dlat, dlng = old_dlat, old_dlng
+            elif placement == "roaming":
+                # Slow drift, weaker signal
+                rssi = self._rng.randint(-85, -50)
+                if mac not in self._device_offsets:
+                    self._device_offsets[mac] = (
+                        self._rng.uniform(-0.0004, 0.0004),
+                        self._rng.uniform(-0.0004, 0.0004),
+                    )
+                old_dlat, old_dlng = self._device_offsets[mac]
+                old_dlat += self._rng.gauss(0, 0.000008)
+                old_dlng += self._rng.gauss(0, 0.000008)
+                old_dlat = max(-0.0006, min(0.0006, old_dlat))
+                old_dlng = max(-0.0006, min(0.0006, old_dlng))
+                self._device_offsets[mac] = (old_dlat, old_dlng)
+                dlat, dlng = old_dlat, old_dlng
+            else:
+                # "mobile" — walking speed, default behavior for phones/wearables
+                rssi = self._rng.randint(-75, -35)
+                if mac not in self._device_offsets:
+                    self._device_offsets[mac] = (
+                        self._rng.uniform(-0.0003, 0.0003),
+                        self._rng.uniform(-0.0003, 0.0003),
+                    )
+                old_dlat, old_dlng = self._device_offsets[mac]
+                old_dlat += self._rng.gauss(0, 0.000015)
+                old_dlng += self._rng.gauss(0, 0.000015)
+                old_dlat = max(-0.0005, min(0.0005, old_dlat))
+                old_dlng = max(-0.0005, min(0.0005, old_dlng))
+                self._device_offsets[mac] = (old_dlat, old_dlng)
+                dlat, dlng = old_dlat, old_dlng
 
             dev_entry: dict = {
                 "mac": mac,
@@ -181,11 +243,9 @@ class BLEScanGenerator(_BaseGenerator):
                 "rssi": rssi,
                 "type": dev["type"],
             }
-            # Include per-device lat/lng so each target gets a unique
-            # moving position (scanner position + device offset).
             if self._node_lat is not None and self._node_lon is not None:
-                dev_entry["lat"] = self._node_lat + old_dlat
-                dev_entry["lng"] = self._node_lon + old_dlng
+                dev_entry["lat"] = self._node_lat + dlat
+                dev_entry["lng"] = self._node_lon + dlng
             devices.append(dev_entry)
 
         payload: dict = {
@@ -202,7 +262,12 @@ class BLEScanGenerator(_BaseGenerator):
         self._event_bus.publish("fleet.ble_presence", payload)
 
     def _rotate_devices(self) -> None:
-        """Randomly add/remove devices to simulate movement."""
+        """Randomly add/remove devices to simulate movement.
+
+        Building-placed devices (IoT) never rotate out — they are always
+        present since they are stationary inside buildings.  Mobile and
+        roaming devices churn to simulate people coming and going.
+        """
         pool = list(_BLE_DEVICE_POOL)
         known = [d for d in pool if d["name"]]
         unknown = [d for d in pool if not d["name"]]
@@ -210,19 +275,34 @@ class BLEScanGenerator(_BaseGenerator):
         n_known = int(self._max_devices * self._known_ratio)
         n_unknown = self._max_devices - n_known
 
-        # Slight churn: 20% chance each device rotates out
+        # Building devices never rotate out; others have 20% churn
         self._active_devices = [
             d for d in self._active_devices
-            if self._rng.random() > 0.2
+            if d.get("placement") == "building" or self._rng.random() > 0.2
         ]
 
-        # Fill up to max
+        # Ensure building devices are always present (up to max capacity)
         current_macs = {d["mac"] for d in self._active_devices}
-        available_known = [d for d in known if d["mac"] not in current_macs]
+        building_pool = [d for d in pool if d.get("placement") == "building"]
+        for d in building_pool:
+            if len(self._active_devices) >= self._max_devices:
+                break
+            if d["mac"] not in current_macs:
+                self._active_devices.append(d)
+                current_macs.add(d["mac"])
+
+        # Fill up to max with mobile/roaming devices
+        available_known = [d for d in known if d["mac"] not in current_macs and d.get("placement") != "building"]
         available_unknown = [d for d in unknown if d["mac"] not in current_macs]
 
-        n_need_known = max(0, n_known - sum(1 for d in self._active_devices if d["name"]))
-        n_need_unknown = max(0, n_unknown - sum(1 for d in self._active_devices if not d["name"]))
+        # Respect max_devices overall
+        remaining = self._max_devices - len(self._active_devices)
+        if remaining <= 0:
+            return
+
+        n_need_known = max(0, min(remaining, n_known - sum(1 for d in self._active_devices if d["name"])))
+        remaining -= n_need_known
+        n_need_unknown = max(0, min(remaining, n_unknown - sum(1 for d in self._active_devices if not d["name"])))
 
         if available_known and n_need_known > 0:
             self._active_devices.extend(

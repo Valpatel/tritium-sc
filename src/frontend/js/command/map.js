@@ -17,11 +17,11 @@
  */
 
 import { TritiumStore } from './store.js';
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
 import { resolveLabels } from './label-collision.js';
 import { drawUnit as drawUnitIcon, drawCrowdRoleIndicator, drawFusionIndicator } from './unit-icons.js';
 import { DeviceModalManager } from './device-modal.js';
-import { _esc } from './panel-utils.js';
+import { _esc } from '/lib/utils.js';
 
 // ============================================================
 // Constants

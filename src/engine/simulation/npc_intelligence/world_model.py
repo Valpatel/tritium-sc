@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     import networkx as nx
     from tritium_lib.tracking.obstacles import BuildingObstacles
-    from engine.tactical.street_graph import StreetGraph
+    from tritium_lib.tracking.street_graph import StreetGraph
 
 
 # ============================================================================

@@ -13,7 +13,7 @@
  */
 
 import { TritiumStore } from './store.js';
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
 
 export const THREAT_LEVELS = {
     GREEN:  { color: '#05ffa1', label: 'GREEN',  bg: '#05ffa110' },

@@ -456,7 +456,7 @@ async def get_target_sightings(
                 hour = dt.hour
                 by_day[day] = by_day.get(day, 0) + 1
                 by_hour[hour] = by_hour[hour] + 1
-            except:
+            except (ValueError, TypeError, AttributeError):
                 pass
 
         ch = s.get("channel")
@@ -542,7 +542,7 @@ async def get_detection_trends(
                 item["label"] = labels.get(item.get("thumbnail_id"), {}).get("label")
                 recent_targets.append(item)
 
-        except:
+        except (ValueError, TypeError, KeyError, AttributeError):
             continue
 
     # Sort recent targets by timestamp
@@ -605,7 +605,7 @@ async def get_target_detail(thumbnail_id: str):
             }
             for m, s in similar_results if m.get("thumbnail_id") != thumbnail_id
         ]
-    except:
+    except Exception:
         item["similar_targets"] = []
 
     return item
@@ -663,7 +663,7 @@ async def get_recurring_individuals(
             ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
             if ts < cutoff:
                 continue
-        except:
+        except (ValueError, TypeError, AttributeError):
             continue
 
         tid = item.get("thumbnail_id", "")

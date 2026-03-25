@@ -64,7 +64,10 @@ async def save_widget_layout(request: Request):
         operator_id: str — operator identifier
         widgets: list[dict] — widget definitions with positions
     """
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"detail": "Invalid JSON body"})
     operator_id = body.get("operator_id", "default")
     widgets_data = body.get("widgets", [])
 

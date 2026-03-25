@@ -17,7 +17,7 @@
  *   mgr.start();
  */
 
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
 
 const HANDOFF_SOURCE_ID = 'tritium-handoffs';
 const HANDOFF_LAYER_ID = 'tritium-handoffs-layer';

@@ -11,7 +11,7 @@
  *   await addonLayers.loadFromAddons();
  */
 
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
 
 // Default colors by geometry hint / category
 const CATEGORY_COLORS = {

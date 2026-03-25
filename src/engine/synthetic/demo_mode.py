@@ -20,6 +20,7 @@ Usage::
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
@@ -39,8 +40,8 @@ from engine.synthetic.robot_demo_generator import RobotDemoGenerator
 
 if TYPE_CHECKING:
     from engine.comms.event_bus import EventBus
-    from engine.tactical.geofence import GeofenceEngine
-    from engine.tactical.target_tracker import TargetTracker
+    from tritium_lib.tracking.geofence import GeofenceEngine
+    from tritium_lib.tracking.target_tracker import TargetTracker
 
 logger = logging.getLogger("synthetic.demo_mode")
 
@@ -213,6 +214,10 @@ class DemoController:
         self._start_fleet_heartbeat_generator()
 
         self._active = True
+
+        # Seed demo assets (cameras, sensors) so the Assets panel has content
+        self._seed_demo_assets()
+
         self._event_bus.publish("demo:started", {
             "ble_devices": self._ble_device_count,
             "mesh_nodes": self._mesh_node_count,
@@ -324,6 +329,92 @@ class DemoController:
             except (KeyError, Exception):
                 pass
         self._demo_camera_ids = []
+
+    # -- Demo asset seeder -------------------------------------------------
+
+    _DEMO_ASSETS = [
+        # Cameras
+        {"asset_id": "demo-cam-01", "name": "North Gate Camera", "asset_type": "fixed",
+         "asset_class": "observation", "home_x": 37.7755, "home_y": -122.4185,
+         "height_meters": 4.0, "mounting_type": "pole", "coverage_radius_meters": 30,
+         "coverage_cone_angle": 90, "capabilities": ["video", "yolo", "recording"]},
+        {"asset_id": "demo-cam-02", "name": "South Lot Camera", "asset_type": "fixed",
+         "asset_class": "observation", "home_x": 37.7742, "home_y": -122.4200,
+         "height_meters": 6.0, "mounting_type": "wall", "coverage_radius_meters": 40,
+         "coverage_cone_angle": 120, "capabilities": ["video", "yolo", "recording"]},
+        # BLE Sensors
+        {"asset_id": "demo-ble-01", "name": "Main Entry BLE Scanner", "asset_type": "fixed",
+         "asset_class": "sensor", "home_x": 37.7749, "home_y": -122.4194,
+         "height_meters": 2.5, "mounting_type": "wall", "coverage_radius_meters": 15,
+         "capabilities": ["ble_scan", "wifi_probe"]},
+        {"asset_id": "demo-ble-02", "name": "Parking Garage BLE", "asset_type": "fixed",
+         "asset_class": "sensor", "home_x": 37.7752, "home_y": -122.4178,
+         "height_meters": 3.0, "mounting_type": "ceiling", "coverage_radius_meters": 20,
+         "capabilities": ["ble_scan", "tpms"]},
+        # Mesh Radios
+        {"asset_id": "demo-mesh-01", "name": "Rooftop Relay", "asset_type": "fixed",
+         "asset_class": "relay", "home_x": 37.7760, "home_y": -122.4170,
+         "height_meters": 12.0, "mounting_type": "pole", "coverage_radius_meters": 500,
+         "capabilities": ["meshtastic", "gps"]},
+        # Motion Sensor
+        {"asset_id": "demo-motion-01", "name": "Alley Motion Detector", "asset_type": "fixed",
+         "asset_class": "sensor", "home_x": 37.7745, "home_y": -122.4190,
+         "height_meters": 2.0, "mounting_type": "wall", "coverage_radius_meters": 8,
+         "coverage_cone_angle": 110, "capabilities": ["pir_motion", "alert"]},
+    ]
+
+    def _seed_demo_assets(self) -> None:
+        """Seed demo assets into the database so Assets panel has content."""
+        try:
+            import asyncio
+            from sqlalchemy import select as sa_select
+            from app.database import async_session
+            from app.models import Asset
+
+            async def _seed():
+                count = 0
+                async with async_session() as session:
+                    for asset_def in self._DEMO_ASSETS:
+                        result = await session.execute(
+                            sa_select(Asset).where(Asset.asset_id == asset_def["asset_id"])
+                        )
+                        if result.scalar_one_or_none() is not None:
+                            continue
+
+                        asset = Asset(
+                            asset_id=asset_def["asset_id"],
+                            name=asset_def["name"],
+                            asset_type=asset_def["asset_type"],
+                            asset_class=asset_def.get("asset_class", "patrol"),
+                            capabilities=json.dumps(asset_def.get("capabilities", [])),
+                            home_x=asset_def.get("home_x", 0),
+                            home_y=asset_def.get("home_y", 0),
+                            position_x=asset_def.get("home_x", 0),
+                            position_y=asset_def.get("home_y", 0),
+                            height_meters=asset_def.get("height_meters"),
+                            mounting_type=asset_def.get("mounting_type"),
+                            coverage_radius_meters=asset_def.get("coverage_radius_meters"),
+                            coverage_cone_angle=asset_def.get("coverage_cone_angle"),
+                            status="active",
+                            enabled=True,
+                            connection_url="simulated://demo",
+                        )
+                        session.add(asset)
+                        count += 1
+
+                    await session.commit()
+                logger.info("Seeded %d demo assets (of %d defined)", count, len(self._DEMO_ASSETS))
+
+            # Run in a daemon thread with its own event loop
+            def _run():
+                try:
+                    asyncio.run(_seed())
+                except Exception as ex:
+                    logger.debug("Demo asset seed thread error: %s", ex)
+            threading.Thread(target=_run, name="demo-asset-seed", daemon=True).start()
+
+        except Exception as e:
+            logger.debug("Demo asset seeding skipped: %s", e)
 
     # -- Camera detection -> TargetTracker bridge ----------------------------
     # Subscribes to detection:camera EventBus events and converts normalized

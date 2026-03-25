@@ -7,7 +7,7 @@
 //   import { loadAddons } from './addon-loader.js';
 //   await loadAddons(panelManager);
 
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
 
 // Track loaded addon versions for cache-busting on reload
 const _addonVersions = {};

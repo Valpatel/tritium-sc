@@ -1122,14 +1122,21 @@ async def report_sighting(request: Request):
         engine = _get_sim_engine(request)
     if engine is None:
         return {"error": "No simulation engine"}
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
     from tritium_lib.sim_engine.world.vision import SightingReport
+    try:
+        position = tuple(body["position"]) if "position" in body else None
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid position format")
     report = SightingReport(
         observer_id=body.get("observer_id", "unknown"),
         target_id=body.get("target_id", ""),
         observer_type=body.get("observer_type", "camera"),
         confidence=body.get("confidence", 1.0),
-        position=tuple(body["position"]) if "position" in body else None,
+        position=position,
         timestamp=body.get("timestamp", 0.0),
     )
     engine.vision_system.add_sighting(report)

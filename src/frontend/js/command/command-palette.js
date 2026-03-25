@@ -11,8 +11,8 @@
 //   import { initCommandPalette } from './command-palette.js';
 //   initCommandPalette(panelManager, mapActions);
 
-import { EventBus } from './events.js';
-import { _esc } from './panel-utils.js';
+import { EventBus } from '/lib/events.js';
+import { _esc } from '/lib/utils.js';
 import { fuzzyScore } from '/lib/command-palette.js';
 
 let _overlay = null;

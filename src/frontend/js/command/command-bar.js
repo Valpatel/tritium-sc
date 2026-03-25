@@ -8,7 +8,7 @@
 //   import { createCommandBar } from './command-bar.js';
 //   createCommandBar(containerEl, panelManager, layoutManager);
 
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
 
 /**
  * Create the command bar and mount it into the given container.

@@ -5,7 +5,7 @@
 // Color by suspicious score: green=normal, yellow=moderate, red=suspicious.
 // Polls /api/convoys every 5 seconds.
 
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
 
 const POLL_INTERVAL_MS = 5000;
 const SCORE_THRESHOLDS = { low: 0.3, high: 0.6 };

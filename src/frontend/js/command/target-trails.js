@@ -26,7 +26,7 @@
  */
 
 import { TritiumStore } from './store.js';
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
 
 const MAX_TRAIL_POINTS = 60;     // ~60 seconds of history at 1Hz
 const TRAIL_SAMPLE_MS = 1000;    // Sample positions every 1 second

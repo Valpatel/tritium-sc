@@ -10,6 +10,7 @@ JSON + HTML reports stored in data/test_reports/.
 
 from __future__ import annotations
 
+import html as _html_mod
 import json
 import logging
 import subprocess
@@ -385,6 +386,7 @@ class TestReportGenerator:
 
 def _render_html(report: dict[str, Any]) -> str:
     """Generate a cyberpunk-styled HTML summary of the test report."""
+    _esc = _html_mod.escape
     totals = report.get("totals", {})
     trend = report.get("trend", {})
     projects = report.get("projects", {})
@@ -409,14 +411,14 @@ def _render_html(report: dict[str, Any]) -> str:
             untested_list += f" ... (+{untested_count - 10} more)"
         project_rows += f"""
         <tr>
-            <td>{name}</td>
-            <td>{proj.get('total', 0)}</td>
-            <td style="color:#05ffa1">{proj.get('passed', 0)}</td>
-            <td style="color:#ff2a6d">{proj.get('failed', 0)}</td>
-            <td>{proj.get('skipped', 0)}</td>
-            <td>{proj.get('duration_s', 0)}s</td>
-            <td>{proj.get('density', 0)}</td>
-            <td title="{untested_list}">{untested_count}</td>
+            <td>{_esc(str(name))}</td>
+            <td>{int(proj.get('total', 0))}</td>
+            <td style="color:#05ffa1">{int(proj.get('passed', 0))}</td>
+            <td style="color:#ff2a6d">{int(proj.get('failed', 0))}</td>
+            <td>{int(proj.get('skipped', 0))}</td>
+            <td>{float(proj.get('duration_s', 0))}s</td>
+            <td>{float(proj.get('density', 0))}</td>
+            <td title="{_esc(untested_list)}">{untested_count}</td>
         </tr>"""
 
     # Module breakdown
@@ -429,11 +431,11 @@ def _render_html(report: dict[str, Any]) -> str:
                 color = "#05ffa1"
             module_rows += f"""
             <tr>
-                <td>{proj_name}</td>
-                <td>{mod}</td>
-                <td style="color:#05ffa1">{counts.get('passed', 0)}</td>
-                <td style="color:#ff2a6d">{counts.get('failed', 0)}</td>
-                <td>{counts.get('skipped', 0)}</td>
+                <td>{_esc(str(proj_name))}</td>
+                <td>{_esc(str(mod))}</td>
+                <td style="color:#05ffa1">{int(counts.get('passed', 0))}</td>
+                <td style="color:#ff2a6d">{int(counts.get('failed', 0))}</td>
+                <td>{int(counts.get('skipped', 0))}</td>
             </tr>"""
 
     return f"""<!DOCTYPE html>
@@ -461,7 +463,7 @@ def _render_html(report: dict[str, Any]) -> str:
 </head>
 <body>
 <h1>TRITIUM TEST REPORT</h1>
-<p class="timestamp">Generated: {report.get('timestamp', 'N/A')} | Duration: {report.get('duration_s', 0)}s</p>
+<p class="timestamp">Generated: {_esc(str(report.get('timestamp', 'N/A')))} | Duration: {float(report.get('duration_s', 0))}s</p>
 
 <div class="summary">
   <div class="stat">

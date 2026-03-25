@@ -9,7 +9,7 @@
 //   import { createMenuBar, focusSaveInput } from './menu-bar.js';
 //   createMenuBar(containerEl, panelManager, layoutManager, mapActions);
 
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
 import { toggleAdsbOverlay, isAdsbOverlayActive } from './adsb-overlay.js';
 
 
@@ -81,64 +81,57 @@ function _fileMenuItems(layoutManager) {
 
 // Panel categories — group all panels into logical sections
 const PANEL_CATEGORIES = {
-    'Tactical':      ['ops-dashboard', 'units', 'unit-inspector', 'alerts', 'unified-alerts', 'escalation', 'missions', 'patrol', 'geofence', 'zones', 'minimap', 'layers', 'bookmarks', 'annotations', 'watchlist', 'swarm-coordination', 'convoy'],
-    'Intelligence':  ['search', 'dossiers', 'dossier-groups', 'dossier-timeline', 'graph-explorer', 'timeline', 'target-search', 'target-compare', 'target-merge', 'heatmap', 'heatmap-timeline', 'automation', 'analytics-dashboard', 'dwell-monitor', 'behavioral-intelligence', 'reid-matches', 'lpr', 'fusion-dashboard', 'acoustic-intelligence', 'activity-feed', 'trail-export'],
-    'Sensors':       ['edge-tracker', 'camera-feeds', 'cameras', 'multi-camera', 'rf-motion', 'meshtastic', 'hackrf', 'sensors', 'tak', 'sensor-health', 'wifi-fingerprint', 'indoor-positioning', 'edge-intelligence', 'edge-diagnostics', 'mqtt-inspector', 'radar-scope', 'sdr-waterfall', 'adsb-table'],
-    'Fleet':         ['fleet', 'fleet-dashboard', 'device-manager', 'device-capabilities', 'assets', 'command-history', 'federation', 'training-dashboard'],
-    'AI & Comms':    ['amy', 'amy-conversation', 'graphlings', 'audio', 'notifications', 'notification-prefs', 'voice-command'],
-    'Collaboration': ['operator-activity', 'operator-cursors', 'map-share', 'keyboard-macros'],
-    'Map & GIS':     ['map-layer-switcher', 'grid-overlay', 'floorplan', 'building-occupancy', 'weather-overlay', 'map-replay'],
-    'Simulation':    ['game', 'battle-stats', 'replay', 'scenarios'],
-    'System':        ['system', 'system-health', 'security-audit', 'deployment', 'testing', 'export-scheduler', 'events', 'videos', 'quick-start', 'setup-wizard'],
+    'Operations':     ['tactical-container', 'ops-dashboard', 'units', 'unit-inspector', 'alerts', 'unified-alerts', 'escalation', 'missions', 'patrol', 'geofence', 'zones', 'minimap', 'layers', 'bookmarks', 'annotations', 'watchlist', 'swarm-coordination', 'convoy', 'fleet-container', 'fleet', 'fleet-dashboard', 'device-manager', 'device-capabilities', 'assets', 'command-history', 'edge-intelligence', 'edge-diagnostics', 'training-dashboard'],
+    'Intel':          ['intelligence-container', 'search', 'dossiers', 'dossier-groups', 'dossier-timeline', 'graph-explorer', 'graphlings', 'timeline', 'target-search', 'target-compare', 'target-merge', 'heatmap', 'heatmap-timeline', 'automation', 'analytics-dashboard', 'dwell-monitor', 'behavioral-intelligence', 'reid-matches', 'lpr', 'fusion-dashboard', 'acoustic-intelligence', 'activity-feed', 'trail-export'],
+    'Sensing':        ['sensors-container', 'edge-tracker', 'camera-feeds', 'cameras', 'multi-camera', 'rf-motion', 'hackrf', 'sensors', 'sensor-health', 'wifi-fingerprint', 'indoor-positioning', 'radar-scope', 'sdr-waterfall', 'adsb-table'],
+    'Communications': ['comms-container', 'meshtastic', 'tak', 'mqtt-inspector', 'federation', 'audio', 'voice-command', 'notifications', 'notification-prefs'],
+    'Commander':      ['commander-container', 'amy', 'amy-conversation'],
+    // Fleet merged into Operations above
+    // Collaboration merged into System below
+    'Map':            ['map-layer-switcher', 'map-screenshot', 'map-share', 'grid-overlay', 'floorplan', 'building-occupancy', 'weather-overlay', 'map-replay'],
+    'Simulation':     ['simulation-container', 'city-sim', 'game', 'battle-stats', 'replay', 'scenarios'],
+    'System':         ['system-container', 'system', 'system-health', 'operator-activity', 'operator-cursors', 'keyboard-macros', 'security-audit', 'deployment', 'testing', 'export-scheduler', 'events', 'videos', 'quick-start', 'setup-wizard'],
 };
 
 function _viewMenuItems(panelManager) {
-    const keyMap = {
-        amy: '1', units: '2', alerts: '3', game: '4', meshtastic: '5',
-        cameras: '6', search: '7', tak: '8', videos: '9', zones: '0',
-        minimap: 'M', replay: 'R', sensors: 'E', 'battle-stats': 'P',
-        'unit-inspector': 'J', layers: 'L',
-    };
-    const allPanels = panelManager.getRegisteredPanels();
-    const panelMap = new Map(allPanels.map(p => [p.id, p]));
-    const categorized = new Set();
+    const panelMap = new Map(panelManager.getRegisteredPanels().map(p => [p.id, p]));
     const items = [];
 
-    for (const [category, ids] of Object.entries(PANEL_CATEGORIES)) {
-        const catItems = [];
-        for (const id of ids) {
-            const p = panelMap.get(id);
-            if (!p) continue;
-            categorized.add(id);
-            catItems.push({
-                label: p.title, shortcut: keyMap[id] || '', checkable: true,
-                checked: () => panelManager.isOpen(id),
-                action: () => panelManager.toggle(id),
-            });
-        }
-        if (catItems.length > 0) {
-            items.push({ header: category });
-            items.push(...catItems);
-        }
-    }
+    // CLEAN MENU: Containers only + a few standalone essentials.
+    // Individual panels are accessed as TABS inside containers, not separate windows.
+    const menuEntries = [
+        { header: 'Open Container' },
+        { id: 'tactical-container',      shortcut: '' },
+        { id: 'intelligence-container',  shortcut: '' },
+        { id: 'sensors-container',       shortcut: '' },
+        { id: 'comms-container',         shortcut: '' },
+        { id: 'commander-container',     shortcut: '' },
+        { id: 'simulation-container',    shortcut: '' },
+        { id: 'system-container',        shortcut: '' },
+        { separator: true },
+        { header: 'Standalone' },
+        { id: 'minimap',    shortcut: 'M' },
+        { id: 'layers',     shortcut: '' },
+        { id: 'city-sim',   shortcut: '' },
+        { id: 'units',      shortcut: '2' },
+        { id: 'alerts',     shortcut: '3' },
+        { id: 'game',       shortcut: '4' },
+        { id: 'search',     shortcut: '7' },
+    ];
 
-    // Any uncategorized panels go under "Other"
-    const uncategorized = allPanels.filter(p => !categorized.has(p.id));
-    if (uncategorized.length > 0) {
-        items.push({ header: 'Other' });
-        for (const p of uncategorized) {
-            items.push({
-                label: p.title, shortcut: keyMap[p.id] || '', checkable: true,
-                checked: () => panelManager.isOpen(p.id),
-                action: () => panelManager.toggle(p.id),
-            });
-        }
+    for (const entry of menuEntries) {
+        if (entry.separator) { items.push({ separator: true }); continue; }
+        if (entry.header) { items.push({ header: entry.header }); continue; }
+        const p = panelMap.get(entry.id);
+        if (!p) continue;
+        items.push({
+            label: p.title, shortcut: entry.shortcut || '', checkable: true,
+            checked: () => panelManager.isOpen(entry.id),
+            action: () => panelManager.toggle(entry.id),
+        });
     }
 
     items.push({ separator: true });
-    items.push({ label: 'Show All', action: () => {
-        for (const p of panelManager.getRegisteredPanels()) panelManager.open(p.id);
-    }});
     items.push({ label: 'Hide All', action: () => {
         for (const p of panelManager.getRegisteredPanels()) if (panelManager.isOpen(p.id)) panelManager.close(p.id);
     }});
@@ -187,6 +180,13 @@ function _mapMenuItems(mapActions) {
         { label: 'Satellite', shortcut: 'I', checkable: true, checked: () => s().showSatellite, action: () => mapActions.toggleSatellite() },
         { label: 'Buildings', shortcut: 'K', checkable: true, checked: () => s().showBuildings, action: () => mapActions.toggleBuildings() },
         { label: 'Roads', shortcut: 'G', checkable: true, checked: () => s().showRoads, action: () => mapActions.toggleRoads() },
+        { label: 'Trees', checkable: true, checked: () => s().showTrees, action: () => mapActions.toggleTrees?.() },
+        { label: 'Water', checkable: true, checked: () => s().showWater, action: () => mapActions.toggleWater?.() },
+        { label: 'Barriers', checkable: true, checked: () => s().showBarriers, action: () => mapActions.toggleBarriers?.() },
+        { label: 'Entrances', checkable: true, checked: () => s().showEntrances, action: () => mapActions.toggleEntrances?.() },
+        { label: 'POIs', checkable: true, checked: () => s().showPOIs, action: () => mapActions.togglePOIs?.() },
+        { label: 'Road Graph', checkable: true, checked: () => s().showRoadGraph, action: () => mapActions.toggleRoadGraph?.() },
+        { label: 'City Sim', shortcut: 'J', checkable: true, checked: () => s().showCitySim, action: () => mapActions.toggleCitySim?.() },
         { label: 'Grid', checkable: true, checked: () => s().showGrid, action: () => mapActions.toggleGrid() },
         { label: 'Unit Markers', shortcut: 'U', checkable: true, checked: () => s().showUnits, action: () => mapActions.toggleUnits() },
         { label: 'GIS Intelligence', checkable: true, checked: () => s().showGeoLayers, action: () => mapActions.toggleGeoLayers() },
@@ -195,6 +195,7 @@ function _mapMenuItems(mapActions) {
         { label: 'Fog of War', checkable: true, checked: () => s().showFog, action: () => mapActions.toggleFog() },
         { label: 'Prediction Cones', checkable: true, checked: () => s().showPredictionCones, action: () => mapActions.togglePredictionCones() },
         { label: 'ADS-B Aircraft', checkable: true, checked: () => isAdsbOverlayActive(), action: () => toggleAdsbOverlay() },
+        { label: 'Asset Coverage', checkable: true, checked: () => s().showAssetCoverage !== false, action: () => mapActions.toggleAssetCoverage?.() },
         { label: 'Terrain', shortcut: 'H', checkable: true, checked: () => s().showTerrain, action: () => mapActions.toggleTerrain() },
         { label: '3D Mode', checkable: true, checked: () => s().tiltMode === 'tilted', action: () => mapActions.toggleTilt() },
         { separator: true },
@@ -220,6 +221,8 @@ function _gameMenuItems(mapActions) {
                 const data = await res.json();
                 if (res.ok) {
                     EventBus.emit('toast:show', { message: 'Demo mode started', type: 'info' });
+                    // Also start city simulation for moving vehicles/pedestrians
+                    EventBus.emit('city-sim:toggle');
                 } else {
                     EventBus.emit('toast:show', { message: data.error || 'Failed to start demo', type: 'alert' });
                 }
@@ -232,6 +235,8 @@ function _gameMenuItems(mapActions) {
                 const res = await fetch('/api/demo/stop', { method: 'POST' });
                 if (res.ok) {
                     EventBus.emit('toast:show', { message: 'Demo mode stopped', type: 'info' });
+                    // Also stop city simulation
+                    EventBus.emit('city-sim:stopped');
                 }
             } catch (e) {
                 EventBus.emit('toast:show', { message: 'Demo stop failed', type: 'alert' });
@@ -289,7 +294,7 @@ function _helpMenuItems() {
             const overlay = document.getElementById('help-overlay');
             if (overlay) overlay.hidden = !overlay.hidden;
         }},
-        { type: 'separator' },
+        { separator: true },
         { label: 'Conductor Dashboard', action: () => {
             window.open(`${window.location.protocol}//${window.location.hostname}:9000`, '_blank');
         }},
@@ -307,7 +312,7 @@ function _helpMenuItems() {
                 });
             }
         }},
-        { type: 'separator' },
+        { separator: true },
         { label: 'About TRITIUM-SC', action: () => {
             EventBus.emit('toast:show', { message: 'TRITIUM-SC v0.1.0 -- Tactical Battlefield Management', type: 'info' });
         }},
@@ -343,7 +348,7 @@ export function createMenuBar(container, panelManager, layoutManager, mapActions
         { label: 'WINDOWS', tip: 'Show or hide panels (Amy, Units, Alerts, etc.)', getItems: () => _viewMenuItems(panelManager) },
         { label: 'LAYOUT', tip: 'Switch between saved workspace layouts', getItems: () => _layoutMenuItems(layoutManager) },
         { label: 'MAP',    tip: 'Map layers, camera, and display settings', getItems: () => _mapMenuItems(mapActions) },
-        { label: 'GAME',   tip: 'Start battles and manage game state', getItems: () => _gameMenuItems(mapActions) },
+        { label: 'SIM',    tip: 'Start demo, launch simulations, run battles', getItems: () => _gameMenuItems(mapActions) },
         { label: 'HELP',   tip: 'Keyboard shortcuts and about info', getItems: () => _helpMenuItems() },
     ];
 

@@ -13,7 +13,7 @@
 // UX Loop: Loop 1 (First Boot) — sensor overlay enrichment
 // API: GET /api/sdr/adsb -> { tracks: [...], count: N }
 
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
 
 // ============================================================
 // Constants

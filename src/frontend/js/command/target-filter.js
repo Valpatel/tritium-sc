@@ -10,7 +10,7 @@
 //   initTargetFilter(document.getElementById('tactical-area'));
 
 import { TritiumStore } from './store.js';
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
 
 // Current filter state
 const _filters = {

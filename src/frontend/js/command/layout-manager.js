@@ -12,7 +12,7 @@
 //   lm.apply('commander');
 //   lm.saveCurrent('my-layout');
 
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
 import { LayoutManager as BaseLayoutManager } from '/lib/layout-manager.js';
 
 const STORAGE_KEY = 'tritium-user-layouts';

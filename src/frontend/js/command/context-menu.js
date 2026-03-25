@@ -18,8 +18,9 @@
  *   ContextMenu.hide();
  */
 
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
 import { TritiumStore } from './store.js';
+import { assetTypeRegistry } from '/static/lib/map/asset-types/registry.js';
 
 // ============================================================
 // State
@@ -53,15 +54,30 @@ function getMenuItems(selectedUnitId) {
             icon: pinned ? '-' : '^',
         });
     } else {
+        // Edit mode: asset placement from registry (extensible by addons)
+        const editMode = window._mapActions?.isEditMode?.() || false;
+        if (editMode) {
+            for (const T of assetTypeRegistry.all()) {
+                items.push({
+                    label: `PLACE ${T.label.toUpperCase()}`,
+                    action: `place_asset_${T.typeId}`,
+                    icon: T.icon,
+                    style: 'edit',
+                });
+            }
+            items.push({ separator: true });
+        }
         items.push({ label: 'DROP MARKER',              action: 'marker',              icon: 'x' });
         items.push({ label: 'DRAW GEOFENCE HERE',       action: 'geofence_here',       icon: '#' });
-        items.push({ label: 'ADD CAMERA HERE',           action: 'camera_here',         icon: 'C' });
+        if (!editMode) {
+            items.push({ label: 'ADD CAMERA HERE',       action: 'camera_here',         icon: 'C' });
+            items.push({ label: 'PLACE SENSOR HERE',    action: 'place_sensor',        icon: '=' });
+        }
         items.push({ label: 'DISPATCH UNIT HERE',        action: 'dispatch_here',       icon: '>' });
-        items.push({ label: 'PLACE SENSOR HERE',        action: 'place_sensor',        icon: '=' });
         items.push({ label: 'ADD PATROL WAYPOINT HERE', action: 'patrol_waypoint',     icon: '>' });
         items.push({ label: 'MEASURE FROM HERE',        action: 'measure_start',       icon: '~' });
         items.push({ label: 'CREATE BOOKMARK HERE',     action: 'bookmark_here',       icon: '*' });
-        items.push({ label: 'SUGGEST TO AMY: INVESTIGATE', action: 'suggest_investigate', icon: '?' });
+        items.push({ label: 'SUGGEST TO COMMANDER: INVESTIGATE', action: 'suggest_investigate', icon: '?' });
     }
     items.push({ label: 'CANCEL', action: 'cancel', icon: '-' });
     return items;
@@ -131,6 +147,48 @@ function buildSuggestCommand(type, unitId, pos) {
  * @param {string|null} selectedUnitId
  */
 function handleAction(action, gamePos, selectedUnitId) {
+    // Asset placement from registry (before switch — handles dynamic type IDs)
+    if (action.startsWith('place_asset_') && gamePos) {
+        const typeId = action.replace('place_asset_', '');
+        const T = assetTypeRegistry.get(typeId);
+        if (T) {
+            const defaults = T.getDefaults();
+            const ll = window._lastContextLngLat;
+            const lat = ll ? ll.lat : 0;
+            const lng = ll ? ll.lng : 0;
+            const assetId = `${typeId}-${Date.now().toString(16)}`;
+            fetch('/api/assets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    asset_id: assetId,
+                    name: T.label,
+                    asset_type: defaults.asset_type,
+                    asset_class: defaults.asset_class,
+                    capabilities: defaults.capabilities,
+                    home_x: lat, home_y: lng,
+                    height_meters: defaults.height_meters,
+                    mounting_type: defaults.mounting_type,
+                    coverage_radius_meters: defaults.coverage_radius_meters,
+                    coverage_cone_angle: defaults.coverage_cone_angle,
+                    connection_url: defaults.connection_url,
+                }),
+            }).then(r => {
+                if (r.ok) {
+                    EventBus.emit('toast:show', { message: `${T.label} placed`, type: 'info' });
+                    EventBus.emit('asset:refresh', {});
+                    EventBus.emit('panel:request-open', { id: 'assets' });
+                    EventBus.emit('asset:select', { assetId });
+                } else {
+                    EventBus.emit('toast:show', { message: 'Placement failed', type: 'alert' });
+                }
+            }).catch(() => {
+                EventBus.emit('toast:show', { message: 'Placement failed: network error', type: 'alert' });
+            });
+        }
+        return;
+    }
+
     switch (action) {
         case 'dispatch':
             if (selectedUnitId) {
@@ -224,6 +282,8 @@ function handleAction(action, gamePos, selectedUnitId) {
             EventBus.emit('toast:show', { message: 'Sensor placement mode', type: 'info' });
             EventBus.emit('panel:request-open', { id: 'assets' });
             break;
+
+        // (asset placement handled before switch via registry)
 
         case 'patrol_waypoint':
             EventBus.emit('patrol:addWaypoint', {

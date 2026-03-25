@@ -174,7 +174,10 @@ function init() {
     });
 
     // Forward city-sim sensor bridge sightings to backend via WebSocket
-    EventBus.on('sim:sighting_batch', ({ sightings, detections }) => {
+    EventBus.on('sim:sighting_batch', (data) => {
+        if (!data) return;
+        const sightings = data.sightings || [];
+        const detections = data.detections || [];
         const batch = [...sightings, ...detections];
         if (batch.length > 0) {
             ws.send({ type: 'sim_sighting_batch', data: batch });

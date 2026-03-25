@@ -110,7 +110,10 @@ async def upload_screenshot_base64(request: Request):
     if store is None:
         return JSONResponse(status_code=500, content={"detail": "Screenshot store unavailable"})
 
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"detail": "Invalid JSON body"})
     png_b64 = body.get("png_base64", "")
     if not png_b64:
         return JSONResponse(status_code=400, content={"detail": "Missing png_base64"})

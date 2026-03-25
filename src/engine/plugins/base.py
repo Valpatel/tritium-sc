@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from engine.comms.event_bus import EventBus
-    from engine.tactical.target_tracker import TargetTracker
+    from tritium_lib.tracking.target_tracker import TargetTracker
     from engine.simulation.engine import SimulationEngine
     from engine.plugins.manager import PluginManager
 

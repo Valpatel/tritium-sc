@@ -36,8 +36,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from engine.comms.event_bus import EventBus
-    from engine.tactical.geofence import GeofenceEngine
-    from engine.tactical.target_tracker import TargetTracker
+    from tritium_lib.tracking.geofence import GeofenceEngine
+    from tritium_lib.tracking.target_tracker import TargetTracker
 
 logger = logging.getLogger("synthetic.fusion_scenario")
 
@@ -311,7 +311,7 @@ class FusionScenario:
 
         # Set up geofence zones if engine available
         if self._geofence is not None and not self._geofence_zone_added:
-            from engine.tactical.geofence import GeoZone
+            from tritium_lib.tracking.geofence import GeoZone
             zone = GeoZone(
                 zone_id="demo-restricted-01",
                 name="Restricted Area",

@@ -16,7 +16,7 @@
  * Exports: DeviceModalManager, DeviceControlRegistry, DeviceAPI
  */
 
-import { _esc } from './panel-utils.js';
+import { _esc } from '/lib/utils.js';
 
 // ============================================================
 // Device API -- sends commands to backend

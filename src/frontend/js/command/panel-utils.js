@@ -2,7 +2,9 @@
 // Copyright 2026 Valpatel Software LLC
 // Licensed under AGPL-3.0 — see LICENSE for details.
 // Panel Utilities -- shared helpers used across all panel modules.
-// Import: import { _esc, _timeAgo, _badge, _statusDot, _fetchJson } from '../panel-utils.js';
+// Canonical source: tritium-lib/web/utils.js
+// This file is kept for backward compatibility with test sandboxes that
+// load it via fs.readFileSync. New code should import from '/lib/utils.js'.
 
 /**
  * HTML-escape a string to prevent XSS when inserting into innerHTML.

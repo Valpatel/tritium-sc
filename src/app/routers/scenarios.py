@@ -342,7 +342,8 @@ async def run_stream(run_id: str):
                     result = run_data["result"]
                     yield f"data: {json.dumps({'type': 'finished', 'score': result.score.model_dump()})}\n\n"
                 else:
-                    yield f"data: {json.dumps({'type': 'finished', 'status': run_data['status'] if run_data else 'unknown'})}\n\n"
+                    final_status = run_data.get("status", "unknown") if run_data else "unknown"
+                    yield f"data: {json.dumps({'type': 'finished', 'status': final_status})}\n\n"
                 break
 
             # Get new actions from the live recorder

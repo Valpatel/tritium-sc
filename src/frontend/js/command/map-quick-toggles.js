@@ -12,7 +12,7 @@
  *   createMapQuickToggles(tacticalAreaEl);
  */
 
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
 
 /**
  * Layer toggle definitions.
