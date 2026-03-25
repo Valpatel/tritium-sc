@@ -12,7 +12,7 @@ from tritium_lib.store.dossiers import DossierStore
 
 from src.engine.comms.event_bus import EventBus
 from src.engine.tactical.dossier_manager import DossierManager
-from src.engine.tactical.target_tracker import TargetTracker, TrackedTarget
+from tritium_lib.tracking.target_tracker import TargetTracker, TrackedTarget
 
 
 def _make_store(tmp_path=None):

@@ -83,7 +83,7 @@ async def self_test(request: Request):
             if tracker is not None:
                 targets = tracker.get_all()
                 return {"target_count": len(targets)}
-        from engine.tactical.target_tracker import TargetTracker
+        from tritium_lib.tracking.target_tracker import TargetTracker
         return {"status": "importable", "note": "no live instance"}
 
     results.append(_check_subsystem("target_tracker", check_tracker))
@@ -186,7 +186,7 @@ async def self_test(request: Request):
     def check_imports():
         import engine.simulation
         import engine.comms.event_bus
-        import engine.tactical.target_tracker
+        import tritium_lib.tracking.target_tracker
         import app.config
         return {"all_imports": "ok"}
 

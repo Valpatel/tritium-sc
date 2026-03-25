@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from engine.comms.event_bus import EventBus
     from engine.comms.mqtt_bridge import MQTTBridge
-    from engine.tactical.target_tracker import TargetTracker, TrackedTarget
+    from tritium_lib.tracking.target_tracker import TargetTracker, TrackedTarget
 
 logger = logging.getLogger("amy.dispatch")
 

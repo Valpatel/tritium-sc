@@ -17,7 +17,7 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
-from engine.tactical.target_tracker import TargetTracker, TrackedTarget
+from tritium_lib.tracking.target_tracker import TargetTracker, TrackedTarget
 
 
 def _populate_tracker(tracker: TargetTracker, count: int) -> None:
@@ -121,7 +121,7 @@ class TestTargetCapacity:
             })
 
         try:
-            from engine.tactical.correlator import TargetCorrelator
+            from tritium_lib.tracking.correlator import TargetCorrelator
             from tritium_lib.tracking.dossier import DossierStore
 
             correlator = TargetCorrelator(

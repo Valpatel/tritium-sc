@@ -743,7 +743,7 @@ class TestTrackerBroadcast:
         """BLE targets added to the TargetTracker must be broadcast via
         WebSocket as part of a sim_telemetry_batch message."""
         from app.routers.ws import _start_tracker_broadcast, manager
-        from engine.tactical.target_tracker import TargetTracker
+        from tritium_lib.tracking.target_tracker import TargetTracker
 
         loop = asyncio.new_event_loop()
         tracker = TargetTracker()
@@ -799,7 +799,7 @@ class TestTrackerBroadcast:
         """Mesh radio targets (asset_type=mesh_radio) must be broadcast via
         WebSocket even though they enter the tracker via update_from_simulation."""
         from app.routers.ws import _start_tracker_broadcast, manager
-        from engine.tactical.target_tracker import TargetTracker
+        from tritium_lib.tracking.target_tracker import TargetTracker
 
         loop = asyncio.new_event_loop()
         tracker = TargetTracker()
@@ -854,7 +854,7 @@ class TestTrackerBroadcast:
         """When the tracker only has pure simulation targets, the tracker
         broadcast should not emit anything (sim engine handles those)."""
         from app.routers.ws import _start_tracker_broadcast, manager
-        from engine.tactical.target_tracker import TargetTracker
+        from tritium_lib.tracking.target_tracker import TargetTracker
 
         loop = asyncio.new_event_loop()
         tracker = TargetTracker()

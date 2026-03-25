@@ -17,7 +17,7 @@ from src.engine.tactical.correlation_strategies import (
 )
 from tritium_lib.tracking.dossier import DossierStore
 from src.engine.tactical.target_history import TargetHistory
-from src.engine.tactical.target_tracker import TrackedTarget
+from tritium_lib.tracking.target_tracker import TrackedTarget
 
 
 def _make_target(

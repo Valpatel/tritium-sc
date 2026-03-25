@@ -503,7 +503,7 @@ class SDRPlugin(PluginInterface):
         if self._tracker is None:
             return
         try:
-            from engine.tactical.target_tracker import TrackedTarget
+            from tritium_lib.tracking.target_tracker import TrackedTarget
 
             with self._tracker._lock:
                 if device_id in self._tracker._targets:
@@ -539,7 +539,7 @@ class SDRPlugin(PluginInterface):
         if self._tracker is None:
             return
         try:
-            from engine.tactical.target_tracker import TrackedTarget
+            from tritium_lib.tracking.target_tracker import TrackedTarget
 
             label = flight if flight else icao
             with self._tracker._lock:

@@ -6,7 +6,7 @@
 import time
 import pytest
 
-from engine.tactical.target_tracker import TargetTracker
+from tritium_lib.tracking.target_tracker import TargetTracker
 
 
 @pytest.mark.unit

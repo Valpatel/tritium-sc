@@ -223,7 +223,7 @@ class TestTargetTrackerHistoryIntegration:
     """Verify TargetTracker wires history recording correctly."""
 
     def test_simulation_update_records_history(self):
-        from engine.tactical.target_tracker import TargetTracker
+        from tritium_lib.tracking.target_tracker import TargetTracker
         tracker = TargetTracker()
         tracker.update_from_simulation({
             "target_id": "rover-01",
@@ -245,7 +245,7 @@ class TestTargetTrackerHistoryIntegration:
         assert trail[1][:2] == (3.0, 4.0)
 
     def test_detection_update_records_history(self):
-        from engine.tactical.target_tracker import TargetTracker
+        from tritium_lib.tracking.target_tracker import TargetTracker
         tracker = TargetTracker()
         tracker.update_from_detection({
             "class_name": "person",
@@ -262,7 +262,7 @@ class TestTargetTrackerHistoryIntegration:
         assert trail[0][:2] == (5.0, 6.0)
 
     def test_ble_update_records_history_with_position(self):
-        from engine.tactical.target_tracker import TargetTracker
+        from tritium_lib.tracking.target_tracker import TargetTracker
         tracker = TargetTracker()
         tracker.update_from_ble({
             "mac": "AA:BB:CC:DD:EE:FF",
@@ -274,7 +274,7 @@ class TestTargetTrackerHistoryIntegration:
         assert trail[0][:2] == (10.0, 20.0)
 
     def test_ble_update_no_position_skips_recording(self):
-        from engine.tactical.target_tracker import TargetTracker
+        from tritium_lib.tracking.target_tracker import TargetTracker
         tracker = TargetTracker()
         tracker.update_from_ble({
             "mac": "AA:BB:CC:DD:EE:FF",
@@ -284,7 +284,7 @@ class TestTargetTrackerHistoryIntegration:
         assert len(trail) == 0
 
     def test_to_dict_includes_trail(self):
-        from engine.tactical.target_tracker import TargetTracker
+        from tritium_lib.tracking.target_tracker import TargetTracker
         tracker = TargetTracker()
         tracker.update_from_simulation({
             "target_id": "rover-01",
@@ -300,7 +300,7 @@ class TestTargetTrackerHistoryIntegration:
         assert d["trail"][0]["x"] == 1.0
 
     def test_to_dict_without_history_no_trail_key(self):
-        from engine.tactical.target_tracker import TargetTracker
+        from tritium_lib.tracking.target_tracker import TargetTracker
         tracker = TargetTracker()
         tracker.update_from_simulation({
             "target_id": "rover-01",
@@ -314,7 +314,7 @@ class TestTargetTrackerHistoryIntegration:
         assert "trail" not in d
 
     def test_stale_prune_clears_history(self):
-        from engine.tactical.target_tracker import TargetTracker
+        from tritium_lib.tracking.target_tracker import TargetTracker
         tracker = TargetTracker()
         tracker.STALE_TIMEOUT = 0.05
         tracker.update_from_detection({

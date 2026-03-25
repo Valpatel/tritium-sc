@@ -26,14 +26,14 @@ import time
 import pytest
 
 from src.engine.comms.event_bus import EventBus
-from src.engine.tactical.ble_classifier import BLEClassifier
-from src.engine.tactical.correlator import TargetCorrelator
+from tritium_lib.tracking.ble_classifier import BLEClassifier
+from tritium_lib.tracking.correlator import TargetCorrelator
 from tritium_lib.tracking.dossier import DossierStore
 from src.engine.tactical.dossier_manager import DossierManager
 from src.engine.tactical.enrichment import EnrichmentPipeline
 from src.engine.tactical.escalation import ThreatClassifier
-from src.engine.tactical.geofence import GeofenceEngine, GeoZone
-from src.engine.tactical.target_tracker import TargetTracker
+from tritium_lib.tracking.geofence import GeofenceEngine, GeoZone
+from tritium_lib.tracking.target_tracker import TargetTracker
 
 pytestmark = pytest.mark.integration
 

@@ -16,7 +16,7 @@ import pytest
 from engine.comms.event_bus import EventBus
 from engine.comms.cot import target_to_cot_xml, cot_xml_to_target, make_sa_cot
 from engine.comms.tak_bridge import TAKBridge
-from engine.tactical.target_tracker import TargetTracker
+from tritium_lib.tracking.target_tracker import TargetTracker
 
 
 @pytest.fixture

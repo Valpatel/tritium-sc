@@ -799,7 +799,7 @@ class SDRMonitorPlugin(PluginInterface):
             return
 
         try:
-            from engine.tactical.target_tracker import TrackedTarget
+            from tritium_lib.tracking.target_tracker import TrackedTarget
 
             with self._tracker._lock:
                 if dev.device_id in self._tracker._targets:
@@ -830,7 +830,7 @@ class SDRMonitorPlugin(PluginInterface):
             return
 
         try:
-            from engine.tactical.target_tracker import TrackedTarget
+            from tritium_lib.tracking.target_tracker import TrackedTarget
 
             target_id = f"adsb_{track.icao_hex}"
             label = track.callsign if track.callsign else track.icao_hex

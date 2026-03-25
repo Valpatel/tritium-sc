@@ -6,7 +6,7 @@
 import time
 import pytest
 
-from engine.tactical.target_tracker import (
+from tritium_lib.tracking.target_tracker import (
     TargetTracker,
     TrackedTarget,
     _MULTI_SOURCE_BOOST,

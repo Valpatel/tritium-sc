@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
-from engine.tactical.target_tracker import TargetTracker, TrackedTarget
+from tritium_lib.tracking.target_tracker import TargetTracker, TrackedTarget
 
 pytestmark = pytest.mark.unit
 

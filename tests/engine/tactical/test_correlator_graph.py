@@ -17,7 +17,7 @@ from tritium_lib.tracking.correlator import (
     _node_type_for,
 )
 from tritium_lib.tracking.dossier import DossierStore
-from src.engine.tactical.target_tracker import TargetTracker, TrackedTarget
+from tritium_lib.tracking.target_tracker import TargetTracker, TrackedTarget
 
 
 def _make_tracker_with(*targets: TrackedTarget) -> TargetTracker:

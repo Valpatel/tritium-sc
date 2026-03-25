@@ -1,0 +1,37 @@
+# City Simulation Addon Manifest
+# Declares how this addon integrates with the Command Center UI and API.
+
+[addon]
+id = "city_sim"
+name = "City Simulation"
+version = "1.0.0"
+description = "OSM-based city simulation with NPC daily routines, vehicle traffic, protest engine, and event director"
+author = "Matthew Valancy"
+license = "AGPL-3.0"
+
+[addon.capabilities]
+routes = true
+ui = true
+data_source = true
+
+# Backend plugin class
+[backend]
+plugin_class = "city_sim.plugin:CitySimPlugin"
+
+# Frontend panel tabs — contribute to the Simulation container
+[[frontend.tabs]]
+container = "simulation-container"
+id = "city-sim-tab"
+title = "CITY SIM"
+file = "panels/city-sim.js"
+export = "CitySimPanelDef"
+
+# API routes
+[[api.routes]]
+prefix = "/api/city-sim"
+tags = ["city-sim"]
+
+# ES modules (loaded by the frontend sim system, not as panel tabs)
+[frontend.modules]
+sim_dir = "js/command/sim/"
+module_count = 25

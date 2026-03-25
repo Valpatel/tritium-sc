@@ -557,7 +557,7 @@ class AcousticPlugin(PluginInterface):
             )
 
         try:
-            from engine.tactical.target_tracker import TrackedTarget
+            from tritium_lib.tracking.target_tracker import TrackedTarget
 
             severity = "low"
             try:
@@ -647,7 +647,7 @@ class AcousticPlugin(PluginInterface):
             self._stats["targets_created"] += 1
 
         try:
-            from engine.tactical.target_tracker import TrackedTarget
+            from tritium_lib.tracking.target_tracker import TrackedTarget
 
             with self._tracker._lock:
                 if target_id in self._tracker._targets:

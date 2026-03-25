@@ -35,12 +35,12 @@ from engine.simulation.battle_integration import (
 )
 from engine.simulation.engine import SimulationEngine
 from tritium_lib.sim_engine.core.entity import SimulationTarget
-from engine.tactical.ble_classifier import BLEClassifier
-from engine.tactical.correlator import TargetCorrelator
+from tritium_lib.tracking.ble_classifier import BLEClassifier
+from tritium_lib.tracking.correlator import TargetCorrelator
 from tritium_lib.tracking.dossier import DossierStore
-from engine.tactical.geofence import GeofenceEngine, GeoZone
+from tritium_lib.tracking.geofence import GeofenceEngine, GeoZone
 from engine.tactical.investigation import InvestigationEngine
-from engine.tactical.target_tracker import TargetTracker
+from tritium_lib.tracking.target_tracker import TargetTracker
 
 
 # ---------------------------------------------------------------------------

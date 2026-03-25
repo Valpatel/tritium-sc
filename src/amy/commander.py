@@ -1034,7 +1034,7 @@ class Commander:
         self._mode: str = "sim"
 
         # Target tracker (unified real + virtual)
-        from engine.tactical.target_tracker import TargetTracker
+        from tritium_lib.tracking.target_tracker import TargetTracker
         self.target_tracker = TargetTracker()
 
         # Amy config from loaded layouts

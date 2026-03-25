@@ -19,7 +19,7 @@ from engine.comms.event_bus import EventBus
 from engine.tactical.escalation import AutoDispatcher, ThreatClassifier
 from engine.simulation.engine import SimulationEngine
 from tritium_lib.sim_engine.core.entity import SimulationTarget
-from engine.tactical.target_tracker import TargetTracker, TrackedTarget
+from tritium_lib.tracking.target_tracker import TargetTracker, TrackedTarget
 
 
 # ---------------------------------------------------------------------------

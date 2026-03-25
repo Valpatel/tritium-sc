@@ -320,7 +320,7 @@ class LPRPlugin(PluginInterface):
         target_id = f"lpr_{plate.replace(' ', '_').replace('-', '_')}"
 
         try:
-            from engine.tactical.target_tracker import TrackedTarget
+            from tritium_lib.tracking.target_tracker import TrackedTarget
 
             alliance = "unknown"
             if detection.get("watchlist_match"):

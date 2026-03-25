@@ -407,7 +407,7 @@ class RadarTracker:
             return
 
         try:
-            from engine.tactical.target_tracker import TrackedTarget
+            from tritium_lib.tracking.target_tracker import TrackedTarget
             from engine.tactical.geo import latlng_to_local
 
             # Convert lat/lng to local coordinates for the tracker

@@ -107,7 +107,7 @@ class TestThreatClassifierTAKHostile:
 
     def test_tak_hostile_in_tracker_classified(self, event_bus):
         """A TAK hostile target in a zone should be classified by ThreatClassifier."""
-        from engine.tactical.target_tracker import TargetTracker
+        from tritium_lib.tracking.target_tracker import TargetTracker
 
         tracker = TargetTracker()
 

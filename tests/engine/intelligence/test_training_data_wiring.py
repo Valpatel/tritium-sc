@@ -28,7 +28,7 @@ def temp_store():
 
 def _make_tracker_with(*targets):
     """Create a TargetTracker pre-loaded with given targets."""
-    from engine.tactical.target_tracker import TargetTracker
+    from tritium_lib.tracking.target_tracker import TargetTracker
     tracker = TargetTracker()
     with tracker._lock:
         for t in targets:
@@ -42,7 +42,7 @@ class TestCorrelatorTrainingWiring:
     @pytest.mark.unit
     def test_correlator_logs_positive_correlation(self, temp_store):
         """Correlator should log merge decisions to training store."""
-        from engine.tactical.target_tracker import TrackedTarget
+        from tritium_lib.tracking.target_tracker import TrackedTarget
         from tritium_lib.tracking.correlator import TargetCorrelator
 
         now = time.monotonic()
@@ -91,7 +91,7 @@ class TestCorrelatorTrainingWiring:
     @pytest.mark.unit
     def test_correlator_logs_negative_decision(self, temp_store):
         """Correlator should log unrelated decisions too."""
-        from engine.tactical.target_tracker import TrackedTarget
+        from tritium_lib.tracking.target_tracker import TrackedTarget
         from tritium_lib.tracking.correlator import TargetCorrelator
 
         now = time.monotonic()

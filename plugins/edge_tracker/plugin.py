@@ -49,7 +49,7 @@ try:
 except ImportError:  # pragma: no cover
     get_geofence_engine = None  # type: ignore[assignment]
 
-from engine.tactical.ble_classifier import BLEClassifier
+from tritium_lib.tracking.ble_classifier import BLEClassifier
 from engine.tactical.sensor_health_monitor import SensorHealthMonitor
 from engine.tactical.target_handoff import HandoffTracker, HandoffEvent
 from tritium_lib.tracking.trilateration import TrilaterationEngine

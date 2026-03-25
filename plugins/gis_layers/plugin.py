@@ -22,6 +22,7 @@ from .providers import (
     LayerProvider,
     OSMTileProvider,
     SatelliteProvider,
+    SegmentedTerrainProvider,
     TerrainProvider,
 )
 
@@ -75,6 +76,7 @@ class GISLayersPlugin(PluginInterface):
         self.register_provider(SatelliteProvider())
         self.register_provider(BuildingFootprintProvider())
         self.register_provider(TerrainProvider())
+        self.register_provider(SegmentedTerrainProvider())
 
         self._register_routes()
         self._logger.info(

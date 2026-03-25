@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
-from engine.tactical.target_tracker import TargetTracker, TrackedTarget
+from tritium_lib.tracking.target_tracker import TargetTracker, TrackedTarget
 
 pytestmark = pytest.mark.unit
 
@@ -198,7 +198,7 @@ class TestUpdateFromMesh:
 
     def test_mesh_half_life_in_decay_table(self):
         """The mesh half-life is defined in the confidence decay table."""
-        from engine.tactical.target_tracker import _HALF_LIVES
+        from tritium_lib.tracking.target_tracker import _HALF_LIVES
         assert "mesh" in _HALF_LIVES
         assert _HALF_LIVES["mesh"] == 120.0
 

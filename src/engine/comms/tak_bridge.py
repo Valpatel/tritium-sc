@@ -50,7 +50,7 @@ from .cot import (
 
 if TYPE_CHECKING:
     from engine.comms.event_bus import EventBus
-    from engine.tactical.target_tracker import TargetTracker
+    from tritium_lib.tracking.target_tracker import TargetTracker
 
 logger = logging.getLogger("amy.tak")
 

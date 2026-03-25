@@ -461,7 +461,7 @@ class TestTargetTrackerIntegration:
     """Tests for TargetTracker.update_from_rf_motion()."""
 
     def test_update_from_rf_motion_creates_target(self):
-        from engine.tactical.target_tracker import TargetTracker
+        from tritium_lib.tracking.target_tracker import TargetTracker
         tracker = TargetTracker()
         tracker.update_from_rf_motion({
             "target_id": "rfm_a_b",
@@ -480,7 +480,7 @@ class TestTargetTrackerIntegration:
         assert "approaching" in target.status
 
     def test_update_from_rf_motion_updates_existing(self):
-        from engine.tactical.target_tracker import TargetTracker
+        from tritium_lib.tracking.target_tracker import TargetTracker
         tracker = TargetTracker()
         tracker.update_from_rf_motion({
             "target_id": "rfm_a_b",
@@ -503,7 +503,7 @@ class TestTargetTrackerIntegration:
 
     def test_rf_motion_target_pruned_when_stale(self):
         import time as _time
-        from engine.tactical.target_tracker import TargetTracker
+        from tritium_lib.tracking.target_tracker import TargetTracker
         tracker = TargetTracker()
         tracker.update_from_rf_motion({
             "target_id": "rfm_stale",
@@ -521,7 +521,7 @@ class TestTargetTrackerIntegration:
 
     def test_update_from_rf_motion_dict_position(self):
         """Position can be passed as a dict with x/y keys."""
-        from engine.tactical.target_tracker import TargetTracker
+        from tritium_lib.tracking.target_tracker import TargetTracker
         tracker = TargetTracker()
         tracker.update_from_rf_motion({
             "target_id": "rfm_dict",

@@ -213,7 +213,7 @@ class TestTrackedTargetGeoIntegration:
     def test_to_dict_includes_latlng(self):
         init_reference(TEST_LAT, TEST_LNG)
 
-        from engine.tactical.target_tracker import TrackedTarget
+        from tritium_lib.tracking.target_tracker import TrackedTarget
         target = TrackedTarget(
             target_id="track-1",
             name="Tracked Rover",

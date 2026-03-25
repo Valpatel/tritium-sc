@@ -223,7 +223,7 @@ class RFMotionPlugin(PluginInterface):
             return
 
         try:
-            from engine.tactical.target_tracker import TrackedTarget
+            from tritium_lib.tracking.target_tracker import TrackedTarget
             import time as _time
 
             with self._tracker._lock:

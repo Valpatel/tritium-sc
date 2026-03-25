@@ -65,7 +65,7 @@ if TYPE_CHECKING:
     from tritium_lib.tracking.dossier import DossierStore
     from tritium_lib.tracking.geofence import GeofenceEngine
     from engine.tactical.investigation import InvestigationEngine
-    from engine.tactical.target_tracker import TargetTracker
+    from tritium_lib.tracking.target_tracker import TargetTracker
 
 logger = logging.getLogger("engine.battle_integration")
 

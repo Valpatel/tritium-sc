@@ -16,8 +16,8 @@ from engine.synthetic.fusion_scenario import (
     _enrich_oui,
     _interpolate_path,
 )
-from engine.tactical.geofence import GeofenceEngine
-from engine.tactical.target_tracker import TargetTracker
+from tritium_lib.tracking.geofence import GeofenceEngine
+from tritium_lib.tracking.target_tracker import TargetTracker
 
 pytestmark = pytest.mark.unit
 

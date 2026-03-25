@@ -175,9 +175,8 @@ class SatelliteProvider(LayerProvider):
 class BuildingFootprintProvider(LayerProvider):
     """Building footprint polygons as GeoJSON.
 
-    Returns stub/mock building polygons within the requested bounding box
-    for development and testing. In production this would query an
-    Overpass API or a local PostGIS database.
+    Queries the Overpass API for real building data when available,
+    falls back to deterministic stub data for development/testing.
     """
 
     @property
@@ -190,17 +189,82 @@ class BuildingFootprintProvider(LayerProvider):
 
     @property
     def attribution(self) -> str:
-        return "OpenStreetMap (stub data)"
+        return "OpenStreetMap"
 
     @property
     def description(self) -> str:
-        return "Building footprint polygons for the visible area"
+        return "Building footprint polygons with heights and types"
 
     def query(self, bounds: BBox) -> dict[str, Any]:
+        """Fetch real building footprints from Overpass, fallback to stubs."""
+        # Try real OSM data first
+        try:
+            return self._query_osm(bounds)
+        except Exception:
+            pass
+        return self._query_stub(bounds)
+
+    def _query_osm(self, bounds: BBox) -> dict[str, Any]:
+        """Fetch building polygons from Overpass API with full geometry."""
+        import requests
+
+        bbox = f"{bounds.south},{bounds.west},{bounds.north},{bounds.east}"
+        query = f'[out:json][timeout:30];way["building"]({bbox});out geom;'
+
+        resp = requests.post(
+            "https://overpass-api.de/api/interpreter",
+            data={"data": query},
+            headers={"User-Agent": "Tritium/1.0"},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        elements = resp.json().get("elements", [])
+
+        features: list[dict[str, Any]] = []
+        for el in elements:
+            if el.get("type") != "way":
+                continue
+            geometry = el.get("geometry", [])
+            if len(geometry) < 3:
+                continue
+
+            tags = el.get("tags", {})
+            coords = [[[pt["lon"], pt["lat"]] for pt in geometry]]
+
+            # Height estimation from tags
+            height = 8.0
+            height_str = tags.get("height")
+            if height_str:
+                try:
+                    height = float(height_str.replace("m", "").strip())
+                except (ValueError, TypeError):
+                    pass
+            elif tags.get("building:levels"):
+                try:
+                    height = float(tags["building:levels"]) * 3.0 + 1.0
+                except (ValueError, TypeError):
+                    pass
+
+            features.append({
+                "type": "Feature",
+                "geometry": {"type": "Polygon", "coordinates": coords},
+                "properties": {
+                    "id": f"osm-{el['id']}",
+                    "height": round(height, 1),
+                    "levels": max(1, int(height / 3)),
+                    "building_type": tags.get("building", "yes"),
+                    "name": tags.get("name", ""),
+                    "source": "osm",
+                },
+            })
+
+        return {"type": "FeatureCollection", "features": features}
+
+    @staticmethod
+    def _query_stub(bounds: BBox) -> dict[str, Any]:
         """Generate deterministic mock building footprints within bounds."""
         features: list[dict[str, Any]] = []
 
-        # Seed from bounds center for deterministic output
         cx = (bounds.west + bounds.east) / 2.0
         cy = (bounds.south + bounds.north) / 2.0
         rng = random.Random(int(cx * 1000) ^ int(cy * 1000))
@@ -208,14 +272,24 @@ class BuildingFootprintProvider(LayerProvider):
         dx = bounds.east - bounds.west
         dy = bounds.north - bounds.south
 
-        # Generate 5-15 buildings
+        btypes = ["residential", "apartments", "commercial", "office",
+                   "industrial", "retail", "house", "garage"]
+
         count = rng.randint(5, 15)
         for i in range(count):
             lon = bounds.west + rng.random() * dx
             lat = bounds.south + rng.random() * dy
             w = rng.uniform(0.0002, 0.0008)
             h = rng.uniform(0.0002, 0.0008)
-            height = rng.uniform(3.0, 25.0)
+            btype = btypes[rng.randint(0, len(btypes) - 1)]
+            # Height varies by type
+            type_heights = {
+                "residential": 8.0, "apartments": 15.0, "commercial": 12.0,
+                "office": 18.0, "industrial": 8.0, "retail": 5.0,
+                "house": 7.0, "garage": 3.0,
+            }
+            base_h = type_heights.get(btype, 8.0)
+            height = base_h + rng.uniform(-2.0, 4.0)
 
             coords = [[
                 [lon, lat],
@@ -229,9 +303,10 @@ class BuildingFootprintProvider(LayerProvider):
                 "type": "Feature",
                 "geometry": {"type": "Polygon", "coordinates": coords},
                 "properties": {
-                    "id": f"bldg-{i}",
-                    "height": round(height, 1),
+                    "id": f"stub-{i}",
+                    "height": round(max(3.0, height), 1),
                     "levels": max(1, int(height / 3)),
+                    "building_type": btype,
                     "source": "stub",
                 },
             })

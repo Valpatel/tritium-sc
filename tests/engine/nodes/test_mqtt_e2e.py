@@ -23,7 +23,7 @@ import pytest
 
 from engine.comms.event_bus import EventBus
 from engine.comms.mqtt_bridge import MQTTBridge
-from engine.tactical.target_tracker import TargetTracker
+from tritium_lib.tracking.target_tracker import TargetTracker
 
 
 # ---------------------------------------------------------------------------
