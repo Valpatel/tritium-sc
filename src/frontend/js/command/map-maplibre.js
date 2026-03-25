@@ -20,12 +20,20 @@
  */
 
 import { TritiumStore } from './store.js';
-import { EventBus } from './events.js';
+import { EventBus } from '/lib/events.js';
 import { drawMinimapContent } from './panels/minimap.js';
 import { DeviceModalManager } from './device-modal.js';
 import { FrontendVisionSystem } from './vision-system.js';
 import { ContextMenu } from './context-menu.js';
-import { _esc } from './panel-utils.js';
+import { _esc } from '/lib/utils.js';
+import { CitySimManager } from './sim/city-sim-manager.js';
+
+// tritium-lib shared map components
+import { MapCoords, buildFovConePolygon as libBuildFovCone } from '/static/lib/map/coords.js';
+import { assetTypeRegistry } from '/static/lib/map/asset-types/registry.js';
+
+// Shared coordinate system instance
+const _coords = new MapCoords();
 
 // ============================================================
 // Constants
@@ -105,6 +113,11 @@ const _state = {
     showTerrain: false,        // 3D terrain mesh (DEM)
     terrainExaggeration: 1.5,  // vertical exaggeration factor
     showGeoLayers: false,      // GIS data overlays (off by default — too noisy)
+    showCitySim: false,        // city simulation (vehicles, pedestrians)
+    showWifiPresence: false,   // WiFi CSI human presence heatmap
+
+    // City simulation
+    citySim: new CitySimManager(),
 
     // Layer visibility — tactical
     showGrid: false,
@@ -126,16 +139,16 @@ const _state = {
     showExplosions: true,      // Three.js + DOM elimination effects
     showParticles: true,       // Three.js debris/sparks
     showHitFlashes: true,      // Three.js + DOM impact flashes
-    showFloatingText: true,    // DOM damage numbers, ELIMINATED text
+    showFloatingText: false,   // DOM damage numbers, ELIMINATED text (off by default — enable during battles)
 
     // Layer visibility — unit decorations
     showHealthBars: true,      // DOM health bars + damage glow on units
     showSelectionFx: true,     // selection highlight glow + hostile pulse animation
 
     // Layer visibility — overlays
-    showKillFeed: true,        // top-right combat log
-    showScreenFx: true,        // screen shake + flash overlay
-    showBanners: true,         // wave/game state announcements
+    showKillFeed: false,       // top-right combat log (enable during battles)
+    showScreenFx: false,       // screen shake + flash overlay (enable during battles)
+    showBanners: false,        // wave/game state announcements (enable during battles)
     showLayerHud: false,       // top-center status bar (hidden by default — overlaps tactical banner)
     showThoughts: true,        // NPC thought bubbles above markers
     showWeaponRange: false,    // weapon range circle — off by default (visual clutter)
@@ -159,6 +172,7 @@ const _state = {
 
     tiltMode: 'tilted',        // 'tilted' or 'top-down'
     currentMode: 'observe',    // 'observe', 'tactical', or 'setup'
+    editMode: false,           // asset edit mode — place, move, configure sensors/cameras
 
     // Unit tracking
     unitMarkers: {},            // id -> maplibregl.Marker
@@ -328,6 +342,7 @@ async function _fetchGeoReference() {
             const data = await resp.json();
             if (data.initialized) {
                 _state.geoCenter = { lat: data.lat, lng: data.lng };
+                _coords.setReference(data.lat, data.lng);
                 console.log(`[MAP-ML] Geo reference: ${data.lat.toFixed(6)}, ${data.lng.toFixed(6)}`);
                 return;
             }
@@ -337,6 +352,7 @@ async function _fetchGeoReference() {
     }
     // Default: Dublin, CA
     _state.geoCenter = { lat: 37.7159, lng: -121.8960 };
+    _coords.setReference(37.7159, -121.8960);
 }
 
 // ---------------------------------------------------------------------------
@@ -501,6 +517,152 @@ function _createMap(mapDiv) {
         EventBus.on('unit:dispatch', _onUnitDispatch);
         EventBus.on('unit:dispatch-mode', _onDispatchModeEnter);
         EventBus.on('minimap:pan', _onMinimapPan);
+        // City sim events from panel
+        EventBus.on('city-sim:toggle', () => toggleCitySim());
+        EventBus.on('city-sim:add-vehicles', (count) => {
+            if (_state.citySim?.loaded && _state.threeScene) {
+                _state.citySim.initRendering(THREE, _state.threeScene);
+                _state.citySim.spawnVehicles(count || 10);
+                _ensureRepaintLoop();
+            }
+        });
+        EventBus.on('city-sim:add-peds', (count) => {
+            if (_state.citySim?.loaded) {
+                _state.citySim.spawnPedestrians(count || 10);
+            }
+        });
+        EventBus.on('city-sim:demo-city', async () => {
+            // Generate procedural city — no OSM/internet needed
+            const { generateProceduralCity } = await import('/lib/sim/procedural-city.js');
+            const cityData = generateProceduralCity({ radius: 300, seed: Date.now() % 10000 });
+            _state.citySim.cityData = cityData;
+            const { RoadNetwork } = await import('/lib/sim/road-network.js');
+            _state.citySim.roadNetwork = new RoadNetwork();
+            _state.citySim.roadNetwork.buildFromOSM(cityData.roads);
+            const { TrafficControllerManager } = await import('/lib/sim/traffic-controller.js');
+            _state.citySim.trafficMgr = new TrafficControllerManager();
+            _state.citySim.trafficMgr.initFromNetwork(_state.citySim.roadNetwork);
+            _state.citySim.loaded = true;
+            // Ensure Three.js layer exists for rendering
+            if (!_state.threeScene && typeof THREE !== 'undefined' && _state.map) {
+                _addThreeJsLayer(true);
+                await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+            }
+            if (_state.threeScene) {
+                _state.citySim.initRendering(THREE, _state.threeScene);
+            }
+            _state.citySim.spawnVehicles(80);
+            _state.citySim.spawnPedestrians(30);
+            _state.showCitySim = true;
+            _ensureRepaintLoop();
+            console.log('[MAP-ML] Procedural demo city loaded');
+        });
+        EventBus.on('city-sim:load-scenario', async (scenarioId) => {
+            const { getScenarioById, loadScenario } = await import('./sim/scenario-loader.js');
+            const scenario = getScenarioById(scenarioId);
+            if (scenario && _state.citySim) {
+                if (!_state.citySim.loaded && _state.geoCenter) {
+                    await _state.citySim.loadCityData(_state.geoCenter.lat, _state.geoCenter.lng, 400);
+                }
+                if (_state.citySim.loaded) {
+                    // Ensure Three.js layer exists for rendering
+                    if (!_state.threeScene && typeof THREE !== 'undefined' && _state.map) {
+                        _addThreeJsLayer(true);
+                        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+                    }
+                    if (_state.threeScene) {
+                        _state.citySim.initRendering(THREE, _state.threeScene);
+                    }
+                    loadScenario(_state.citySim, scenario);
+                    _state.showCitySim = true;
+                    _ensureRepaintLoop();
+                    console.log(`[MAP-ML] Loaded scenario: ${scenario.name}`);
+                }
+            }
+        });
+        // Protest lifecycle events → Commander alerts (Amy or any commander plugin)
+        EventBus.on('city-sim:protest-phase', (data) => {
+            const narratives = {
+                CALL_TO_ACTION: `Unrest detected. Social media chatter indicates a gathering is being organized. ${data.activeCount} individuals mobilizing.`,
+                MARCHING: `Crowd movement detected. Protesters marching toward central area. Monitoring ${data.activeCount} active participants.`,
+                ASSEMBLED: `Crowd assembled. ${data.activeCount} protesters gathered. Tension level: ${(data.tensionLevel * 100).toFixed(0)}%.`,
+                TENSION: `ALERT: Tension escalating. ${data.activeCount} active protesters, crowd tightening. Police response recommended.`,
+                FIRST_INCIDENT: `INCIDENT: First violent act reported. Crowd volatility spiking. Recommending escalated response.`,
+                RIOT: `CRITICAL: Full riot in progress. ${data.activeCount} active rioters. ${data.arrestedCount} arrested. All available units respond.`,
+                DISPERSAL: `Crowd dispersing. Police advancing. ${data.arrestedCount} arrested. Maintaining perimeter.`,
+                AFTERMATH: `Situation stabilizing. ${data.arrestedCount} in custody. Area being secured. Monitoring for regrouping.`,
+            };
+            const narrative = narratives[data.phase] || `Protest phase: ${data.phase}`;
+            const level = ['RIOT', 'FIRST_INCIDENT'].includes(data.phase) ? 'critical' :
+                       ['TENSION', 'DISPERSAL'].includes(data.phase) ? 'warning' : 'info';
+            EventBus.emit('alert:new', {
+                id: `protest_${data.phase}_${Date.now()}`,
+                type: 'city_sim_protest',
+                level,
+                title: `Protest: ${data.phase.replace(/_/g, ' ')}`,
+                message: narrative,
+                source: 'city_sim',
+                timestamp: Date.now(),
+            });
+            // Also show as toast for immediate visibility
+            EventBus.emit('toast:show', {
+                message: narrative,
+                type: level === 'critical' ? 'error' : level,
+                duration: level === 'critical' ? 8000 : 5000,
+            });
+        });
+
+        EventBus.on('city-sim:police-dispatched', (data) => {
+            EventBus.emit('alert:new', {
+                id: `police_dispatch_${Date.now()}`,
+                type: 'city_sim_police',
+                level: 'info',
+                title: 'Police Dispatched',
+                message: `${data.count} officers dispatched to protest area. Total response: ${data.total} officers.`,
+                source: 'city_sim',
+                timestamp: Date.now(),
+            });
+        });
+
+        // Auto-center on protest when it starts
+        EventBus.on('city-sim:protest-started', (data) => {
+            EventBus.emit('toast:show', {
+                message: `PROTEST: ${data.participants} NPCs converging on plaza. Watch for red dots.`,
+                type: 'warning',
+                duration: 6000,
+            });
+            if (data.plazaCenter && _state.map && _state.geoCenter) {
+                const R = 6378137;
+                const latRad = _state.geoCenter.lat * Math.PI / 180;
+                const mPerDegLng = 111320 * Math.cos(latRad);
+                const mPerDegLat = 111320;
+                const lng = _state.geoCenter.lng + data.plazaCenter.x / mPerDegLng;
+                const lat = _state.geoCenter.lat + data.plazaCenter.z / mPerDegLat;
+                _state.map.flyTo({ center: [lng, lat], zoom: 17, pitch: 0, duration: 2000 });
+            }
+        });
+
+        // Protest event trigger
+        // WiFi CSI presence detection events
+        EventBus.on('wifi-csi:detections', (detections) => {
+            if (_state.showWifiPresence && Array.isArray(detections)) {
+                _updateWifiPresence(detections);
+            }
+        });
+        EventBus.on('wifi-csi:toggle', () => toggleWifiPresence());
+
+        EventBus.on('city-sim:start-protest', (config) => {
+            if (_state.citySim?.loaded) {
+                // Default plaza: center of city or config override
+                const plazaCenter = config?.plazaCenter || { x: 0, z: 0 };
+                const participantCount = config?.participantCount || 40;
+                _state.citySim.protestManager.start(_state.citySim.pedestrians, {
+                    plazaCenter,
+                    participantCount,
+                    legitimacy: config?.legitimacy ?? 0.4,
+                });
+            }
+        });
         EventBus.on('map:flyToMission', _onPanToMission);
         EventBus.on('map:centerOnUnit', _onCenterOnUnit);
         EventBus.on('map:marker', _onDropMarker);
@@ -585,6 +747,9 @@ function _createMap(mapDiv) {
         // Re-fetch cameras periodically (demo mode may register new cameras)
         // Also triggered when demo mode starts via the demo:started event
         setInterval(_fetchCamerasForMap, 15000);
+
+        // Asset coverage layer — shows sensors/cameras from /api/assets with radius circles
+        _initAssetLayers();
 
         // Apply the initial mode (default: observe) so visual state matches
         setMapMode(_state.currentMode || 'observe');
@@ -910,13 +1075,17 @@ function _buildStyle() {
 // Three.js Custom Layer (tactical overlays)
 // ============================================================
 
-function _addThreeJsLayer() {
+function _addThreeJsLayer(force = false) {
     if (typeof THREE === 'undefined') {
         console.warn('[MAP-ML] Three.js not loaded, skipping tactical overlay');
         return;
     }
-    if (!_state.showModels3d) {
+    if (!force && !_state.showModels3d) {
         console.log('[MAP-ML] 3D models disabled, skipping Three.js layer');
+        return;
+    }
+    // Prevent double-add
+    if (_state.threeScene || (_state.map && _state.map.getLayer('three-overlay'))) {
         return;
     }
 
@@ -1049,6 +1218,24 @@ function _addThreeJsLayer() {
             // depthMask(true) ensures the clear actually writes.
             gl.depthMask(true);
             gl.clear(gl.DEPTH_BUFFER_BIT);
+            // City sim tick + rendering (if running)
+            if (_state.citySim?.running) {
+                const now = performance.now();
+                const dt = _state._lastCitySimTime ? Math.min(0.1, (now - _state._lastCitySimTime) / 1000) : 0.016;
+                _state._lastCitySimTime = now;
+                _state.citySim.tick(dt);
+                // Convert game coords to MapLibre's Mercator coords for vehicle rendering
+                // Game coords (local meters) → Three.js coords for MapLibre custom layer
+                // refMatrix on camera converts meter-space to Mercator, so raw meters work
+                // Game coords: x=east, z=north (meters from geo center)
+                // Three.js convention in this scene: X=east, Y=north, Z=altitude
+                // (refMatrix scales Y by -ms to convert north→Mercator-south)
+                const gameToThree = (gx, gz) => ({ x: gx, y: gz });
+                _state.citySim.updateRendering(gameToThree);
+                // Update 2D MapLibre vehicle markers (visible at all zoom levels)
+                _updateCitySimMarkers();
+            }
+
             _state.threeRenderer.render(_state.threeScene, _state.threeCamera);
             // NOTE: Do NOT call triggerRepaint() here unconditionally.
             // _repaintLoop() already manages triggerRepaint() via rAF when
@@ -1065,24 +1252,13 @@ function _addThreeJsLayer() {
  * Convert game coordinates (meters from geo reference) to lat/lng.
  */
 function _gameToLngLat(gx, gy) {
-    if (!_state.geoCenter) return [0, 0];
-    const R = 6378137;
-    const latRad = _state.geoCenter.lat * Math.PI / 180;
-    const dLng = gx / (R * Math.cos(latRad)) * (180 / Math.PI);
-    const dLat = gy / R * (180 / Math.PI);
-    return [_state.geoCenter.lng + dLng, _state.geoCenter.lat + dLat];
+    if (!_coords.hasReference) return [0, 0];
+    return _coords.gameToLngLat(gx, gy);
 }
 
-/**
- * Convert lng/lat back to game coordinates (meters from geo reference).
- */
 function _lngLatToGame(lng, lat) {
-    if (!_state.geoCenter) return { x: 0, y: 0 };
-    const R = 6378137;
-    const latRad = _state.geoCenter.lat * Math.PI / 180;
-    const gx = (lng - _state.geoCenter.lng) * (Math.PI / 180) * R * Math.cos(latRad);
-    const gy = (lat - _state.geoCenter.lat) * (Math.PI / 180) * R;
-    return { x: gx, y: gy };
+    if (!_coords.hasReference) return { x: 0, y: 0 };
+    return _coords.lngLatToGame(lng, lat);
 }
 
 // ============================================================
@@ -5708,12 +5884,7 @@ function _lineOpacity(layerId) {
  * plus meterInMercatorCoordinateUnits() for backward compat.
  */
 function _gameToMercator(gx, gy, altMeters) {
-    return {
-        x: gx,
-        y: gy,
-        z: altMeters || 0,
-        meterInMercatorCoordinateUnits() { return 1.0; },
-    };
+    return _coords.gameToMercator(gx, gy, altMeters);
 }
 
 /**
@@ -7342,9 +7513,568 @@ function _ensureRepaintLoop() {
     _repaintLoop();
 }
 
+// 2D vehicle/pedestrian markers on MapLibre (visible at all zoom levels)
+let _markerThrottle = 0;
+function _updateCitySimMarkers() {
+    if (!_state.map || !_state.citySim || !_state.geoCenter) return;
+
+    // Throttle to ~5 Hz (every 200ms) to avoid GeoJSON churn
+    const now = performance.now();
+    if (now - _markerThrottle < 200) return;
+    _markerThrottle = now;
+
+    const R = 6378137;
+    const cLat = _state.geoCenter.lat;
+    const cLng = _state.geoCenter.lng;
+    const latRad = cLat * Math.PI / 180;
+    const mPerDegLng = 111320 * Math.cos(latRad);
+    const mPerDegLat = 111320;
+
+    const features = [];
+
+    // Vehicles — point features with heading for direction indicator
+    for (const car of _state.citySim.vehicles) {
+        if (car.parked) continue;
+        const lng = cLng + car.x / mPerDegLng;
+        const lat = cLat + car.z / mPerDegLat;
+        // Heading: game uses atan2(dx,dz) which is 0=north, positive=east
+        // MapLibre icon-rotate expects degrees clockwise from north
+        const headingDeg = (car.heading * 180 / Math.PI);
+        features.push({
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [lng, lat] },
+            properties: {
+                kind: car.inAccident ? 'accident' : (car.isEmergency ? 'emergency' : 'vehicle'),
+                speed: car.speed,
+                heading: headingDeg,
+                purpose: car.purpose || 'random',
+                vehicleDesc: car._identity?.vehicleDesc || car.subtype || 'vehicle',
+                ownerName: car._identity?.ownerName || '',
+            },
+        });
+    }
+
+    // Pedestrians — color by mood during protests, role info for styling
+    for (const ped of _state.citySim.pedestrians) {
+        if (ped.inBuilding || !ped.visible) continue;
+        const lng = cLng + ped.x / mPerDegLng;
+        const lat = cLat + ped.z / mPerDegLat;
+        let kind = 'pedestrian';
+        if (ped.stunTimer > 0) kind = 'ped-stunned';
+        else if (ped.mood === 'angry') kind = 'ped-angry';
+        else if (ped.mood === 'panicked') kind = 'ped-panicked';
+        else if (ped.mood === 'anxious') kind = 'ped-anxious';
+        else if (ped.role === 'police') kind = 'ped-police';
+        else if (ped.role === 'jogger') kind = 'ped-jogger';
+        // Pulse factor for angry/panicked NPCs — oscillates 0.7-1.3 for visual emphasis
+        const pulse = (kind === 'ped-angry' || kind === 'ped-panicked')
+            ? 0.7 + 0.6 * (0.5 + 0.5 * Math.sin(now * 0.004 + lng * 100))
+            : 1.0;
+        features.push({
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [lng, lat] },
+            properties: { kind, role: ped.role || 'resident', name: ped.name || '', pulse },
+        });
+    }
+
+    // Build heading lines — short line segments showing vehicle direction
+    const headingFeatures = [];
+    for (const car of _state.citySim.vehicles) {
+        if (car.parked || car.inAccident || car.speed < 0.5) continue;
+        const lng0 = cLng + car.x / mPerDegLng;
+        const lat0 = cLat + car.z / mPerDegLat;
+        // Heading line: 8m in travel direction
+        const hLen = 8 + car.speed * 0.5;  // longer at higher speed
+        const hx = Math.sin(car.heading) * hLen;
+        const hz = Math.cos(car.heading) * hLen;
+        const lng1 = lng0 + hx / mPerDegLng;
+        const lat1 = lat0 + hz / mPerDegLat;
+        headingFeatures.push({
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: [[lng0, lat0], [lng1, lat1]] },
+            properties: {
+                kind: car.isEmergency ? 'emergency' : 'vehicle',
+            },
+        });
+    }
+    // Protest NPC trails — show movement direction for angry/marching NPCs
+    for (const ped of _state.citySim.pedestrians) {
+        if (ped.inBuilding || !ped.visible || ped.speed < 0.3) continue;
+        if (ped.mood !== 'angry' && ped.mood !== 'panicked') continue;
+        const lng0 = cLng + ped.x / mPerDegLng;
+        const lat0 = cLat + ped.z / mPerDegLat;
+        // Trail behind the NPC (opposite to heading)
+        const tLen = 5 + ped.speed * 2;
+        const tx = -Math.sin(ped.heading) * tLen;
+        const tz = -Math.cos(ped.heading) * tLen;
+        const lng1 = lng0 + tx / mPerDegLng;
+        const lat1 = lat0 + tz / mPerDegLat;
+        headingFeatures.push({
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: [[lng1, lat1], [lng0, lat0]] },
+            properties: { kind: ped.mood === 'panicked' ? 'ped-flee' : 'protest-march' },
+        });
+    }
+
+    const headingGeoJson = { type: 'FeatureCollection', features: headingFeatures };
+
+    if (_state.map.getSource('city-sim-headings')) {
+        _state.map.getSource('city-sim-headings').setData(headingGeoJson);
+    } else {
+        _state.map.addSource('city-sim-headings', { type: 'geojson', data: headingGeoJson });
+        _state.map.addLayer({
+            id: 'city-sim-heading-lines',
+            type: 'line',
+            source: 'city-sim-headings',
+            filter: ['==', ['get', 'kind'], 'vehicle'],
+            paint: {
+                'line-color': '#00f0ff',
+                'line-width': ['interpolate', ['linear'], ['zoom'], 14, 1, 18, 2, 20, 3],
+                'line-opacity': 0.5,
+            },
+        });
+        _state.map.addLayer({
+            id: 'city-sim-heading-lines-emergency',
+            type: 'line',
+            source: 'city-sim-headings',
+            filter: ['==', ['get', 'kind'], 'emergency'],
+            paint: {
+                'line-color': '#ff2a6d',
+                'line-width': ['interpolate', ['linear'], ['zoom'], 14, 2, 18, 3, 20, 4],
+                'line-opacity': 0.7,
+            },
+        });
+        // Protest march trails — orange/red lines behind angry NPCs
+        _state.map.addLayer({
+            id: 'city-sim-protest-trails',
+            type: 'line',
+            source: 'city-sim-headings',
+            filter: ['==', ['get', 'kind'], 'protest-march'],
+            paint: {
+                'line-color': '#ff4444',
+                'line-width': ['interpolate', ['linear'], ['zoom'], 14, 1, 18, 2, 20, 3],
+                'line-opacity': 0.4,
+            },
+        });
+        // Fleeing trails — yellow
+        _state.map.addLayer({
+            id: 'city-sim-flee-trails',
+            type: 'line',
+            source: 'city-sim-headings',
+            filter: ['==', ['get', 'kind'], 'ped-flee'],
+            paint: {
+                'line-color': '#fcee0a',
+                'line-width': ['interpolate', ['linear'], ['zoom'], 14, 1, 18, 2, 20, 3],
+                'line-opacity': 0.5,
+            },
+        });
+    }
+
+    const geojson = { type: 'FeatureCollection', features };
+
+    if (_state.map.getSource('city-sim-markers')) {
+        _state.map.getSource('city-sim-markers').setData(geojson);
+
+        // Update onscreen HUD
+        _updateCitySimHUD();
+    } else {
+        _state.map.addSource('city-sim-markers', { type: 'geojson', data: geojson });
+        // Vehicles: colored circles
+        _state.map.addLayer({
+            id: 'city-sim-vehicles-2d',
+            type: 'circle',
+            source: 'city-sim-markers',
+            filter: ['==', ['get', 'kind'], 'vehicle'],
+            paint: {
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 3, 16, 5, 18, 7, 20, 10],
+                'circle-color': '#00f0ff',
+                'circle-stroke-color': '#000',
+                'circle-stroke-width': 1,
+                'circle-opacity': 0.95,
+            },
+        });
+        // Emergency: red pulsing
+        _state.map.addLayer({
+            id: 'city-sim-emergency-2d',
+            type: 'circle',
+            source: 'city-sim-markers',
+            filter: ['==', ['get', 'kind'], 'emergency'],
+            paint: {
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 3, 18, 7, 20, 10],
+                'circle-color': '#ff2a6d',
+                'circle-stroke-color': '#fff',
+                'circle-stroke-width': 2,
+                'circle-opacity': 0.95,
+            },
+        });
+        // Accidents: yellow
+        _state.map.addLayer({
+            id: 'city-sim-accidents-2d',
+            type: 'circle',
+            source: 'city-sim-markers',
+            filter: ['==', ['get', 'kind'], 'accident'],
+            paint: {
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 3, 18, 6, 20, 9],
+                'circle-color': '#fcee0a',
+                'circle-stroke-color': '#ff2a6d',
+                'circle-stroke-width': 2,
+                'circle-opacity': 0.9,
+            },
+        });
+        // Pedestrians: green dots (smaller)
+        _state.map.addLayer({
+            id: 'city-sim-peds-2d',
+            type: 'circle',
+            source: 'city-sim-markers',
+            filter: ['==', ['get', 'kind'], 'pedestrian'],
+            paint: {
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 1.5, 18, 3, 20, 5],
+                'circle-color': '#05ffa1',
+                'circle-stroke-color': '#000',
+                'circle-stroke-width': 0.5,
+                'circle-opacity': 0.8,
+            },
+        });
+        // Stunned pedestrians: magenta
+        _state.map.addLayer({
+            id: 'city-sim-peds-stunned-2d',
+            type: 'circle',
+            source: 'city-sim-markers',
+            filter: ['==', ['get', 'kind'], 'ped-stunned'],
+            paint: {
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 2, 18, 4, 20, 6],
+                'circle-color': '#ff2a6d',
+                'circle-stroke-color': '#fff',
+                'circle-stroke-width': 1,
+                'circle-opacity': 0.9,
+            },
+        });
+        // Angry pedestrians (protest active) — orange/red
+        _state.map.addLayer({
+            id: 'city-sim-peds-angry-2d',
+            type: 'circle',
+            source: 'city-sim-markers',
+            filter: ['==', ['get', 'kind'], 'ped-angry'],
+            paint: {
+                // Larger than normal pedestrians — angry protest NPCs stand out
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 4, 16, 6, 18, 8, 20, 12],
+                'circle-color': '#ff2200',
+                'circle-stroke-color': '#ffaa00',
+                'circle-stroke-width': 2,
+                'circle-opacity': 1.0,
+            },
+        });
+        // Panicked pedestrians (fleeing) — yellow
+        _state.map.addLayer({
+            id: 'city-sim-peds-panicked-2d',
+            type: 'circle',
+            source: 'city-sim-markers',
+            filter: ['==', ['get', 'kind'], 'ped-panicked'],
+            paint: {
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 3.5, 16, 5, 18, 7, 20, 10],
+                'circle-color': '#fcee0a',
+                'circle-stroke-color': '#ff4400',
+                'circle-stroke-width': 2,
+                'circle-opacity': 1.0,
+            },
+        });
+        // Anxious pedestrians — yellow-green
+        _state.map.addLayer({
+            id: 'city-sim-peds-anxious-2d',
+            type: 'circle',
+            source: 'city-sim-markers',
+            filter: ['==', ['get', 'kind'], 'ped-anxious'],
+            paint: {
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 1.5, 18, 3, 20, 5],
+                'circle-color': '#aacc44',
+                'circle-stroke-color': '#888',
+                'circle-stroke-width': 0.5,
+                'circle-opacity': 0.85,
+            },
+        });
+        // Police NPCs — blue, larger
+        _state.map.addLayer({
+            id: 'city-sim-peds-police-2d',
+            type: 'circle',
+            source: 'city-sim-markers',
+            filter: ['==', ['get', 'kind'], 'ped-police'],
+            paint: {
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 2.5, 18, 5, 20, 8],
+                'circle-color': '#4488ff',
+                'circle-stroke-color': '#fff',
+                'circle-stroke-width': 1.5,
+                'circle-opacity': 0.95,
+            },
+        });
+        // Joggers — small, bright green
+        _state.map.addLayer({
+            id: 'city-sim-peds-jogger-2d',
+            type: 'circle',
+            source: 'city-sim-markers',
+            filter: ['==', ['get', 'kind'], 'ped-jogger'],
+            paint: {
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 1.5, 18, 3, 20, 4],
+                'circle-color': '#00ff88',
+                'circle-stroke-color': '#000',
+                'circle-stroke-width': 0.5,
+                'circle-opacity': 0.9,
+            },
+        });
+        // Crowd density heatmap — shows gathering intensity, especially during protests
+        _state.map.addLayer({
+            id: 'city-sim-crowd-heatmap',
+            type: 'heatmap',
+            source: 'city-sim-markers',
+            filter: ['in', ['get', 'kind'], ['literal', ['ped-angry', 'ped-panicked', 'ped-stunned', 'pedestrian', 'ped-anxious']]],
+            maxzoom: 20,
+            paint: {
+                // Weight: angry/panicked NPCs contribute 3x more heat
+                'heatmap-weight': ['match', ['get', 'kind'],
+                    'ped-angry', 3,
+                    'ped-panicked', 2,
+                    'ped-stunned', 2,
+                    'ped-anxious', 1.5,
+                    1  // default (calm pedestrian)
+                ],
+                // Intensity increases with zoom
+                'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 14, 0.5, 18, 1.5, 20, 3],
+                // Radius in pixels
+                'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 14, 10, 18, 25, 20, 40],
+                // Color ramp: transparent → green → yellow → orange → red
+                'heatmap-color': [
+                    'interpolate', ['linear'], ['heatmap-density'],
+                    0, 'rgba(0,0,0,0)',
+                    0.1, 'rgba(5,255,161,0.3)',    // green
+                    0.3, 'rgba(252,238,10,0.5)',    // yellow
+                    0.5, 'rgba(255,136,68,0.7)',    // orange
+                    0.8, 'rgba(255,42,109,0.8)',    // magenta
+                    1.0, 'rgba(255,0,0,0.9)',       // red
+                ],
+                // Fade out at high zoom where individual dots are visible
+                'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 16, 0.8, 19, 0.4, 20, 0.1],
+            },
+        }, 'city-sim-vehicles-2d');  // Insert below vehicle dots
+
+        // NPC hover tooltip — show name, role, activity on hover
+        const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 10 });
+        const pedLayers = [
+            'city-sim-peds-2d', 'city-sim-peds-angry-2d', 'city-sim-peds-panicked-2d',
+            'city-sim-peds-anxious-2d', 'city-sim-peds-police-2d', 'city-sim-peds-jogger-2d',
+            'city-sim-peds-stunned-2d',
+        ];
+        for (const layerId of pedLayers) {
+            _state.map.on('mouseenter', layerId, (e) => {
+                _state.map.getCanvas().style.cursor = 'pointer';
+                if (e.features?.[0]?.properties) {
+                    const p = e.features[0].properties;
+                    const name = p.name || 'Unknown';
+                    const role = p.role || 'civilian';
+                    const kind = p.kind || 'pedestrian';
+                    const moodLabel = kind.replace('ped-', '').replace('pedestrian', 'calm');
+                    popup.setLngLat(e.lngLat)
+                        .setHTML(`<div style="font-family:monospace;font-size:11px;color:#00f0ff;background:#0a0a12ee;padding:4px 8px;border:1px solid #00f0ff33;border-radius:3px"><b>${name}</b><br>${role} &middot; ${moodLabel}</div>`)
+                        .addTo(_state.map);
+                }
+            });
+            _state.map.on('mouseleave', layerId, () => {
+                _state.map.getCanvas().style.cursor = '';
+                popup.remove();
+            });
+        }
+        // Vehicle hover tooltip
+        const vehicleLayers = ['city-sim-vehicles-2d', 'city-sim-emergency-2d', 'city-sim-accidents-2d'];
+        for (const layerId of vehicleLayers) {
+            _state.map.on('mouseenter', layerId, (e) => {
+                _state.map.getCanvas().style.cursor = 'pointer';
+                if (e.features?.[0]?.properties) {
+                    const p = e.features[0].properties;
+                    const desc = p.vehicleDesc || 'Vehicle';
+                    const owner = p.ownerName || '';
+                    const purpose = p.purpose || 'driving';
+                    const speed = p.speed ? `${(p.speed * 3.6).toFixed(0)}km/h` : '';
+                    const statusLabel = p.kind === 'accident' ? 'ACCIDENT' : p.kind === 'emergency' ? 'EMERGENCY' : purpose;
+                    const color = p.kind === 'accident' ? '#fcee0a' : p.kind === 'emergency' ? '#ff2a6d' : '#00f0ff';
+                    popup.setLngLat(e.lngLat)
+                        .setHTML(`<div style="font-family:monospace;font-size:11px;color:${color};background:#0a0a12ee;padding:4px 8px;border:1px solid ${color}33;border-radius:3px"><b>${desc}</b>${owner ? '<br>' + owner : ''}<br>${statusLabel} ${speed}</div>`)
+                        .addTo(_state.map);
+                }
+            });
+            _state.map.on('mouseleave', layerId, () => {
+                _state.map.getCanvas().style.cursor = '';
+                popup.remove();
+            });
+        }
+    }
+}
+
+// ============================================================
+// WiFi CSI Presence Layer — human detection via WiFi signals
+// ============================================================
+
+function _initWifiPresenceLayer() {
+    if (!_state.map || _state.map.getSource('wifi-csi-presence')) return;
+
+    _state.map.addSource('wifi-csi-presence', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+    });
+
+    // Heatmap showing human density around APs
+    _state.map.addLayer({
+        id: 'wifi-csi-heatmap',
+        type: 'heatmap',
+        source: 'wifi-csi-presence',
+        paint: {
+            'heatmap-weight': ['coalesce', ['get', 'occupancy'], 1],
+            'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 14, 0.5, 18, 2, 20, 4],
+            'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 14, 15, 18, 30, 20, 50],
+            'heatmap-color': [
+                'interpolate', ['linear'], ['heatmap-density'],
+                0, 'rgba(0,0,0,0)',
+                0.15, 'rgba(0,240,255,0.2)',     // cyan glow — low presence
+                0.35, 'rgba(5,255,161,0.4)',      // green — moderate
+                0.55, 'rgba(252,238,10,0.6)',     // yellow — crowded
+                0.8, 'rgba(255,42,109,0.8)',      // magenta — very crowded
+                1.0, 'rgba(255,0,0,0.9)',         // red — max density
+            ],
+            'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0.7, 20, 0.3],
+        },
+    });
+
+    // Circle markers at AP positions showing occupancy count
+    _state.map.addLayer({
+        id: 'wifi-csi-ap-markers',
+        type: 'circle',
+        source: 'wifi-csi-presence',
+        paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 4, 18, 8, 20, 12],
+            'circle-color': ['interpolate', ['linear'], ['get', 'occupancy'],
+                0, '#00f0ff',   // cyan — empty
+                2, '#05ffa1',   // green — light
+                5, '#fcee0a',   // yellow — moderate
+                10, '#ff2a6d',  // magenta — crowded
+            ],
+            'circle-stroke-color': '#000',
+            'circle-stroke-width': 1,
+            'circle-opacity': 0.9,
+        },
+    });
+
+    // Occupancy count label at AP positions
+    _state.map.addLayer({
+        id: 'wifi-csi-labels',
+        type: 'symbol',
+        source: 'wifi-csi-presence',
+        layout: {
+            'text-field': ['concat', ['get', 'occupancy'], ''],
+            'text-size': 10,
+            'text-offset': [0, -1.5],
+            'text-allow-overlap': true,
+        },
+        paint: {
+            'text-color': '#fff',
+            'text-halo-color': '#000',
+            'text-halo-width': 1,
+        },
+        minzoom: 17,
+    });
+
+    // Set initial visibility based on state
+    const vis = _state.showWifiPresence ? 'visible' : 'none';
+    _state.map.setLayoutProperty('wifi-csi-heatmap', 'visibility', vis);
+    _state.map.setLayoutProperty('wifi-csi-ap-markers', 'visibility', vis);
+    _state.map.setLayoutProperty('wifi-csi-labels', 'visibility', vis);
+}
+
+function _updateWifiPresence(detections) {
+    if (!_state.map?.getSource('wifi-csi-presence') || !_state.geoCenter) return;
+
+    const features = detections.map(d => {
+        // Convert local meters to lat/lng if needed, or use lat/lng directly
+        let lng, lat;
+        if (d.lng !== undefined) {
+            lng = d.lng;
+            lat = d.lat;
+        } else if (d.x !== undefined && _state.geoCenter) {
+            const latRad = _state.geoCenter.lat * Math.PI / 180;
+            lng = _state.geoCenter.lng + d.x / (111320 * Math.cos(latRad));
+            lat = _state.geoCenter.lat + d.z / 111320;
+        } else {
+            return null;
+        }
+        return {
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [lng, lat] },
+            properties: {
+                occupancy: d.occupancy_estimate || d.occupancy || 1,
+                confidence: d.confidence || 0.5,
+                ap_name: d.ap_name || d.device_id || 'AP',
+                source: 'wifi_csi',
+            },
+        };
+    }).filter(Boolean);
+
+    _state.map.getSource('wifi-csi-presence').setData({
+        type: 'FeatureCollection',
+        features,
+    });
+}
+
+function toggleWifiPresence() {
+    _state.showWifiPresence = !_state.showWifiPresence;
+    const vis = _state.showWifiPresence ? 'visible' : 'none';
+    if (_state.map?.getLayer('wifi-csi-heatmap')) {
+        _state.map.setLayoutProperty('wifi-csi-heatmap', 'visibility', vis);
+        _state.map.setLayoutProperty('wifi-csi-ap-markers', 'visibility', vis);
+        _state.map.setLayoutProperty('wifi-csi-labels', 'visibility', vis);
+    } else if (_state.showWifiPresence) {
+        _initWifiPresenceLayer();
+    }
+    console.log(`[MAP-ML] WiFi Presence ${_state.showWifiPresence ? 'ON' : 'OFF'}`);
+}
+
+function _updateCitySimHUD() {
+    if (!_state.citySim?.running || !_state.container) return;
+
+    let hud = _state._citySimHud;
+    if (!hud) {
+        hud = document.createElement('div');
+        hud.id = 'city-sim-hud';
+        hud.style.cssText = [
+            'position:absolute; bottom:60px; left:10px; z-index:5;',
+            'font-family:"JetBrains Mono",monospace; font-size:11px;',
+            'color:#00f0ff; background:rgba(6,6,9,0.8);',
+            'padding:6px 10px; border-radius:3px;',
+            'border:1px solid rgba(0,240,255,0.15);',
+            'pointer-events:none; line-height:1.6;',
+        ].join('');
+        _state.container.appendChild(hud);
+        _state._citySimHud = hud;
+    }
+
+    const stats = _state.citySim.getStats();
+    if (!stats) return;
+
+    const lines = [
+        `<span style="color:#888">SIM</span> ${stats.timeOfDay || '--'}`,
+        `<span style="color:#888">VEH</span> ${stats.vehicles} <span style="color:#888">PEOPLE</span> ${stats.pedestriansActive || 0}/${stats.pedestrians}`,
+        `<span style="color:#888">SPD</span> ${stats.avgSpeedKmh}km/h <span style="color:#888">×</span>${stats.timeScale || 60}`,
+    ];
+
+    if (stats.protest && stats.protest.phase !== 'NORMAL') {
+        const p = stats.protest;
+        const phaseColor = ['RIOT', 'FIRST_INCIDENT'].includes(p.phase) ? '#ff2a6d' :
+                          ['TENSION', 'DISPERSAL'].includes(p.phase) ? '#fcee0a' : '#ff8844';
+        lines.push(`<span style="color:${phaseColor}">⚡ ${p.phase.replace(/_/g, ' ')}</span> ${p.active}↑ ${p.arrested}↓`);
+    }
+
+    hud.innerHTML = lines.join('<br>');
+}
+
 function _repaintLoop() {
     const has3DUnits = Object.keys(_state.unitMeshes).length > 0;
-    if (_state.effects.length === 0 && !has3DUnits) {
+    const hasCitySim = _state.citySim?.running;
+    if (_state.effects.length === 0 && !has3DUnits && !hasCitySim) {
         _state.effectsActive = false;
         return;
     }
@@ -7549,6 +8279,7 @@ function _updateLayerHud() {
     if (_state.showGeoLayers) layers.push('GIS');
     if (_state.showPatrolRoutes) layers.push('PATROL');
     if (_state.showTerrain) layers.push('TERRAIN');
+    if (_state.showWifiPresence) layers.push('WIFI-CSI');
     if (_state.showHeatmap) layers.push('HEAT');
     if (_state.showWeaponRange) layers.push('WPNRNG');
     if (_state.showSwarmHull) layers.push('SWARM');
@@ -7575,6 +8306,16 @@ function _updateLayerHud() {
     if (!_state.showBanners) fxOff.push('BNR');
     if (!_state.showHealthBars) fxOff.push('HP');
     if (!_state.showSelectionFx) fxOff.push('SEL');
+
+    // City sim status
+    const simStats = _state.citySim?.getStats();
+    if (simStats && simStats.running) {
+        const h = Math.floor(simStats.simHour);
+        const m = Math.floor((simStats.simHour - h) * 60);
+        const t = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+        const w = (simStats.weather || 'CLEAR').toUpperCase();
+        layers.push(`SIM: ${simStats.vehicles}v ${simStats.pedestrians}p ${t} ${w}`);
+    }
 
     const zoom = _state.map.getZoom().toFixed(1);
     const pitch = _state.map.getPitch();
@@ -8802,6 +9543,9 @@ function _onMapRightClick(e) {
     const selectedId = _state.selectedUnitId || TritiumStore.get('map.selectedUnitId');
     const gamePos = _lngLatToGame(e.lngLat.lng, e.lngLat.lat);
 
+    // Store lngLat for context menu asset placement
+    window._lastContextLngLat = { lng: e.lngLat.lng, lat: e.lngLat.lat };
+
     // Show context menu at the click position
     const container = _state.container || document.body;
     ContextMenu.show(container, selectedId, gamePos, e.point.x, e.point.y);
@@ -8914,6 +9658,74 @@ export function toggleFog() {
     console.log(`[MAP-ML] Fog ${_state.showFog ? 'ON' : 'OFF'}`);
 }
 
+export function toggleEditMode() {
+    _state.editMode = !_state.editMode;
+    const container = _state.container || document.body;
+
+    // Visual badge
+    let badge = document.getElementById('edit-mode-badge');
+    if (_state.editMode) {
+        if (!badge) {
+            badge = document.createElement('div');
+            badge.id = 'edit-mode-badge';
+            badge.style.cssText = `
+                position: fixed; top: 40px; left: 50%; transform: translateX(-50%); z-index: 900;
+                padding: 4px 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+                color: #00f0ff; background: rgba(0, 240, 255, 0.08); border: 1px solid #00f0ff44;
+                border-radius: 3px; letter-spacing: 2px; pointer-events: none;
+                animation: editBadgePulse 2s ease-in-out infinite;
+            `;
+            badge.textContent = 'EDIT MODE';
+            // Add pulse animation
+            if (!document.getElementById('edit-mode-styles')) {
+                const style = document.createElement('style');
+                style.id = 'edit-mode-styles';
+                style.textContent = `
+                    @keyframes editBadgePulse { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
+                    .edit-mode-active { box-shadow: inset 0 0 30px rgba(0, 240, 255, 0.05); }
+                `;
+                document.head.appendChild(style);
+            }
+            container.appendChild(badge);
+        }
+        badge.style.display = '';
+        container.classList.add('edit-mode-active');
+
+        // Make asset points larger in edit mode
+        if (_state.map?.getLayer(ASSET_LAYER_POINT)) {
+            _state.map.setPaintProperty(ASSET_LAYER_POINT, 'circle-radius',
+                ['interpolate', ['linear'], ['zoom'], 12, 5, 18, 10]);
+        }
+
+        EventBus.emit('toast:show', { message: 'Edit mode ON — click assets to select, right-click to place', type: 'info' });
+    } else {
+        if (badge) badge.style.display = 'none';
+        container.classList.remove('edit-mode-active');
+
+        // Restore normal asset point size
+        if (_state.map?.getLayer(ASSET_LAYER_POINT)) {
+            _state.map.setPaintProperty(ASSET_LAYER_POINT, 'circle-radius',
+                ['interpolate', ['linear'], ['zoom'], 12, 3, 18, 6]);
+        }
+
+        EventBus.emit('toast:show', { message: 'Edit mode OFF', type: 'info' });
+    }
+
+    EventBus.emit('editMode:changed', { active: _state.editMode });
+}
+
+export function isEditMode() { return _state.editMode; }
+
+export function toggleAssetCoverage() {
+    _state.showAssetCoverage = !(_state.showAssetCoverage ?? true);
+    if (_state.map) {
+        const vis = _state.showAssetCoverage ? 'visible' : 'none';
+        [ASSET_LAYER_COVERAGE, ASSET_LAYER_FOV_FILL, ASSET_LAYER_FOV_LINE, ASSET_LAYER_POINT, ASSET_LAYER_LABEL].forEach(id => {
+            if (_state.map.getLayer(id)) _state.map.setLayoutProperty(id, 'visibility', vis);
+        });
+    }
+}
+
 export function toggleTerrain() {
     if (_state.map && typeof _state.map.setTerrain !== 'function') {
         console.warn('[MAP-ML] Terrain API not available in this MapLibre version');
@@ -8948,6 +9760,8 @@ export function toggleTerrain() {
     _updateLayerHud();
     console.log(`[MAP-ML] Terrain ${_state.showTerrain ? 'ON' : 'OFF'} (exaggeration: ${_state.terrainExaggeration})`);
 }
+
+export { toggleWifiPresence };
 
 export function toggleUnits() {
     _state.showUnits = !_state.showUnits;
@@ -9522,6 +10336,335 @@ export function centerOnAction() {
     }
 }
 
+// ── Asset Coverage Layer ──────────────────────────────────────────────
+// Renders placed assets (sensors, cameras, mesh radios) with coverage radius
+// circles on the map. Fetches from /api/assets and updates periodically.
+
+const ASSET_SOURCE_ID = 'tritium-assets';
+const ASSET_FOV_SOURCE_ID = 'tritium-asset-fov';
+const ASSET_LAYER_COVERAGE = 'tritium-asset-coverage';
+const ASSET_LAYER_FOV_FILL = 'tritium-asset-fov-fill';
+const ASSET_LAYER_FOV_LINE = 'tritium-asset-fov-line';
+const ASSET_LAYER_POINT = 'tritium-asset-point';
+const ASSET_LAYER_LABEL = 'tritium-asset-label';
+
+let _assetLayerInited = false;
+let _assetRefreshTimer = null;
+
+function _initAssetLayers() {
+    if (_assetLayerInited || !_state.map) return;
+    _assetLayerInited = true;
+
+    _state.map.addSource(ASSET_SOURCE_ID, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+    });
+
+    // Coverage radius circle (translucent fill)
+    _state.map.addLayer({
+        id: ASSET_LAYER_COVERAGE,
+        type: 'circle',
+        source: ASSET_SOURCE_ID,
+        paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'],
+                12, ['*', ['get', 'radiusPixels'], 0.1],
+                16, ['*', ['get', 'radiusPixels'], 1],
+                20, ['*', ['get', 'radiusPixels'], 8],
+            ],
+            'circle-color': ['get', 'color'],
+            'circle-stroke-color': ['get', 'color'],
+            'circle-stroke-width': ['case', ['==', ['get', 'simulated'], true], 0.5, 1.5],
+            'circle-stroke-opacity': ['case', ['==', ['get', 'simulated'], true], 0.2, 0.5],
+            'circle-opacity': ['case', ['==', ['get', 'simulated'], true], 0.6, 1],
+        },
+    });
+
+    // FOV cone source + layers for directional assets (cameras, motion sensors)
+    _state.map.addSource(ASSET_FOV_SOURCE_ID, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+    });
+    _state.map.addLayer({
+        id: ASSET_LAYER_FOV_FILL,
+        type: 'fill',
+        source: ASSET_FOV_SOURCE_ID,
+        paint: {
+            'fill-color': ['get', 'color'],
+            'fill-opacity': 0.1,
+        },
+    });
+    _state.map.addLayer({
+        id: ASSET_LAYER_FOV_LINE,
+        type: 'line',
+        source: ASSET_FOV_SOURCE_ID,
+        paint: {
+            'line-color': ['get', 'color'],
+            'line-width': 1.5,
+            'line-opacity': 0.5,
+            'line-dasharray': [4, 2],
+        },
+    });
+
+    // Asset point marker
+    _state.map.addLayer({
+        id: ASSET_LAYER_POINT,
+        type: 'circle',
+        source: ASSET_SOURCE_ID,
+        paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 3, 18, 6],
+            'circle-color': ['get', 'color'],
+            'circle-stroke-color': '#fff',
+            'circle-stroke-width': 1.5,
+        },
+    });
+
+    // Asset label
+    _state.map.addLayer({
+        id: ASSET_LAYER_LABEL,
+        type: 'symbol',
+        source: ASSET_SOURCE_ID,
+        layout: {
+            'text-field': ['get', 'name'],
+            'text-size': 10,
+            'text-offset': [0, 1.2],
+            'text-anchor': 'top',
+            'text-font': ['Open Sans Regular'],
+        },
+        paint: {
+            'text-color': '#aaa',
+            'text-halo-color': '#000',
+            'text-halo-width': 1,
+        },
+        minzoom: 15,
+    });
+
+    // Hover tooltip
+    const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 10 });
+    _state.map.on('mouseenter', ASSET_LAYER_POINT, (e) => {
+        _state.map.getCanvas().style.cursor = 'pointer';
+        const p = e.features?.[0]?.properties;
+        if (p) {
+            const color = p.assetClass === 'observation' ? '#00f0ff' : p.assetClass === 'sensor' ? '#05ffa1' : '#fcee0a';
+            popup.setLngLat(e.lngLat)
+                .setHTML(`<div style="font-family:monospace;font-size:11px;color:${color};background:#0a0a12ee;padding:4px 8px;border:1px solid ${color}33;border-radius:3px"><b>${p.name}</b><br>${p.assetType}/${p.assetClass}<br>${p.coverageRadius || '?'}m range · ${p.mounting || '?'} mount</div>`)
+                .addTo(_state.map);
+        }
+    });
+    _state.map.on('mouseleave', ASSET_LAYER_POINT, () => {
+        _state.map.getCanvas().style.cursor = '';
+        popup.remove();
+    });
+
+    // Click handler — in edit mode show action popup, otherwise just select
+    let _assetPopup = null;
+    _state.map.on('click', ASSET_LAYER_POINT, (e) => {
+        const p = e.features?.[0]?.properties;
+        if (!p?.id) return;
+
+        // Remove any existing asset popup
+        if (_assetPopup) { _assetPopup.remove(); _assetPopup = null; }
+
+        // Resolve type from registry for color + popup
+        const T = assetTypeRegistry.resolveForAsset({ asset_class: p.assetClass, asset_type: p.assetType });
+        const color = T ? T.color : (p.color || '#888');
+        const isSimulated = (p.source || '').includes('simulated');
+        const simBadge = isSimulated
+            ? '<span style="color:#fcee0a;font-size:9px;border:1px solid #fcee0a33;padding:1px 4px;border-radius:2px">SIM</span>'
+            : '<span style="color:#05ffa1;font-size:9px;border:1px solid #05ffa133;padding:1px 4px;border-radius:2px">LIVE</span>';
+
+        const editBtns = _state.editMode ? `
+            <div style="display:flex;gap:4px;margin-top:6px">
+                <button class="asset-popup-btn" data-action="edit" style="flex:1;padding:3px 6px;font-family:monospace;font-size:9px;background:transparent;border:1px solid ${color}44;color:${color};cursor:pointer;border-radius:2px">EDIT</button>
+                <button class="asset-popup-btn" data-action="move" style="flex:1;padding:3px 6px;font-family:monospace;font-size:9px;background:transparent;border:1px solid #fcee0a44;color:#fcee0a;cursor:pointer;border-radius:2px">MOVE</button>
+                <button class="asset-popup-btn" data-action="delete" style="flex:1;padding:3px 6px;font-family:monospace;font-size:9px;background:transparent;border:1px solid #ff2a6d44;color:#ff2a6d;cursor:pointer;border-radius:2px">DEL</button>
+            </div>` : '';
+
+        // Use registry popup if available, fall back to generic
+        const popupBody = T ? T.getPopupHtml(p) : `
+            <div style="font-weight:bold;margin-bottom:3px">${p.name}</div>
+            <div style="color:#888;font-size:9px">${p.assetType}/${p.assetClass}</div>`;
+
+        _assetPopup = new maplibregl.Popup({ closeButton: true, maxWidth: '240px', offset: 12 })
+            .setLngLat(e.lngLat)
+            .setHTML(`<div style="font-family:monospace;font-size:11px;color:${color};background:#0a0a12;padding:6px 10px;border-radius:3px">
+                ${popupBody}
+                <div style="margin-top:4px">${simBadge}</div>
+                ${editBtns}
+            </div>`)
+            .addTo(_state.map);
+
+        // Wire popup button actions
+        setTimeout(() => {
+            const popupEl = _assetPopup?.getElement();
+            if (!popupEl) return;
+            popupEl.querySelectorAll('.asset-popup-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const action = btn.dataset.action;
+                    if (action === 'edit') {
+                        EventBus.emit('panel:request-open', { id: 'assets' });
+                        EventBus.emit('asset:select', { assetId: p.id });
+                    } else if (action === 'move') {
+                        _startAssetDrag(p.id, e.lngLat);
+                        _assetPopup?.remove();
+                    } else if (action === 'delete') {
+                        if (confirm(`Delete ${p.name}?`)) {
+                            fetch(`/api/assets/${encodeURIComponent(p.id)}`, { method: 'DELETE' })
+                                .then(r => {
+                                    if (r.ok) {
+                                        EventBus.emit('toast:show', { message: `Deleted: ${p.name}`, type: 'info' });
+                                        _refreshAssetLayer();
+                                    }
+                                });
+                            _assetPopup?.remove();
+                        }
+                    }
+                });
+            });
+        }, 50);
+    });
+
+    // Refresh on demand (after asset creation/edit/delete)
+    EventBus.on('asset:refresh', () => _refreshAssetLayer());
+
+    // Initial fetch + periodic refresh
+    _refreshAssetLayer();
+    _assetRefreshTimer = setInterval(_refreshAssetLayer, 15000);
+}
+
+function _startAssetDrag(assetId, lngLat) {
+    if (!_state.editMode) return;
+    _state.draggingAsset = { id: assetId, startLng: lngLat.lng, startLat: lngLat.lat };
+    if (_state.container) _state.container.style.cursor = 'grabbing';
+    // Disable map drag while moving asset
+    _state.map?.dragPan.disable();
+    EventBus.emit('toast:show', { message: 'Drag to reposition — click to place, ESC to cancel', type: 'info' });
+
+    const onMove = (e) => {
+        if (!_state.draggingAsset) return;
+        // Update the specific feature position in the GeoJSON source
+        _updateDraggedAssetPosition(e.lngLat.lng, e.lngLat.lat);
+    };
+    const onUp = (e) => {
+        if (!_state.draggingAsset) return;
+        const { id } = _state.draggingAsset;
+        _state.draggingAsset = null;
+        _state.map?.dragPan.enable();
+        if (_state.container) _state.container.style.cursor = '';
+        _state.map.off('mousemove', onMove);
+        _state.map.off('click', onUp);
+        document.removeEventListener('keydown', onEsc);
+
+        // Save new position
+        fetch(`/api/assets/${encodeURIComponent(id)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                home_x: e.lngLat.lat,
+                home_y: e.lngLat.lng,
+                position_x: e.lngLat.lat,
+                position_y: e.lngLat.lng,
+            }),
+        }).then(r => {
+            if (r.ok) {
+                EventBus.emit('toast:show', { message: 'Asset repositioned', type: 'info' });
+                _refreshAssetLayer();
+            }
+        });
+    };
+    const onEsc = (e) => {
+        if (e.key === 'Escape' && _state.draggingAsset) {
+            _state.draggingAsset = null;
+            _state.map?.dragPan.enable();
+            if (_state.container) _state.container.style.cursor = '';
+            _state.map.off('mousemove', onMove);
+            _state.map.off('click', onUp);
+            document.removeEventListener('keydown', onEsc);
+            _refreshAssetLayer(); // Reset to original positions
+            EventBus.emit('toast:show', { message: 'Move cancelled', type: 'info' });
+        }
+    };
+
+    _state.map.on('mousemove', onMove);
+    _state.map.on('click', onUp);
+    document.addEventListener('keydown', onEsc);
+}
+
+function _updateDraggedAssetPosition(lng, lat) {
+    const src = _state.map?.getSource(ASSET_SOURCE_ID);
+    if (!src || !_state.draggingAsset) return;
+    const data = src._data || src.serialize?.()?.data;
+    if (!data?.features) return;
+
+    const updated = {
+        ...data,
+        features: data.features.map(f => {
+            if (f.properties?.id === _state.draggingAsset.id) {
+                return { ...f, geometry: { type: 'Point', coordinates: [lng, lat] } };
+            }
+            return f;
+        }),
+    };
+    src.setData(updated);
+}
+
+async function _refreshAssetLayer() {
+    if (!_state.map) return;
+    try {
+        const resp = await fetch('/api/assets');
+        if (!resp.ok) return;
+        const assets = await resp.json();
+
+        const features = assets
+            .filter(a => a.home_x != null && a.home_y != null)
+            .map(a => {
+                // Resolve color from registry (extensible by addons)
+                const T = assetTypeRegistry.resolveForAsset(a);
+                const color = T ? T.color : '#888';
+                return {
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: [a.home_y, a.home_x] },
+                    properties: {
+                        id: a.asset_id,
+                        name: a.name,
+                        assetType: a.asset_type,
+                        assetClass: a.asset_class,
+                        coverageRadius: a.coverage_radius_meters || 0,
+                        radiusPixels: Math.max(2, Math.min(80, (a.coverage_radius_meters || 10) / 2)),
+                        mounting: a.mounting_type,
+                        height: a.height_meters,
+                        enabled: a.enabled,
+                        source: a.connection_url || 'real',
+                        simulated: (a.connection_url || '').includes('simulated'),
+                        color,
+                    },
+                };
+            });
+
+        const src = _state.map.getSource(ASSET_SOURCE_ID);
+        if (src) src.setData({ type: 'FeatureCollection', features });
+
+        // Generate FOV cones for directional assets (cone_angle < 360)
+        const fovFeatures = assets
+            .filter(a => a.home_x != null && a.home_y != null &&
+                         a.coverage_cone_angle && a.coverage_cone_angle < 360 &&
+                         a.coverage_radius_meters > 0)
+            .map(a => {
+                const lng = a.home_y; // home_y=lng
+                const lat = a.home_x; // home_x=lat
+                const heading = a.heading || 0;
+                const coords = _buildFovConePolygon(lng, lat, heading, a.coverage_cone_angle, a.coverage_radius_meters);
+                const color = a.asset_class === 'observation' ? '#00f0ff' : '#05ffa1';
+                return {
+                    type: 'Feature',
+                    geometry: { type: 'Polygon', coordinates: [coords] },
+                    properties: { id: a.asset_id, name: a.name, color },
+                };
+            });
+        const fovSrc = _state.map.getSource(ASSET_FOV_SOURCE_ID);
+        if (fovSrc) fovSrc.setData({ type: 'FeatureCollection', features: fovFeatures });
+    } catch { /* ignore fetch errors */ }
+}
+
 // ── Camera Markers ─────────────────────────────────────────────────────
 // Shows camera icons on the tactical map for cameras that have lat/lng.
 
@@ -9540,23 +10683,7 @@ const CAMERA_LAYER_FOV_LINE = 'tritium-camera-fov-line';
  * rangeMeterss: how far the cone extends from the camera.
  */
 function _buildFovConePolygon(lng, lat, heading, fovAngle, rangeMeters) {
-    const steps = 24;
-    const halfFov = fovAngle / 2;
-    const startBearing = heading - halfFov;
-    const endBearing = heading + halfFov;
-    const coords = [[lng, lat]]; // start at camera position
-
-    for (let i = 0; i <= steps; i++) {
-        const bearing = startBearing + (endBearing - startBearing) * (i / steps);
-        const bearingRad = (bearing * Math.PI) / 180;
-        // Approximate: 1 degree lat ~ 111320m, 1 degree lng ~ 111320 * cos(lat)
-        const latRad = (lat * Math.PI) / 180;
-        const dLat = (rangeMeters * Math.cos(bearingRad)) / 111320;
-        const dLng = (rangeMeters * Math.sin(bearingRad)) / (111320 * Math.cos(latRad));
-        coords.push([lng + dLng, lat + dLat]);
-    }
-    coords.push([lng, lat]); // close the polygon
-    return coords;
+    return libBuildFovCone(lng, lat, heading, fovAngle, rangeMeters);
 }
 
 /**
@@ -9590,6 +10717,7 @@ async function _fetchCamerasForMap() {
                             if (dist > 0.01) {
                                 console.log(`[MAP-ML] Geo reference changed, flying to ${geoData.lat.toFixed(4)}, ${geoData.lng.toFixed(4)}`);
                                 _state.geoCenter = { lat: geoData.lat, lng: geoData.lng };
+                                _coords.setReference(geoData.lat, geoData.lng);
                                 _state.map.flyTo({ center: [geoData.lng, geoData.lat], zoom: 17, duration: 1500 });
                             }
                         }
@@ -9875,6 +11003,7 @@ export function getMapState() {
         showRoads: _state.showRoads,
         showGrid: _state.showGrid,
         showBuildings: _state.showBuildings,
+        showCitySim: _state.citySim?.running || false,
         showUnits: _state.showUnits,
         showLabels: _state.showLabels,
         showModels3d: _state.showModels3d,
@@ -10072,4 +11201,175 @@ export function setLayers(layers) {
     _updateLayerHud();
     console.log('[MAP-ML] Layers set:', JSON.stringify(getMapState()));
     return getMapState();
+}
+
+// ============================================================
+// City Simulation Integration
+// ============================================================
+
+/**
+ * Toggle city simulation on/off.
+ * Loads city data if needed, spawns vehicles and pedestrians,
+ * runs simulation in the render loop.
+ */
+export async function toggleCitySim() {
+    if (_state.citySim?.running) {
+        _state.citySim.clearVehicles();
+        _state.citySim.anomalyDetector?.reset();
+        _state.showCitySim = false;
+        // Stop standalone sim tick
+        if (_state._simTickStop) {
+            _state._simTickStop();
+        }
+        // Remove HUD
+        if (_state._citySimHud) {
+            _state._citySimHud.remove();
+            _state._citySimHud = null;
+        }
+        // Clear 2D markers and heading lines
+        const emptyGJ = { type: 'FeatureCollection', features: [] };
+        if (_state.map?.getSource('city-sim-markers')) {
+            _state.map.getSource('city-sim-markers').setData(emptyGJ);
+        }
+        if (_state.map?.getSource('city-sim-headings')) {
+            _state.map.getSource('city-sim-headings').setData(emptyGJ);
+        }
+        console.log('[MAP-ML] City sim stopped');
+        EventBus.emit('city-sim:stopped');
+        return;
+    }
+
+    if (!_state.citySim?.loaded) {
+        if (!_state.geoCenter) {
+            console.warn('[MAP-ML] No geo reference — cannot start city sim');
+            return;
+        }
+        console.log('[MAP-ML] Loading city data for simulation...');
+        EventBus.emit('toast:show', { message: 'Loading city data...', type: 'info', duration: 3000 });
+        const ok = await _state.citySim.loadCityData(
+            _state.geoCenter.lat, _state.geoCenter.lng, 400
+        );
+        if (!ok) {
+            console.warn('[MAP-ML] Failed to load city data');
+            return;
+        }
+    }
+
+    const stats = _state.citySim.roadNetwork?.stats();
+    if (stats?.edges > 0) {
+        // Ensure Three.js layer exists — city sim needs InstancedMesh for rendering.
+        // The Three.js layer may not have been added if showModels3d was false at boot.
+        if (!_state.threeScene && typeof THREE !== 'undefined' && _state.map) {
+            console.log('[MAP-ML] Adding Three.js layer for city sim rendering...');
+            _addThreeJsLayer(true);
+            // Wait one frame for onAdd callback to fire
+            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        }
+        // Initialize rendering using the MapLibre Three.js scene
+        if (_state.threeScene) {
+            _state.citySim.initRendering(THREE, _state.threeScene);
+        } else {
+            console.warn('[MAP-ML] Three.js scene not available — city sim will run headless (no rendering)');
+        }
+        // Scale entity counts with road network size for a lively city
+        const vehicleCount = Math.min(200, Math.max(30, stats.edges * 2));
+        const pedCount = Math.min(100, Math.max(20, stats.edges));
+        _state.citySim.spawnVehicles(vehicleCount);
+        _state.citySim.spawnPedestrians(pedCount);
+        _state.showCitySim = true;
+        const simStats = _state.citySim.getStats();
+        console.log(`[MAP-ML] City sim started: ${vehicleCount} vehicles, ${pedCount} people, ${stats.edges} roads, ${stats.nodes} intersections`);
+        EventBus.emit('city-sim:started');
+        // Toast notification so user sees it worked
+        EventBus.emit('toast:show', {
+            message: `City sim: ${vehicleCount} vehicles, ${pedCount} pedestrians on ${stats.edges} roads`,
+            type: 'info',
+            duration: 4000,
+        });
+        // Ensure continuous repaints so vehicles animate
+        _ensureRepaintLoop();
+        // Standalone sim tick — uses both MessageChannel (not throttled) and
+        // setInterval (throttled fallback) to ensure sim progresses reliably.
+        // MessageChannel.postMessage is NOT throttled in background tabs, unlike
+        // setInterval which drops to 1Hz.
+        if (!_state._simTickInterval) {
+            let lastTick = performance.now();
+            const tickFn = () => {
+                if (!_state.citySim?.running) return;
+                const now = performance.now();
+                const dt = Math.min(2.0, (now - lastTick) / 1000);
+                if (dt < 0.05) return; // skip if < 50ms since last tick
+                lastTick = now;
+                _state.citySim.tick(dt);
+                _updateCitySimMarkers();
+                if (_state.map) _state.map.triggerRepaint();
+            };
+
+            // Primary: MessageChannel for unthrottled ticks
+            const channel = new MessageChannel();
+            let mcRunning = true;
+            channel.port1.onmessage = () => {
+                if (!mcRunning) return;
+                tickFn();
+                // Schedule next tick ~100ms from now
+                setTimeout(() => { if (mcRunning) channel.port2.postMessage(null); }, 100);
+            };
+            channel.port2.postMessage(null); // kick off
+            _state._simTickChannel = channel;
+            _state._simTickChannelRunning = () => mcRunning;
+
+            // Fallback: setInterval (browsers throttle to 1Hz in background)
+            _state._simTickInterval = setInterval(tickFn, 200);
+
+            // Store cleanup for stop
+            _state._simTickStop = () => {
+                mcRunning = false;
+                clearInterval(_state._simTickInterval);
+                _state._simTickInterval = null;
+            };
+        }
+    }
+}
+
+/**
+ * Get city sim stats for panel/HUD.
+ */
+export function getCitySimStats() {
+    return _state.citySim?.getStats() || null;
+}
+
+/**
+ * Cycle sim time scale.
+ */
+export function cycleSimTimeScale() {
+    if (!_state.citySim) return;
+    const scales = [1, 10, 60, 300, 1800, 0]; // 1x, 10x, 60x, 5min/s, 30min/s, pause
+    const current = _state.citySim.timeScale;
+    const idx = scales.indexOf(current);
+    const newScale = scales[(idx + 1) % scales.length];
+    _state.citySim.timeScale = newScale;
+    console.log(`[MAP-ML] Time scale: ${newScale}x (${newScale === 0 ? 'PAUSED' : newScale <= 60 ? newScale + ' sim-sec/real-sec' : (newScale/60).toFixed(0) + ' sim-min/real-sec'})`);
+}
+
+/**
+ * Spawn an emergency vehicle into the city sim.
+ */
+export function spawnEmergencyVehicle() {
+    if (!_state.citySim?.running) return;
+    _state.citySim.spawnEmergency();
+}
+
+/**
+ * Toggle road graph debug overlay.
+ */
+export function toggleRoadGraph() {
+    // Road graph overlay not available in MapLibre mode
+    console.log('[MAP-ML] Road graph overlay not available in 2D mode');
+}
+
+/**
+ * Toggle bloom (not available in MapLibre mode).
+ */
+export function toggleBloom() {
+    console.log('[MAP-ML] Bloom not available in 2D mode');
 }

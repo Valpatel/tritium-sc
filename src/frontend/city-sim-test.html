@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>City Sim Module Test Harness</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a12; color: #ccc; font-family: 'Courier New', monospace; padding: 20px; }
+        h1 { color: #00f0ff; font-size: 18px; margin-bottom: 10px; }
+        h2 { color: #888; font-size: 14px; margin: 15px 0 8px; }
+        .test { padding: 4px 8px; margin: 2px 0; font-size: 12px; }
+        .pass { color: #05ffa1; }
+        .fail { color: #ff2a6d; }
+        .info { color: #888; }
+        #summary { margin-top: 20px; padding: 10px; border: 1px solid #333; font-size: 14px; }
+        #phase2 { margin-top: 20px; }
+        button { background: #1a1a2e; color: #00f0ff; border: 1px solid #00f0ff; padding: 8px 16px; cursor: pointer; font-family: inherit; margin: 5px; }
+        button:hover { background: #00f0ff; color: #0a0a12; }
+    </style>
+</head>
+<body>
+    <h1>TRITIUM CITY SIM — MODULE TEST HARNESS</h1>
+    <p class="info">This page imports the REAL ES modules and verifies they load and work correctly.</p>
+
+    <h2>PHASE 1: Module Loading</h2>
+    <div id="loading-results"></div>
+
+    <h2>PHASE 2: Constructor Tests</h2>
+    <div id="constructor-results"></div>
+
+    <h2>PHASE 3: Logic Tests (Pure — No Three.js)</h2>
+    <div id="logic-results"></div>
+
+    <h2>PHASE 4: Integration Tests (Requires Server)</h2>
+    <div id="integration-results"></div>
+    <button id="btn-integration">Run Integration Tests</button>
+    <button id="btn-physics">Run 1000-tick Physics Stress</button>
+
+    <div id="summary"></div>
+
+    <script type="module">
+        const results = { pass: 0, fail: 0, skip: 0 };
+        const loadingDiv = document.getElementById('loading-results');
+        const constructorDiv = document.getElementById('constructor-results');
+        const logicDiv = document.getElementById('logic-results');
+        const integrationDiv = document.getElementById('integration-results');
+        const summaryDiv = document.getElementById('summary');
+
+        function log(div, status, msg) {
+            const el = document.createElement('div');
+            el.className = `test ${status}`;
+            el.textContent = `[${status.toUpperCase()}] ${msg}`;
+            div.appendChild(el);
+            results[status]++;
+        }
+
+        function updateSummary() {
+            const total = results.pass + results.fail + results.skip;
+            const color = results.fail > 0 ? '#ff2a6d' : '#05ffa1';
+            summaryDiv.innerHTML = `<span style="color:${color}">${results.pass}/${total} passed, ${results.fail} failed, ${results.skip} skipped</span>`;
+        }
+
+        // =====================================================================
+        // PHASE 1: Module Loading
+        // =====================================================================
+        const moduleMap = {
+            'events.js': { path: './js/command/events.js', expected: ['EventBus'] },
+            'road-network.js': { path: '/lib/sim/road-network.js', expected: ['RoadNetwork'] },
+            'idm.js': { path: '/lib/sim/idm.js', expected: ['idmAcceleration', 'ROAD_SPEEDS', 'IDM_DEFAULTS'] },
+            'spatial-grid.js': { path: '/lib/sim/spatial-grid.js', expected: ['SpatialGrid'] },
+            'weather.js': { path: '/lib/sim/weather.js', expected: ['CityWeather'] },
+            'anomaly-detector.js': { path: './js/command/sim/anomaly-detector.js', expected: ['AnomalyDetector'] },
+            'ambient-sound.js': { path: './js/command/sim/ambient-sound.js', expected: ['AmbientSoundBridge'] },
+            'sensor-bridge.js': { path: './js/command/sim/sensor-bridge.js', expected: ['SensorBridge'] },
+            'scenario-loader.js': { path: './js/command/sim/scenario-loader.js', expected: ['loadScenario'] },
+            'rl-hooks.js': { path: './js/command/sim/rl-hooks.js', expected: ['RLHooks'] },
+            'mobil.js': { path: './js/command/sim/mobil.js', expected: [] },  // may export MOBILEvaluator or similar
+            'procedural-city.js': { path: '/lib/sim/procedural-city.js', expected: [] },
+            'traffic-controller.js': { path: '/lib/sim/traffic-controller.js', expected: ['TrafficControllerManager'] },
+            'pedestrian.js': { path: './js/command/sim/pedestrian.js', expected: ['SimPedestrian'] },
+            'vehicle.js': { path: './js/command/sim/vehicle.js', expected: ['SimVehicle'] },
+            'lod-manager.js': { path: './js/command/sim/lod-manager.js', expected: ['LODManager'] },
+            'weather-vfx.js': { path: './js/command/sim/weather-vfx.js', expected: ['WeatherVFX'] },
+            'facade-shader.js': { path: './js/command/sim/facade-shader.js', expected: [] },
+            'city-sim-manager.js': { path: './js/command/sim/city-sim-manager.js', expected: ['CitySimManager'] },
+        };
+
+        const loaded = {};
+
+        for (const [name, info] of Object.entries(moduleMap)) {
+            try {
+                const mod = await import(info.path);
+                const exports = Object.keys(mod);
+                loaded[name] = mod;
+
+                // Check expected exports exist
+                const missing = info.expected.filter(e => !exports.includes(e));
+                if (missing.length > 0) {
+                    log(loadingDiv, 'fail', `${name}: loaded but missing exports: ${missing.join(', ')} (has: ${exports.join(', ')})`);
+                } else {
+                    log(loadingDiv, 'pass', `${name}: loaded OK — exports: ${exports.join(', ')}`);
+                }
+            } catch (e) {
+                log(loadingDiv, 'fail', `${name}: IMPORT FAILED — ${e.message}`);
+                loaded[name] = null;
+            }
+        }
+
+        // =====================================================================
+        // PHASE 2: Constructor Tests
+        // =====================================================================
+
+        function tryConstruct(name, fn) {
+            try {
+                const obj = fn();
+                if (obj === null || obj === undefined) {
+                    log(constructorDiv, 'fail', `${name}: constructor returned null/undefined`);
+                } else {
+                    log(constructorDiv, 'pass', `${name}: constructed OK`);
+                }
+                return obj;
+            } catch (e) {
+                log(constructorDiv, 'fail', `${name}: constructor threw — ${e.message}`);
+                return null;
+            }
+        }
+
+        const rn = tryConstruct('RoadNetwork', () => loaded['road-network.js'] && new loaded['road-network.js'].RoadNetwork());
+        // IDM is functional, not class-based — test the function instead
+        let idm = null;
+        if (loaded['idm.js']?.idmAcceleration) {
+            log(constructorDiv, 'pass', 'IDM: idmAcceleration function available');
+            idm = loaded['idm.js'];
+        } else {
+            log(constructorDiv, 'fail', 'IDM: idmAcceleration function not found');
+        }
+        const sg = tryConstruct('SpatialGrid', () => loaded['spatial-grid.js'] && new loaded['spatial-grid.js'].SpatialGrid(20));
+        const cw = tryConstruct('CityWeather', () => loaded['weather.js'] && new loaded['weather.js'].CityWeather());
+        const ad = tryConstruct('AnomalyDetector', () => loaded['anomaly-detector.js'] && new loaded['anomaly-detector.js'].AnomalyDetector());
+        const sb = tryConstruct('SensorBridge', () => loaded['sensor-bridge.js'] && new loaded['sensor-bridge.js'].SensorBridge());
+        const ab = tryConstruct('AmbientSoundBridge', () => loaded['ambient-sound.js'] && new loaded['ambient-sound.js'].AmbientSoundBridge());
+        const tc = tryConstruct('TrafficControllerManager', () => loaded['traffic-controller.js'] && new loaded['traffic-controller.js'].TrafficControllerManager());
+
+        // CitySimManager is the big one — it creates sub-objects in constructor
+        const csm = tryConstruct('CitySimManager', () => loaded['city-sim-manager.js'] && new loaded['city-sim-manager.js'].CitySimManager());
+
+        // =====================================================================
+        // PHASE 3: Logic Tests
+        // =====================================================================
+
+        // --- EventBus ---
+        if (loaded['events.js']) {
+            const { EventBus } = loaded['events.js'];
+            try {
+                let received = null;
+                const unsub = EventBus.on('test-event', (data) => { received = data; });
+                EventBus.emit('test-event', { value: 42 });
+                if (received?.value === 42) {
+                    log(logicDiv, 'pass', 'EventBus: emit/on works');
+                } else {
+                    log(logicDiv, 'fail', `EventBus: emit/on failed — received: ${JSON.stringify(received)}`);
+                }
+                unsub();
+                received = null;
+                EventBus.emit('test-event', { value: 99 });
+                if (received === null) {
+                    log(logicDiv, 'pass', 'EventBus: unsubscribe works');
+                } else {
+                    log(logicDiv, 'fail', 'EventBus: unsubscribe failed — still receiving');
+                }
+            } catch (e) {
+                log(logicDiv, 'fail', `EventBus: test threw — ${e.message}`);
+            }
+        }
+
+        // --- RoadNetwork ---
+        if (rn) {
+            try {
+                // Empty build
+                rn.buildFromOSM([]);
+                const s0 = rn.stats();
+                if (s0.nodes === 0 && s0.edges === 0) {
+                    log(logicDiv, 'pass', 'RoadNetwork: empty build → 0 nodes, 0 edges');
+                } else {
+                    log(logicDiv, 'fail', `RoadNetwork: empty build → ${s0.nodes} nodes, ${s0.edges} edges`);
+                }
+
+                // Proper T-junction: 3 road segments meeting at [50,0]
+                // (OSM splits roads at intersections, so you get 3 segments, not 2 crossing roads)
+                rn.buildFromOSM([
+                    { points: [[0, 0], [50, 0]], class: 'residential', width: 8, lanes: 2, oneway: false },
+                    { points: [[50, 0], [100, 0]], class: 'residential', width: 8, lanes: 2, oneway: false },
+                    { points: [[50, 0], [50, 50]], class: 'residential', width: 8, lanes: 2, oneway: false },
+                ]);
+                const s1 = rn.stats();
+                if (s1.nodes >= 3 && s1.edges >= 3) {
+                    log(logicDiv, 'pass', `RoadNetwork: T-junction → ${s1.nodes} nodes, ${s1.edges} edges`);
+                } else {
+                    log(logicDiv, 'fail', `RoadNetwork: T-junction → ${s1.nodes} nodes, ${s1.edges} edges (expected >=3 each)`);
+                }
+
+                // Pathfinding
+                const nodeIds = Object.keys(rn.nodes);
+                if (nodeIds.length >= 2) {
+                    const path = rn.findPath(nodeIds[0], nodeIds[nodeIds.length - 1]);
+                    if (path && path.length > 0) {
+                        log(logicDiv, 'pass', `RoadNetwork: findPath returned ${path.length} steps`);
+                    } else {
+                        log(logicDiv, 'fail', 'RoadNetwork: findPath returned empty path');
+                    }
+                }
+
+                // randomEdge
+                const re = rn.randomEdge();
+                if (re && re.length > 0) {
+                    log(logicDiv, 'pass', `RoadNetwork: randomEdge returned edge (length=${re.length.toFixed(1)}m)`);
+                } else {
+                    log(logicDiv, 'fail', 'RoadNetwork: randomEdge returned null');
+                }
+            } catch (e) {
+                log(logicDiv, 'fail', `RoadNetwork: test threw — ${e.message}`);
+            }
+        }
+
+        // --- IDM ---
+        if (idm) {
+            try {
+                const params = idm.IDM_DEFAULTS;
+                // Free road acceleration
+                const acc = idm.idmAcceleration(0, 100, 14, params);  // speed=0, gap=100m, leaderSpeed=14
+                if (typeof acc === 'number' && !isNaN(acc) && acc > 0) {
+                    log(logicDiv, 'pass', `IDM: free road acceleration = ${acc.toFixed(3)} m/s^2`);
+                } else {
+                    log(logicDiv, 'fail', `IDM: free road acceleration invalid = ${acc}`);
+                }
+
+                // Braking behind stopped car
+                const brake = idm.idmAcceleration(14, 3, 0, params);  // speed=14, gap=3m, leaderSpeed=0
+                if (typeof brake === 'number' && !isNaN(brake) && brake < 0) {
+                    log(logicDiv, 'pass', `IDM: braking = ${brake.toFixed(3)} m/s^2`);
+                } else {
+                    log(logicDiv, 'fail', `IDM: braking invalid = ${brake}`);
+                }
+
+                // NaN check: very small gap
+                const tiny = idm.idmAcceleration(10, 0.1, 5, params);
+                if (!isNaN(tiny)) {
+                    log(logicDiv, 'pass', `IDM: small gap doesn't produce NaN (acc=${tiny.toFixed(3)})`);
+                } else {
+                    log(logicDiv, 'fail', 'IDM: small gap produces NaN');
+                }
+            } catch (e) {
+                log(logicDiv, 'fail', `IDM: test threw — ${e.message}`);
+            }
+        }
+
+        // --- SpatialGrid ---
+        if (sg) {
+            try {
+                sg.clear();
+                sg.insert({ id: 'a', x: 10, z: 10 });
+                sg.insert({ id: 'b', x: 12, z: 10 });
+                sg.insert({ id: 'c', x: 100, z: 100 });
+
+                const near = sg.getNearby(10, 10);
+                const nearIds = near.map(e => e.id);
+                if (nearIds.includes('a') && nearIds.includes('b') && !nearIds.includes('c')) {
+                    log(logicDiv, 'pass', 'SpatialGrid: getNearby returns correct neighbors');
+                } else {
+                    log(logicDiv, 'fail', `SpatialGrid: getNearby returned [${nearIds.join(',')}]`);
+                }
+
+                sg.clear();
+                const afterClear = sg.getNearby(10, 10);
+                if (afterClear.length === 0) {
+                    log(logicDiv, 'pass', 'SpatialGrid: clear empties grid');
+                } else {
+                    log(logicDiv, 'fail', 'SpatialGrid: clear did not empty grid');
+                }
+            } catch (e) {
+                log(logicDiv, 'fail', `SpatialGrid: test threw — ${e.message}`);
+            }
+        }
+
+        // --- CityWeather ---
+        if (cw) {
+            try {
+                cw.update(12.0, 0.1);  // noon, 0.1s dt
+                if (typeof cw.weather === 'string' && typeof cw.isNight === 'boolean') {
+                    log(logicDiv, 'pass', `CityWeather: weather=${cw.weather}, isNight=${cw.isNight}`);
+                } else {
+                    log(logicDiv, 'fail', `CityWeather: invalid state`);
+                }
+
+                // Night check
+                cw.update(23.0, 0.1);
+                if (cw.isNight === true) {
+                    log(logicDiv, 'pass', 'CityWeather: 11pm is night');
+                } else {
+                    log(logicDiv, 'fail', `CityWeather: 11pm isNight=${cw.isNight}`);
+                }
+            } catch (e) {
+                log(logicDiv, 'fail', `CityWeather: test threw — ${e.message}`);
+            }
+        }
+
+        // --- Vehicle on road ---
+        if (rn && loaded['vehicle.js']) {
+            try {
+                // Build a simple network first
+                rn.buildFromOSM([
+                    { points: [[0, 0], [200, 0]], class: 'residential', width: 8, lanes: 2, oneway: false },
+                    { points: [[100, -100], [100, 100]], class: 'residential', width: 8, lanes: 2, oneway: false },
+                ]);
+                const edge = rn.randomEdge();
+                if (!edge) throw new Error('No edges available');
+
+                const { SimVehicle } = loaded['vehicle.js'];
+                const car = new SimVehicle(edge, 10, rn);
+
+                // Initial state
+                if (typeof car.x === 'number' && typeof car.z === 'number' && !isNaN(car.x) && !isNaN(car.z)) {
+                    log(logicDiv, 'pass', `SimVehicle: created at (${car.x.toFixed(1)}, ${car.z.toFixed(1)})`);
+                } else {
+                    log(logicDiv, 'fail', `SimVehicle: invalid position (${car.x}, ${car.z})`);
+                }
+
+                // Tick 100 times
+                let nanFound = false;
+                for (let i = 0; i < 100; i++) {
+                    car.tick(0.1, []);
+                    if (isNaN(car.x) || isNaN(car.z) || isNaN(car.speed)) {
+                        nanFound = true;
+                        break;
+                    }
+                }
+                if (!nanFound) {
+                    log(logicDiv, 'pass', `SimVehicle: 100 ticks without NaN (speed=${car.speed.toFixed(2)} m/s)`);
+                } else {
+                    log(logicDiv, 'fail', 'SimVehicle: NaN detected during ticks');
+                }
+
+                // Speed should be positive or zero
+                if (car.speed >= 0) {
+                    log(logicDiv, 'pass', `SimVehicle: speed non-negative (${car.speed.toFixed(2)})`);
+                } else {
+                    log(logicDiv, 'fail', `SimVehicle: negative speed (${car.speed})`);
+                }
+            } catch (e) {
+                log(logicDiv, 'fail', `SimVehicle: test threw — ${e.message}\n${e.stack}`);
+            }
+        }
+
+        // --- Pedestrian ---
+        if (loaded['pedestrian.js']) {
+            try {
+                const { SimPedestrian } = loaded['pedestrian.js'];
+                const ped = new SimPedestrian(50, 50, { x: 50, z: 50 }, { x: 150, z: 150 });
+
+                if (typeof ped.x === 'number' && !isNaN(ped.x)) {
+                    log(logicDiv, 'pass', `SimPedestrian: created at (${ped.x.toFixed(1)}, ${ped.z.toFixed(1)})`);
+                } else {
+                    log(logicDiv, 'fail', `SimPedestrian: invalid position`);
+                }
+
+                // Tick pedestrian through some sim hours
+                for (let i = 0; i < 100; i++) {
+                    ped.tick(0.1, 8.0, [], []);
+                }
+                if (!isNaN(ped.x) && !isNaN(ped.z)) {
+                    log(logicDiv, 'pass', `SimPedestrian: 100 ticks without NaN`);
+                } else {
+                    log(logicDiv, 'fail', 'SimPedestrian: NaN detected');
+                }
+            } catch (e) {
+                log(logicDiv, 'fail', `SimPedestrian: test threw — ${e.message}`);
+            }
+        }
+
+        // --- AnomalyDetector ---
+        if (ad) {
+            try {
+                ad.enabled = true;
+                // No anomalies with empty vehicles
+                const a1 = ad.tick(0.1, 12.0, [], [], null);
+                if (Array.isArray(a1)) {
+                    log(logicDiv, 'pass', `AnomalyDetector: empty tick returns array (${a1.length} anomalies)`);
+                } else {
+                    log(logicDiv, 'fail', `AnomalyDetector: tick returned non-array`);
+                }
+
+                const stats = ad.getStats();
+                if (typeof stats === 'object' && 'totalDetections' in stats && 'baselineReady' in stats) {
+                    log(logicDiv, 'pass', `AnomalyDetector: getStats works (detections=${stats.totalDetections}, baseline=${stats.baselineReady})`);
+                } else {
+                    log(logicDiv, 'fail', `AnomalyDetector: getStats invalid — keys: ${Object.keys(stats || {}).join(',')}`);
+                }
+            } catch (e) {
+                log(logicDiv, 'fail', `AnomalyDetector: test threw — ${e.message}`);
+            }
+        }
+
+        // --- TrafficControllerManager ---
+        if (tc && rn) {
+            try {
+                tc.initFromNetwork(rn);
+                const ctrlCount = Object.keys(tc.controllers).length;
+                log(logicDiv, 'pass', `TrafficController: initialized with ${ctrlCount} controllers`);
+
+                // Tick a few times
+                for (let i = 0; i < 100; i++) {
+                    tc.tick(0.1);
+                }
+                log(logicDiv, 'pass', 'TrafficController: 100 ticks without error');
+            } catch (e) {
+                log(logicDiv, 'fail', `TrafficController: test threw — ${e.message}`);
+            }
+        }
+
+        // --- CitySimManager full lifecycle (without Three.js) ---
+        if (csm) {
+            try {
+                // Check initial state
+                if (csm.running === false && csm.loaded === false) {
+                    log(logicDiv, 'pass', 'CitySimManager: initial state correct');
+                } else {
+                    log(logicDiv, 'fail', `CitySimManager: unexpected initial state`);
+                }
+
+                // Stats without loading
+                const s0 = csm.getStats();
+                if (s0 === null) {
+                    log(logicDiv, 'pass', 'CitySimManager: getStats returns null before load');
+                } else {
+                    log(logicDiv, 'fail', `CitySimManager: getStats before load returned non-null`);
+                }
+            } catch (e) {
+                log(logicDiv, 'fail', `CitySimManager: lifecycle test threw — ${e.message}`);
+            }
+        }
+
+        updateSummary();
+
+        // =====================================================================
+        // PHASE 4: Integration Tests (button-triggered, needs server)
+        // =====================================================================
+
+        document.getElementById('btn-integration').addEventListener('click', async () => {
+            integrationDiv.innerHTML = '';
+
+            // Test: Load procedural city data
+            try {
+                const resp = await fetch('/api/city-sim/demo-city?radius=300&seed=42');
+                const cityData = await resp.json();
+                if (cityData.buildings?.length > 0 && cityData.roads?.length > 0) {
+                    log(integrationDiv, 'pass', `API: demo-city returned ${cityData.buildings.length} buildings, ${cityData.roads.length} roads`);
+                } else {
+                    log(integrationDiv, 'fail', 'API: demo-city returned empty data');
+                }
+
+                // Feed data into CitySimManager
+                if (csm) {
+                    csm.cityData = cityData;
+                    csm.roadNetwork = new (loaded['road-network.js'].RoadNetwork)();
+                    csm.roadNetwork.buildFromOSM(cityData.roads);
+                    const stats = csm.roadNetwork.stats();
+
+                    if (stats.nodes > 0 && stats.edges > 0) {
+                        log(integrationDiv, 'pass', `Integration: road network built — ${stats.nodes} nodes, ${stats.edges} edges`);
+                    } else {
+                        log(integrationDiv, 'fail', `Integration: road network empty`);
+                    }
+
+                    // Initialize traffic controllers
+                    csm.trafficMgr = new (loaded['traffic-controller.js'].TrafficControllerManager)();
+                    csm.trafficMgr.initFromNetwork(csm.roadNetwork);
+                    csm.loaded = true;
+
+                    // Spawn vehicles
+                    const spawned = csm.spawnVehicles(20);
+                    if (spawned > 0) {
+                        log(integrationDiv, 'pass', `Integration: spawned ${spawned} vehicles`);
+                    } else {
+                        log(integrationDiv, 'fail', 'Integration: failed to spawn vehicles');
+                    }
+
+                    // Spawn pedestrians
+                    const pedCount = csm.spawnPedestrians(10);
+                    if (pedCount > 0) {
+                        log(integrationDiv, 'pass', `Integration: spawned ${pedCount} pedestrians`);
+                    } else {
+                        log(integrationDiv, 'fail', 'Integration: failed to spawn pedestrians');
+                    }
+
+                    // Tick the sim 100 times
+                    const t0 = performance.now();
+                    for (let i = 0; i < 100; i++) {
+                        csm.tick(0.016);
+                    }
+                    const elapsed = performance.now() - t0;
+                    log(integrationDiv, 'pass', `Integration: 100 ticks in ${elapsed.toFixed(1)}ms (${(elapsed / 100).toFixed(2)}ms/tick)`);
+
+                    // Check no NaN in vehicles
+                    let nanVehicles = 0;
+                    for (const v of csm.vehicles) {
+                        if (isNaN(v.x) || isNaN(v.z) || isNaN(v.speed)) nanVehicles++;
+                    }
+                    if (nanVehicles === 0) {
+                        log(integrationDiv, 'pass', `Integration: 0 NaN vehicles after 100 ticks`);
+                    } else {
+                        log(integrationDiv, 'fail', `Integration: ${nanVehicles} vehicles have NaN`);
+                    }
+
+                    // Get stats
+                    const finalStats = csm.getStats();
+                    if (finalStats && finalStats.vehicles > 0) {
+                        log(integrationDiv, 'pass', `Integration: stats — ${finalStats.vehicles} vehicles, avgSpeed=${finalStats.avgSpeedKmh}km/h, hour=${finalStats.simHour.toFixed(1)}`);
+                    } else {
+                        log(integrationDiv, 'fail', 'Integration: getStats returned invalid data');
+                    }
+
+                    // Cleanup
+                    csm.clearVehicles();
+                    if (csm.vehicles.length === 0 && csm.pedestrians.length === 0) {
+                        log(integrationDiv, 'pass', 'Integration: clearVehicles works');
+                    } else {
+                        log(integrationDiv, 'fail', `Integration: clearVehicles left ${csm.vehicles.length} vehicles`);
+                    }
+                }
+            } catch (e) {
+                log(integrationDiv, 'fail', `Integration: threw — ${e.message}`);
+            }
+
+            updateSummary();
+        });
+
+        document.getElementById('btn-physics').addEventListener('click', async () => {
+            const div = integrationDiv;
+
+            if (!csm || !loaded['road-network.js']) {
+                log(div, 'skip', 'Physics stress: CitySimManager not available');
+                return;
+            }
+
+            try {
+                // Build fresh road network
+                const resp = await fetch('/api/city-sim/demo-city?radius=300&seed=99');
+                const cityData = await resp.json();
+
+                const RoadNetwork = loaded['road-network.js'].RoadNetwork;
+                const TrafficControllerManager = loaded['traffic-controller.js'].TrafficControllerManager;
+
+                csm.cityData = cityData;
+                csm.roadNetwork = new RoadNetwork();
+                csm.roadNetwork.buildFromOSM(cityData.roads);
+                csm.trafficMgr = new TrafficControllerManager();
+                csm.trafficMgr.initFromNetwork(csm.roadNetwork);
+                csm.loaded = true;
+
+                // Spawn many vehicles
+                csm.spawnVehicles(100);
+                csm.spawnPedestrians(50);
+
+                // Run 1000 ticks
+                const t0 = performance.now();
+                let nanCount = 0;
+                let negSpeedCount = 0;
+                let maxSpeed = 0;
+
+                for (let i = 0; i < 1000; i++) {
+                    csm.tick(0.016);
+                    for (const v of csm.vehicles) {
+                        if (isNaN(v.x) || isNaN(v.z) || isNaN(v.speed)) nanCount++;
+                        if (v.speed < -0.01) negSpeedCount++;
+                        if (v.speed > maxSpeed) maxSpeed = v.speed;
+                    }
+                }
+                const elapsed = performance.now() - t0;
+
+                log(div, nanCount === 0 ? 'pass' : 'fail',
+                    `Physics: 1000 ticks, ${csm.vehicles.length} vehicles — NaN count: ${nanCount}`);
+                log(div, negSpeedCount === 0 ? 'pass' : 'fail',
+                    `Physics: negative speed count: ${negSpeedCount}`);
+                log(div, maxSpeed < 50 ? 'pass' : 'fail',
+                    `Physics: max speed ${maxSpeed.toFixed(1)} m/s (${(maxSpeed * 3.6).toFixed(0)} km/h)`);
+                log(div, elapsed < 5000 ? 'pass' : 'fail',
+                    `Physics: 1000 ticks in ${elapsed.toFixed(0)}ms (${(elapsed / 1000).toFixed(2)}ms/tick)`);
+
+                const stats = csm.getStats();
+                log(div, 'pass', `Physics final: ${stats.vehicles} vehicles, ${stats.pedestriansActive} active pedestrians, avgSpeed=${stats.avgSpeedKmh}km/h`);
+
+                csm.clearVehicles();
+            } catch (e) {
+                log(div, 'fail', `Physics stress: threw — ${e.message}\n${e.stack}`);
+            }
+
+            updateSummary();
+        });
+    </script>
+</body>
+</html>

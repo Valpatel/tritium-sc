@@ -2066,7 +2066,7 @@ async function _loadOverlayData() {
                 if (cityData.roads?.length) {
                     _state.citySim.roadNetwork = null;  // Reset
                     _state.citySim.cityData = cityData;
-                    const { RoadNetwork } = await import('./sim/road-network.js');
+                    const { RoadNetwork } = await import('/lib/sim/road-network.js');
                     _state.citySim.roadNetwork = new RoadNetwork();
                     _state.citySim.roadNetwork.buildFromOSM(cityData.roads);
                     _state.citySim.loaded = true;
