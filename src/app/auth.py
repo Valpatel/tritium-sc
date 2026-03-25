@@ -496,18 +496,38 @@ def authenticate_user(username: str, password: str) -> Optional[dict]:
 
 
 def _hash_password(password: str) -> str:
-    """Hash password using SHA-256 with salt (MVP — use bcrypt in production)."""
-    import hashlib
-    salt = secrets.token_hex(16)
-    hashed = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
-    return f"{salt}:{hashed}"
+    """Hash password using bcrypt with 12 rounds of key stretching."""
+    import bcrypt
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12)).decode()
 
 
-def _verify_password(password: str, stored_hash: str) -> bool:
-    """Verify password against stored hash."""
-    import hashlib
+def _is_legacy_sha256_hash(stored_hash: str) -> bool:
+    """Detect legacy SHA-256 hashes (format: 32-hex-salt:64-hex-digest)."""
     if ":" not in stored_hash:
         return False
+    parts = stored_hash.split(":", 1)
+    # Legacy format: 32 hex chars salt + 64 hex chars SHA-256 digest
+    return len(parts) == 2 and len(parts[0]) == 32 and len(parts[1]) == 64
+
+
+def _verify_legacy_sha256(password: str, stored_hash: str) -> bool:
+    """Verify password against legacy SHA-256 hash."""
+    import hashlib
     salt, expected = stored_hash.split(":", 1)
     actual = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
     return secrets.compare_digest(actual, expected)
+
+
+def _verify_password(password: str, stored_hash: str) -> bool:
+    """Verify password against stored hash (bcrypt or legacy SHA-256)."""
+    if _is_legacy_sha256_hash(stored_hash):
+        logger.warning(
+            "Legacy SHA-256 password hash detected — rehash with bcrypt recommended"
+        )
+        return _verify_legacy_sha256(password, stored_hash)
+    # bcrypt hash (starts with $2b$ or $2a$)
+    try:
+        import bcrypt
+        return bcrypt.checkpw(password.encode(), stored_hash.encode())
+    except Exception:
+        return False
