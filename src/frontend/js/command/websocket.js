@@ -1139,7 +1139,9 @@ export class WebSocketManager extends TritiumWebSocket {
 
             default:
                 // Forward unknown events for extensibility
-                EventBus.emit(`ws:${type}`, msg.data || msg);
+                if (type) {
+                    EventBus.emit(`ws:${type}`, msg.data || msg);
+                }
                 break;
         }
     }

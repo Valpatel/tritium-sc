@@ -16,7 +16,7 @@ from tritium_lib.tracking.correlation_strategies import (
     TemporalStrategy,
 )
 from tritium_lib.tracking.dossier import DossierStore
-from src.engine.tactical.target_history import TargetHistory
+from tritium_lib.tracking.target_history import TargetHistory
 from tritium_lib.tracking.target_tracker import TrackedTarget
 
 

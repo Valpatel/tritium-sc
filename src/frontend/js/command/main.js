@@ -1760,24 +1760,29 @@ function initKeyboard() {
         }
 
         switch (e.key) {
-            case '?':
-                document.getElementById('help-overlay').hidden =
-                    !document.getElementById('help-overlay')?.hidden;
+            case '?': {
+                const helpEl = document.getElementById('help-overlay');
+                if (helpEl) helpEl.hidden = !helpEl.hidden;
                 break;
+            }
             case 'c':
             case 'C':
                 toggleChat();
                 break;
-            case 'Escape':
+            case 'Escape': {
                 toggleChat(false);
-                document.getElementById('help-overlay').hidden = true;
-                document.getElementById('modal-overlay').hidden = true;
-                document.getElementById('game-over-overlay').hidden = true;
+                const helpOverlay = document.getElementById('help-overlay');
+                const modalOverlay = document.getElementById('modal-overlay');
+                const gameOverOverlay = document.getElementById('game-over-overlay');
+                if (helpOverlay) helpOverlay.hidden = true;
+                if (modalOverlay) modalOverlay.hidden = true;
+                if (gameOverOverlay) gameOverOverlay.hidden = true;
                 MissionModal.hide();
                 if (TritiumStore.get('map.mode') === 'setup') {
                     document.querySelector('[data-map-mode="observe"]')?.click();
                 }
                 break;
+            }
             case '/':
                 e.preventDefault();
                 toggleChat(true);

@@ -31,11 +31,24 @@ async def list_plugins(request: Request):
 
 @router.get("/health")
 async def plugin_health(request: Request):
-    """Health check for all running plugins."""
+    """Health check for all plugins — running and failed.
+
+    Returns running plugin health plus any failed plugins with reasons,
+    so operators can see at a glance what is broken and why.
+    """
     mgr = _get_manager(request)
     if mgr is None:
-        return {}
-    return mgr.health_check()
+        return {"healthy": {}, "failed": {}, "load_errors": []}
+
+    healthy = mgr.health_check()
+    failed = mgr.get_failure_reasons()
+    load_errors = mgr.get_load_errors()
+
+    return {
+        "healthy": healthy,
+        "failed": failed,
+        "load_errors": load_errors,
+    }
 
 
 @router.get("/status")
