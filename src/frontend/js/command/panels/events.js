@@ -15,7 +15,7 @@ const EVENT_TYPES = {
     'combat:hit':         { label: 'HIT',     color: '#ff6b35', icon: '*' },
     'game:wave_start':    { label: 'WAVE',    color: '#05ffa1', icon: 'W' },
     'game:wave_complete': { label: 'WAVE OK', color: '#05ffa1', icon: 'V' },
-    'game:state':         { label: 'GAME',    color: '#00f0ff', icon: 'G' },
+    'game:state':         { label: 'BATTLE',  color: '#00f0ff', icon: 'G' },
     'amy:thought':        { label: 'AMY',     color: '#00f0ff', icon: 'A' },
     'amy:speech':         { label: 'SPEECH',  color: '#00a0ff', icon: 'S' },
     'unit:selected':      { label: 'SELECT',  color: '#05ffa1', icon: '>' },
@@ -27,7 +27,7 @@ const EVENT_TYPES = {
 const FILTER_OPTIONS = [
     { value: 'all', label: 'ALL' },
     { value: 'combat', label: 'COMBAT' },
-    { value: 'game', label: 'GAME' },
+    { value: 'game', label: 'BATTLE' },
     { value: 'amy', label: 'AMY' },
     { value: 'alert', label: 'ALERTS' },
 ];

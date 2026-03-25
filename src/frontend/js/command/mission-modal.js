@@ -81,7 +81,7 @@ function _createModal() {
         <div class="mission-modal-panel corner-marks">
             <div class="mission-modal-header">
                 <div class="mission-modal-title mono">MISSION INITIALIZATION</div>
-                <div class="mission-status mono">SELECT GAME MODE</div>
+                <div class="mission-status mono">SELECT MISSION TYPE</div>
             </div>
 
             <div class="mission-mode-select" data-section="mode-select">
@@ -509,7 +509,7 @@ function show() {
     _stepsContainer.innerHTML = '';
     _briefingContainer.hidden = true;
     _progressBar.style.width = '0%';
-    _statusLabel.textContent = 'SELECT GAME MODE';
+    _statusLabel.textContent = 'SELECT MISSION TYPE';
     _resetButtons();
 }
 

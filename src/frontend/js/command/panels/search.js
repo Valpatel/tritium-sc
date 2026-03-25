@@ -12,7 +12,7 @@ import { _esc } from '../panel-utils.js';
 
 export const SearchPanelDef = {
     id: 'search',
-    title: 'INTEL',
+    title: 'TARGET SEARCH',
     defaultPosition: { x: 8, y: 8 },
     defaultSize: { w: 360, h: 480 },
 

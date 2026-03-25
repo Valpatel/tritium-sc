@@ -192,7 +192,7 @@ const STEPS = [
                     <label class="wiz-radio-card ${layout === 'commander' ? 'selected' : ''}">
                         <input type="radio" name="wiz-layout" value="commander" ${layout === 'commander' ? 'checked' : ''} />
                         <div class="wiz-radio-title">COMMANDER</div>
-                        <div class="wiz-radio-desc">Amy + Units + Alerts + Minimap. Full tactical awareness.</div>
+                        <div class="wiz-radio-desc">Commander + Units + Alerts + Minimap. Full tactical awareness.</div>
                     </label>
                     <label class="wiz-radio-card ${layout === 'observer' ? 'selected' : ''}">
                         <input type="radio" name="wiz-layout" value="observer" ${layout === 'observer' ? 'checked' : ''} />

@@ -293,10 +293,10 @@ function _buildHTML() {
         </div>
     </div>
 
-    <!-- Amy Status + Demo Mode -->
+    <!-- Commander Status + Demo Mode -->
     <div style="display:flex;gap:8px;">
         <div class="ops-section" style="border:1px solid rgba(0,240,255,0.2);border-radius:4px;padding:8px;flex:1;">
-            <div class="ops-section-title" style="color:var(--cyan,#00f0ff);font-size:0.65rem;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Amy Status</div>
+            <div class="ops-section-title" style="color:var(--cyan,#00f0ff);font-size:0.65rem;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Commander Status</div>
             <div style="display:flex;align-items:center;gap:8px;">
                 <div data-bind="amy-state-dot" style="width:10px;height:10px;border-radius:50%;background:var(--green,#05ffa1);flex-shrink:0;"></div>
                 <div>

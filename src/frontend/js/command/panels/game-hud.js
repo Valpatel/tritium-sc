@@ -472,7 +472,7 @@ if (typeof window !== 'undefined') {
 
 export const GameHudPanelDef = {
     id: 'game',
-    title: 'GAME STATUS',
+    title: 'BATTLE STATUS',
     defaultPosition: { x: null, y: 8 },  // x calculated (top-right)
     defaultSize: { w: 260, h: 360 },
 
@@ -641,7 +641,7 @@ export const GameHudPanelDef = {
             }
             const accPct = totalShots > 0 ? Math.round((totalHits / totalShots) * 100) : 0;
             gameMetricsEl.innerHTML =
-                '<div class="ghud-section-label">GAME METRICS</div>' +
+                '<div class="ghud-section-label">BATTLE METRICS</div>' +
                 '<div class="ghud-combat-metrics">' +
                 `<div class="ghud-row"><span class="ghud-label mono">SHOTS</span><span class="ghud-value mono">${totalShots} fired / ${totalHits} hit (${accPct}%)</span></div>` +
                 `<div class="ghud-row"><span class="ghud-label mono">DISTANCE</span><span class="ghud-value mono">${Math.round(totalDist)}m total</span></div>` +
