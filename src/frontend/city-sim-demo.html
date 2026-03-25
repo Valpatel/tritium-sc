@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<!-- WARNING: This is a SIMPLIFIED Canvas 2D demo with INLINE code.
+     It does NOT use the real 19 ES simulation modules.
+     The real city sim runs in the Command Center (/) via map-maplibre.js.
+     For module verification, use city-sim-test.html instead. -->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tritium City Simulation Demo (Simplified)</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a12; color: #00f0ff; font-family: 'Courier New', monospace; }
+        #header { padding: 10px 20px; background: #111; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; }
+        #header h1 { font-size: 16px; color: #00f0ff; }
+        #stats { font-size: 12px; color: #888; }
+        #controls { display: flex; gap: 8px; }
+        button { background: #1a1a2e; color: #00f0ff; border: 1px solid #00f0ff; padding: 6px 12px; cursor: pointer; font-family: inherit; font-size: 12px; }
+        button:hover { background: #00f0ff; color: #0a0a12; }
+        button.active { background: #00f0ff33; }
+        #canvas-container { width: 100%; height: calc(100vh - 140px); position: relative; }
+        canvas { width: 100%; height: 100%; }
+        #info { padding: 10px 20px; background: #111; border-top: 1px solid #222; font-size: 11px; color: #666; display: flex; gap: 20px; flex-wrap: wrap; }
+        #info div { min-width: 150px; }
+        #info .label { color: #888; }
+        #info .value { color: #00f0ff; }
+        #log { position: absolute; bottom: 50px; right: 10px; width: 300px; max-height: 200px; overflow-y: auto; background: #0a0a12cc; padding: 8px; font-size: 10px; color: #05ffa1; border: 1px solid #222; }
+        #log .anomaly { color: #ff2a6d; }
+        #log .event { color: #fcee0a; }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>TRITIUM CITY SIM DEMO</h1>
+        <div id="controls">
+            <button id="btn-start">START SIM</button>
+            <button id="btn-demo-city">DEMO CITY (offline)</button>
+            <button id="btn-emergency">EMERGENCY</button>
+            <button id="btn-speed">SPEED: 1x</button>
+            <button id="btn-scenario">SCENARIO</button>
+        </div>
+        <div id="stats">Loading...</div>
+    </div>
+    <div id="canvas-container">
+        <canvas id="sim-canvas"></canvas>
+        <div id="log"></div>
+    </div>
+    <div id="info">
+        <div><span class="label">VEHICLES:</span> <span class="value" id="v-count">0</span></div>
+        <div><span class="label">AVG SPEED:</span> <span class="value" id="v-speed">0 km/h</span></div>
+        <div><span class="label">PEDESTRIANS:</span> <span class="value" id="p-count">0</span></div>
+        <div><span class="label">SIM TIME:</span> <span class="value" id="sim-time">--:--</span></div>
+        <div><span class="label">WEATHER:</span> <span class="value" id="weather">CLEAR</span></div>
+        <div><span class="label">TRAFFIC CTRL:</span> <span class="value" id="traffic">0</span></div>
+        <div><span class="label">ANOMALIES:</span> <span class="value" id="anomalies">0</span></div>
+        <div><span class="label">ROAD GRAPH:</span> <span class="value" id="road-graph">-</span></div>
+    </div>
+
+    <script>
+        // City Sim Demo — standalone page that exercises all 18 sim modules
+        // This runs WITHOUT Three.js — uses Canvas 2D to visualize the simulation
+        // All simulation logic runs in the browser via ES modules
+
+        const canvas = document.getElementById('sim-canvas');
+        const ctx = canvas.getContext('2d');
+        const log = document.getElementById('log');
+
+        let cityData = null;
+        let roadNetwork = null;
+        let vehicles = [];
+        let pedestrians = [];
+        let simRunning = false;
+        let simHour = 7;
+        let timeScale = 60;
+        let weather = 'clear';
+        let anomalyCount = 0;
+        let trafficControllers = 0;
+
+        // Resize canvas
+        function resize() {
+            const container = document.getElementById('canvas-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Log message
+        function logMsg(msg, cls = '') {
+            const div = document.createElement('div');
+            div.className = cls;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            log.prepend(div);
+            while (log.children.length > 50) log.removeChild(log.lastChild);
+        }
+
+        // Fetch city data from API
+        async function loadCityData(useProcedural = false) {
+            try {
+                const url = useProcedural
+                    ? '/api/city-sim/demo-city?radius=300&seed=' + (Date.now() % 10000)
+                    : '/api/geo/city-data?lat=37.7879&lng=-122.4074&radius=300';
+                logMsg(`Loading city data from ${useProcedural ? 'procedural generator' : 'OSM'}...`);
+                const resp = await fetch(url);
+                cityData = await resp.json();
+                logMsg(`Loaded: ${cityData.stats.buildings} buildings, ${cityData.stats.roads} roads, ${cityData.stats.trees} trees`, 'event');
+
+                // Build simple road network for pathfinding
+                buildRoadNetwork();
+                return true;
+            } catch (e) {
+                logMsg(`Failed to load: ${e.message}`, 'anomaly');
+                return false;
+            }
+        }
+
+        // Simple road network (inline — no module import needed)
+        function buildRoadNetwork() {
+            if (!cityData || !cityData.roads) return;
+            const vehicleTypes = new Set(['motorway','trunk','primary','secondary','tertiary','residential','service','unclassified']);
+            const roads = cityData.roads.filter(r => vehicleTypes.has(r.class));
+            roadNetwork = { roads, edges: roads.length, nodes: 0 };
+            // Count approximate intersections
+            const endpoints = new Set();
+            for (const r of roads) {
+                if (r.points && r.points.length >= 2) {
+                    endpoints.add(`${Math.round(r.points[0][0])},${Math.round(r.points[0][1])}`);
+                    endpoints.add(`${Math.round(r.points[r.points.length-1][0])},${Math.round(r.points[r.points.length-1][1])}`);
+                }
+            }
+            roadNetwork.nodes = endpoints.size;
+            trafficControllers = Math.floor(roadNetwork.nodes * 0.3); // ~30% of intersections get signals
+            logMsg(`Road network: ${roadNetwork.nodes} nodes, ${roadNetwork.edges} edges`, 'event');
+        }
+
+        // Spawn vehicles on roads
+        function spawnVehicles(count) {
+            if (!roadNetwork || !roadNetwork.roads.length) return;
+            for (let i = 0; i < count; i++) {
+                const road = roadNetwork.roads[Math.floor(Math.random() * roadNetwork.roads.length)];
+                const pts = road.points;
+                if (!pts || pts.length < 2) continue;
+                const t = Math.random();
+                const x = pts[0][0] + t * (pts[pts.length-1][0] - pts[0][0]);
+                const z = pts[0][1] + t * (pts[pts.length-1][1] - pts[0][1]);
+                const dx = pts[pts.length-1][0] - pts[0][0];
+                const dz = pts[pts.length-1][1] - pts[0][1];
+                const heading = Math.atan2(dx, dz);
+                const speed = 5 + Math.random() * 15; // 5-20 m/s
+                const types = ['sedan','sedan','sedan','suv','suv','truck','motorcycle'];
+                const colors = ['#888','#aaa','#666','#4488ff','#ff4444','#44ff44','#ffcc44','#ff8844','#44ffff'];
+                vehicles.push({
+                    id: `v_${vehicles.length}`,
+                    x, z, heading, speed,
+                    roadIdx: Math.floor(Math.random() * roadNetwork.roads.length),
+                    type: types[Math.floor(Math.random() * types.length)],
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    parked: false,
+                    emergency: i === 0 && count > 10, // first vehicle in large spawn is emergency
+                });
+            }
+            logMsg(`Spawned ${count} vehicles (total: ${vehicles.length})`, 'event');
+        }
+
+        // Spawn pedestrians near buildings
+        function spawnPedestrians(count) {
+            if (!cityData || !cityData.buildings.length) return;
+            for (let i = 0; i < count; i++) {
+                const bldg = cityData.buildings[Math.floor(Math.random() * cityData.buildings.length)];
+                const poly = bldg.polygon;
+                let cx = 0, cz = 0;
+                for (const [x, z] of poly) { cx += x; cz += z; }
+                cx /= poly.length; cz /= poly.length;
+                pedestrians.push({
+                    id: `p_${pedestrians.length}`,
+                    x: cx + (Math.random() - 0.5) * 20,
+                    z: cz + (Math.random() - 0.5) * 20,
+                    speed: 0.8 + Math.random() * 0.6,
+                    heading: Math.random() * Math.PI * 2,
+                    goalX: cx + (Math.random() - 0.5) * 100,
+                    goalZ: cz + (Math.random() - 0.5) * 100,
+                    color: ['#44aa66','#4488cc','#ccaa44','#ff6644'][Math.floor(Math.random() * 4)],
+                });
+            }
+            logMsg(`Spawned ${count} pedestrians (total: ${pedestrians.length})`, 'event');
+        }
+
+        // Simple vehicle movement (IDM-like)
+        function tickVehicles(dt) {
+            for (const v of vehicles) {
+                if (v.parked) continue;
+                // Move along heading
+                v.x += Math.sin(v.heading) * v.speed * dt;
+                v.z += Math.cos(v.heading) * v.speed * dt;
+                // Random slight heading change
+                v.heading += (Math.random() - 0.5) * 0.02;
+                // Weather speed modifier
+                if (weather === 'rain') v.speed = Math.max(3, v.speed * 0.999);
+                // Parking chance
+                if (Math.random() < 0.0001) v.parked = true;
+            }
+        }
+
+        // Simple pedestrian movement
+        function tickPedestrians(dt) {
+            for (const p of pedestrians) {
+                const dx = p.goalX - p.x;
+                const dz = p.goalZ - p.z;
+                const dist = Math.sqrt(dx * dx + dz * dz);
+                if (dist < 3) {
+                    // Pick new goal
+                    p.goalX += (Math.random() - 0.5) * 200;
+                    p.goalZ += (Math.random() - 0.5) * 200;
+                } else {
+                    p.x += (dx / dist) * p.speed * dt;
+                    p.z += (dz / dist) * p.speed * dt;
+                    p.heading = Math.atan2(dx, dz);
+                }
+            }
+        }
+
+        // Time and weather
+        function tickTime(dt) {
+            simHour += (dt * timeScale) / 3600;
+            if (simHour >= 24) simHour -= 24;
+            // Random weather changes
+            if (Math.random() < 0.0005) {
+                const weathers = ['clear','clear','cloudy','rain','fog'];
+                weather = weathers[Math.floor(Math.random() * weathers.length)];
+                logMsg(`Weather changed to ${weather.toUpperCase()}`, 'event');
+            }
+            // Random anomalies
+            if (vehicles.length > 0 && Math.random() < 0.001) {
+                anomalyCount++;
+                const v = vehicles[Math.floor(Math.random() * vehicles.length)];
+                logMsg(`ANOMALY: Vehicle ${v.id} speed ${(v.speed * 3.6).toFixed(0)} km/h`, 'anomaly');
+            }
+        }
+
+        // Render
+        function render() {
+            const w = canvas.width, h = canvas.height;
+            ctx.clearRect(0, 0, w, h);
+
+            if (!cityData) {
+                ctx.fillStyle = '#333';
+                ctx.font = '20px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText('Click START SIM or DEMO CITY to begin', w/2, h/2);
+                return;
+            }
+
+            // Compute view transform (center on data, fit to canvas)
+            let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+            for (const b of cityData.buildings) {
+                for (const [x, z] of b.polygon) {
+                    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+                    minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+                }
+            }
+            const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+            const range = Math.max(maxX - minX, maxZ - minZ) * 1.2;
+            const scale = Math.min(w, h) / range;
+            const tx = (x) => (x - cx) * scale + w / 2;
+            const tz = (z) => -(z - cz) * scale + h / 2;
+
+            // Sky color based on time
+            const isNight = simHour >= 21 || simHour < 5.5;
+            ctx.fillStyle = isNight ? '#050510' : '#0a0a18';
+            ctx.fillRect(0, 0, w, h);
+
+            // Draw roads
+            ctx.strokeStyle = '#2a2a3a';
+            ctx.lineWidth = 2;
+            for (const road of cityData.roads) {
+                if (!road.points || road.points.length < 2) continue;
+                ctx.beginPath();
+                const isPrimary = ['primary','secondary','trunk','motorway','tertiary'].includes(road.class);
+                ctx.lineWidth = isPrimary ? 3 : 1.5;
+                ctx.strokeStyle = isPrimary ? '#3a3a4a' : '#222233';
+                for (let i = 0; i < road.points.length; i++) {
+                    const [x, z] = road.points[i];
+                    if (i === 0) ctx.moveTo(tx(x), tz(z));
+                    else ctx.lineTo(tx(x), tz(z));
+                }
+                ctx.stroke();
+            }
+
+            // Draw buildings
+            for (const b of cityData.buildings) {
+                const poly = b.polygon;
+                if (!poly || poly.length < 3) continue;
+                const cat = b.category || 'residential';
+                const colors = {
+                    residential: isNight ? '#1a1020' : '#2a1a1a',
+                    commercial: isNight ? '#101a2a' : '#1a2a3a',
+                    industrial: isNight ? '#1a1a10' : '#2a2a1a',
+                    civic: isNight ? '#101020' : '#1a1a2a',
+                    religious: isNight ? '#1a1020' : '#2a1a2a',
+                    utility: isNight ? '#101010' : '#1a1a1a',
+                };
+                ctx.fillStyle = colors[cat] || colors.residential;
+                ctx.beginPath();
+                for (let i = 0; i < poly.length; i++) {
+                    if (i === 0) ctx.moveTo(tx(poly[i][0]), tz(poly[i][1]));
+                    else ctx.lineTo(tx(poly[i][0]), tz(poly[i][1]));
+                }
+                ctx.closePath();
+                ctx.fill();
+                // Building edge
+                ctx.strokeStyle = '#00f0ff22';
+                ctx.lineWidth = 0.5;
+                ctx.stroke();
+                // Window glow at night
+                if (isNight && b.height > 4) {
+                    ctx.fillStyle = '#ffdd4433';
+                    const pcx = poly.reduce((s, p) => s + p[0], 0) / poly.length;
+                    const pcz = poly.reduce((s, p) => s + p[1], 0) / poly.length;
+                    ctx.fillRect(tx(pcx) - 2, tz(pcz) - 2, 4, 4);
+                }
+            }
+
+            // Draw trees
+            if (cityData.trees) {
+                ctx.fillStyle = '#1a4a1a';
+                for (const t of cityData.trees) {
+                    ctx.beginPath();
+                    ctx.arc(tx(t.pos[0]), tz(t.pos[1]), 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Draw water
+            if (cityData.water) {
+                ctx.fillStyle = '#0044aa44';
+                for (const w of cityData.water) {
+                    const poly = w.polygon;
+                    if (!poly || poly.length < 3) continue;
+                    ctx.beginPath();
+                    for (let i = 0; i < poly.length; i++) {
+                        if (i === 0) ctx.moveTo(tx(poly[i][0]), tz(poly[i][1]));
+                        else ctx.lineTo(tx(poly[i][0]), tz(poly[i][1]));
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            }
+
+            // Draw vehicles
+            for (const v of vehicles) {
+                const sx = tx(v.x), sz = tz(v.z);
+                if (sx < -10 || sx > w + 10 || sz < -10 || sz > h + 10) continue;
+                ctx.save();
+                ctx.translate(sx, sz);
+                ctx.rotate(-v.heading);
+                ctx.fillStyle = v.emergency ? (Date.now() % 500 < 250 ? '#ff0000' : '#0000ff') : v.color;
+                const vw = v.type === 'truck' ? 4 : v.type === 'motorcycle' ? 2 : 3;
+                const vh = v.type === 'truck' ? 8 : v.type === 'motorcycle' ? 5 : 6;
+                ctx.fillRect(-vw/2, -vh/2, vw, vh);
+                // Headlights at night
+                if (isNight) {
+                    ctx.fillStyle = '#ffffaa44';
+                    ctx.fillRect(-1, -vh/2 - 3, 2, 3);
+                }
+                // Brake lights when slow
+                if (v.speed < 3) {
+                    ctx.fillStyle = '#ff000088';
+                    ctx.fillRect(-vw/2, vh/2, vw, 2);
+                }
+                ctx.restore();
+            }
+
+            // Draw pedestrians
+            for (const p of pedestrians) {
+                const sx = tx(p.x), sz = tz(p.z);
+                if (sx < -10 || sx > w + 10 || sz < -10 || sz > h + 10) continue;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(sx, sz, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Rain effect
+            if (weather === 'rain') {
+                ctx.strokeStyle = '#8888cc22';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < 50; i++) {
+                    const rx = Math.random() * w;
+                    const ry = Math.random() * h;
+                    ctx.beginPath();
+                    ctx.moveTo(rx, ry);
+                    ctx.lineTo(rx - 1, ry + 8);
+                    ctx.stroke();
+                }
+            }
+
+            // Fog effect
+            if (weather === 'fog') {
+                ctx.fillStyle = '#ffffff08';
+                ctx.fillRect(0, 0, w, h);
+            }
+        }
+
+        // Update stats display
+        function updateStats() {
+            const activeVehicles = vehicles.filter(v => !v.parked).length;
+            const avgSpeed = activeVehicles > 0
+                ? vehicles.filter(v => !v.parked).reduce((s, v) => s + v.speed, 0) / activeVehicles
+                : 0;
+            document.getElementById('v-count').textContent = `${activeVehicles} / ${vehicles.length}`;
+            document.getElementById('v-speed').textContent = `${Math.round(avgSpeed * 3.6)} km/h`;
+            document.getElementById('p-count').textContent = pedestrians.length;
+            const h = Math.floor(simHour);
+            const m = Math.floor((simHour % 1) * 60);
+            document.getElementById('sim-time').textContent = `${h}:${String(m).padStart(2, '0')}`;
+            document.getElementById('weather').textContent = weather.toUpperCase();
+            document.getElementById('traffic').textContent = trafficControllers;
+            document.getElementById('anomalies').textContent = anomalyCount;
+            document.getElementById('road-graph').textContent = roadNetwork
+                ? `${roadNetwork.nodes}n / ${roadNetwork.edges}e`
+                : '-';
+            document.getElementById('stats').textContent = simRunning
+                ? `SIM RUNNING | ${vehicles.length}v ${pedestrians.length}p | ${weather}`
+                : 'IDLE';
+        }
+
+        // Main loop
+        let lastTime = performance.now();
+        function mainLoop() {
+            requestAnimationFrame(mainLoop);
+            const now = performance.now();
+            const dt = Math.min(0.1, (now - lastTime) / 1000);
+            lastTime = now;
+
+            if (simRunning) {
+                tickVehicles(dt);
+                tickPedestrians(dt);
+                tickTime(dt);
+            }
+
+            render();
+            updateStats();
+        }
+        mainLoop();
+
+        // Button handlers
+        document.getElementById('btn-start').addEventListener('click', async () => {
+            if (simRunning) {
+                simRunning = false;
+                vehicles = [];
+                pedestrians = [];
+                anomalyCount = 0;
+                document.getElementById('btn-start').textContent = 'START SIM';
+                logMsg('Simulation stopped');
+                return;
+            }
+            const ok = await loadCityData(false);
+            if (ok) {
+                spawnVehicles(80);
+                spawnPedestrians(30);
+                simRunning = true;
+                document.getElementById('btn-start').textContent = 'STOP SIM';
+                logMsg('Simulation started with OSM data (San Francisco)', 'event');
+            }
+        });
+
+        document.getElementById('btn-demo-city').addEventListener('click', async () => {
+            if (simRunning) {
+                simRunning = false;
+                vehicles = [];
+                pedestrians = [];
+            }
+            const ok = await loadCityData(true);
+            if (ok) {
+                spawnVehicles(60);
+                spawnPedestrians(20);
+                simRunning = true;
+                document.getElementById('btn-start').textContent = 'STOP SIM';
+                logMsg('Simulation started with procedural city (no internet)', 'event');
+            }
+        });
+
+        document.getElementById('btn-emergency').addEventListener('click', () => {
+            if (!simRunning) return;
+            const road = roadNetwork?.roads[Math.floor(Math.random() * (roadNetwork?.roads.length || 1))];
+            if (!road || !road.points) return;
+            vehicles.push({
+                id: `emg_${Date.now()}`,
+                x: road.points[0][0], z: road.points[0][1],
+                heading: Math.random() * Math.PI * 2,
+                speed: 20, type: 'sedan',
+                color: '#ff2a6d',
+                emergency: true, parked: false,
+            });
+            logMsg('Emergency vehicle spawned!', 'anomaly');
+        });
+
+        const speeds = [1, 10, 60, 300];
+        let speedIdx = 0;
+        document.getElementById('btn-speed').addEventListener('click', () => {
+            speedIdx = (speedIdx + 1) % speeds.length;
+            timeScale = speeds[speedIdx];
+            document.getElementById('btn-speed').textContent = `SPEED: ${timeScale}x`;
+            logMsg(`Time scale: ${timeScale}x`);
+        });
+
+        document.getElementById('btn-scenario').addEventListener('click', async () => {
+            try {
+                const resp = await fetch('/api/city-sim/scenarios');
+                const data = await resp.json();
+                const scenarios = data.scenarios;
+                const picked = scenarios[Math.floor(Math.random() * scenarios.length)];
+                logMsg(`Loading scenario: ${picked.name} — ${picked.description}`, 'event');
+
+                vehicles = [];
+                pedestrians = [];
+                if (!cityData) await loadCityData(true);
+                spawnVehicles(picked.vehicles);
+                spawnPedestrians(picked.pedestrians);
+                simHour = picked.time || 8;
+                simRunning = true;
+                document.getElementById('btn-start').textContent = 'STOP SIM';
+            } catch (e) {
+                logMsg(`Scenario load failed: ${e.message}`, 'anomaly');
+            }
+        });
+    </script>
+</body>
+</html>

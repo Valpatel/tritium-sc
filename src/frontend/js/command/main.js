@@ -361,6 +361,25 @@ function init() {
     // Initialize tactical map
     initMap();
 
+    // Dismiss loading overlay once map is fully loaded
+    const _dismissLoadingOverlay = () => {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            overlay.style.transition = 'opacity 0.5s ease';
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 500);
+        }
+    };
+    EventBus.on('map:ready', _dismissLoadingOverlay);
+    // Safety net: dismiss after 10s even if map:ready never fires
+    setTimeout(() => {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            console.warn('[TRITIUM] Loading overlay safety timeout — dismissing after 10s');
+            _dismissLoadingOverlay();
+        }
+    }, 10000);
+
     // Target trail manager (speed-colored movement trails on map)
     const trailManager = new TargetTrailManager();
     trailManager.start();

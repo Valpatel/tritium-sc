@@ -26,7 +26,12 @@ function assertApprox(a, b, tol, msg) {
 }
 
 const simDir = path.join(__dirname, '../../src/frontend/js/command/sim');
-const read = (f) => fs.readFileSync(path.join(simDir, f), 'utf8');
+const libSimDir = path.join(__dirname, '../../../tritium-lib/web/sim');
+const read = (f) => {
+    const libPath = path.join(libSimDir, f);
+    if (fs.existsSync(libPath)) return fs.readFileSync(libPath, 'utf8');
+    return fs.readFileSync(path.join(simDir, f), 'utf8');
+};
 
 // ============================================================
 // PHASE 4: Traffic Controller

@@ -41,7 +41,7 @@ console.log('\n--- Module Imports ---');
 })();
 
 (function testImportsEventBus() {
-    assert(mainSrc.includes("import { EventBus } from './events.js'"),
+    assert(mainSrc.includes("import { EventBus } from '/lib/events.js'"),
         'Imports EventBus from events.js');
 })();
 

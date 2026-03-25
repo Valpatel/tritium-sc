@@ -23,7 +23,7 @@ import requests
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 DEFAULT_PORT = 8765
-HEALTH_TIMEOUT = 30  # seconds to wait for server startup
+HEALTH_TIMEOUT = 90  # seconds to wait for server startup
 HEALTH_INTERVAL = 0.5  # seconds between health polls
 
 

@@ -28,8 +28,9 @@ function assertApprox(a, b, tol, msg) {
 // ============================================================
 
 console.log('--- IDM Module ---');
+const libSimDir = path.join(__dirname, '../../../tritium-lib/web/sim');
 const idmSource = fs.readFileSync(
-    path.join(__dirname, '../../src/frontend/js/command/sim/idm.js'), 'utf8'
+    path.join(libSimDir, 'idm.js'), 'utf8'
 );
 
 assert(idmSource.includes('idmAcceleration'), 'idmAcceleration function exists');
@@ -139,7 +140,7 @@ const IDM = { v0: 12, a: 1.4, b: 2.0, s0: 2.0, T: 1.5, delta: 4 };
 
 console.log('\n--- Vehicle Module ---');
 const vehSource = fs.readFileSync(
-    path.join(__dirname, '../../src/frontend/js/command/sim/vehicle.js'), 'utf8'
+    path.join(__dirname, '../../../tritium-lib/web/sim/vehicle.js'), 'utf8'
 );
 
 assert(vehSource.includes('class SimVehicle'), 'SimVehicle class defined');

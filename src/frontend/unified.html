@@ -27,6 +27,21 @@
 </script>
 <body class="v2 grid-bg">
 
+    <!-- Loading overlay — visible immediately, dismissed when map is ready -->
+    <div id="loading-overlay" style="position:fixed;inset:0;z-index:9999;background:#0a0a1a;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;">
+        <div style="color:#00f0ff;font-size:28px;letter-spacing:6px;margin-bottom:16px;text-shadow:0 0 20px #00f0ff88;">TRITIUM</div>
+        <div style="color:#00f0ff99;font-size:13px;letter-spacing:3px;">INITIALIZING COMMAND CENTER</div>
+        <div style="margin-top:24px;width:200px;height:2px;background:#ffffff11;border-radius:1px;overflow:hidden;">
+            <div style="width:40%;height:100%;background:#00f0ff;border-radius:1px;animation:tritium-load-bar 1.2s ease-in-out infinite;"></div>
+        </div>
+        <style>
+            @keyframes tritium-load-bar {
+                0% { transform: translateX(-100%); }
+                100% { transform: translateX(350%); }
+            }
+        </style>
+    </div>
+
     <!-- ================================================================== -->
     <!-- HEADER BAR (36px)                                                   -->
     <!-- ================================================================== -->
@@ -243,6 +258,7 @@
                     <div class="help-row"><kbd>/</kbd><span>Focus chat input</span></div>
                     <div class="help-row"><kbd>M</kbd><span>Toggle minimap</span></div>
                     <div class="help-row"><kbd>X</kbd><span>Mute / unmute notification sounds</span></div>
+                    <div class="help-row"><kbd>Shift+E</kbd><span>Toggle Edit Mode (place/move assets)</span></div>
                 </div>
                 <div class="help-section" style="break-inside:avoid">
                     <div class="help-section-title mono">MAP MODES</div>
@@ -359,6 +375,14 @@
     <!-- ================================================================== -->
     <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Three.js post-processing (bloom) — r128 compatible -->
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+
     <script src="/static/js/models.js"></script>
 
     <!-- ================================================================== -->

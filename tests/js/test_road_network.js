@@ -26,9 +26,10 @@ function assertApprox(a, b, tol, msg) {
     else { failed++; console.log(`FAIL: ${msg} (${a} != ${b} ±${tol})`); }
 }
 
-// Read source file for structure validation
+// Read source file for structure validation (canonical copy in tritium-lib)
+const libSimDir = path.join(__dirname, '../../../tritium-lib/web/sim');
 const source = fs.readFileSync(
-    path.join(__dirname, '../../src/frontend/js/command/sim/road-network.js'), 'utf8'
+    path.join(libSimDir, 'road-network.js'), 'utf8'
 );
 
 // ============================================================

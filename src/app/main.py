@@ -414,6 +414,13 @@ def _start_plugins(app, amy_instance, sim_engine) -> object | None:
                     "id": p.plugin_id,
                     "reason": "duplicate",
                 })
+            except Exception as e:
+                pid = getattr(p, "plugin_id", "unknown")
+                logger.warning(f"Plugin '{pid}' failed to register: {e}")
+                discovery_report["plugins_failed"].append({
+                    "id": pid,
+                    "reason": f"register failed: {e}",
+                })
 
         if not mgr.list_plugins() and not found:
             logger.info("No plugins found")

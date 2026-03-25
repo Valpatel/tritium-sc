@@ -1,69 +1,64 @@
-# VILLAGE IDIOT REPORT -- Wave 178 (2026-03-15)
+# VILLAGE IDIOT REPORT -- 2026-03-23
 
-**Persona**: A confused person who wandered in. Ollama was not responding, so I am just me -- someone trying to use this product for the first time. Tech skill: 2/5. Expected a clean tactical map with some dots I could click. Got a satellite photo someone sneezed neon paint on.
+**Persona**: Greg Holloway, 54, building manager at a mid-size office complex. Tech skill 2/5. Was told this software could help him monitor his parking lot and lobby. Expects something like his Ring doorbell app. Military acronyms and "tactical" language confuse him. Does not know what MQTT or a "dossier" is.
 
 ## Summary Scorecard
 
 ```
 WEBSITE: works
-MAP: visible -- satellite imagery present but OBSCURED by overlapping layers
-TARGETS ON MAP: yes -- 70+ targets as small colored squares, but hard to distinguish from GIS noise
-CLICKING: targets are clickable, Unit Inspector opens with full details
-DEMO MODE: already active, targets moving in real time
-APIs: 5 of 5 returned data
+MAP: visible -- satellite imagery, loads fast, no tile errors
+TARGETS ON MAP: yes -- 70 markers appeared after demo started (colored military-style icons)
+CLICKING: targets are clickable -- Unit Inspector panel opens with full details
+DEMO MODE: started via API, markers appeared within 10 seconds, map auto-panned
+APIs: 5 of 5 returned data (targets, fleet, readiness, plugins, dossiers)
 JS ERRORS: 0
 
-Loop 1 (First Boot): 7/8 (everything works but the map is cluttered)
+Loop 1 (First Boot): 6/8 PASS -- SIM menu is empty (BROKEN), header stats confusing
 ```
 
 ---
 
 ## Loop 1: First Boot -- "What am I looking at?"
 
-| Step | Result | What Happened |
-|------|--------|---------------|
-| 1. Navigate to localhost:8000 | PASS | Page loads, no errors, takes about 5-8 seconds |
-| 2. See tactical map with satellite imagery | PARTIAL | Satellite imagery IS there but obscured by 61 prediction ellipses creating an opaque blob in the center, 474 traffic signal dots scattered on every street, and 133 trail lines |
-| 3. Understand the UI | PARTIAL | Header shows stats (49 units, 21 threats, 70 targets), menu bar visible. But the map itself is confusing -- too many overlapping visual layers |
-| 4. Open VIEW menu | NOT TESTED |
-| 5. Start demo mode | PASS | Demo was already active, confirmed via /api/demo/status |
-| 6. See targets appear | PASS | 67-73 markers visible as 22x22px colored squares, they move |
-| 7. Click a target | PASS | Clicked "Intruder Alpha", Unit Inspector opened on the left side |
-| 8. See target details | PASS | Full details: name, type (PERSON), alliance (HOSTILE), FSM state (ADVANCING), position, speed (1.5 m/s), heading (271 deg), health (80/80 100%), combat stats, personality, brain state |
+| Step | Expected | Result |
+|------|----------|--------|
+| 1. Navigate to localhost:8000 | Page loads | PASS -- loads in ~3 seconds |
+| 2. See tactical map with satellite imagery | Satellite visible | PASS -- clean satellite view of a neighborhood |
+| 3. Understand the UI | Header, map, menu bar | PARTIAL -- header exists but stats are confusing ("0 units / 3 threats / 3 targets" -- what?) |
+| 4. Open WINDOWS menu | Browse panels | PASS but OVERWHELMING -- 80+ items in one dropdown |
+| 5. Start demo (SIM > Start Demo) | Demo starts | FAIL -- SIM menu dropdown is EMPTY. No Start Demo button visible. |
+| 6. See targets appear | Markers on map | PASS (via API workaround) -- 70 markers appeared |
+| 7. Click a target | See details | PASS -- Unit Inspector opens showing "Intruder Hotel-2" |
+| 8. See target info | Name, type, position | PASS -- name, type, alliance, position, speed, health |
 
 ---
 
-## THE VISUAL CLUTTER PROBLEM -- THIS IS THE MAIN FINDING
+## OBVIOUS PROBLEMS
 
-I was asked specifically about "large blue/cyan circles cluttering the map." Here is what I found:
+1. **SIM MENU IS EMPTY.** Clicking "SIM" in the menu bar produces NO dropdown. The welcome tooltip says "Click SIM > Start Demo" but the SIM menu literally shows nothing when clicked. The only way to start demo mode is via API (curl POST) or a keyboard shortcut nobody told Greg about. This is the single biggest UX failure -- the product's own instructions point to a broken menu.
 
-### Problem 1: Prediction Ellipses (THE WORST)
-- **61 prediction ellipse polygons** are drawn on the map as filled shapes
-- Each one is individually `rgba(255, 42, 109, 0.12)` (magenta at 12% opacity)
-- The layer paint has `fill-opacity: 1` so the polygon color is the effective opacity
-- BUT because 61 of them overlap in the center where targets cluster, opacity STACKS
-- 12% x many overlapping = essentially opaque in the center
-- Result: a large blurry blue/magenta/pink BLOB covers the center of the map
-- You CANNOT see the satellite imagery or buildings underneath
-- Layer name: `tritium-prediction-ellipses-fill`
+2. **WINDOWS MENU IS OVERWHELMING.** There are 80+ items in a single giant dropdown. Categories exist (Operations, Intel, Sensing, Communications, Commander, Map, Simulation, System, Other) but the list is a wall of text. Greg would close the browser immediately. Nobody needs 80 options on first load.
 
-### Problem 2: Traffic Signal Dots (474 of them)
-- **474 traffic signal markers** rendered as small magenta circles (radius 4px)
-- They appear at EVERY street intersection across the entire visible area
-- Same magenta color family as hostile target markers
-- A new user cannot tell which dots are actual targets vs. GIS decoration
-- The map looks like it has a rash
-- Layer name: `geo-traffic-signals-layer`
+3. **WELCOME TOOLTIP NEVER GOES AWAY.** The cyan "WELCOME TO TRITIUM" box sits at the bottom center of the screen permanently. After demo starts, after clicking targets, after opening panels -- still there. Has a small "Dismiss" button Greg might not notice.
 
-### Problem 3: Trail Lines (133 of them)
-- **133 trail lines** showing where targets have moved
-- They add more colored lines to an already busy map
+4. **FLOATING BATTLE TEXT ON MAP.** After some time, large cyan glitch-styled text appears floating on the satellite map: "Hostile confirmed! Unknown contact is a threat!" and "We have a confirmed hostile -- Unknown contact!" The text is huge, overlaps everything, and Greg thinks the software is crashing.
 
-### Proof: Comparison Screenshots
-I programmatically toggled the layers off:
-- **With all overlays ON** (default): Center of map is an unreadable glowing blob, hundreds of dots on every street
-- **With prediction ellipses OFF**: Map immediately clearer, you can see buildings and targets
-- **With ALL overlays OFF** (just satellite + markers): Map is clean, professional, and readable. Target markers are clearly visible. This is what a first-time user should see.
+5. **HEADER BAR STATS ARE CONFUSING.** Shows "0 units | 3 threats | 3 targets" with colored badges. Greg doesn't know the difference between a "unit" and a "target." Numbers changed during the session with no explanation.
+
+6. **UNIT INSPECTOR USES MILITARY JARGON.** Clicking a target shows "FSM STATE: ADVANCING", "ALLIANCE: HOSTILE", coordinates like "(-306.6, 210.1)". Greg does not know what FSM means. He wants "Person walking north" not "PERSON / HOSTILE / ADVANCING."
+
+7. **BRIGHT CYAN CAMERA FOV LINES.** Bright cyan lines stretch across the entire map from corner to corner. They look like laser beams. Greg thinks something is broken. Probably camera field-of-view cones but visually dominating.
+
+---
+
+## MENUS TESTED
+
+| Menu | Works? | Contents |
+|------|--------|----------|
+| WINDOWS | YES | 80+ items in 9 categories (Operations, Intel, Sensing, Communications, Commander, Map, Simulation, System, Other) |
+| SIM | BROKEN | Dropdown is EMPTY -- nothing appears |
+| MAP | YES | Layers toggle (Satellite, Buildings, Roads, Trees, Water, etc.), Grid, Unit Markers, Fog of War, 3D Mode, Zoom controls |
+| LAYOUT | YES | 4 presets: Commander, Observer, Tactical, Battle, plus "Save Current..." |
 
 ---
 
@@ -71,54 +66,67 @@ I programmatically toggled the layers off:
 
 | Endpoint | Result |
 |----------|--------|
-| `/api/targets` | Returned 2 targets (oddly low -- UI shows 70. Simulation uses different endpoint?) |
-| `/api/fleet/devices` | Returned demo device "Alpha-Node" with battery 85.7%, uptime, sensor counts |
-| `/api/system/readiness` | "partially_ready" 5/9 -- MQTT yellow (not connected), demo green, auth yellow (disabled) |
-| `/api/plugins` | 26 plugins loaded successfully |
-| `/api/dossiers` | Returned dossier list with UUIDs, entity types, threat levels |
+| `/api/targets` | 2 targets (much less than 70 on map -- simulation targets use different path?) |
+| `/api/fleet/devices` | Demo device "Alpha-Node" with battery 87.6%, uptime, sensor counts |
+| `/api/system/readiness` | "partially_ready" 4/9 -- MQTT yellow, demo green, auth yellow (disabled) |
+| `/api/plugins` | 27 plugins loaded |
+| `/api/dossiers` | Dossier list with UUIDs, entity types, threat levels |
 
-APIs: 5/5 returned real data. No 500 errors, no empty responses.
+APIs: 5/5 returned real data. No 500 errors.
 
 ---
 
-## OBVIOUS PROBLEMS
+## KEYBOARD SHORTCUTS TESTED
 
-1. **Prediction ellipses make the map center unreadable.** 61 overlapping semi-transparent polygons create an opaque blob. This should be OFF by default or dramatically reduced in opacity.
+| Key | Expected | Result |
+|-----|----------|--------|
+| J | City Sim | WORKS -- map zoomed out, cyan dots (vehicles/NPCs) appeared across city |
+| \ | Protest | WORKS -- floating narration text appeared |
+| 1 | Amy panel | WORKS -- Amy Commander panel opened on right side |
+| 2 | Units panel | WORKS -- Units panel opened on left side |
 
-2. **474 traffic signal dots look like targets.** They are the same magenta color family. A new user sees hundreds of dots and has no idea which ones are real targets vs. GIS decoration. This layer should be OFF by default.
-
-3. **The /api/targets endpoint returns 2 while the UI shows 70.** The main "targets" API seems disconnected from what the simulation engine is tracking. Confusing for anyone trying to integrate.
-
-4. **Mouse wheel zoom did not work** in my Playwright test. The map stayed at roughly the same zoom level across 13 scroll events. Could be a Playwright issue, but worth noting.
-
-5. **Trail lines add clutter.** 133 lines on top of everything else. Not as bad as the ellipses but contributes to the overall visual noise.
+---
 
 ## THINGS THAT ACTUALLY WORK
 
-1. Map loads with real satellite imagery -- the neighborhood is recognizable and detailed
-2. Target markers (22x22px colored squares with NATO-style symbology) are visible and clickable
-3. Unit Inspector opens with complete target information -- name, type, alliance, health, speed, heading, combat stats
-4. Header stats bar shows live counts (49 units, 21 threats, 70 targets) with color coding
-5. Demo mode runs and targets move in real time
-6. Amy narration text floats across the map in green ("confirmed hostile -- Unknown contact!")
-7. Zero JavaScript errors across all tests
-8. 26 plugins loaded without errors
-9. All 5 API endpoints returned real data
-10. Welcome tooltip appears explaining controls
+1. Map loads fast with real satellite imagery -- no tile errors, looks professional
+2. Keyboard shortcuts work reliably (J, \, 1, 2)
+3. Clicking a target marker opens Unit Inspector with actual data (name, type, alliance, health, speed)
+4. Amy panel opened and shows status information
+5. City sim (J key) populated the map with many moving cyan markers
+6. Zero JavaScript errors during entire 10+ minute test session
+7. All 5 API endpoints returned real data
+8. 27 plugins loaded without errors
+9. MAP menu has useful layer toggles
+10. LAYOUT menu has 4 sensible presets
+11. WINDOWS menu has organized categories (9 of them)
+12. 70 MapLibre markers rendered and are interactive
+
+---
 
 ## MY HONEST IMPRESSION
 
-The product works. The map loads, targets appear and move, clicking them shows detailed information, the AI commander narrates events, and the APIs return real data. Zero JS errors. That is genuinely impressive.
+The map looks really cool and the fact that it loads with real satellite imagery is impressive. But as Greg the building manager, I have no idea what I'm looking at or how to use it. The SIM menu being empty means I literally cannot start the demo without someone telling me a keyboard shortcut or an API command. The WINDOWS menu with 80+ items makes me feel like I accidentally opened a nuclear submarine control panel. The floating battle text on the map makes it look like a video game, not a security tool.
 
-But the default view is a cluttered mess. A park ranger or security guard opening this for the first time would see a glowing neon blob over a satellite photo with hundreds of unexplained dots on every street. They would close the tab. The actual useful information -- where are the targets, what are they doing -- is buried under layers of GIS decoration and prediction visualization that should be turned off by default.
+That said -- once someone SHOWED me how to start things and click targets, the interaction actually works. The bones are good. The first-time experience is terrible because the main entry point (SIM menu) is broken and everything else assumes you already know what you're doing.
 
-The fix is straightforward: hide prediction ellipses and traffic signals by default. Let power users toggle them on via the MAP or VIEW menu. The product underneath the clutter is solid.
+Compared to previous report (Wave 178): the visual clutter from prediction ellipses and traffic signals seems to be LESS of a problem now -- the default view was clean satellite imagery without the "opaque blob" described last time. The main regression is the SIM menu being completely empty.
+
+---
 
 ## Screenshots Saved
 
-- `tests/.baselines/idiot_initial_view.png` -- first load, all layers on
-- `tests/.baselines/idiot_zoomed_default.png` -- default zoom after dismissing tooltip
-- `tests/.baselines/idiot_clicked_target.png` -- Unit Inspector open after clicking target
-- `tests/.baselines/idiot_no_ellipses.png` -- prediction ellipses HIDDEN (much cleaner)
-- `tests/.baselines/idiot_with_ellipses.png` -- prediction ellipses VISIBLE (cluttered)
-- `tests/.baselines/idiot_clean_map.png` -- ALL overlays hidden (cleanest, most readable view)
+- `tests/.baselines/idiot_step1_firstload.png` -- first load, clean satellite map
+- `tests/.baselines/idiot_step2_windows_menu.png` -- WINDOWS menu open (overwhelming)
+- `tests/.baselines/idiot_step2b_menu_closeup.png` -- WINDOWS menu closeup
+- `tests/.baselines/idiot_step3_sim_menu.png` -- SIM menu (nothing visible)
+- `tests/.baselines/idiot_step4_after_demo.png` -- after demo start, targets on map
+- `tests/.baselines/idiot_step5_click_map.png` -- after clicking on map
+- `tests/.baselines/idiot_step6_J_citysim.png` -- city sim active (cyan dots)
+- `tests/.baselines/idiot_step6_protest.png` -- protest narration floating text
+- `tests/.baselines/idiot_step6_amy.png` -- Amy panel visible
+- `tests/.baselines/idiot_click_target.png` -- Unit Inspector with target details
+- `tests/.baselines/idiot_menu_map.png` -- MAP menu open
+- `tests/.baselines/idiot_menu_layout.png` -- LAYOUT menu open
+- `tests/.baselines/idiot_panel_units.png` -- Units panel open
+- `tests/.baselines/idiot_panel_amy.png` -- Amy panel open
