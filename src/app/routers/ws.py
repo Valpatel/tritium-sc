@@ -225,6 +225,10 @@ async def websocket_live(websocket: WebSocket, token: str | None = Query(default
                     websocket, {"type": "error", "message": "Invalid JSON"}
                 )
     except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.warning(f"WebSocket error: {e}")
+    finally:
         await manager.disconnect(websocket)
 
 
@@ -791,6 +795,7 @@ def start_amy_event_bridge(amy_commander, loop: asyncio.AbstractEventLoop):
     batcher.start()
 
     def bridge_loop():
+        event_type = "unknown"
         while True:
             try:
                 msg = sub.get(timeout=60)
@@ -925,6 +930,7 @@ def start_headless_event_bridge(event_bus, loop: asyncio.AbstractEventLoop,
     batcher.start()
 
     def bridge_loop():
+        event_type = "unknown"
         while True:
             try:
                 msg = sub.get(timeout=60)
