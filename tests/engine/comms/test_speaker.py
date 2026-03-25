@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-from engine.comms.speaker import Speaker, DEFAULT_PIPER_DIR
+from tritium_lib.comms.speaker import Speaker, DEFAULT_PIPER_DIR
 from app.ai.thumbnails import ObjectThumbnail
 
 
@@ -245,7 +245,7 @@ class TestSpeakerLifecycle:
                 mock_result = MagicMock()
                 mock_result.returncode = 0
                 mock_result.stdout = fake_pcm
-                with patch("engine.comms.speaker.subprocess.run", return_value=mock_result):
+                with patch("tritium_lib.comms.speaker.subprocess.run", return_value=mock_result):
                     result = s.synthesize_raw("Hello")
                     assert result == fake_pcm
 
@@ -263,7 +263,7 @@ class TestSpeakerLifecycle:
                 mock_result = MagicMock()
                 mock_result.returncode = 1
                 mock_result.stdout = b""
-                with patch("engine.comms.speaker.subprocess.run", return_value=mock_result):
+                with patch("tritium_lib.comms.speaker.subprocess.run", return_value=mock_result):
                     result = s.synthesize_raw("Hello")
                     assert result is None
 
@@ -278,7 +278,7 @@ class TestSpeakerLifecycle:
                 s = Speaker.__new__(Speaker)
                 s.piper_bin = str(piper_bin)
                 s.voice_model = str(voice_model)
-                with patch("engine.comms.speaker.subprocess.run", side_effect=OSError("No such file")):
+                with patch("tritium_lib.comms.speaker.subprocess.run", side_effect=OSError("No such file")):
                     result = s.synthesize_raw("Hello")
                     assert result is None
 

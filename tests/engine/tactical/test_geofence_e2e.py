@@ -4,7 +4,7 @@
 """End-to-end geofence polygon test — draw → save → engine → events fire."""
 
 import pytest
-from engine.tactical.geofence import GeofenceEngine, GeoZone, point_in_polygon
+from tritium_lib.tracking.geofence import GeofenceEngine, GeoZone, point_in_polygon
 
 
 class MockEventBus:

@@ -21,7 +21,7 @@ import pytest
 from src.engine.comms.event_bus import EventBus
 from src.engine.tactical.target_tracker import TargetTracker
 from tritium_lib.tracking.dossier import DossierStore
-from src.engine.tactical.correlator import TargetCorrelator
+from tritium_lib.tracking.correlator import TargetCorrelator
 
 
 class TestDemoModePipeline:

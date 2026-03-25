@@ -214,7 +214,7 @@ async def amy_speak_audio(request: Request, body: SpeakRequest):
     # Fallback: try to use Speaker directly
     if speaker is None:
         try:
-            from engine.comms.speaker import Speaker
+            from tritium_lib.comms.speaker import Speaker
             speaker = Speaker()
         except Exception:
             return JSONResponse(

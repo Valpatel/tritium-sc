@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, call
 
 import pytest
 
-from src.engine.tactical.correlator import (
+from tritium_lib.tracking.correlator import (
     TargetCorrelator,
     _node_type_for,
 )

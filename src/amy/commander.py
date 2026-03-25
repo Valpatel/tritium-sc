@@ -1799,7 +1799,7 @@ class Commander:
     def _boot(self) -> None:
         """Initialize all subsystems. Called from run()."""
         from .brain.agent import Agent, CREATURE_SYSTEM_PROMPT
-        from engine.comms.speaker import Speaker
+        from tritium_lib.comms.speaker import Speaker
         from .brain.thinking import ThinkingThread
         from .actions.motor import MotorThread
 

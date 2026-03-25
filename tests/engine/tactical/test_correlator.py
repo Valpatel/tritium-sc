@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from src.engine.tactical.correlator import (
+from tritium_lib.tracking.correlator import (
     CorrelationRecord,
     TargetCorrelator,
     start_correlator,

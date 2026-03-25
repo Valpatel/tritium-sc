@@ -1084,7 +1084,7 @@ async def lifespan(app: FastAPI):
     # Wire geofence engine to EventBus so enter/exit events reach notifications
     try:
         from app.routers.geofence import get_engine as _get_geofence_engine, set_engine as _set_geofence_engine
-        from engine.tactical.geofence import GeofenceEngine as _GeofenceEngine
+        from tritium_lib.tracking.geofence import GeofenceEngine as _GeofenceEngine
         _geo_bus = amy_instance.event_bus if amy_instance else (
             sim_engine.event_bus if sim_engine is not None else None
         )

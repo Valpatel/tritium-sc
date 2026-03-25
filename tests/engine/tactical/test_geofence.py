@@ -6,7 +6,7 @@
 import pytest
 import queue
 
-from engine.tactical.geofence import (
+from tritium_lib.tracking.geofence import (
     GeoZone,
     GeoEvent,
     GeofenceEngine,

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from engine.tactical.ble_classifier import (
+from tritium_lib.tracking.ble_classifier import (
     BLEClassification,
     BLEClassifier,
     CLASSIFICATION_LEVELS,

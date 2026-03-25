@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.auth import require_auth
 
-from engine.tactical.geofence import GeoZone, GeofenceEngine
+from tritium_lib.tracking.geofence import GeoZone, GeofenceEngine
 
 _MAX_NAME_LEN = 200
 _MAX_VERTICES = 1000

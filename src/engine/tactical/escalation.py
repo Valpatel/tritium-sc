@@ -19,6 +19,10 @@ Design philosophy:
     Amy handles strategic awareness (she sees dispatches in her thinking
     context and can override, recall, or re-assign).  Both write to the
     same SimulationTarget waypoints — last writer wins.
+
+Domain logic (ThreatRecord, THREAT_LEVELS, zone matching, escalation
+ladder) lives in tritium-lib.  This module adds SC-specific wiring:
+EventBus pub/sub, threading, SimulationEngine dispatch, MQTT bridge.
 """
 
 from __future__ import annotations
@@ -28,8 +32,20 @@ import math
 import queue
 import threading
 import time
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
+
+# Re-export domain types from tritium-lib so existing SC imports keep working
+from tritium_lib.tracking.escalation import (  # noqa: F401
+    ThreatRecord,
+    THREAT_LEVELS,
+    EscalationConfig,
+    ClassifyResult,
+    escalation_index,
+    is_escalation,
+    find_zone,
+    classify_target,
+    classify_all_targets,
+)
 
 if TYPE_CHECKING:
     from ..comms.event_bus import EventBus
@@ -38,31 +54,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("amy.escalation")
 
-# Threat ladder levels (ordered)
-THREAT_LEVELS = ["none", "unknown", "suspicious", "hostile"]
-
-
-@dataclass
-class ThreatRecord:
-    """Tracks threat state for a single target.
-
-    One record exists per non-friendly, non-neutral target that the
-    classifier has seen.  Records persist even when threat_level returns
-    to ``none`` (they are only pruned when the target disappears from
-    the TargetTracker).
-    """
-
-    target_id: str
-    threat_level: str = "none"
-    level_since: float = field(default_factory=time.monotonic)
-    in_zone: str = ""       # name of the zone the target is currently in
-    zone_enter_time: float = 0.0
-    last_update: float = field(default_factory=time.monotonic)
-    prior_hostile: bool = False  # was this target ever classified as hostile?
-
 
 class ThreatClassifier:
     """Monitors targets and classifies threat levels at 2Hz.
+
+    Delegates pure classification logic to tritium_lib.tracking.escalation.
+    Adds SC-specific: EventBus publishing, background thread, zone violation
+    events for frontend display.
 
     Escalation triggers:
         - Perimeter zone entry: none -> unknown
@@ -96,11 +94,16 @@ class ThreatClassifier:
         self._thread: threading.Thread | None = None
         # Track when targets left all zones (for de-escalation)
         self._zone_exit_times: dict[str, float] = {}
-        # Override class constants with instance values if provided
+        # Build lib config from instance overrides
         if linger_threshold is not None:
             self.LINGER_THRESHOLD = linger_threshold
         if deescalation_time is not None:
             self.DEESCALATION_TIME = deescalation_time
+        self._config = EscalationConfig(
+            linger_threshold=self.LINGER_THRESHOLD,
+            deescalation_time=self.DEESCALATION_TIME,
+            tick_interval=self.TICK_INTERVAL,
+        )
 
     @property
     def zones(self) -> list[dict]:
@@ -125,6 +128,10 @@ class ThreatClassifier:
         if self._thread is not None:
             self._thread.join(timeout=2.0)
             self._thread = None
+
+    def _find_zone(self, position: tuple[float, float]) -> dict | None:
+        """Delegate to lib find_zone for backward compatibility."""
+        return find_zone(position, self._zones)
 
     def get_records(self) -> dict[str, ThreatRecord]:
         with self._lock:
@@ -162,120 +169,51 @@ class ThreatClassifier:
         now = time.monotonic()
         all_targets = self._tracker.get_all()
 
+        # Build a target_id -> position lookup for zone_violation events
+        position_map: dict[str, tuple[float, float]] = {}
+        for t in all_targets:
+            position_map[t.target_id] = t.position
+
         with self._lock:
-            # Prune records for targets no longer tracked
-            tracked_ids = {t.target_id for t in all_targets}
-            stale = [tid for tid in self._records if tid not in tracked_ids]
-            for tid in stale:
-                del self._records[tid]
-                self._zone_exit_times.pop(tid, None)
+            # Delegate batch classification to lib
+            results = classify_all_targets(
+                self._records,
+                self._zone_exit_times,
+                all_targets,
+                self._zones,
+                now,
+                self._config,
+            )
 
-            for target in all_targets:
-                # Skip friendly and neutral targets — only classify
-                # hostile and unknown alliance entities.  Neutral targets
-                # (neighbors, cars, animals from AmbientSpawner) should
-                # not trigger zone violations or escalations.
-                if target.alliance in ("friendly", "neutral"):
-                    continue
+            # Publish events for each result
+            for result in results:
+                tid = result.record.target_id
 
-                # Get or create record
-                if target.target_id not in self._records:
-                    self._records[target.target_id] = ThreatRecord(
-                        target_id=target.target_id
-                    )
-                record = self._records[target.target_id]
-                record.last_update = now
+                # Publish zone violation for frontend when entering a zone
+                if result.zone_entered:
+                    pos = position_map.get(tid, (0.0, 0.0))
+                    zone = find_zone(pos, self._zones)
+                    zone_type = zone.get("type", "") if zone else ""
+                    self._event_bus.publish("zone_violation", {
+                        "target_id": tid,
+                        "zone_name": result.zone_entered,
+                        "zone_type": zone_type,
+                        "position": {"x": pos[0], "y": pos[1]},
+                    })
 
-                # Check zone membership
-                current_zone = self._find_zone(target.position)
-                old_level = record.threat_level
-
-                if current_zone is not None:
-                    zone_type = current_zone.get("type", "")
-                    zone_name = current_zone.get("name", zone_type) or "<unnamed>"
-
-                    # Track zone entry
-                    if record.in_zone != zone_name:
-                        record.in_zone = zone_name
-                        record.zone_enter_time = now
-                        self._zone_exit_times.pop(target.target_id, None)
-                        # Publish zone violation event for frontend
-                        self._event_bus.publish("zone_violation", {
-                            "target_id": target.target_id,
-                            "zone_name": zone_name,
-                            "zone_type": zone_type,
-                            "position": {"x": target.position[0], "y": target.position[1]},
-                        })
-
-                    # Escalation based on zone type
-                    if "restricted" in zone_type:
-                        if THREAT_LEVELS.index(record.threat_level) < THREAT_LEVELS.index("suspicious"):
-                            record.threat_level = "suspicious"
-                            record.level_since = now
-                    elif record.threat_level == "none":
-                        # Prior hostiles skip unknown — they've earned suspicion
-                        if record.prior_hostile:
-                            record.threat_level = "suspicious"
-                        else:
-                            record.threat_level = "unknown"
-                        record.level_since = now
-
-                    # Linger escalation
-                    time_in_zone = now - record.zone_enter_time
-                    if time_in_zone > self.LINGER_THRESHOLD:
-                        if THREAT_LEVELS.index(record.threat_level) < THREAT_LEVELS.index("hostile"):
-                            record.threat_level = "hostile"
-                            record.level_since = now
-                            record.prior_hostile = True
-
-                else:
-                    # Target outside all zones — track for de-escalation
-                    if record.in_zone:
-                        record.in_zone = ""
-                        self._zone_exit_times[target.target_id] = now
-
-                    # De-escalation after time outside zones
-                    exit_time = self._zone_exit_times.get(target.target_id, 0)
-                    if exit_time > 0 and (now - exit_time) > self.DEESCALATION_TIME:
-                        level_idx = THREAT_LEVELS.index(record.threat_level)
-                        if level_idx > 0:
-                            record.threat_level = THREAT_LEVELS[level_idx - 1]
-                            record.level_since = now
-                            self._zone_exit_times[target.target_id] = now
-
-                # Publish escalation event if level changed
-                if record.threat_level != old_level:
-                    reason = f"zone:{record.in_zone}" if record.in_zone else "de-escalation"
+                # Only publish escalation/deescalation for actual level changes
+                if result.level_changed:
                     self._publish_escalation(
-                        target.target_id, old_level, record.threat_level, reason
+                        tid,
+                        result.old_level,
+                        result.new_level,
+                        result.reason,
                     )
-
-    def _find_zone(self, position: tuple[float, float]) -> dict | None:
-        """Find the most restrictive zone containing the given position.
-
-        Uses simple radius-based containment: a zone contains a point if the
-        point is within the zone's radius (default 10 units) of the zone center.
-        When a position is inside multiple zones, restricted zones take priority.
-        """
-        px, py = position
-        best: dict | None = None
-        for zone in self._zones:
-            zpos = zone.get("position", {})
-            zx = zpos.get("x", 0.0)
-            zy = zpos.get("z", zpos.get("y", 0.0))
-            radius = zone.get("properties", {}).get("radius", 10.0)
-            dist = math.hypot(px - zx, py - zy)
-            if dist <= radius:
-                if "restricted" in zone.get("type", ""):
-                    return zone  # restricted always wins
-                if best is None:
-                    best = zone
-        return best
 
     def _publish_escalation(self, target_id: str, old_level: str, new_level: str, reason: str) -> None:
         """Publish threat escalation/de-escalation event."""
-        is_escalation = THREAT_LEVELS.index(new_level) > THREAT_LEVELS.index(old_level)
-        event_type = "threat_escalation" if is_escalation else "threat_deescalation"
+        escalating = is_escalation(old_level, new_level)
+        event_type = "threat_escalation" if escalating else "threat_deescalation"
         data = {
             "target_id": target_id,
             "old_level": old_level,

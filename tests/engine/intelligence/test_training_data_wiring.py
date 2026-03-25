@@ -43,7 +43,7 @@ class TestCorrelatorTrainingWiring:
     def test_correlator_logs_positive_correlation(self, temp_store):
         """Correlator should log merge decisions to training store."""
         from engine.tactical.target_tracker import TrackedTarget
-        from engine.tactical.correlator import TargetCorrelator
+        from tritium_lib.tracking.correlator import TargetCorrelator
 
         now = time.monotonic()
 
@@ -76,7 +76,7 @@ class TestCorrelatorTrainingWiring:
         )
 
         with patch(
-            "engine.tactical.correlator._get_training_store",
+            "tritium_lib.tracking.correlator.TargetCorrelator._get_training_store",
             return_value=temp_store,
         ):
             records = correlator.correlate()
@@ -92,7 +92,7 @@ class TestCorrelatorTrainingWiring:
     def test_correlator_logs_negative_decision(self, temp_store):
         """Correlator should log unrelated decisions too."""
         from engine.tactical.target_tracker import TrackedTarget
-        from engine.tactical.correlator import TargetCorrelator
+        from tritium_lib.tracking.correlator import TargetCorrelator
 
         now = time.monotonic()
 
@@ -125,7 +125,7 @@ class TestCorrelatorTrainingWiring:
         )
 
         with patch(
-            "engine.tactical.correlator._get_training_store",
+            "tritium_lib.tracking.correlator.TargetCorrelator._get_training_store",
             return_value=temp_store,
         ):
             records = correlator.correlate()
@@ -143,30 +143,27 @@ class TestBLEClassifierTrainingWiring:
     @pytest.mark.unit
     def test_ble_classifier_logs_classification(self, temp_store):
         """BLE classifier should log each classification to training store."""
-        from engine.tactical.ble_classifier import BLEClassifier
+        from tritium_lib.tracking.ble_classifier import BLEClassifier
         from engine.comms.event_bus import EventBus
 
         bus = EventBus()
         classifier = BLEClassifier(
             event_bus=bus,
             known_macs={"AA:BB:CC:DD:EE:FF"},
+            training_store_fn=lambda: temp_store,
         )
 
-        with patch(
-            "engine.tactical.ble_classifier._get_training_store",
-            return_value=temp_store,
-        ):
-            # Classify a known device
-            result = classifier.classify("AA:BB:CC:DD:EE:FF", "Known Phone", -50)
-            assert result.level == "known"
+        # Classify a known device
+        result = classifier.classify("AA:BB:CC:DD:EE:FF", "Known Phone", -50)
+        assert result.level == "known"
 
-            # Classify an unknown device
-            result = classifier.classify("11:22:33:44:55:66", "Unknown", -80)
-            assert result.level == "new"
+        # Classify an unknown device
+        result = classifier.classify("11:22:33:44:55:66", "Unknown", -80)
+        assert result.level == "new"
 
-            # Classify a suspicious device (strong signal, unknown)
-            result = classifier.classify("99:88:77:66:55:44", "Strong", -30)
-            assert result.level == "suspicious"
+        # Classify a suspicious device (strong signal, unknown)
+        result = classifier.classify("99:88:77:66:55:44", "Strong", -30)
+        assert result.level == "suspicious"
 
         # Check training store
         data = temp_store.get_classification_data()
@@ -181,19 +178,18 @@ class TestBLEClassifierTrainingWiring:
     @pytest.mark.unit
     def test_ble_classifier_continues_if_store_unavailable(self):
         """BLE classifier should not crash if training store is unavailable."""
-        from engine.tactical.ble_classifier import BLEClassifier
+        from tritium_lib.tracking.ble_classifier import BLEClassifier
         from engine.comms.event_bus import EventBus
 
         bus = EventBus()
-        classifier = BLEClassifier(event_bus=bus)
+        classifier = BLEClassifier(
+            event_bus=bus,
+            training_store_fn=lambda: None,
+        )
 
-        with patch(
-            "engine.tactical.ble_classifier._get_training_store",
-            return_value=None,
-        ):
-            # Should not raise
-            result = classifier.classify("AA:BB:CC:DD:EE:FF", "Test", -60)
-            assert result.level in ("known", "unknown", "new", "suspicious")
+        # Should not raise
+        result = classifier.classify("AA:BB:CC:DD:EE:FF", "Test", -60)
+        assert result.level in ("known", "unknown", "new", "suspicious")
 
 
 class TestHealthRLMetrics:
