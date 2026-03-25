@@ -117,6 +117,144 @@ class TestSecurityHeaders:
         # But still get other security headers
         assert resp.headers.get("X-Content-Type-Options") == "nosniff"
 
+    def test_hsts_present_when_tls_enabled(self, monkeypatch):
+        """HSTS header is set when tls_enabled=True."""
+        from app import security_headers as sh
+        from app.config import Settings
+
+        prod_settings = Settings(tls_enabled=True)
+        monkeypatch.setattr(sh, "settings", prod_settings)
+
+        test_app = FastAPI()
+        test_app.add_middleware(sh.SecurityHeadersMiddleware)
+
+        @test_app.get("/test-hsts")
+        async def html_page():
+            from fastapi.responses import HTMLResponse
+            return HTMLResponse("<html><body>HSTS</body></html>")
+
+        client = TestClient(test_app)
+        resp = client.get("/test-hsts")
+        assert resp.status_code == 200
+        hsts = resp.headers.get("Strict-Transport-Security")
+        assert hsts is not None, "HSTS header missing when TLS enabled"
+        assert "max-age=63072000" in hsts
+        assert "includeSubDomains" in hsts
+
+    def test_no_hsts_when_tls_disabled(self, monkeypatch):
+        """HSTS header must NOT be set when tls_enabled=False (dev mode)."""
+        from app import security_headers as sh
+        from app.config import Settings
+
+        dev_settings = Settings(tls_enabled=False)
+        monkeypatch.setattr(sh, "settings", dev_settings)
+
+        test_app = FastAPI()
+        test_app.add_middleware(sh.SecurityHeadersMiddleware)
+
+        @test_app.get("/test-no-hsts")
+        async def html_page():
+            from fastapi.responses import HTMLResponse
+            return HTMLResponse("<html><body>No HSTS</body></html>")
+
+        client = TestClient(test_app)
+        resp = client.get("/test-no-hsts")
+        assert resp.status_code == 200
+        assert "Strict-Transport-Security" not in resp.headers
+
+    def test_hsts_on_api_responses_when_tls(self, monkeypatch):
+        """HSTS applies to all responses (including API), not just HTML."""
+        from app import security_headers as sh
+        from app.config import Settings
+
+        prod_settings = Settings(tls_enabled=True)
+        monkeypatch.setattr(sh, "settings", prod_settings)
+
+        test_app = FastAPI()
+        test_app.add_middleware(sh.SecurityHeadersMiddleware)
+
+        @test_app.get("/api/test-hsts")
+        async def api_endpoint():
+            return {"status": "ok"}
+
+        client = TestClient(test_app)
+        resp = client.get("/api/test-hsts")
+        assert resp.status_code == 200
+        assert "Strict-Transport-Security" in resp.headers
+
+    def test_strict_csp_when_auth_enabled(self, monkeypatch):
+        """CSP drops unsafe-inline from script-src when auth_enabled=True."""
+        from app import security_headers as sh
+        from app.config import Settings
+
+        prod_settings = Settings(
+            auth_enabled=True,
+            auth_secret_key="test-secret-key-32-chars-long-ok",
+        )
+        monkeypatch.setattr(sh, "settings", prod_settings)
+
+        test_app = FastAPI()
+        test_app.add_middleware(sh.SecurityHeadersMiddleware)
+
+        @test_app.get("/test-strict-csp")
+        async def html_page():
+            from fastapi.responses import HTMLResponse
+            return HTMLResponse("<html><body>Strict</body></html>")
+
+        client = TestClient(test_app)
+        resp = client.get("/test-strict-csp")
+        assert resp.status_code == 200
+        csp = resp.headers.get("Content-Security-Policy", "")
+        assert "'unsafe-inline'" not in csp.split("script-src")[1].split(";")[0], (
+            "script-src should not contain unsafe-inline when auth is enabled"
+        )
+        # style-src may still have unsafe-inline (needed for inline styles)
+        assert "style-src" in csp
+
+    def test_dev_csp_keeps_unsafe_inline(self, monkeypatch):
+        """CSP keeps unsafe-inline in script-src when auth_enabled=False (dev)."""
+        from app import security_headers as sh
+        from app.config import Settings
+
+        dev_settings = Settings(auth_enabled=False)
+        monkeypatch.setattr(sh, "settings", dev_settings)
+
+        test_app = FastAPI()
+        test_app.add_middleware(sh.SecurityHeadersMiddleware)
+
+        @test_app.get("/test-dev-csp")
+        async def html_page():
+            from fastapi.responses import HTMLResponse
+            return HTMLResponse("<html><body>Dev</body></html>")
+
+        client = TestClient(test_app)
+        resp = client.get("/test-dev-csp")
+        assert resp.status_code == 200
+        csp = resp.headers.get("Content-Security-Policy", "")
+        script_src = csp.split("script-src")[1].split(";")[0]
+        assert "'unsafe-inline'" in script_src, (
+            "script-src should contain unsafe-inline in dev mode"
+        )
+
+    def test_build_csp_policy_strict_vs_dev(self):
+        """_build_csp_policy produces different output for strict vs dev."""
+        from app.security_headers import _build_csp_policy
+
+        dev_csp = _build_csp_policy(strict=False)
+        strict_csp = _build_csp_policy(strict=True)
+
+        # Both must have the same directives except script-src inline
+        assert "default-src 'self'" in dev_csp
+        assert "default-src 'self'" in strict_csp
+        assert "'unsafe-inline'" in dev_csp.split("script-src")[1].split(";")[0]
+        assert "'unsafe-inline'" not in strict_csp.split("script-src")[1].split(";")[0]
+
+        # Both should still have object-src 'none' and frame-ancestors
+        assert "object-src 'none'" in dev_csp
+        assert "object-src 'none'" in strict_csp
+        assert "frame-ancestors 'none'" in dev_csp
+        assert "frame-ancestors 'none'" in strict_csp
+
 
 # ------------------------------------------------------------------ #
 # File Upload Security tests

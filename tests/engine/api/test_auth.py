@@ -29,12 +29,29 @@ class TestAuthModule:
         assert callable(decode_token)
         assert callable(init_default_admin)
 
-    def test_password_hashing(self):
+    def test_password_hashing_bcrypt(self):
         from app.auth import _hash_password, _verify_password
         hashed = _hash_password("test123")
-        assert ":" in hashed
+        # bcrypt hashes start with $2b$
+        assert hashed.startswith("$2b$")
         assert _verify_password("test123", hashed)
         assert not _verify_password("wrong", hashed)
+
+    def test_legacy_sha256_backward_compat(self):
+        """Old SHA-256 hashes should still verify (with deprecation warning)."""
+        import hashlib
+        import secrets as _secrets
+        from app.auth import _verify_password, _is_legacy_sha256_hash
+        salt = _secrets.token_hex(16)
+        legacy_hash = f"{salt}:{hashlib.sha256(f'{salt}mypass'.encode()).hexdigest()}"
+        assert _is_legacy_sha256_hash(legacy_hash)
+        assert _verify_password("mypass", legacy_hash)
+        assert not _verify_password("wrong", legacy_hash)
+
+    def test_bcrypt_hash_not_detected_as_legacy(self):
+        from app.auth import _hash_password, _is_legacy_sha256_hash
+        hashed = _hash_password("test123")
+        assert not _is_legacy_sha256_hash(hashed)
 
     def test_create_access_token(self):
         from app.auth import create_access_token, decode_token

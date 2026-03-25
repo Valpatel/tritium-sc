@@ -16,7 +16,7 @@ import pytest
 
 from tritium_lib.sim_engine.world.pathfinding import plan_path
 from tritium_lib.tracking.obstacles import BuildingObstacles
-from engine.tactical.street_graph import StreetGraph
+from tritium_lib.tracking.street_graph import StreetGraph
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ _MOCK_OVERPASS_BUILDINGS = {
 def street_graph(tmp_path):
     """Pre-loaded street graph with mock data."""
     cache_dir = str(tmp_path / "sg_cache")
-    with patch("engine.tactical.street_graph._fetch_roads") as mock_fetch:
+    with patch("tritium_lib.tracking.street_graph._fetch_roads") as mock_fetch:
         mock_fetch.return_value = _MOCK_OVERPASS_ROADS["elements"]
         sg = StreetGraph()
         sg.load(REF_LAT, REF_LNG, radius_m=300, cache_dir=cache_dir)
@@ -96,7 +96,7 @@ def street_graph(tmp_path):
 def obstacles(tmp_path):
     """Pre-loaded building obstacles with mock data."""
     cache_dir = str(tmp_path / "obs_cache")
-    with patch("engine.tactical.obstacles._fetch_buildings") as mock_fetch:
+    with patch("tritium_lib.tracking.obstacles._fetch_buildings") as mock_fetch:
         mock_fetch.return_value = _MOCK_OVERPASS_BUILDINGS["elements"]
         obs = BuildingObstacles()
         obs.load(REF_LAT, REF_LNG, radius_m=300, cache_dir=cache_dir)

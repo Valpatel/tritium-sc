@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 import networkx as nx
 
-from engine.tactical.street_graph import StreetGraph
+from tritium_lib.tracking.street_graph import StreetGraph
 from tritium_lib.tracking.obstacles import BuildingObstacles
 
 pytestmark = pytest.mark.unit

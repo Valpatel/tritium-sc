@@ -18,7 +18,7 @@ from engine.comms.event_bus import EventBus
 from engine.simulation.engine import SimulationEngine
 from tritium_lib.sim_engine.core.entity import SimulationTarget
 from tritium_lib.tracking.obstacles import BuildingObstacles
-from engine.tactical.street_graph import StreetGraph
+from tritium_lib.tracking.street_graph import StreetGraph
 
 
 # Reference point matching config.py defaults
@@ -66,7 +66,7 @@ _MOCK_ROADS = {
 def street_graph(tmp_path):
     """Pre-loaded street graph."""
     cache_dir = str(tmp_path / "sg_cache")
-    with patch("engine.tactical.street_graph._fetch_roads") as mock_fetch:
+    with patch("tritium_lib.tracking.street_graph._fetch_roads") as mock_fetch:
         mock_fetch.return_value = _MOCK_ROADS["elements"]
         sg = StreetGraph()
         sg.load(REF_LAT, REF_LNG, radius_m=300, cache_dir=cache_dir)

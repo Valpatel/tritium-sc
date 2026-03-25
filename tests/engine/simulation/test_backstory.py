@@ -606,7 +606,7 @@ class TestEngineWiring:
         bus = EventBus()
         engine = SimulationEngine(bus, map_bounds=50)
         mock_fleet = _make_fleet(response=_valid_defender_json())
-        with patch('engine.inference.fleet.OllamaFleet', return_value=mock_fleet):
+        with patch('tritium_lib.inference.fleet.OllamaFleet', return_value=mock_fleet):
             with patch('app.config.settings') as mock_settings:
                 mock_settings.backstory_enabled = True
                 mock_settings.backstory_bulk_model = "gemma3:1b"
@@ -630,7 +630,7 @@ class TestEngineWiring:
         bus = EventBus()
         engine = SimulationEngine(bus, map_bounds=50)
         mock_fleet = _make_fleet(response=_valid_defender_json())
-        with patch('engine.inference.fleet.OllamaFleet', return_value=mock_fleet):
+        with patch('tritium_lib.inference.fleet.OllamaFleet', return_value=mock_fleet):
             with patch('app.config.settings') as mock_settings:
                 mock_settings.backstory_enabled = True
                 mock_settings.backstory_bulk_model = "gemma3:1b"
@@ -652,7 +652,7 @@ class TestEngineWiring:
         bus = EventBus()
         engine = SimulationEngine(bus, map_bounds=50)
         mock_fleet = _make_fleet(response=_valid_defender_json())
-        with patch('engine.inference.fleet.OllamaFleet', return_value=mock_fleet):
+        with patch('tritium_lib.inference.fleet.OllamaFleet', return_value=mock_fleet):
             with patch('app.config.settings') as mock_settings:
                 mock_settings.backstory_enabled = True
                 mock_settings.backstory_bulk_model = "gemma3:1b"
@@ -675,7 +675,7 @@ class TestEngineWiring:
         bus = EventBus()
         engine = SimulationEngine(bus, map_bounds=50)
         mock_fleet = _make_fleet(response=_valid_defender_json())
-        with patch('engine.inference.fleet.OllamaFleet', return_value=mock_fleet):
+        with patch('tritium_lib.inference.fleet.OllamaFleet', return_value=mock_fleet):
             with patch('app.config.settings') as mock_settings:
                 mock_settings.backstory_enabled = True
                 mock_settings.backstory_bulk_model = "gemma3:1b"

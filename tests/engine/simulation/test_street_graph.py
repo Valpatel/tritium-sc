@@ -17,7 +17,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # The module under test — will fail until implementation exists
-from engine.tactical.street_graph import StreetGraph
+from tritium_lib.tracking.street_graph import StreetGraph
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +80,7 @@ REF_LNG = -122.4194
 
 def _make_loaded_graph(temp_cache_dir: str) -> StreetGraph:
     """Helper: create and load a StreetGraph with mock data."""
-    with patch("engine.tactical.street_graph._fetch_roads") as mock_fetch:
+    with patch("tritium_lib.tracking.street_graph._fetch_roads") as mock_fetch:
         mock_fetch.return_value = _MOCK_OVERPASS_ROADS["elements"]
         sg = StreetGraph()
         sg.load(REF_LAT, REF_LNG, radius_m=300, cache_dir=temp_cache_dir)
@@ -217,7 +217,7 @@ class TestCachingWorks:
             call_count += 1
             return _MOCK_OVERPASS_ROADS["elements"]
 
-        with patch("engine.tactical.street_graph._fetch_roads", side_effect=counting_fetch):
+        with patch("tritium_lib.tracking.street_graph._fetch_roads", side_effect=counting_fetch):
             sg1 = StreetGraph()
             sg1.load(REF_LAT, REF_LNG, radius_m=300, cache_dir=temp_cache_dir)
             assert call_count == 1, "First load should call API"
@@ -237,7 +237,7 @@ class TestCachingWorks:
             call_count += 1
             return _MOCK_OVERPASS_ROADS["elements"]
 
-        with patch("engine.tactical.street_graph._fetch_roads", side_effect=counting_fetch):
+        with patch("tritium_lib.tracking.street_graph._fetch_roads", side_effect=counting_fetch):
             sg = StreetGraph()
             sg.load(REF_LAT, REF_LNG, radius_m=300, cache_dir=temp_cache_dir)
             assert call_count == 1
@@ -264,7 +264,7 @@ class TestOfflineFallback:
         def failing_fetch(*args, **kwargs):
             raise ConnectionError("Overpass API unreachable")
 
-        with patch("engine.tactical.street_graph._fetch_roads", side_effect=failing_fetch):
+        with patch("tritium_lib.tracking.street_graph._fetch_roads", side_effect=failing_fetch):
             sg = StreetGraph()
             sg.load(REF_LAT, REF_LNG, radius_m=300, cache_dir=temp_cache_dir)
 
@@ -279,7 +279,7 @@ class TestOfflineFallback:
         def empty_fetch(*args, **kwargs):
             return []
 
-        with patch("engine.tactical.street_graph._fetch_roads", side_effect=empty_fetch):
+        with patch("tritium_lib.tracking.street_graph._fetch_roads", side_effect=empty_fetch):
             sg = StreetGraph()
             sg.load(REF_LAT, REF_LNG, radius_m=300, cache_dir=temp_cache_dir)
 

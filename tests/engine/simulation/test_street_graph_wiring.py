@@ -178,7 +178,7 @@ class TestGracefulFallback:
 class TestMainLifespanWiring:
     """Test that main.py lifespan wiring code loads street graph/obstacles."""
 
-    @patch("engine.tactical.street_graph.StreetGraph")
+    @patch("tritium_lib.tracking.street_graph.StreetGraph")
     def test_street_graph_load_called_with_settings(self, MockSG):
         """Verify the wiring pattern: create -> load -> set_street_graph."""
         mock_sg = MagicMock()
@@ -191,7 +191,7 @@ class TestMainLifespanWiring:
         eb = EventBus()
         eng = SimulationEngine(eb, map_bounds=200.0)
 
-        from engine.tactical.street_graph import StreetGraph
+        from tritium_lib.tracking.street_graph import StreetGraph
         street_graph = StreetGraph()
         street_graph.load(37.7749, -122.4194, radius_m=300)
         if street_graph.graph is not None:
@@ -200,7 +200,7 @@ class TestMainLifespanWiring:
         mock_sg.load.assert_called_once_with(37.7749, -122.4194, radius_m=300)
         assert eng.street_graph is mock_sg
 
-    @patch("engine.tactical.obstacles.BuildingObstacles")
+    @patch("tritium_lib.tracking.obstacles.BuildingObstacles")
     def test_obstacles_load_called_with_settings(self, MockObs):
         """Verify the wiring pattern: create -> load -> set_obstacles."""
         mock_obs = MagicMock()

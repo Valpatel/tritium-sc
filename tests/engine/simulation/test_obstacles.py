@@ -66,7 +66,7 @@ def temp_cache_dir(tmp_path):
 
 def _make_loaded_obstacles(temp_cache_dir: str) -> BuildingObstacles:
     """Helper: create and load obstacles with mock data."""
-    with patch("engine.tactical.obstacles._fetch_buildings") as mock_fetch:
+    with patch("tritium_lib.tracking.obstacles._fetch_buildings") as mock_fetch:
         mock_fetch.return_value = _MOCK_OVERPASS_BUILDINGS["elements"]
         obs = BuildingObstacles()
         obs.load(REF_LAT, REF_LNG, radius_m=300, cache_dir=temp_cache_dir)
@@ -102,7 +102,7 @@ class TestBuildingObstaclesLoad:
         def failing_fetch(*args, **kwargs):
             raise ConnectionError("Overpass unreachable")
 
-        with patch("engine.tactical.obstacles._fetch_buildings", side_effect=failing_fetch):
+        with patch("tritium_lib.tracking.obstacles._fetch_buildings", side_effect=failing_fetch):
             obs = BuildingObstacles()
             obs.load(REF_LAT, REF_LNG, radius_m=300, cache_dir=temp_cache_dir)
 
@@ -110,7 +110,7 @@ class TestBuildingObstaclesLoad:
 
     def test_empty_response(self, temp_cache_dir):
         """Empty Overpass response produces empty polygon list."""
-        with patch("engine.tactical.obstacles._fetch_buildings") as mock_fetch:
+        with patch("tritium_lib.tracking.obstacles._fetch_buildings") as mock_fetch:
             mock_fetch.return_value = []
             obs = BuildingObstacles()
             obs.load(REF_LAT, REF_LNG, radius_m=300, cache_dir=temp_cache_dir)
