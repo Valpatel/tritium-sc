@@ -18,10 +18,12 @@ from typing import Any, Optional
 import html
 import re
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
-router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
+from app.auth import require_auth
+
+router = APIRouter(prefix="/api/watchlist", tags=["watchlist"], dependencies=[Depends(require_auth)])
 
 # ---------------------------------------------------------------------------
 # Limits

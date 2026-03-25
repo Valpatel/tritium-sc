@@ -19,10 +19,12 @@ import time
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/api/deployment", tags=["deployment"])
+from app.auth import require_auth
+
+router = APIRouter(prefix="/api/deployment", tags=["deployment"], dependencies=[Depends(require_auth)])
 
 # Track bridge processes we started
 _managed_processes: dict[str, dict] = {}

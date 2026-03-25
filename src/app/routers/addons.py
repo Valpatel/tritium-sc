@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
+
+from app.auth import require_auth
 
 router = APIRouter(prefix="/api/addons", tags=["addons"])
 
@@ -65,7 +67,7 @@ async def addon_health(request: Request):
 
 
 @router.post("/{addon_id}/enable")
-async def enable_addon(addon_id: str, request: Request):
+async def enable_addon(addon_id: str, request: Request, _user: dict = Depends(require_auth)):
     """Enable a specific addon."""
     loader = getattr(request.app.state, "addon_loader", None)
     if not loader:
@@ -75,7 +77,7 @@ async def enable_addon(addon_id: str, request: Request):
 
 
 @router.post("/{addon_id}/disable")
-async def disable_addon(addon_id: str, request: Request):
+async def disable_addon(addon_id: str, request: Request, _user: dict = Depends(require_auth)):
     """Disable a specific addon."""
     loader = getattr(request.app.state, "addon_loader", None)
     if not loader:
@@ -85,7 +87,7 @@ async def disable_addon(addon_id: str, request: Request):
 
 
 @router.post("/{addon_id}/reload")
-async def reload_addon(addon_id: str, request: Request):
+async def reload_addon(addon_id: str, request: Request, _user: dict = Depends(require_auth)):
     """Hot-reload an addon: re-read manifest, purge module cache, re-enable.
 
     This is the key endpoint for addon development. Change code, hit reload,
@@ -104,7 +106,7 @@ async def reload_addon(addon_id: str, request: Request):
 
 
 @router.post("/rediscover")
-async def rediscover_addons(request: Request):
+async def rediscover_addons(request: Request, _user: dict = Depends(require_auth)):
     """Re-scan addon directories for new addons.
 
     Call this after dropping a new addon folder into the addons/ directory.

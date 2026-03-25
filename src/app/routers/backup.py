@@ -19,16 +19,17 @@ import json
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import FileResponse, JSONResponse
 from loguru import logger
 from pydantic import BaseModel
 
+from app.auth import require_auth
 from app.config import settings
 from engine.backup.backup import BackupManager
 
 
-router = APIRouter(prefix="/api/backup", tags=["backup"])
+router = APIRouter(prefix="/api/backup", tags=["backup"], dependencies=[Depends(require_auth)])
 
 
 def _get_db_path() -> Path:

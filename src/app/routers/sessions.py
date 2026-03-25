@@ -25,10 +25,11 @@ import time
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from loguru import logger
 from pydantic import BaseModel
 
+from app.auth import require_auth
 from tritium_lib.models.user import (
     Permission,
     ROLE_PERMISSIONS,
@@ -37,7 +38,7 @@ from tritium_lib.models.user import (
     UserSession,
 )
 
-router = APIRouter(prefix="/api/sessions", tags=["sessions"])
+router = APIRouter(prefix="/api/sessions", tags=["sessions"], dependencies=[Depends(require_auth)])
 
 # ---- In-memory session store -------------------------------------------------
 

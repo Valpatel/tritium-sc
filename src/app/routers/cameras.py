@@ -10,10 +10,11 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import require_auth
 from app.database import get_db
 from app.models import Camera
 
-router = APIRouter(prefix="/api/cameras", tags=["cameras"])
+router = APIRouter(prefix="/api/cameras", tags=["cameras"], dependencies=[Depends(require_auth)])
 
 
 class CameraCreate(BaseModel):

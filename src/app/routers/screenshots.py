@@ -21,12 +21,14 @@ import base64
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
+
+from app.auth import require_auth
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/screenshots", tags=["screenshots"])
+router = APIRouter(prefix="/api/screenshots", tags=["screenshots"], dependencies=[Depends(require_auth)])
 
 # Lazy singleton — created on first use
 _store = None

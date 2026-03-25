@@ -13,11 +13,13 @@ from __future__ import annotations
 import time
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Response
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Response
 from pydantic import BaseModel, Field
 from loguru import logger
 
-router = APIRouter(prefix="/api/intelligence/models", tags=["intelligence-models"])
+from app.auth import require_auth
+
+router = APIRouter(prefix="/api/intelligence/models", tags=["intelligence-models"], dependencies=[Depends(require_auth)])
 
 # Maximum upload size: 100MB
 MAX_MODEL_SIZE = 100 * 1024 * 1024

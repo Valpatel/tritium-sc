@@ -12,10 +12,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Body, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from loguru import logger
 
-router = APIRouter(prefix="/api/investigations", tags=["investigations"])
+from app.auth import require_auth
+
+router = APIRouter(prefix="/api/investigations", tags=["investigations"], dependencies=[Depends(require_auth)])
 
 # Lazy-init singleton engine
 _engine = None
