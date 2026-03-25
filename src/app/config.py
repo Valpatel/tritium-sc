@@ -157,6 +157,10 @@ class Settings(BaseSettings):
     # API key authentication (stateless alternative to JWT)
     api_keys: str = ""                     # Comma-separated API keys for X-API-Key header auth
 
+    # Trusted proxies — only trust X-Forwarded-For from these IPs
+    # Comma-separated list (e.g. "127.0.0.1,10.0.0.1"). Empty = don't trust any proxy headers.
+    trusted_proxies: str = ""
+
     # Rate limiting
     rate_limit_enabled: bool = False       # Enable rate limiting
     rate_limit_requests: int = 100         # Max requests per window
