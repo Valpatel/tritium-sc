@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timezone
+from html import escape
 from typing import Optional
 
 from fastapi import APIRouter, Query, Request
@@ -408,7 +409,7 @@ def _briefing_to_html(briefing: dict) -> str:
         html += "<table><tr><th>Alliance</th><th>Count</th></tr>"
         for alliance, count in sorted(ts.get("by_alliance", {}).items()):
             badge = f'badge-{alliance}' if alliance in ("hostile", "friendly") else "badge-unknown"
-            html += f'<tr><td><span class="badge {badge}">{alliance}</span></td><td>{count}</td></tr>'
+            html += f'<tr><td><span class="badge {badge}">{escape(str(alliance))}</span></td><td>{escape(str(count))}</td></tr>'
         html += "</table>"
 
     threats = briefing.get("active_threats", [])
@@ -416,7 +417,7 @@ def _briefing_to_html(briefing: dict) -> str:
         html += f"<p>Active Threats: <strong>{len(threats)}</strong></p><ul>"
         for t in threats[:10]:
             name = t.get("name") or t.get("target_id", "unknown")
-            html += f'<li>{name} [{t.get("type", "?")}]</li>'
+            html += f'<li>{escape(str(name))} [{escape(str(t.get("type", "?")))}]</li>'
         html += "</ul>"
     html += "</div>"
 
@@ -431,7 +432,7 @@ def _briefing_to_html(briefing: dict) -> str:
     if missions:
         html += '<div class="section"><h2>ACTIVE MISSIONS</h2><table><tr><th>Mission</th><th>Type</th><th>Status</th></tr>'
         for m in missions:
-            html += f'<tr><td>{m.get("name", "?")}</td><td>{m.get("type", "?")}</td><td>{m.get("status", "?")}</td></tr>'
+            html += f'<tr><td>{escape(str(m.get("name", "?")))}</td><td>{escape(str(m.get("type", "?")))}</td><td>{escape(str(m.get("status", "?")))}</td></tr>'
         html += "</table></div>"
 
     # Investigations
@@ -439,7 +440,7 @@ def _briefing_to_html(briefing: dict) -> str:
     if investigations:
         html += '<div class="section"><h2>ACTIVE INVESTIGATIONS</h2><table><tr><th>Title</th><th>Priority</th><th>Status</th><th>Assigned</th></tr>'
         for inv in investigations:
-            html += f'<tr><td>{inv.get("title", "?")}</td><td>{inv.get("priority", "?")}</td><td>{inv.get("status", "?")}</td><td>{inv.get("assigned_to", "")}</td></tr>'
+            html += f'<tr><td>{escape(str(inv.get("title", "?")))}</td><td>{escape(str(inv.get("priority", "?")))}</td><td>{escape(str(inv.get("status", "?")))}</td><td>{escape(str(inv.get("assigned_to", "")))}</td></tr>'
         html += "</table></div>"
 
     # Operators
@@ -448,7 +449,7 @@ def _briefing_to_html(briefing: dict) -> str:
     if operators:
         html += "<table><tr><th>Operator</th><th>Role</th></tr>"
         for op in operators:
-            html += f'<tr><td>{op.get("display_name", op.get("username", "?"))}</td><td>{op.get("role", "?")}</td></tr>'
+            html += f'<tr><td>{escape(str(op.get("display_name", op.get("username", "?"))))}</td><td>{escape(str(op.get("role", "?")))}</td></tr>'
         html += "</table>"
     else:
         html += "<p>No active operator sessions</p>"
@@ -456,7 +457,7 @@ def _briefing_to_html(briefing: dict) -> str:
 
     # Amy assessment
     if briefing.get("amy_assessment"):
-        html += f'<div class="section"><h2>AI COMMANDER ASSESSMENT</h2><p>{briefing["amy_assessment"]}</p></div>'
+        html += f'<div class="section"><h2>AI COMMANDER ASSESSMENT</h2><p>{escape(str(briefing["amy_assessment"]))}</p></div>'
 
     # Footer
     sys = briefing.get("system", {})
