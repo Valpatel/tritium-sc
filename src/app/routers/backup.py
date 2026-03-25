@@ -91,7 +91,7 @@ async def create_backup(body: CreateBackupRequest | None = None):
         archive_path = mgr.export_state(label=label or None)
     except Exception as e:
         logger.error(f"Backup creation failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Backup failed: {e}")
+        raise HTTPException(status_code=500, detail="Backup operation failed")
 
     backup_id = archive_path.stem
     return {
@@ -215,10 +215,11 @@ async def restore_backup(file: UploadFile = File(...)):
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.warning(f"Restore validation error: {e}")
+        raise HTTPException(status_code=400, detail="Invalid backup file")
     except Exception as e:
         logger.error(f"Restore failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Restore failed: {e}")
+        raise HTTPException(status_code=500, detail="Restore operation failed")
     finally:
         if tmp_path is not None:
             tmp_path.unlink(missing_ok=True)

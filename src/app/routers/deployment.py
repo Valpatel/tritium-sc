@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from loguru import logger
 from pydantic import BaseModel
 
 from app.auth import require_auth
@@ -286,7 +287,8 @@ async def start_service(action: ServiceAction, request: Request):
                 return {"ok": True, "message": "MQTT broker started"}
             return {"ok": False, "message": "MQTT broker start command sent but port not responding yet"}
         except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-            raise HTTPException(500, f"Failed to start mosquitto: {e}")
+            logger.error(f"Failed to start mosquitto: {e}")
+            raise HTTPException(500, "Service operation failed")
 
     elif name == "meshtastic_bridge":
         status = _service_status_meshtastic_bridge()
@@ -294,7 +296,8 @@ async def start_service(action: ServiceAction, request: Request):
             return {"ok": True, "message": "Meshtastic bridge already running", "pid": status["pid"]}
         bridge_script = SC_DIR / "scripts" / "meshtastic-bridge.py"
         if not bridge_script.exists():
-            raise HTTPException(400, f"Bridge script not found at {bridge_script}")
+            logger.error(f"Bridge script not found at {bridge_script}")
+            raise HTTPException(400, "Bridge script not found")
         try:
             venv_python = SC_DIR / ".venv" / "bin" / "python3"
             python = str(venv_python) if venv_python.exists() else "python3"
@@ -310,7 +313,8 @@ async def start_service(action: ServiceAction, request: Request):
             }
             return {"ok": True, "message": "Meshtastic bridge started", "pid": proc.pid}
         except (FileNotFoundError, OSError) as e:
-            raise HTTPException(500, f"Failed to start bridge: {e}")
+            logger.error(f"Failed to start bridge: {e}")
+            raise HTTPException(500, "Service operation failed")
 
     elif name == "ollama":
         status = _service_status_ollama()
@@ -330,10 +334,11 @@ async def start_service(action: ServiceAction, request: Request):
             }
             return {"ok": True, "message": "Ollama started", "pid": proc.pid}
         except (FileNotFoundError, OSError) as e:
-            raise HTTPException(500, f"Failed to start Ollama: {e}")
+            logger.error(f"Failed to start Ollama: {e}")
+            raise HTTPException(500, "Service operation failed")
 
     else:
-        raise HTTPException(400, f"Unknown service: {name}")
+        raise HTTPException(400, "Unknown service")
 
 
 @router.post("/services/stop")
@@ -383,7 +388,7 @@ async def stop_service(action: ServiceAction):
         return {"ok": False, "message": "No Ollama process found"}
 
     else:
-        raise HTTPException(400, f"Unknown service: {name}")
+        raise HTTPException(400, "Unknown service")
 
 
 @router.get("/requirements")

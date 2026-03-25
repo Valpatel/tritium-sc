@@ -351,9 +351,10 @@ def decode_token(token: str) -> dict:
             detail="Token expired",
         )
     except jwt.InvalidTokenError as e:
+        logger.warning("Invalid token rejected: %s", e)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid token: {e}",
+            detail="Invalid or expired token",
         )
 
 
