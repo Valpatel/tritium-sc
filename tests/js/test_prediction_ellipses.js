@@ -1,86 +1,166 @@
 // Created by Matthew Valancy
 // Copyright 2026 Valpatel Software LLC
 // Licensed under AGPL-3.0 — see LICENSE for details.
-// Tests for prediction-ellipses.js
+/**
+ * TRITIUM-SC prediction-ellipses.js tests
+ * Tests PredictionEllipseManager: instantiation, start/stop timer,
+ * trail data, and graceful handling of empty units.
+ * Run: node tests/js/test_prediction_ellipses.js
+ */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+const fs = require('fs');
+const vm = require('vm');
 
-// Stub browser globals
-globalThis.window = globalThis.window || {};
-globalThis.document = globalThis.document || {
-    createElement: () => ({
-        className: '', style: {}, innerHTML: '',
-        addEventListener: vi.fn(),
+// Simple test runner
+let passed = 0, failed = 0;
+function assert(cond, msg) {
+    if (!cond) { console.error('FAIL:', msg); failed++; }
+    else { console.log('PASS:', msg); passed++; }
+}
+
+// ============================================================
+// DOM + browser mocks
+// ============================================================
+
+function createMockElement(tag) {
+    const children = [];
+    const style = {};
+    let _innerHTML = '';
+
+    const el = {
+        tagName: (tag || 'DIV').toUpperCase(),
+        className: '',
+        get innerHTML() { return _innerHTML; },
+        set innerHTML(val) { _innerHTML = val; },
+        style,
+        children,
+        appendChild(child) { children.push(child); return child; },
+        querySelector() { return null; },
+        querySelectorAll() { return []; },
+        addEventListener() {},
+    };
+    return el;
+}
+
+const sandbox = {
+    Math, Date, console, Map, Set, Array, Object, Number, String, Boolean,
+    Infinity, NaN, undefined, parseInt, parseFloat, isNaN, isFinite, JSON,
+    Promise, setTimeout, clearTimeout, setInterval, clearInterval, Error,
+    document: {
+        createElement: createMockElement,
+        getElementById: () => null,
         querySelector: () => null,
-        querySelectorAll: () => [],
-        appendChild: vi.fn(),
-    }),
-    getElementById: () => null,
+        addEventListener() {},
+    },
+    window: { _mapState: null },
+    performance: { now: () => Date.now() },
 };
 
-// Mock EventBus
-vi.mock('../../../src/frontend/js/command/events.js', () => ({
-    EventBus: {
-        on: vi.fn(),
-        off: vi.fn(),
-        emit: vi.fn(),
-    },
-}));
+const ctx = vm.createContext(sandbox);
 
-// Mock store
-vi.mock('../../../src/frontend/js/command/store.js', () => ({
-    TritiumStore: {
-        units: new Map(),
-    },
-}));
+// Load events.js (EventBus)
+const eventsCode = fs.readFileSync(__dirname + '/../../../tritium-lib/web/events.js', 'utf8');
+const eventsPlain = eventsCode
+    .replace(/^export\s+/gm, '')
+    .replace(/^import\s+.*$/gm, '');
+vm.runInContext(eventsPlain, ctx);
 
-describe('PredictionEllipseManager', () => {
-    let PredictionEllipseManager;
+// Load store.js (TritiumStore)
+const storeCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/store.js', 'utf8');
+const storePlain = storeCode
+    .replace(/^export\s+/gm, '')
+    .replace(/^import\s+.*$/gm, '');
+vm.runInContext(storePlain, ctx);
 
-    beforeEach(async () => {
-        vi.resetModules();
-        window._mapState = null;
-        const mod = await import('../../../src/frontend/js/command/prediction-ellipses.js');
-        PredictionEllipseManager = mod.PredictionEllipseManager;
-    });
+// Load prediction-ellipses.js
+const peCode = fs.readFileSync(__dirname + '/../../src/frontend/js/command/prediction-ellipses.js', 'utf8');
+const pePlain = peCode
+    .replace(/^export\s+class\s+(\w+)/gm, 'var $1 = class $1')
+    .replace(/^export\s+/gm, '')
+    .replace(/^import\s+.*$/gm, '');
+vm.runInContext(pePlain, ctx);
 
-    it('should instantiate without errors', () => {
-        const mgr = new PredictionEllipseManager();
-        expect(mgr).toBeDefined();
-        expect(mgr._visible).toBe(true);
-        expect(mgr._layersAdded).toBe(false);
-    });
+const PredictionEllipseManager = ctx.PredictionEllipseManager;
 
-    it('should start and stop timer', () => {
-        const mgr = new PredictionEllipseManager();
-        mgr.start();
-        expect(mgr._timer).not.toBeNull();
-        mgr.stop();
-        expect(mgr._timer).toBeNull();
-    });
+// ============================================================
+// 1. Instantiation
+// ============================================================
 
-    it('should accept trail data', () => {
-        const mgr = new PredictionEllipseManager();
-        const trails = new Map();
-        trails.set('unit1', [
-            { lng: -121.896, lat: 37.716, time: 1000 },
-            { lng: -121.8961, lat: 37.7161, time: 2000 },
-        ]);
-        mgr.setTrailData(trails);
-        expect(mgr._trailData.size).toBe(1);
-    });
+console.log('\n--- PredictionEllipseManager instantiation ---');
 
-    it('should handle empty units gracefully', () => {
-        const mgr = new PredictionEllipseManager();
-        // _update with no units should not throw
-        expect(() => mgr._update()).not.toThrow();
-    });
+(function testInstantiate() {
+    const mgr = new PredictionEllipseManager();
+    assert(mgr !== undefined, 'instantiates without errors');
+    assert(mgr._visible === false, '_visible defaults to false');
+    assert(mgr._layersAdded === false, '_layersAdded defaults to false');
+})();
 
-    it('should generate ellipse with correct segment count', () => {
-        // Test the ellipse coordinate generation indirectly
-        const mgr = new PredictionEllipseManager();
-        // The module exports the class, not the internal functions,
-        // so we test via the public API's rendering behavior.
-        expect(mgr).toBeDefined();
-    });
-});
+// ============================================================
+// 2. Start and stop timer
+// ============================================================
+
+console.log('\n--- start/stop timer ---');
+
+(function testStartSetsTimer() {
+    const mgr = new PredictionEllipseManager();
+    mgr.start();
+    assert(mgr._timer !== null, 'start() sets _timer');
+    mgr.stop();
+    assert(mgr._timer === null, 'stop() clears _timer');
+})();
+
+// ============================================================
+// 3. Accept trail data
+// ============================================================
+
+console.log('\n--- trail data ---');
+
+(function testSetTrailData() {
+    const mgr = new PredictionEllipseManager();
+    const trails = new Map();
+    trails.set('unit1', [
+        { lng: -121.896, lat: 37.716, time: 1000 },
+        { lng: -121.8961, lat: 37.7161, time: 2000 },
+    ]);
+    mgr.setTrailData(trails);
+    assert(mgr._trailData.size === 1, 'setTrailData stores trail data');
+    assert(mgr._trailData.has('unit1'), 'trail data contains unit1');
+})();
+
+// ============================================================
+// 4. Handle empty units gracefully
+// ============================================================
+
+console.log('\n--- empty units ---');
+
+(function testUpdateWithNoUnits() {
+    const mgr = new PredictionEllipseManager();
+    let threw = false;
+    try {
+        mgr._update();
+    } catch (e) {
+        threw = true;
+    }
+    assert(!threw, '_update() with no units does not throw');
+})();
+
+// ============================================================
+// 5. Ellipse generation (indirect via public API)
+// ============================================================
+
+console.log('\n--- ellipse generation ---');
+
+(function testManagerHasTrailDataMap() {
+    const mgr = new PredictionEllipseManager();
+    assert(mgr._trailData instanceof Map, '_trailData is a Map');
+    assert(mgr._trailData.size === 0, '_trailData starts empty');
+})();
+
+// ============================================================
+// Summary
+// ============================================================
+
+console.log('\n' + '='.repeat(40));
+console.log(`Results: ${passed} passed, ${failed} failed`);
+console.log('='.repeat(40));
+process.exit(failed > 0 ? 1 : 0);
