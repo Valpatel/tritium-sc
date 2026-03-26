@@ -22,6 +22,25 @@ tritium/
     └── examples/README.md    # Reference implementations
 ```
 
+```mermaid
+graph TB
+    docs["docs/ (you are here)"]
+    arch["Architecture & Design<br/>16 documents"]
+    testing["Testing<br/>4 documents"]
+    users["User Guides<br/>4 documents"]
+    game["Game Design<br/>4 documents"]
+    ops["Operations<br/>4 documents"]
+
+    docs --> arch
+    docs --> testing
+    docs --> users
+    docs --> game
+    docs --> ops
+
+    src["../src/ READMEs"]
+    docs -.-> src
+```
+
 ## For Users
 
 | Document | Description |
