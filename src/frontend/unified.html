@@ -28,19 +28,40 @@
 <body class="v2 grid-bg">
 
     <!-- Loading overlay — visible immediately, dismissed when map is ready -->
-    <div id="loading-overlay" style="position:fixed;inset:0;z-index:9999;background:#0a0a1a;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;">
-        <div style="color:#00f0ff;font-size:28px;letter-spacing:6px;margin-bottom:16px;text-shadow:0 0 20px #00f0ff88;">TRITIUM</div>
-        <div style="color:#00f0ff99;font-size:13px;letter-spacing:3px;">INITIALIZING COMMAND CENTER</div>
-        <div style="margin-top:24px;width:200px;height:2px;background:#ffffff11;border-radius:1px;overflow:hidden;">
-            <div style="width:40%;height:100%;background:#00f0ff;border-radius:1px;animation:tritium-load-bar 1.2s ease-in-out infinite;"></div>
+    <div id="tritium-loading" style="position:fixed;inset:0;z-index:99999;background:#0a0a1a;display:flex;align-items:center;justify-content:center;flex-direction:column;font-family:'JetBrains Mono',monospace;transition:opacity 0.5s">
+        <div style="color:#00f0ff;font-size:36px;letter-spacing:6px;text-shadow:0 0 20px #00f0ff,0 0 40px #00f0ff44">TRITIUM</div>
+        <div style="color:#05ffa1;font-size:12px;margin-top:16px;opacity:0.7;letter-spacing:3px">UNIFIED OPERATING PICTURE</div>
+        <div style="width:200px;height:2px;background:#1a1a2e;margin-top:24px;border-radius:1px;overflow:hidden">
+            <div id="loading-bar" style="width:0%;height:100%;background:linear-gradient(90deg,#00f0ff,#05ffa1);transition:width 0.3s"></div>
         </div>
-        <style>
-            @keyframes tritium-load-bar {
-                0% { transform: translateX(-100%); }
-                100% { transform: translateX(350%); }
-            }
-        </style>
+        <div style="color:#666;font-size:11px;margin-top:12px" id="loading-status">Initializing systems...</div>
     </div>
+    <script>
+        // Animate loading bar progress
+        (function() {
+            var bar = document.getElementById('loading-bar');
+            var status = document.getElementById('loading-status');
+            if (bar) {
+                setTimeout(function() { bar.style.width = '30%'; status.textContent = 'Connecting WebSocket...'; }, 500);
+                setTimeout(function() { bar.style.width = '60%'; status.textContent = 'Loading plugins...'; }, 1500);
+                setTimeout(function() { bar.style.width = '80%'; status.textContent = 'Initializing map...'; }, 2500);
+            }
+            // Global dismiss function — called by map:ready or safety timeout
+            window.hideLoading = function() {
+                var el = document.getElementById('tritium-loading');
+                if (el) {
+                    if (bar) bar.style.width = '100%';
+                    if (status) status.textContent = 'Ready';
+                    el.style.opacity = '0';
+                    setTimeout(function() { el.remove(); }, 500);
+                }
+            };
+            // Absolute fallback: remove after 10s even if nothing else fires
+            setTimeout(function() {
+                if (document.getElementById('tritium-loading')) window.hideLoading();
+            }, 10000);
+        })();
+    </script>
 
     <!-- ================================================================== -->
     <!-- HEADER BAR (36px)                                                   -->
