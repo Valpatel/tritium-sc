@@ -33,19 +33,19 @@ export class LayoutManager extends BaseLayoutManager {
             panels: {
                 amy:    { x: 8,  y: -210, w: 320, h: 200, visible: true, minimized: false },
                 units:  { x: 8,  y: 8,    w: 260, h: -230, visible: true, minimized: false },
-                alerts: { x: -296, y: 8,  w: 280, h: 320, visible: true, minimized: false },
+                'unified-alerts': { x: -296, y: 8,  w: 280, h: 320, visible: true, minimized: false },
                 game:   { x: -296, y: 340, w: 280, h: 250, visible: true, minimized: false },
             },
         },
         observer: {
             panels: {
-                alerts: { x: -296, y: 8, w: 280, h: 300, visible: true, minimized: false },
+                'unified-alerts': { x: -296, y: 8, w: 280, h: 300, visible: true, minimized: false },
             },
         },
         tactical: {
             panels: {
                 units:  { x: 8,  y: 8,    w: 260, h: -230, visible: true, minimized: false },
-                alerts: { x: -296, y: 8,  w: 280, h: 300, visible: true, minimized: false },
+                'unified-alerts': { x: -296, y: 8,  w: 280, h: 300, visible: true, minimized: false },
                 game:   { x: -296, y: 320, w: 280, h: 250, visible: true, minimized: false },
             },
         },
@@ -53,7 +53,7 @@ export class LayoutManager extends BaseLayoutManager {
             panels: {
                 amy:    { x: 8,  y: -210, w: 320, h: 200, visible: true, minimized: false },
                 units:  { x: 8,  y: 8,    w: 260, h: -230, visible: true, minimized: false },
-                alerts: { x: -296, y: 8,  w: 280, h: 320, visible: true, minimized: false },
+                'unified-alerts': { x: -296, y: 8,  w: 280, h: 320, visible: true, minimized: false },
                 game:   { x: -296, y: 340, w: 280, h: 250, visible: true, minimized: false },
             },
         },

@@ -81,8 +81,8 @@ function _fileMenuItems(layoutManager) {
 
 // Panel categories — group all panels into logical sections
 const PANEL_CATEGORIES = {
-    'Operations':     ['tactical-container', 'ops-dashboard', 'units', 'unit-inspector', 'alerts', 'unified-alerts', 'escalation', 'missions', 'patrol', 'geofence', 'zones', 'zone-manager', 'minimap', 'layers', 'bookmarks', 'annotations', 'watchlist', 'swarm-coordination', 'convoy', 'fleet-container', 'fleet', 'fleet-dashboard', 'device-manager', 'device-capabilities', 'assets', 'command-history', 'edge-intelligence', 'edge-diagnostics', 'training-dashboard'],
-    'Intel':          ['intelligence-container', 'search', 'dossiers', 'dossier-groups', 'dossier-timeline', 'graph-explorer', 'graphlings', 'timeline', 'target-search', 'target-compare', 'target-merge', 'heatmap', 'heatmap-timeline', 'automation', 'analytics-dashboard', 'analytics-panel', 'dwell-monitor', 'behavioral-intelligence', 'reid-matches', 'lpr', 'fusion-dashboard', 'acoustic-intelligence', 'activity-feed', 'trail-export'],
+    'Operations':     ['tactical-container', 'ops-dashboard', 'units', 'unit-inspector', 'unified-alerts', 'escalation', 'missions', 'patrol', 'zone-manager', 'minimap', 'layers', 'bookmarks', 'annotations', 'watchlist', 'swarm-coordination', 'convoy', 'fleet-container', 'fleet-dashboard', 'device-manager', 'assets', 'command-history', 'edge-intelligence', 'edge-diagnostics', 'training-dashboard'],
+    'Intel':          ['intelligence-container', 'search', 'dossiers', 'dossier-groups', 'graph-explorer', 'graphlings', 'timeline', 'target-compare', 'target-merge', 'heatmap', 'automation', 'analytics-panel', 'dwell-monitor', 'behavioral-intelligence', 'reid-matches', 'lpr', 'fusion-dashboard', 'acoustic-intelligence', 'activity-feed', 'trail-export'],
     'Sensing':        ['sensors-container', 'edge-tracker', 'camera-feeds', 'cameras', 'multi-camera', 'rf-motion', 'hackrf', 'sensors', 'sensor-health', 'wifi-fingerprint', 'indoor-positioning', 'radar-scope', 'sdr-waterfall', 'adsb-table'],
     'Communications': ['comms-container', 'meshtastic', 'tak', 'mqtt-inspector', 'federation', 'audio', 'voice-command', 'notifications', 'notification-prefs'],
     'Commander':      ['commander-container', 'amy', 'amy-conversation'],
@@ -90,7 +90,7 @@ const PANEL_CATEGORIES = {
     // Collaboration merged into System below
     'Map':            ['map-layer-switcher', 'map-screenshot', 'map-share', 'grid-overlay', 'floorplan', 'building-occupancy', 'weather-overlay', 'map-replay'],
     'Simulation':     ['simulation-container', 'city-sim', 'game', 'battle-stats', 'replay', 'scenarios'],
-    'System':         ['system-container', 'system', 'system-health', 'operator-activity', 'operator-cursors', 'keyboard-macros', 'security-audit', 'deployment', 'testing', 'export-scheduler', 'events', 'videos', 'quick-start', 'setup-wizard'],
+    'System':         ['system-container', 'system', 'system-health-dashboard', 'operator-activity', 'operator-cursors', 'keyboard-macros', 'security-audit', 'deployment', 'testing', 'export-scheduler', 'events', 'videos', 'quick-start', 'setup-wizard'],
 };
 
 function _viewMenuItems(panelManager) {
@@ -114,7 +114,7 @@ function _viewMenuItems(panelManager) {
         { id: 'layers',     shortcut: '' },
         { id: 'city-sim',   shortcut: '' },
         { id: 'units',      shortcut: '2' },
-        { id: 'alerts',     shortcut: '3' },
+        { id: 'unified-alerts', shortcut: '3' },
         { id: 'game',       shortcut: '4' },
         { id: 'search',     shortcut: '7' },
     ];
@@ -608,8 +608,8 @@ function _shortLabel(title) {
 
 function _panelKey(id) {
     const map = {
-        amy: '1', units: '2', alerts: '3', game: '4', meshtastic: '5',
-        cameras: '6', search: '7', tak: '8', videos: '9', zones: '0',
+        amy: '1', units: '2', 'unified-alerts': '3', game: '4', meshtastic: '5',
+        cameras: '6', search: '7', tak: '8', videos: '9', 'zone-manager': '0',
         minimap: 'M', replay: 'R', sensors: 'E', 'battle-stats': 'P',
         'unit-inspector': 'J', layers: 'L',
     };
