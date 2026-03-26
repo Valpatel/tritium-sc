@@ -37,7 +37,7 @@
 
 # Test (individual)
 .venv/bin/python3 -m pytest tests/amy/ -m unit -v    # Python unit tests
-.venv/bin/python3 -m pytest tests/amy/simulation/test_combat.py  # Single test file
+.venv/bin/python3 -m pytest tests/amy/core/test_instinct.py  # Single test file
 
 # Open in browser
 # http://localhost:8000                      # Command Center (primary)
@@ -75,35 +75,30 @@ tritium-sc/
 ├── src/                        # ALL Python source code
 │   ├── engine/                 # System infrastructure (reusable, commander-agnostic)
 │   │   ├── commander_protocol.py  # Protocol interface for swappable commanders
-│   │   ├── simulation/        # Battlespace simulation engine (30+ files)
+│   │   ├── simulation/        # Battlespace simulation engine (38 files)
 │   │   │   ├── engine.py     # 10Hz tick loop, hostile spawner
-│   │   │   ├── target.py     # SimulationTarget dataclass
-│   │   │   ├── combat.py     # Projectile flight, hit detection, damage
 │   │   │   ├── game_mode.py  # Wave-based game progression
-│   │   │   ├── behaviors.py  # Unit AI (turret, drone, rover, hostile)
+│   │   │   ├── behavior/     # Unit AI (turret, drone, rover, hostile)
 │   │   │   ├── ambient.py    # AmbientSpawner (neutral activity)
+│   │   │   ├── npc_intelligence/ # NPC FSM, crowds, protests
 │   │   │   └── loader.py     # TritiumLevelFormat JSON parser
 │   │   ├── comms/             # Communication & I/O
-│   │   │   ├── event_bus.py  # Thread-safe pub/sub (generic)
+│   │   │   ├── event_bus.py  # Shim → tritium_lib QueueEventBus
 │   │   │   ├── listener.py   # Audio VAD + recording
-│   │   │   ├── speaker.py    # TTS output (Piper)
 │   │   │   ├── mqtt_bridge.py # MQTT broker bridge
 │   │   │   ├── cot.py        # CoT XML protocol
 │   │   │   ├── mqtt_cot.py   # MQTT CoT codec
 │   │   │   └── tak_bridge.py # TAK server bridge
-│   │   ├── tactical/          # Tracking, threat detection, geo
-│   │   │   ├── target_tracker.py # Unified target registry
+│   │   ├── tactical/          # Threat detection, geo, enrichment (25+ files)
 │   │   │   ├── escalation.py # ThreatClassifier + AutoDispatcher
 │   │   │   ├── geo.py        # Coordinate transforms
 │   │   │   ├── street_graph.py # OSM road extraction + A*
-│   │   │   └── obstacles.py  # Building obstacles
-│   │   ├── inference/         # Model routing & fleet
-│   │   │   ├── model_router.py # Task-aware model selection
-│   │   │   ├── fleet.py      # Multi-host Ollama discovery
+│   │   │   └── dossier_manager.py # Target dossiers + enrichment
+│   │   ├── inference/         # LLM-powered reasoning
 │   │   │   └── robot_thinker.py # Robot LLM thinking
 │   │   ├── perception/        # Frame analysis & vision
 │   │   │   ├── perception.py # Layered perception: quality gate, motion
-│   │   │   ├── vision.py     # Ollama chat API wrapper
+│   │   │   ├── vision.py     # LLM chat API wrapper
 │   │   │   └── extraction.py # Fact extraction from conversation
 │   │   ├── actions/           # Lua dispatch & formations
 │   │   │   ├── lua_motor.py  # Lua parser, VALID_ACTIONS
@@ -134,7 +129,7 @@ tritium-sc/
 │   └── app/                    # FastAPI backend
 │       ├── main.py            # App entry point, lifespan, boot sequence
 │       ├── config.py          # Pydantic settings
-│       ├── routers/           # API endpoints + WebSocket + Amy event bridge
+│       ├── routers/           # 105 API routers + WebSocket + Amy event bridge
 │       ├── ai/                # Detection pipeline (YOLO, tracker, embeddings)
 │       ├── zones/             # Zone management and alerting
 │       ├── discovery/         # NVR auto-discovery
@@ -144,39 +139,41 @@ tritium-sc/
 │       ├── index.html         # LEGACY — Original 10-tab SPA
 │       ├── js/                # Modular JavaScript
 │       │   ├── app.js        # Main app, view switching, shortcuts
+│       │   ├── command/       # Command Center (main.js, 98 panels, map, menu-bar)
 │       │   ├── war.js        # War Room — Canvas 2D RTS tactical map
 │       │   └── (amy, assets, input, scenarios, grid, player, zones, targets)
 │       └── css/
 │           ├── cybercore.css # CYBERCORE CSS framework
 │           └── tritium.css   # Custom + Amy + War Room panel styles
-├── tests/                      # ALL tests
-│   ├── engine/                # System infrastructure tests
-│   │   ├── simulation/       # Simulation engine tests (48 files)
-│   │   ├── comms/            # CoT, MQTT, event bus, speaker (20+ files)
-│   │   ├── tactical/         # Geo, escalation tests
-│   │   ├── api/              # FastAPI router tests (21 files)
-│   │   ├── nodes/            # Sensor nodes, MQTT, ML (16 files)
+├── tests/                      # ALL tests (668 test files)
+│   ├── engine/                # System infrastructure tests (467 Python files)
+│   │   ├── simulation/       # Simulation engine tests (133 files)
+│   │   ├── comms/            # CoT, MQTT, event bus (24 files)
+│   │   ├── tactical/         # Geo, escalation, dossier tests
+│   │   ├── api/              # FastAPI router tests (120 files)
+│   │   ├── nodes/            # Sensor nodes, MQTT, ML (18 files)
 │   │   ├── actions/          # Lua, dispatch, formation tests
-│   │   ├── inference/        # Model router, fleet tests
+│   │   ├── inference/        # Robot thinker tests
 │   │   ├── perception/       # Perception, extraction tests
 │   │   ├── units/            # Unit type registry tests
-│   │   ├── synthetic/        # Video, audio generation (14 files)
-│   │   ├── scenarios/        # Behavioral tests (6 files)
+│   │   ├── synthetic/        # Video, audio generation (20 files)
+│   │   ├── scenarios/        # Behavioral tests (9 files)
 │   │   ├── audio/            # Audio pipeline tests
-│   │   └── models/           # Data models (10 files)
+│   │   └── models/           # Data models
 │   ├── amy/                   # Amy personality tests
 │   │   ├── core/             # Commander, thinking, memory, sensorium
 │   │   ├── brain/            # Thinking battle tests
 │   │   └── api/              # Amy-specific API tests
 │   ├── scenarios/             # Behavioral test scenarios (JSON)
-│   ├── integration/           # 23 server E2E tests (headless, auto-port)
-│   ├── visual/                # 23 three-layer E2E (OpenCV + LLM + API)
-│   ├── js/                    # 281 JS tests (math, audio, fog, geo, panels)
-│   ├── lib/                   # 62 test infrastructure tests
-│   └── ui/                    # Vision audit, gameplay, battle verification
+│   ├── integration/           # 6 server E2E tests (headless, auto-port)
+│   ├── visual/                # 113 visual tests (OpenCV + LLM + Playwright)
+│   ├── js/                    # 113 JS test files (7700+ assertions)
+│   ├── lib/                   # 8 test infrastructure tests
+│   └── ui/                    # 52 UI tests (UX, layout, defects, panels)
 ├── examples/                   # ALL standalone reference projects
 │   ├── robot-template/        # Reference MQTT robot brain (Python)
 │   ├── ros2-robot/            # ROS2 Humble robot (Nav2 + MQTT bridge)
+│   ├── ros2-camera/           # ROS2 camera node
 │   ├── camera-server/         # Demo camera simulator
 │   ├── hostile-agent/         # Demo hostile LLM agent
 │   ├── mesh-radio/            # Demo Meshtastic radio
@@ -213,23 +210,18 @@ tritium-sc/
 |------|---------|
 | `src/engine/commander_protocol.py` | Protocol interface for swappable commanders |
 | `src/engine/simulation/engine.py` | SimulationEngine — 10Hz tick loop |
-| `src/engine/simulation/target.py` | SimulationTarget dataclass (all entity types) |
-| `src/engine/simulation/combat.py` | CombatSystem — projectile flight, hit detection, damage |
 | `src/engine/simulation/game_mode.py` | GameMode — wave-based game progression |
-| `src/engine/simulation/behaviors.py` | UnitBehaviors — turret, drone, rover, hostile AI |
+| `src/engine/simulation/behavior/` | Unit AI (turret, drone, rover, hostile) |
 | `src/engine/simulation/loader.py` | TritiumLevelFormat JSON parser |
-| `src/engine/comms/event_bus.py` | EventBus — thread-safe pub/sub for all internal events |
+| `src/engine/comms/event_bus.py` | EventBus shim — delegates to tritium_lib QueueEventBus |
 | `src/engine/comms/listener.py` | Audio VAD + recording |
-| `src/engine/comms/speaker.py` | TTS output (Piper) |
 | `src/engine/comms/mqtt_bridge.py` | MQTT broker bridge — distributed device communication |
-| `src/engine/tactical/target_tracker.py` | Unified registry of real (YOLO) + virtual (sim) targets |
 | `src/engine/tactical/escalation.py` | ThreatClassifier (2Hz) + AutoDispatcher |
 | `src/engine/tactical/geo.py` | Server-side geo-reference and coordinate transforms |
-| `src/engine/inference/model_router.py` | Task-aware model selection with fleet fallback |
-| `src/engine/inference/fleet.py` | OllamaFleet — multi-host discovery (conf/env/Tailscale) |
+| `src/engine/tactical/dossier_manager.py` | Target dossiers + enrichment |
 | `src/engine/inference/robot_thinker.py` | LLM-powered autonomous robot thinking |
 | `src/engine/perception/perception.py` | Layered perception: quality gate, complexity, motion detection |
-| `src/engine/perception/vision.py` | Ollama chat API wrapper |
+| `src/engine/perception/vision.py` | LLM chat API wrapper |
 | `src/engine/perception/extraction.py` | Fact extraction from conversation (regex-based) |
 | `src/engine/actions/lua_motor.py` | Lua parser, VALID_ACTIONS |
 | `src/engine/actions/lua_registry.py` | Dynamic Lua action registry for Amy and robots |
@@ -237,6 +229,8 @@ tritium-sc/
 | `src/engine/nodes/bcc950.py` | BCC950 PTZ camera + mic + speaker node |
 | `src/engine/nodes/mqtt_robot.py` | MQTTSensorNode — wraps MQTT robot as SensorNode |
 | `src/engine/units/` | Unit type registry (16 types, auto-discovery) |
+
+**Moved to tritium-lib:** SimulationTarget, CombatSystem, UnitBehaviors, Speaker/TTS, ModelRouter, OllamaFleet, TargetTracker. SC imports these from `tritium_lib.*`.
 
 ### Amy (personality plugin)
 
@@ -266,7 +260,7 @@ tritium-sc/
 | `src/frontend/js/app.js` | Main app state, WebSocket, keyboard shortcuts |
 | `src/frontend/js/war.js` | War Room — Canvas 2D RTS tactical map |
 | `src/frontend/js/war3d.js` | War Room — Three.js WebGL 3D renderer |
-| `tests/ui/test_vision.py` | Vision audit: Playwright + Ollama |
+| `tests/ui/test_vision.py` | Vision audit: Playwright + local LLM |
 | `examples/robot-template/` | Reference MQTT robot brain for real hardware |
 | `examples/ros2-robot/` | ROS2 Humble robot (Nav2 + MQTT bridge) |
 
@@ -290,25 +284,30 @@ See `.env.example` for full list. Key settings:
 ```bash
 ./test.sh              # Fast: tiers 1-3 + 8 + 8b (~60s) — run this after every change
 ./test.sh all          # Everything including visual E2E (~15 min)
+./test.sh --gentle     # Lower priority, tighter timeouts (15s), maxfail=5
+./test.sh --resource-report  # Show memory/CPU/swap status and exit
 ```
 
 | Tier | Command | What | Count | Time |
 |------|---------|------|-------|------|
 | 1 | `./test.sh 1` | Syntax check (Python + JS) | 31 files | ~2s |
-| 2 | `./test.sh 2` | Python unit tests | 1666 | ~45s |
-| 3 | `./test.sh 3` | JS tests (math, audio, fog, geo, panels) | 281 | ~3s |
-| 8 | `./test.sh 8` | Test infrastructure | 62 | ~1s |
+| 2 | `./test.sh 2` | Python unit tests (3 sub-tiers) | ~8830 | ~270s |
+| 3 | `./test.sh 3` | JS tests (batch runner, 113 files) | 7700+ assertions | ~3s |
+| 8 | `./test.sh 8` | Test infrastructure | 8 files | ~1s |
 | 8b | `./test.sh 8b` | ROS2 robot tests | 125 | ~1s |
-| 9 | `./test.sh 9` | Integration (live headless server E2E) | 23 | ~70s |
-| 10 | `./test.sh 10` | Visual quality (Playwright) | 7 | ~30s |
-| 7 | `./test.sh 7` | Visual E2E (three-layer verification) | 23 | ~13min |
+| 9 | `./test.sh 9` | Integration (live headless server E2E) | 6 | ~70s |
+| 10 | `./test.sh 10` | Visual quality (Playwright + LLM) | — | ~30s |
+| 11-22 | `./test.sh 11`..`22` | UI smoke, layout, UX, defects, alignment, layers, combat | — | varies |
+| 7 | `./test.sh 7` | Visual E2E (three-layer verification) | 113 files | ~13min |
+
+Tier 2 splits into sub-tiers to manage memory: 2a simulation (~3100), 2b engine (~4900), 2c amy (~830).
 
 ```bash
 # Distributed: sync + run on both machines
 ./test.sh --dist
 
 # Individual Python test files
-.venv/bin/python3 -m pytest tests/amy/simulation/test_combat.py -v
+.venv/bin/python3 -m pytest tests/amy/core/test_instinct.py -v
 .venv/bin/python3 -m pytest tests/amy/ -m unit -v      # All unit tests
 
 # Robot template tests
