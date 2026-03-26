@@ -143,6 +143,48 @@ async def create_zone(request: CreateGeoZoneRequest, _user: dict = Depends(requi
     return _zone_response(zone)
 
 
+class UpdateGeoZoneRequest(BaseModel):
+    """Request to update a geofence zone."""
+    name: Optional[str] = Field(None, min_length=1, max_length=_MAX_NAME_LEN)
+    zone_type: Optional[str] = None
+    alert_on_enter: Optional[bool] = None
+    alert_on_exit: Optional[bool] = None
+    enabled: Optional[bool] = None
+
+    @field_validator("name")
+    @classmethod
+    def sanitize_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return _sanitize(v, _MAX_NAME_LEN)
+
+
+@router.put("/zones/{zone_id}", response_model=GeoZoneResponse)
+async def update_zone(zone_id: str, request: UpdateGeoZoneRequest, _user: dict = Depends(require_auth)):
+    """Update a geofence zone's properties."""
+    engine = get_engine()
+    zone = engine.get_zone(zone_id)
+    if zone is None:
+        raise HTTPException(status_code=404, detail="Zone not found")
+
+    valid_types = ("restricted", "monitored", "safe")
+    updates = request.model_dump(exclude_unset=True)
+
+    if "zone_type" in updates and updates["zone_type"] not in valid_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"zone_type must be one of: {valid_types}",
+        )
+
+    for key, value in updates.items():
+        if hasattr(zone, key):
+            setattr(zone, key, value)
+
+    # Re-add to engine (dict replacement ensures consistency)
+    engine.add_zone(zone)
+    return _zone_response(zone)
+
+
 @router.get("/zones/{zone_id}/occupants")
 async def get_zone_occupants(zone_id: str):
     """Return target IDs currently inside a zone."""
