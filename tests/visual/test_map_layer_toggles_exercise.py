@@ -102,7 +102,10 @@ class TestMapLayerTogglesExercise:
         print(f"\nInitial layer state:")
         for k, v in sorted(state.items()):
             print(f"  {k:25s} = {v}")
-        self._screenshot("01_initial")
+        shot = self._screenshot("01_initial")
+        assert isinstance(state, dict), "Layer state should be a dict"
+        assert len(state) > 0, "Layer state should have at least one key"
+        assert Path(shot).exists(), "Screenshot should be saved to disk"
 
     def test_02_toggle_satellite(self):
         """Satellite toggle changes map tiles."""
@@ -111,6 +114,9 @@ class TestMapLayerTogglesExercise:
         state = self._get_layer_state()
 
         print(f"\nSatellite toggle: diff={result['diff']:.1f}%, satellite={state.get('satellite')}")
+        assert isinstance(result["diff"], float), "Diff should be a float percentage"
+        assert result["diff"] >= 0.0, "Diff should be non-negative"
+        assert "satellite" in state, "Layer state should include 'satellite' key"
         # Toggle back
         self.page.evaluate("() => window._mapActions.toggleSatellite()")
         time.sleep(1)
@@ -122,6 +128,9 @@ class TestMapLayerTogglesExercise:
 
         print(f"\nRoads toggle: diff={result['diff']:.1f}%, roads={state.get('roads')}")
         self._screenshot("03_roads")
+        assert isinstance(result["diff"], float), "Diff should be a float"
+        assert "roads" in state, "Layer state should include 'roads' key"
+        assert Path(result["before"]).exists(), "Before screenshot should exist"
         # Toggle back
         self.page.evaluate("() => window._mapActions.toggleRoads()")
         time.sleep(0.5)
@@ -133,6 +142,9 @@ class TestMapLayerTogglesExercise:
 
         print(f"\nGrid toggle: diff={result['diff']:.1f}%, grid={state.get('grid')}")
         self._screenshot("04_grid")
+        assert isinstance(result["diff"], float), "Diff should be a float"
+        assert "grid" in state, "Layer state should include 'grid' key"
+        assert isinstance(state["grid"], bool), "Grid state should be boolean"
         self.page.evaluate("() => window._mapActions.toggleGrid()")
         time.sleep(0.5)
 
@@ -143,6 +155,9 @@ class TestMapLayerTogglesExercise:
 
         print(f"\nBuildings toggle: diff={result['diff']:.1f}%, buildings={state.get('buildings')}")
         self._screenshot("05_buildings")
+        assert isinstance(result["diff"], float), "Diff should be a float"
+        assert "buildings" in state, "Layer state should include 'buildings' key"
+        assert Path(result["after"]).exists(), "After screenshot should exist"
         self.page.evaluate("() => window._mapActions.toggleBuildings()")
         time.sleep(0.5)
 
@@ -153,6 +168,9 @@ class TestMapLayerTogglesExercise:
 
         print(f"\nFog toggle: diff={result['diff']:.1f}%, fog={state.get('fog')}")
         self._screenshot("06_fog")
+        assert isinstance(result["diff"], float), "Diff should be a float"
+        assert "fog" in state, "Layer state should include 'fog' key"
+        assert isinstance(state["fog"], bool), "Fog state should be boolean"
         self.page.evaluate("() => window._mapActions.toggleFog()")
         time.sleep(0.5)
 
@@ -163,6 +181,9 @@ class TestMapLayerTogglesExercise:
 
         print(f"\nTerrain toggle: diff={result['diff']:.1f}%, terrain={state.get('terrain')}")
         self._screenshot("07_terrain")
+        assert isinstance(result["diff"], float), "Diff should be a float"
+        assert "terrain" in state, "Layer state should include 'terrain' key"
+        assert isinstance(state["terrain"], bool), "Terrain state should be boolean"
         self.page.evaluate("() => window._mapActions.toggleTerrain()")
         time.sleep(0.5)
 
@@ -173,6 +194,9 @@ class TestMapLayerTogglesExercise:
 
         print(f"\nLabels toggle: diff={result['diff']:.1f}%, labels={state.get('labels')}")
         self._screenshot("08_labels")
+        assert isinstance(result["diff"], float), "Diff should be a float"
+        assert "labels" in state, "Layer state should include 'labels' key"
+        assert isinstance(state["labels"], bool), "Labels state should be boolean"
         self.page.evaluate("() => window._mapActions.toggleLabels()")
         time.sleep(0.5)
 
@@ -183,6 +207,9 @@ class TestMapLayerTogglesExercise:
 
         print(f"\nHealth bars toggle: diff={result['diff']:.1f}%, healthBars={state.get('healthBars')}")
         self._screenshot("09_health_bars")
+        assert isinstance(result["diff"], float), "Diff should be a float"
+        assert "healthBars" in state, "Layer state should include 'healthBars' key"
+        assert isinstance(state["healthBars"], bool), "HealthBars state should be boolean"
         self.page.evaluate("() => window._mapActions.toggleHealthBars()")
         time.sleep(0.5)
 
@@ -193,6 +220,9 @@ class TestMapLayerTogglesExercise:
 
         print(f"\nTracers toggle: diff={result['diff']:.1f}%, tracers={state.get('tracers')}")
         self._screenshot("10_tracers")
+        assert isinstance(result["diff"], float), "Diff should be a float"
+        assert "tracers" in state, "Layer state should include 'tracers' key"
+        assert isinstance(state["tracers"], bool), "Tracers state should be boolean"
         self.page.evaluate("() => window._mapActions.toggleTracers()")
         time.sleep(0.5)
 
@@ -210,6 +240,10 @@ class TestMapLayerTogglesExercise:
         print(f"\nToggle all: diff={diff:.1f}%")
         for k, v in sorted(state.items()):
             print(f"  {k:25s} = {v}")
+
+        assert isinstance(diff, float), "Diff should be a float"
+        assert diff >= 0.0, "Diff should be non-negative"
+        assert isinstance(state, dict), "Layer state should be a dict"
 
         # Toggle back
         self.page.evaluate("() => window._mapActions.toggleAllLayers()")
@@ -253,6 +287,16 @@ class TestMapLayerTogglesExercise:
             "including satellite imagery, roads, buildings, fog of war, and unit markers.")
 
         print(f"\nLLaVA analysis: {analysis[:200]}")
+
+        # Verify all toggles were exercised and produced valid diffs
+        assert len(results) == len(toggles), (
+            f"Expected {len(toggles)} toggle results, got {len(results)}"
+        )
+        for fn, diff in results.items():
+            assert not isinstance(diff, str) or not diff.startswith("error"), (
+                f"Toggle {fn} raised an error: {diff}"
+            )
+
         self._generate_report(results, analysis)
 
     def _generate_report(self, results: dict, analysis: str):

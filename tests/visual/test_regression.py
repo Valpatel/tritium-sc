@@ -159,7 +159,10 @@ class TestScreenshotRegression:
                 pass
         time.sleep(2)
 
-        _, img = _capture_view(self.page, "war_room_setup")
+        path, img = _capture_view(self.page, "war_room_setup")
+        assert img is not None, "Screenshot capture failed"
+        assert img.size > 0, "Screenshot should not be empty"
+        assert float(img.mean()) > 5.0, "Screenshot is a black screen -- UI did not render"
         self._compare_or_update("war_room_setup", img)
 
     def test_countdown_baseline(self):
@@ -177,7 +180,10 @@ class TestScreenshotRegression:
         requests.post(f"{self.server_url}/api/game/begin", timeout=5)
         time.sleep(1.5)
 
-        _, img = _capture_view(self.page, "countdown")
+        path, img = _capture_view(self.page, "countdown")
+        assert img is not None, "Screenshot capture failed"
+        assert img.size > 0, "Screenshot should not be empty"
+        assert float(img.mean()) > 5.0, "Screenshot is a black screen -- UI did not render"
         self._compare_or_update("countdown", img)
 
     def test_active_combat_baseline(self):
@@ -205,7 +211,10 @@ class TestScreenshotRegression:
                 pass
         time.sleep(2)
 
-        _, img = _capture_view(self.page, "active_combat")
+        path, img = _capture_view(self.page, "active_combat")
+        assert img is not None, "Screenshot capture failed"
+        assert img.size > 0, "Screenshot should not be empty"
+        assert float(img.mean()) > 5.0, "Screenshot is a black screen -- UI did not render"
         self._compare_or_update("active_combat", img)
 
     def test_amy_dashboard_baseline(self):
@@ -213,7 +222,10 @@ class TestScreenshotRegression:
         self.page.keyboard.press("y")
         time.sleep(3)
 
-        _, img = _capture_view(self.page, "amy_dashboard")
+        path, img = _capture_view(self.page, "amy_dashboard")
+        assert img is not None, "Screenshot capture failed"
+        assert img.size > 0, "Screenshot should not be empty"
+        assert float(img.mean()) > 5.0, "Screenshot is a black screen -- UI did not render"
         self._compare_or_update("amy_dashboard", img)
 
     def test_grid_view_baseline(self):
@@ -221,5 +233,8 @@ class TestScreenshotRegression:
         self.page.keyboard.press("g")
         time.sleep(3)
 
-        _, img = _capture_view(self.page, "grid_view")
+        path, img = _capture_view(self.page, "grid_view")
+        assert img is not None, "Screenshot capture failed"
+        assert img.size > 0, "Screenshot should not be empty"
+        assert float(img.mean()) > 5.0, "Screenshot is a black screen -- UI did not render"
         self._compare_or_update("grid_view", img)

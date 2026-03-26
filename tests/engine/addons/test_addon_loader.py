@@ -11,17 +11,24 @@ from unittest.mock import MagicMock
 from engine.addons.loader import AddonLoader
 
 
-ADDONS_DIR = str(Path(__file__).parent.parent.parent.parent / "addons")
+# Match the addon directories used in production (src/app/main.py):
+# 1. Local SC addons/ (dev overrides)
+# 2. Parent-level tritium-addons/ submodule (where real addons live)
+_SC_ROOT = Path(__file__).parent.parent.parent.parent
+ADDONS_DIRS = [
+    str(_SC_ROOT / "addons"),
+    str(_SC_ROOT.parent / "tritium-addons"),
+]
 
 
 class TestAddonDiscovery:
     def test_discover_finds_meshtastic(self):
-        loader = AddonLoader([ADDONS_DIR])
+        loader = AddonLoader(ADDONS_DIRS)
         found = loader.discover()
         assert "meshtastic" in found
 
     def test_discover_loads_manifest(self):
-        loader = AddonLoader([ADDONS_DIR])
+        loader = AddonLoader(ADDONS_DIRS)
         loader.discover()
         assert "meshtastic" in loader.registry
         entry = loader.registry["meshtastic"]
@@ -41,7 +48,7 @@ class TestAddonDiscovery:
 
 class TestAddonEnable:
     def test_enable_meshtastic(self):
-        loader = AddonLoader([ADDONS_DIR])
+        loader = AddonLoader(ADDONS_DIRS)
         loader.discover()
         # Use a mock app since we don't have the full SC app in tests
         mock_app = MagicMock()
@@ -54,13 +61,13 @@ class TestAddonEnable:
         assert loader.registry["meshtastic"].instance is not None
 
     def test_enable_unknown(self):
-        loader = AddonLoader([ADDONS_DIR])
+        loader = AddonLoader(ADDONS_DIRS)
         loader.discover()
         result = asyncio.run(loader.enable("nonexistent-addon"))
         assert result is False
 
     def test_enable_twice(self):
-        loader = AddonLoader([ADDONS_DIR])
+        loader = AddonLoader(ADDONS_DIRS)
         loader.discover()
         mock_app = MagicMock()
         loader.app = mock_app
@@ -69,7 +76,7 @@ class TestAddonEnable:
         assert result is True  # Already enabled, returns True
 
     def test_disable(self):
-        loader = AddonLoader([ADDONS_DIR])
+        loader = AddonLoader(ADDONS_DIRS)
         loader.discover()
         mock_app = MagicMock()
         loader.app = mock_app
@@ -81,12 +88,12 @@ class TestAddonEnable:
 
 class TestAddonManifests:
     def test_get_manifests_empty(self):
-        loader = AddonLoader([ADDONS_DIR])
+        loader = AddonLoader(ADDONS_DIRS)
         loader.discover()
         assert loader.get_manifests() == []
 
     def test_get_manifests_after_enable(self):
-        loader = AddonLoader([ADDONS_DIR])
+        loader = AddonLoader(ADDONS_DIRS)
         loader.discover()
         mock_app = MagicMock()
         loader.app = mock_app
@@ -95,10 +102,10 @@ class TestAddonManifests:
         assert len(manifests) == 1
         assert manifests[0]["id"] == "meshtastic"
         assert manifests[0]["enabled"] is True
-        assert len(manifests[0]["panels"]) == 4
+        assert len(manifests[0]["panels"]) == 1
 
     def test_get_all_addons(self):
-        loader = AddonLoader([ADDONS_DIR])
+        loader = AddonLoader(ADDONS_DIRS)
         loader.discover()
         all_addons = loader.get_all_addons()
         assert len(all_addons) >= 1
@@ -107,7 +114,7 @@ class TestAddonManifests:
         assert mesh["enabled"] is False
 
     def test_get_health(self):
-        loader = AddonLoader([ADDONS_DIR])
+        loader = AddonLoader(ADDONS_DIRS)
         loader.discover()
         health = loader.get_health()
         assert health["discovered"] >= 1

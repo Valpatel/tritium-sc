@@ -68,8 +68,8 @@ class NPCIntelligencePlugin(PluginInterface):
         """Store references to shared services."""
         self._event_bus = ctx.event_bus
         self._engine = ctx.simulation_engine
-        self._reactor = EventReactor(ctx.event_bus)
-        self._alliance_mgr = AllianceManager(event_bus=ctx.event_bus)
+        self._reactor = EventReactor(ctx.event_bus) if ctx.event_bus is not None else None
+        self._alliance_mgr = AllianceManager(event_bus=ctx.event_bus) if ctx.event_bus is not None else None
         # Discover Ollama fleet for distributed NPC thinking
         fleet_hosts = []
         try:

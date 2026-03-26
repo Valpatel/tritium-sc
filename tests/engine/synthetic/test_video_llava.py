@@ -159,7 +159,14 @@ class TestBirdEyeLLaVA:
         frame = render_bird_eye(
             resolution=RESOLUTION, seed=SEED, timestamp="12:00:00", **demo,
         )
+        assert frame is not None, "render_bird_eye should return a frame"
+        assert frame.shape[:2] == (RESOLUTION[1], RESOLUTION[0]), (
+            f"Frame should be {RESOLUTION[1]}x{RESOLUTION[0]}, got {frame.shape[:2]}"
+        )
+        assert frame.size > 0, "Frame should not be empty"
+        assert float(frame.mean()) > 1.0, "Frame is completely black -- render failed"
         path = _save_frame(frame, "bird_eye")
+        assert path.exists(), "Saved frame file should exist on disk"
 
         result, responses = _majority_vote(
             fleet, path, "Is this a top-down tactical or map view?"
@@ -175,7 +182,13 @@ class TestBirdEyeLLaVA:
         frame = render_bird_eye(
             resolution=RESOLUTION, seed=SEED, timestamp="12:00:00", **demo,
         )
+        assert frame is not None, "render_bird_eye should return a frame"
+        assert frame.shape[:2] == (RESOLUTION[1], RESOLUTION[0]), (
+            f"Frame should be {RESOLUTION[1]}x{RESOLUTION[0]}, got {frame.shape[:2]}"
+        )
+        assert float(frame.max()) > 0, "Frame should contain non-zero pixels"
         path = _save_frame(frame, "bird_eye_dots")
+        assert path.exists(), "Saved frame file should exist on disk"
 
         result, responses = _majority_vote(
             fleet, path,
@@ -202,7 +215,14 @@ class TestStreetCamLLaVA:
             resolution=RESOLUTION, seed=SEED, timestamp="2026-02-20 12:00:00",
             camera_name="CAM-01", **demo,
         )
+        assert frame is not None, "render_street_cam should return a frame"
+        assert frame.shape[:2] == (RESOLUTION[1], RESOLUTION[0]), (
+            f"Frame should be {RESOLUTION[1]}x{RESOLUTION[0]}, got {frame.shape[:2]}"
+        )
+        assert frame.size > 0, "Frame should not be empty"
+        assert float(frame.mean()) > 1.0, "Frame is completely black -- render failed"
         path = _save_frame(frame, "street_cam")
+        assert path.exists(), "Saved frame file should exist on disk"
 
         result, responses = _majority_vote(
             fleet, path,
@@ -228,7 +248,14 @@ class TestBattleLLaVA:
         frame = render_battle_scene(
             resolution=RESOLUTION, seed=SEED, timestamp="09:00:00", **demo,
         )
+        assert frame is not None, "render_battle_scene should return a frame"
+        assert frame.shape[:2] == (RESOLUTION[1], RESOLUTION[0]), (
+            f"Frame should be {RESOLUTION[1]}x{RESOLUTION[0]}, got {frame.shape[:2]}"
+        )
+        assert frame.size > 0, "Frame should not be empty"
+        assert float(frame.mean()) > 1.0, "Frame is completely black -- render failed"
         path = _save_frame(frame, "battle")
+        assert path.exists(), "Saved frame file should exist on disk"
 
         result, responses = _majority_vote(
             fleet, path,
@@ -256,7 +283,14 @@ class TestNeighborhoodLLaVA:
             resolution=RESOLUTION, seed=SEED, timestamp="2026-02-20 22:00:00",
             camera_name="NBHD-01", **demo,
         )
+        assert frame is not None, "render_neighborhood should return a frame"
+        assert frame.shape[:2] == (RESOLUTION[1], RESOLUTION[0]), (
+            f"Frame should be {RESOLUTION[1]}x{RESOLUTION[0]}, got {frame.shape[:2]}"
+        )
+        assert frame.size > 0, "Frame should not be empty"
+        assert float(frame.mean()) > 1.0, "Frame is completely black -- render failed"
         path = _save_frame(frame, "neighborhood")
+        assert path.exists(), "Saved frame file should exist on disk"
 
         result, responses = _majority_vote(
             fleet, path,

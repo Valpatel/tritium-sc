@@ -210,12 +210,15 @@ class TestMenuDropdownExercise:
         items = self._get_menu_items()
 
         panel_items = [i for i in items if i["hasCheck"]]
+        assert len(panel_items) > 0, "VIEW menu should have checkable panel items"
+
         print(f"\nVIEW panel items:")
         for item in panel_items:
             status = "OPEN  " if item["checked"] else "CLOSED"
             print(f"  {status} {item['label']}")
 
         # Verify against actual panel state
+        mismatches = []
         for item in panel_items:
             # Map VIEW menu labels to panel IDs
             label_to_id = {
@@ -231,12 +234,19 @@ class TestMenuDropdownExercise:
                     const pm = window.panelManager;
                     return pm && pm.isOpen ? pm.isOpen('{pid}') : null;
                 }}""")
-                match = actual == item["checked"] if actual is not None else True
-                status = "MATCH" if match else "MISMATCH"
+                if actual is not None and actual != item["checked"]:
+                    mismatches.append(
+                        f"{item['label']}: menu={item['checked']} actual={actual}"
+                    )
+                status = "MATCH" if (actual is None or actual == item["checked"]) else "MISMATCH"
                 print(f"    {status}: menu={item['checked']} actual={actual}")
 
         self._screenshot("04_view_menu_states")
         self._close_menu()
+
+        assert len(mismatches) == 0, (
+            f"VIEW menu panel states don't match actual visibility: {mismatches}"
+        )
 
     def test_05_hover_mode_switching(self):
         """After clicking one menu, hovering over another switches to it."""
@@ -250,14 +260,22 @@ class TestMenuDropdownExercise:
         time.sleep(0.3)
         view_shot = self._screenshot("05_hover_view")
 
-        # Hover over MAP
+        # Hover over MAP - should switch to MAP dropdown
         self.page.locator('.menu-trigger:has-text("MAP")').hover()
         time.sleep(0.3)
         map_shot = self._screenshot("05_hover_map")
 
-        # Check that different menus are showing
-        file_items = self._get_menu_items()
-        print(f"\nAfter hover to MAP: {len(file_items)} items visible")
+        # After hovering to MAP, the MAP dropdown should be open with its items
+        map_items = self._get_menu_items()
+        assert len(map_items) >= 20, (
+            f"After hovering to MAP, dropdown should show >= 20 items, got {len(map_items)}"
+        )
+        print(f"\nAfter hover to MAP: {len(map_items)} items visible")
+
+        # Verify the screenshots were saved
+        assert Path(file_shot).exists(), "FILE hover screenshot should exist"
+        assert Path(view_shot).exists(), "VIEW hover screenshot should exist"
+        assert Path(map_shot).exists(), "MAP hover screenshot should exist"
 
         self._close_menu()
 
@@ -281,6 +299,7 @@ class TestMenuDropdownExercise:
         }
 
         mismatches = []
+        items_found = 0
         for menu_label, expected_shortcuts in shortcut_map.items():
             self._open_menu(menu_label)
             items = self._get_menu_items()
@@ -289,6 +308,7 @@ class TestMenuDropdownExercise:
             for item_label, expected_key in expected_shortcuts.items():
                 matching = [i for i in items if i["label"] == item_label]
                 if matching:
+                    items_found += 1
                     actual_shortcut = matching[0]["shortcut"]
                     if expected_key not in actual_shortcut:
                         mismatches.append(
@@ -297,10 +317,12 @@ class TestMenuDropdownExercise:
                         )
                     print(f"  {menu_label}/{item_label}: '{actual_shortcut}' (expected '{expected_key}')")
 
-        if mismatches:
-            print(f"\nMismatches: {mismatches}")
-
         self._screenshot("06_shortcuts")
+
+        assert items_found > 0, "Should find at least one menu item with a shortcut"
+        assert len(mismatches) == 0, (
+            f"Keyboard shortcut label mismatches: {mismatches}"
+        )
 
     def test_07_help_menu_about(self):
         """HELP > About TRITIUM-SC shows a toast message."""
@@ -316,6 +338,11 @@ class TestMenuDropdownExercise:
 
         print(f"\nAbout toast: {toast}")
         self._screenshot("07_about_toast")
+        assert isinstance(toast, list), "Toast query should return a list"
+        assert len(toast) > 0, "About TRITIUM-SC should display a toast message"
+        assert any("TRITIUM" in t.upper() for t in toast), (
+            f"Toast should mention TRITIUM, got: {toast}"
+        )
 
     def test_08_llm_menu_analysis(self):
         """Use LLaVA to analyze menu screenshots."""
@@ -324,12 +351,19 @@ class TestMenuDropdownExercise:
         for m in ["FILE", "MAP", "GAME"]:
             self._open_menu(m)
             shot = self._screenshot(f"08_llm_{m.lower()}")
+            assert Path(shot).exists(), f"Screenshot for {m} menu should exist"
             analysis = _llava_analyze(shot,
                 f"This shows the '{m}' dropdown menu of a tactical command center. "
                 f"List all visible menu items and their states.")
             analyses[m] = analysis
             print(f"\n{m}: {analysis[:200]}")
             self._close_menu()
+
+        assert len(analyses) == 3, "Should have analysis results for all 3 menus"
+        # LLM may be unavailable, so only check that we exercised the menus
+        assert all(isinstance(v, str) for v in analyses.values()), (
+            "All analysis results should be strings"
+        )
 
         # Generate report
         summary = _qwen_summarize(
