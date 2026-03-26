@@ -175,9 +175,12 @@ async def update_group(group_id: str, body: GroupUpdate):
         conn.close()
         return _row_to_dict(row)
 
+    _ALLOWED_COLUMNS = {"name", "description", "color", "icon"}
     sets = []
     vals = []
     for k, v in updates.items():
+        if k not in _ALLOWED_COLUMNS:
+            continue
         sets.append(f"{k} = ?")
         vals.append(v)
     sets.append("updated_at = ?")

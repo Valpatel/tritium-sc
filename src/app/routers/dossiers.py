@@ -58,6 +58,7 @@ async def list_dossiers(
     sort: Optional[str] = Query(
         "last_seen",
         description="Sort field: last_seen, first_seen, confidence, threat_level, name, signals",
+        pattern="^(last_seen|first_seen|confidence|threat_level|name|signals)$",
     ),
     order: str = Query("desc", pattern="^(asc|desc)$"),
 ):

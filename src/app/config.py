@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     # InfluxDB v2 time-series store
     influx_enabled: bool = True
     influx_url: str = "http://localhost:8086"
-    influx_token: str = "tritium-dev-token"
+    influx_token: str = ""  # Set via INFLUX_TOKEN env var
     influx_org: str = "tritium"
     influx_bucket: str = "telemetry"
 

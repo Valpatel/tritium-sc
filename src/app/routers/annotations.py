@@ -516,9 +516,16 @@ async def update_annotation(annotation_id: str, body: AnnotationUpdate):
         conn.close()
         return ann
 
+    _ALLOWED_COLUMNS = {
+        "lat", "lng", "text", "end_lat", "end_lng", "radius_m", "points",
+        "width", "height", "color", "stroke_width", "font_size", "opacity",
+        "fill", "locked",
+    }
     sets = []
     vals = []
     for k, v in updates.items():
+        if k not in _ALLOWED_COLUMNS:
+            continue
         if k == "points":
             sets.append("points = ?")
             vals.append(json.dumps(v) if v else None)

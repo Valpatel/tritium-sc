@@ -217,6 +217,11 @@ async def websocket_live(websocket: WebSocket, token: str | None = Query(default
         while True:
             # Handle incoming messages from client
             data = await websocket.receive_text()
+            if len(data) > 1_000_000:  # 1MB max message size
+                await manager.send_to(
+                    websocket, {"type": "error", "message": "Message too large"}
+                )
+                continue
             try:
                 message = json.loads(data)
                 await handle_client_message(websocket, message)

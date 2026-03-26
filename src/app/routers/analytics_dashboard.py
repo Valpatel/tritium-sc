@@ -14,8 +14,11 @@ Endpoints:
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -77,8 +80,8 @@ async def save_widget_layout(request: Request):
         try:
             w = DashboardWidget.from_dict(wd)
             validated.append(w.to_dict())
-        except Exception:
-            # Skip invalid widgets silently
+        except Exception as e:
+            logger.warning("Skipping invalid widget: %s", e)
             continue
 
     _custom_layouts[operator_id] = validated

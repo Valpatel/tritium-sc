@@ -4,6 +4,11 @@
 """Shared fixtures for visual E2E tests.
 
 Provides fleet, test_db, run_id, visual_assert, and server management.
+
+Note: Visual tests use Playwright's SYNC API.  pytest-asyncio must not
+interfere with these tests — ``asyncio_mode = auto`` in pytest.ini
+handles async tests elsewhere in the suite, while the sync Playwright
+fixtures here remain unaffected.
 """
 
 from __future__ import annotations
