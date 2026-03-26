@@ -128,6 +128,9 @@ import { ZoneManagerPanelDef } from './panels/zone-manager-panel.js';
 import { AnalyticsPanelDef } from './panels/analytics-panel.js';
 import { AmyBriefingPanelDef } from './panels/amy-briefing-panel.js';
 import { ThreatFeedsPanelDef } from './panels/threat-feeds-panel.js';
+import { CorrelationDashboardPanelDef } from './panels/correlation-dashboard-panel.js';
+import { BehaviorAnalysisPanelDef } from './panels/behavior-analysis-panel.js';
+import { DwellTimePanelDef } from './panels/dwell-time-panel.js';
 import { loadAddons } from './addon-loader.js';
 import { PredictionEllipseManager } from './prediction-ellipses.js';
 import { initScreenshotHotkey } from './panels/map-screenshot.js';
@@ -889,6 +892,9 @@ function initPanelSystem(container) {
     panelManager.register(AnalyticsPanelDef);
     panelManager.register(AmyBriefingPanelDef);
     panelManager.register(ThreatFeedsPanelDef);
+    panelManager.register(CorrelationDashboardPanelDef);
+    panelManager.register(BehaviorAnalysisPanelDef);
+    panelManager.register(DwellTimePanelDef);
 
     // Dynamically load addon panels from /api/addons/manifests
     loadAddons(panelManager).catch(err => {
