@@ -263,89 +263,101 @@
     <div id="help-overlay" class="help-overlay" data-component="help" hidden>
         <div class="help-panel corner-marks">
             <div class="help-header">
-                <span class="help-title">KEYBOARD SHORTCUTS</span>
-                <button class="help-close-btn" data-element="help-close" aria-label="Close help" title="Close keyboard shortcuts (?)">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                    </svg>
-                </button>
+                <div class="help-header-left">
+                    <span class="help-title-icon">&gt;_</span>
+                    <span class="help-title">KEYBOARD SHORTCUTS</span>
+                </div>
+                <div class="help-header-right">
+                    <span class="help-hint">Press <kbd>?</kbd> or <kbd>ESC</kbd> to close</span>
+                    <button class="help-close-btn" data-element="help-close" aria-label="Close help" title="Close keyboard shortcuts (?)">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
-            <div class="help-body" style="columns:2;column-gap:16px">
-                <div class="help-section" style="break-inside:avoid">
-                    <div class="help-section-title mono">GENERAL</div>
-                    <div class="help-row"><kbd>?</kbd><span>Toggle this help overlay</span></div>
-                    <div class="help-row"><kbd>ESC</kbd><span>Close panel / modal / drawing</span></div>
-                    <div class="help-row"><kbd>C</kbd><span>Open Commander chat</span></div>
-                    <div class="help-row"><kbd>/</kbd><span>Focus chat input</span></div>
-                    <div class="help-row"><kbd>M</kbd><span>Toggle minimap</span></div>
-                    <div class="help-row"><kbd>X</kbd><span>Mute / unmute notification sounds</span></div>
-                    <div class="help-row"><kbd>Shift+E</kbd><span>Toggle Edit Mode (place/move assets)</span></div>
+            <div class="help-divider"></div>
+            <div class="help-body">
+                <div class="help-col">
+                    <div class="help-section" data-category="general">
+                        <div class="help-section-title mono"><span class="help-section-dot"></span>GENERAL</div>
+                        <div class="help-row"><kbd>?</kbd><span>Toggle this help overlay</span></div>
+                        <div class="help-row"><kbd>ESC</kbd><span>Close panel / modal / cancel drawing</span></div>
+                        <div class="help-row"><kbd>C</kbd><span>Open Commander chat</span></div>
+                        <div class="help-row"><kbd>/</kbd><span>Focus chat input</span></div>
+                        <div class="help-row"><kbd>M</kbd><span>Toggle minimap</span></div>
+                        <div class="help-row"><kbd>X</kbd><span>Mute / unmute notification sounds</span></div>
+                        <div class="help-row"><kbd>Tab</kbd><span>Cycle panel focus</span></div>
+                    </div>
+                    <div class="help-section" data-category="navigation">
+                        <div class="help-section-title mono"><span class="help-section-dot"></span>NAVIGATION</div>
+                        <div class="help-row"><kbd>O</kbd><span>Observe mode</span></div>
+                        <div class="help-row"><kbd>T</kbd><span>Tactical mode</span></div>
+                        <div class="help-row"><kbd>S</kbd><span>Setup mode</span></div>
+                        <div class="help-row"><kbd>F</kbd><span>Center on action</span></div>
+                        <div class="help-row"><kbd>A</kbd><span>Toggle auto-follow</span></div>
+                        <div class="help-row"><kbd>Shift+E</kbd><span>Toggle Edit Mode (place/move assets)</span></div>
+                    </div>
+                    <div class="help-section" data-category="simulation">
+                        <div class="help-section-title mono"><span class="help-section-dot"></span>SIMULATION</div>
+                        <div class="help-row"><kbd>B</kbd><span>Begin Battle</span></div>
+                        <div class="help-row"><kbd>N</kbd><span>Mission generation modal</span></div>
+                        <div class="help-row"><kbd>J</kbd><span>Toggle City Simulation</span></div>
+                        <div class="help-row"><kbd>[</kbd><span>Cycle sim time scale</span></div>
+                        <div class="help-row"><kbd>]</kbd><span>Spawn emergency vehicle</span></div>
+                        <div class="help-row"><kbd>\</kbd><span>Start protest event</span></div>
+                        <div class="help-row"><kbd>WASD</kbd><span>Direct unit control (when selected)</span></div>
+                    </div>
+                    <div class="help-section" data-category="views">
+                        <div class="help-section-title mono"><span class="help-section-dot"></span>MAP LAYERS</div>
+                        <div class="help-row"><kbd>I</kbd><span>Satellite imagery</span></div>
+                        <div class="help-row"><kbd>U</kbd><span>Unit markers</span></div>
+                        <div class="help-row"><kbd>V</kbd><span>Fog of war</span></div>
+                        <div class="help-row"><kbd>K</kbd><span>Buildings</span></div>
+                        <div class="help-row"><kbd>G</kbd><span>Roads</span></div>
+                        <div class="help-row"><kbd>H</kbd><span>Terrain</span></div>
+                        <div class="help-row"><kbd>L</kbd><span>Layers panel</span></div>
+                    </div>
                 </div>
-                <div class="help-section" style="break-inside:avoid">
-                    <div class="help-section-title mono">MAP MODES</div>
-                    <div class="help-row"><kbd>O</kbd><span>Observe mode</span></div>
-                    <div class="help-row"><kbd>T</kbd><span>Tactical mode</span></div>
-                    <div class="help-row"><kbd>S</kbd><span>Setup mode</span></div>
+                <div class="help-col">
+                    <div class="help-section" data-category="panels">
+                        <div class="help-section-title mono"><span class="help-section-dot"></span>PANELS</div>
+                        <div class="help-row"><kbd>1</kbd><span>Commander</span></div>
+                        <div class="help-row"><kbd>2</kbd><span>Units</span></div>
+                        <div class="help-row"><kbd>3</kbd><span>Alerts</span></div>
+                        <div class="help-row"><kbd>4</kbd><span>Battle Status</span></div>
+                        <div class="help-row"><kbd>5</kbd><span>Mesh Network</span></div>
+                        <div class="help-row"><kbd>6</kbd><span>Cameras</span></div>
+                        <div class="help-row"><kbd>7</kbd><span>Intel Search</span></div>
+                        <div class="help-row"><kbd>8</kbd><span>TAK Bridge</span></div>
+                        <div class="help-row"><kbd>9</kbd><span>Recordings</span></div>
+                        <div class="help-row"><kbd>0</kbd><span>Zones</span></div>
+                        <div class="help-row"><kbd>E</kbd><span>Sensors</span></div>
+                        <div class="help-row"><kbd>P</kbd><span>Battle Stats</span></div>
+                        <div class="help-row"><kbd>R</kbd><span>Replay</span></div>
+                    </div>
+                    <div class="help-section" data-category="layouts">
+                        <div class="help-section-title mono"><span class="help-section-dot"></span>LAYOUTS</div>
+                        <div class="help-row"><kbd>Ctrl+1</kbd><span>Commander layout</span></div>
+                        <div class="help-row"><kbd>Ctrl+2</kbd><span>Observer layout</span></div>
+                        <div class="help-row"><kbd>Ctrl+3</kbd><span>Tactical layout</span></div>
+                        <div class="help-row"><kbd>Ctrl+4</kbd><span>Battle layout</span></div>
+                        <div class="help-row"><kbd>Ctrl+Shift+S</kbd><span>Save current layout</span></div>
+                        <div class="help-row"><kbd>Ctrl+G</kbd><span>Military grid overlay</span></div>
+                        <div class="help-row"><kbd>Ctrl+Shift+M</kbd><span>Keyboard macros panel</span></div>
+                    </div>
+                    <div class="help-section" data-category="targets">
+                        <div class="help-section-title mono"><span class="help-section-dot"></span>TARGETS &amp; DRAWING</div>
+                        <div class="help-row"><kbd>Click</kbd><span>Select target on map</span></div>
+                        <div class="help-row"><kbd>Right-click</kbd><span>Context menu (dispatch, geofence, bookmark)</span></div>
+                        <div class="help-row"><kbd>Enter</kbd><span>Finish polygon / measurement</span></div>
+                        <div class="help-row"><kbd>ESC</kbd><span>Cancel drawing</span></div>
+                    </div>
                 </div>
-                <div class="help-section" style="break-inside:avoid">
-                    <div class="help-section-title mono">MAP NAVIGATION</div>
-                    <div class="help-row"><kbd>F</kbd><span>Center on action</span></div>
-                    <div class="help-row"><kbd>A</kbd><span>Toggle auto-follow</span></div>
-                    <div class="help-row"><kbd>[</kbd> / <kbd>]</kbd><span>Zoom out / in</span></div>
-                    <div class="help-row"><kbd>WASD</kbd><span>Direct unit control</span></div>
-                </div>
-                <div class="help-section" style="break-inside:avoid">
-                    <div class="help-section-title mono">MAP LAYERS</div>
-                    <div class="help-row"><kbd>I</kbd><span>Toggle satellite imagery</span></div>
-                    <div class="help-row"><kbd>U</kbd><span>Toggle unit markers</span></div>
-                    <div class="help-row"><kbd>V</kbd><span>Toggle fog of war</span></div>
-                    <div class="help-row"><kbd>K</kbd><span>Toggle buildings</span></div>
-                    <div class="help-row"><kbd>G</kbd><span>Toggle roads</span></div>
-                    <div class="help-row"><kbd>H</kbd><span>Toggle terrain</span></div>
-                </div>
-                <div class="help-section" style="break-inside:avoid">
-                    <div class="help-section-title mono">PANELS</div>
-                    <div class="help-row"><kbd>1</kbd><span>Commander</span></div>
-                    <div class="help-row"><kbd>2</kbd><span>Units</span></div>
-                    <div class="help-row"><kbd>3</kbd><span>Alerts</span></div>
-                    <div class="help-row"><kbd>4</kbd><span>Battle Status</span></div>
-                    <div class="help-row"><kbd>5</kbd><span>Mesh</span></div>
-                    <div class="help-row"><kbd>6</kbd><span>Cameras</span></div>
-                    <div class="help-row"><kbd>7</kbd><span>Intel Search</span></div>
-                    <div class="help-row"><kbd>8</kbd><span>TAK Bridge</span></div>
-                    <div class="help-row"><kbd>9</kbd><span>Recordings</span></div>
-                    <div class="help-row"><kbd>0</kbd><span>Zones</span></div>
-                    <div class="help-row"><kbd>E</kbd><span>Sensors</span></div>
-                    <div class="help-row"><kbd>P</kbd><span>Battle Stats</span></div>
-                    <div class="help-row"><kbd>J</kbd><span>City Simulation</span></div>
-                    <div class="help-row"><kbd>L</kbd><span>Layers</span></div>
-                    <div class="help-row"><kbd>R</kbd><span>Replay</span></div>
-                    <div class="help-row"><kbd>Tab</kbd><span>Cycle panel focus</span></div>
-                </div>
-                <div class="help-section" style="break-inside:avoid">
-                    <div class="help-section-title mono">TARGETS</div>
-                    <div class="help-row"><kbd>Click</kbd><span>Select target</span></div>
-                    <div class="help-row"><kbd>Right-click</kbd><span>Context menu (dispatch, waypoint, geofence, bookmark)</span></div>
-                    <div class="help-row"><kbd>Enter</kbd><span>Finish drawing (geofence/patrol)</span></div>
-                </div>
-                <div class="help-section" style="break-inside:avoid">
-                    <div class="help-section-title mono">DRAWING</div>
-                    <div class="help-row"><kbd>Enter</kbd><span>Finish polygon / measurement</span></div>
-                    <div class="help-row"><kbd>ESC</kbd><span>Cancel drawing</span></div>
-                </div>
-                <div class="help-section" style="break-inside:avoid">
-                    <div class="help-section-title mono">LAYOUTS</div>
-                    <div class="help-row"><kbd>Ctrl+1</kbd><span>Commander layout</span></div>
-                    <div class="help-row"><kbd>Ctrl+2</kbd><span>Observer layout</span></div>
-                    <div class="help-row"><kbd>Ctrl+3</kbd><span>Tactical layout</span></div>
-                    <div class="help-row"><kbd>Ctrl+4</kbd><span>Battle layout</span></div>
-                    <div class="help-row"><kbd>Ctrl+Shift+S</kbd><span>Save current layout</span></div>
-                </div>
-                <div class="help-section" style="break-inside:avoid">
-                    <div class="help-section-title mono">SIMULATION</div>
-                    <div class="help-row"><kbd>B</kbd><span>Begin Battle</span></div>
-                    <div class="help-row"><kbd>N</kbd><span>Mission generation modal</span></div>
-                </div>
+            </div>
+            <div class="help-footer">
+                <span class="help-footer-text">TRITIUM COMMAND CENTER</span>
+                <span class="help-footer-version">v2.0</span>
             </div>
         </div>
     </div>
