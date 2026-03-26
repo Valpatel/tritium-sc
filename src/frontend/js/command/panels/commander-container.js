@@ -22,6 +22,7 @@ import { createTabbedContainer } from './tabbed-container.js';
 // When a different commander loads, it registers its own tabs
 // and the old ones are replaced (handled by the plugin lifecycle)
 import './tabs/commander-amy-tab.js';
+import './tabs/commander-briefing-tab.js';
 
 export const CommanderContainerDef = createTabbedContainer(
     'commander-container',

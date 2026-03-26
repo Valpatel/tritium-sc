@@ -126,6 +126,8 @@ import { SitAwarePanelDef } from './panels/sitaware-panel.js';
 import { SystemHealthDashboardPanelDef } from './panels/system-health-panel.js';
 import { ZoneManagerPanelDef } from './panels/zone-manager-panel.js';
 import { AnalyticsPanelDef } from './panels/analytics-panel.js';
+import { AmyBriefingPanelDef } from './panels/amy-briefing-panel.js';
+import { ThreatFeedsPanelDef } from './panels/threat-feeds-panel.js';
 import { loadAddons } from './addon-loader.js';
 import { PredictionEllipseManager } from './prediction-ellipses.js';
 import { initScreenshotHotkey } from './panels/map-screenshot.js';
@@ -885,6 +887,8 @@ function initPanelSystem(container) {
     panelManager.register(SystemHealthDashboardPanelDef);
     panelManager.register(ZoneManagerPanelDef);
     panelManager.register(AnalyticsPanelDef);
+    panelManager.register(AmyBriefingPanelDef);
+    panelManager.register(ThreatFeedsPanelDef);
 
     // Dynamically load addon panels from /api/addons/manifests
     loadAddons(panelManager).catch(err => {
