@@ -56,6 +56,52 @@ def _proxy_get(url: str, timeout: float = 5.0) -> dict | list | None:
         return None
 
 
+@router.get("/status")
+async def fleet_status(request: Request):
+    """Fleet management status.
+
+    Returns whether the fleet server is reachable, how many edge nodes
+    are known, and the data source (live vs cached vs unavailable).
+    """
+    base = _get_fleet_url(request)
+
+    # Quick probe: try to reach the fleet server
+    data = _proxy_get(f"{base}/api/devices", timeout=3.0)
+
+    if data is not None:
+        devices = data if isinstance(data, list) else data.get("devices", [])
+        online = sum(1 for d in devices if d.get("status") == "online")
+        return {
+            "status": "running",
+            "available": True,
+            "fleet_url": base,
+            "total_nodes": len(devices),
+            "online_nodes": online,
+            "source": "live",
+        }
+
+    # Fallback: check bridge cache
+    bridge = getattr(request.app.state, "fleet_bridge", None)
+    if bridge is not None and bridge.devices:
+        return {
+            "status": "degraded",
+            "available": True,
+            "fleet_url": base,
+            "total_nodes": len(bridge.devices),
+            "online_nodes": 0,
+            "source": "cached",
+        }
+
+    return {
+        "status": "stopped",
+        "available": False,
+        "fleet_url": base,
+        "total_nodes": 0,
+        "online_nodes": 0,
+        "source": "unavailable",
+    }
+
+
 @router.get("/nodes")
 async def fleet_nodes(request: Request):
     """GET /api/fleet/nodes — list all tritium-edge sensor nodes.

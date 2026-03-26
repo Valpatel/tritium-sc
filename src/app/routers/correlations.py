@@ -30,6 +30,57 @@ def _get_correlator(request: Request):
         return None
 
 
+@router.get("/status")
+async def correlation_status(request: Request):
+    """Target correlation engine status.
+
+    Returns whether the correlator is active, how many active correlations
+    exist, average confidence, and which strategies are contributing.
+    """
+    correlator = _get_correlator(request)
+    if correlator is None:
+        return {
+            "status": "stopped",
+            "available": False,
+            "total_correlations": 0,
+            "high_confidence": 0,
+            "avg_confidence": 0.0,
+            "strategy_counts": {},
+        }
+
+    try:
+        records = correlator.get_correlations()
+        high = sum(1 for r in records if r.confidence >= 0.7)
+        avg = (
+            round(sum(r.confidence for r in records) / len(records), 3)
+            if records else 0.0
+        )
+
+        strategy_counts: dict[str, int] = {}
+        for r in records:
+            for s in r.strategy_scores:
+                if s.score > 0:
+                    strategy_counts[s.strategy_name] = (
+                        strategy_counts.get(s.strategy_name, 0) + 1
+                    )
+
+        return {
+            "status": "running",
+            "available": True,
+            "total_correlations": len(records),
+            "high_confidence": high,
+            "avg_confidence": avg,
+            "strategy_counts": strategy_counts,
+        }
+    except Exception as e:
+        logger.warning("Correlation status error: %s", e)
+        return {
+            "status": "error",
+            "available": False,
+            "error": str(e),
+        }
+
+
 @router.get("")
 async def list_correlations(request: Request):
     """List all active target correlation records.

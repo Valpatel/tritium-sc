@@ -97,6 +97,42 @@ async def sitaware_updates(
         }
 
 
+@router.get("/status")
+async def sitaware_status(request: Request):
+    """Situational awareness engine status.
+
+    Returns whether the SitAware engine is running, its uptime, and
+    high-level operating picture statistics.
+    """
+    engine = _get_engine(request)
+    if engine is None:
+        return {
+            "status": "stopped",
+            "available": False,
+            "error": "SitAwareEngine not initialized",
+        }
+
+    try:
+        stats = engine.get_stats()
+        sa_stats = stats.get("sitaware", {})
+        return {
+            "status": "running",
+            "available": True,
+            "targets_tracked": sa_stats.get("targets_tracked", 0),
+            "active_alerts": sa_stats.get("active_alerts", 0),
+            "anomalies_detected": sa_stats.get("anomalies_detected", 0),
+            "threat_level": sa_stats.get("threat_level", "unknown"),
+            "uptime_s": sa_stats.get("uptime_s", 0),
+        }
+    except Exception as e:
+        logger.warning("SitAware status error: %s", e)
+        return {
+            "status": "error",
+            "available": False,
+            "error": str(e),
+        }
+
+
 @router.get("/health")
 async def sitaware_health(request: Request):
     """System health for all subsystems monitored by the SitAwareEngine.

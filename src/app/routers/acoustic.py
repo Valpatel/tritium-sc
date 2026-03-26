@@ -46,6 +46,32 @@ class AcousticEventResponse(BaseModel):
     device_id: str
 
 
+@router.get("/status")
+async def acoustic_status():
+    """Acoustic classifier status.
+
+    Returns whether the acoustic classifier is running, which event types
+    it recognises, and summary event counts.
+    """
+    try:
+        event_counts = _classifier.get_event_counts()
+        total = len(_classifier.get_recent_events(10000))
+        return {
+            "status": "running",
+            "available": True,
+            "event_types": [e.value for e in AcousticEventType],
+            "total_events": total,
+            "event_counts": event_counts,
+            "ml_available": False,
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "available": False,
+            "error": str(e),
+        }
+
+
 @router.post("/classify", response_model=AcousticEventResponse)
 async def classify_audio(request: ClassifyRequest):
     """Classify audio features into an acoustic event type."""

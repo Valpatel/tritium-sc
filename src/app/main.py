@@ -120,6 +120,11 @@ from app.routers.target_groups import router as target_groups_router
 from app.routers.reid import router as reid_router
 from app.routers.unified_alerts import router as unified_alerts_router
 from app.routers.sitaware import router as sitaware_router
+from app.routers.sim_status import router as sim_status_router
+from app.routers.federation_status import router as federation_status_router
+from app.routers.swarm_status import router as swarm_status_router
+from app.routers.combat_status import router as combat_status_router
+from app.routers.correlation_status import router as correlation_status_router
 
 
 # ---------------------------------------------------------------------------
@@ -1498,6 +1503,11 @@ app.include_router(mesh_environment_router)
 app.include_router(target_groups_router)
 app.include_router(reid_router)
 app.include_router(unified_alerts_router)
+app.include_router(sim_status_router)
+app.include_router(federation_status_router)
+app.include_router(swarm_status_router)
+app.include_router(combat_status_router)
+app.include_router(correlation_status_router)
 
 # Static files — addon frontend files served before main frontend
 # so the SPA catch-all doesn't intercept /addons/ requests.

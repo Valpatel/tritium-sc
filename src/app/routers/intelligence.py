@@ -330,6 +330,55 @@ def _template_description(anomaly_type: str, context: dict[str, Any]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# RL training metrics
+# ---------------------------------------------------------------------------
+
+
+@router.get("/rl-metrics")
+async def rl_metrics(request: Request):
+    """RL training metrics — model accuracy trends, feature importance,
+    training data growth, and prediction distribution.
+
+    Attempts to load RLMetrics from the correlation learner pipeline.
+    Returns a default "no data" response when metrics are unavailable.
+    """
+    try:
+        from tritium_lib.intelligence.rl_metrics import RLMetrics
+
+        # Try to get RL metrics from the correlation learner
+        rl: RLMetrics | None = None
+        try:
+            from engine.intelligence.correlation_learner import get_correlation_learner
+            learner = get_correlation_learner()
+            rl = getattr(learner, "_rl_metrics", None)
+        except Exception:
+            pass
+
+        if rl is not None:
+            return {
+                "status": "running",
+                "available": True,
+                **rl.get_status(),
+            }
+
+        return {
+            "status": "stopped",
+            "available": False,
+            "total_trainings": 0,
+            "total_predictions": 0,
+            "overall_accuracy": 0.0,
+            "models": {},
+        }
+    except Exception as exc:
+        logger.error("RL metrics endpoint failed: %s", exc)
+        return {
+            "status": "error",
+            "available": False,
+            "error": str(exc),
+        }
+
+
+# ---------------------------------------------------------------------------
 # Feature aggregation & classification feedback endpoints
 # ---------------------------------------------------------------------------
 
