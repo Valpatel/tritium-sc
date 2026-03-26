@@ -378,14 +378,14 @@ function makeMockMapActions() {
 const defaultPanels = [
     { id: 'amy', title: 'AMY COMMANDER', isOpen: true },
     { id: 'units', title: 'UNITS', isOpen: false },
-    { id: 'alerts', title: 'ALERTS', isOpen: true },
+    { id: 'unified-alerts', title: 'ALERTS', isOpen: true },
     { id: 'game', title: 'GAME HUD', isOpen: false },
     { id: 'mesh', title: 'MESH', isOpen: false },
     { id: 'cameras', title: 'CAMERA FEEDS', isOpen: false },
     { id: 'search', title: 'INTEL', isOpen: false },
     { id: 'tak', title: 'TAK', isOpen: false },
     { id: 'videos', title: 'RECORDINGS', isOpen: false },
-    { id: 'zones', title: 'ZONES', isOpen: false },
+    { id: 'zone-manager', title: 'ZONES', isOpen: false },
 ];
 
 // Helper: clear doc listeners between groups that depend on them
@@ -1606,8 +1606,8 @@ console.log('\n--- Helper functions ---');
 })();
 
 (function testPanelKeyAlerts() {
-    const result = vm.runInContext('_panelKey("alerts")', ctx);
-    assert(result === '3', '_panelKey("alerts") returns "3"');
+    const result = vm.runInContext('_panelKey("unified-alerts")', ctx);
+    assert(result === '3', '_panelKey("unified-alerts") returns "3"');
 })();
 
 (function testPanelKeyGame() {

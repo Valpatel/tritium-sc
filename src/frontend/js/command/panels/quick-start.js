@@ -60,10 +60,10 @@ export const QuickStartPanelDef = {
                         <button class="qs-link-btn" data-open-panel="edge-tracker">Edge Tracker</button>
                         <button class="qs-link-btn" data-open-panel="layers">Layers</button>
                         <button class="qs-link-btn" data-open-panel="fleet-dashboard">Fleet</button>
-                        <button class="qs-link-btn" data-open-panel="system-health">System Health</button>
+                        <button class="qs-link-btn" data-open-panel="system-health-dashboard">System Health</button>
                         <button class="qs-link-btn" data-open-panel="camera-feeds">Camera Feeds</button>
                         <button class="qs-link-btn" data-open-panel="amy">Amy (AI)</button>
-                        <button class="qs-link-btn" data-open-panel="target-search">Target Search</button>
+                        <button class="qs-link-btn" data-open-panel="search">Target Search</button>
                         <button class="qs-link-btn" data-open-panel="dossiers">Dossiers</button>
                     </div>
                 </div>

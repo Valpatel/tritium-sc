@@ -258,7 +258,7 @@ function handleAction(action, gamePos, selectedUnitId) {
             });
             EventBus.emit('toast:show', { message: 'Geofence zone started at click position', type: 'info' });
             // Open geofence panel if available
-            EventBus.emit('panel:request-open', { id: 'geofence' });
+            EventBus.emit('panel:request-open', { id: 'zone-manager' });
             break;
 
         case 'camera_here':
@@ -383,9 +383,9 @@ function handleAction(action, gamePos, selectedUnitId) {
         case 'investigate_target':
             if (selectedUnitId) {
                 // Open target dossier panel with focused single-target view
-                EventBus.emit('panel:request-open', { id: 'target-dossier' });
+                EventBus.emit('panel:request-open', { id: 'dossiers' });
                 setTimeout(() => {
-                    EventBus.emit('target-dossier:open', { target_id: selectedUnitId });
+                    EventBus.emit('dossier:open', { target_id: selectedUnitId });
                 }, 200);
             }
             break;

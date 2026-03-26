@@ -464,8 +464,8 @@ console.log('\n--- Panel Toggle Wiring ---');
 })();
 
 (function testPanelToggle3Alerts() {
-    assert(mainSrc.includes("panelManager.toggle('alerts')"),
-        'Key 3 toggles alerts panel');
+    assert(mainSrc.includes("panelManager.toggle('unified-alerts')"),
+        'Key 3 toggles unified-alerts panel');
 })();
 
 (function testPanelToggle4Game() {

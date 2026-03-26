@@ -4432,9 +4432,9 @@ function _bindQuickActionButtons(modal, targetId) {
             ev.preventDefault();
             const tid = btn.dataset.targetId;
             if (window.EventBus) {
-                window.EventBus.emit('panel:request-open', { id: 'target-dossier' });
+                window.EventBus.emit('panel:request-open', { id: 'dossiers' });
                 setTimeout(() => {
-                    window.EventBus.emit('target-dossier:open', { target_id: tid });
+                    window.EventBus.emit('dossier:open', { target_id: tid });
                 }, 200);
             }
             document.getElementById('target-detail-modal')?.remove();

@@ -235,12 +235,12 @@ function makePM(containerW, containerH) {
     return new PanelManager(container);
 }
 
-/** Create a PanelManager with standard panels registered (amy, units, alerts, game) */
+/** Create a PanelManager with standard panels registered (amy, units, unified-alerts, game) */
 function makePMWithPanels(containerW, containerH) {
     const pm = makePM(containerW || 1200, containerH || 700);
     pm.register(makeDef({ id: 'amy', title: 'AMY', defaultPosition: { x: 10, y: 10 }, defaultSize: { w: 320, h: 200 } }));
     pm.register(makeDef({ id: 'units', title: 'UNITS', defaultPosition: { x: 10, y: 10 }, defaultSize: { w: 260, h: 400 } }));
-    pm.register(makeDef({ id: 'alerts', title: 'ALERTS', defaultPosition: { x: 10, y: 10 }, defaultSize: { w: 280, h: 320 } }));
+    pm.register(makeDef({ id: 'unified-alerts', title: 'ALERTS', defaultPosition: { x: 10, y: 10 }, defaultSize: { w: 280, h: 320 } }));
     pm.register(makeDef({ id: 'game', title: 'GAME', defaultPosition: { x: 10, y: 10 }, defaultSize: { w: 280, h: 250 } }));
     return pm;
 }
@@ -275,12 +275,12 @@ console.log('\n--- Built-in Layout Listing ---');
     const panels = LayoutManager.BUILTIN_LAYOUTS.commander.panels;
     assert(panels.amy !== undefined, 'commander layout has amy panel');
     assert(panels.units !== undefined, 'commander layout has units panel');
-    assert(panels.alerts !== undefined, 'commander layout has alerts panel');
+    assert(panels['unified-alerts'] !== undefined, 'commander layout has alerts panel');
 })();
 
 (function testObserverLayoutPanels() {
     const panels = LayoutManager.BUILTIN_LAYOUTS.observer.panels;
-    assert(panels.alerts !== undefined, 'observer layout has alerts panel');
+    assert(panels['unified-alerts'] !== undefined, 'observer layout has alerts panel');
     assert(panels.amy === undefined, 'observer layout does not have amy panel');
     assert(panels.units === undefined, 'observer layout does not have units panel');
 })();
@@ -288,7 +288,7 @@ console.log('\n--- Built-in Layout Listing ---');
 (function testTacticalLayoutPanels() {
     const panels = LayoutManager.BUILTIN_LAYOUTS.tactical.panels;
     assert(panels.units !== undefined, 'tactical layout has units panel');
-    assert(panels.alerts !== undefined, 'tactical layout has alerts panel');
+    assert(panels['unified-alerts'] !== undefined, 'tactical layout has alerts panel');
     assert(panels.amy === undefined, 'tactical layout does not have amy panel');
 })();
 
@@ -296,7 +296,7 @@ console.log('\n--- Built-in Layout Listing ---');
     const panels = LayoutManager.BUILTIN_LAYOUTS.battle.panels;
     assert(panels.amy !== undefined, 'battle layout has amy panel');
     assert(panels.units !== undefined, 'battle layout has units panel');
-    assert(panels.alerts !== undefined, 'battle layout has alerts panel');
+    assert(panels['unified-alerts'] !== undefined, 'battle layout has alerts panel');
     assert(panels.game !== undefined, 'battle layout has game panel');
 })();
 
@@ -324,7 +324,7 @@ console.log('\n--- Apply Layout ---');
     flushRAF();
     assert(pm.isOpen('amy'), 'apply commander opens amy');
     assert(pm.isOpen('units'), 'apply commander opens units');
-    assert(pm.isOpen('alerts'), 'apply commander opens alerts');
+    assert(pm.isOpen('unified-alerts'), 'apply commander opens alerts');
     assert(pm.isOpen('game'), 'apply commander opens game');
     pm.destroyAll();
 })();
@@ -338,7 +338,7 @@ console.log('\n--- Apply Layout ---');
     lm.apply('observer');
     flushRAF();
     assert(!pm.isOpen('amy'), 'apply observer closes amy');
-    assert(pm.isOpen('alerts'), 'apply observer opens alerts');
+    assert(pm.isOpen('unified-alerts'), 'apply observer opens alerts');
     assert(!pm.isOpen('units'), 'apply observer does not open units');
     pm.destroyAll();
 })();
@@ -350,7 +350,7 @@ console.log('\n--- Apply Layout ---');
     lm.apply('tactical');
     flushRAF();
     assert(pm.isOpen('units'), 'apply tactical opens units');
-    assert(pm.isOpen('alerts'), 'apply tactical opens alerts');
+    assert(pm.isOpen('unified-alerts'), 'apply tactical opens alerts');
     assert(!pm.isOpen('amy'), 'apply tactical does not open amy');
     pm.destroyAll();
 })();
@@ -363,7 +363,7 @@ console.log('\n--- Apply Layout ---');
     flushRAF();
     assert(pm.isOpen('amy'), 'apply battle opens amy');
     assert(pm.isOpen('units'), 'apply battle opens units');
-    assert(pm.isOpen('alerts'), 'apply battle opens alerts');
+    assert(pm.isOpen('unified-alerts'), 'apply battle opens alerts');
     assert(pm.isOpen('game'), 'apply battle opens game');
     pm.destroyAll();
 })();
@@ -375,7 +375,7 @@ console.log('\n--- Apply Layout ---');
     // Open all four panels
     pm.open('amy');
     pm.open('units');
-    pm.open('alerts');
+    pm.open('unified-alerts');
     pm.open('game');
     // Apply observer -- should close all except alerts
     lm.apply('observer');
@@ -383,7 +383,7 @@ console.log('\n--- Apply Layout ---');
     assert(!pm.isOpen('amy'), 'apply observer closes previously open amy');
     assert(!pm.isOpen('units'), 'apply observer closes previously open units');
     assert(!pm.isOpen('game'), 'apply observer closes previously open game');
-    assert(pm.isOpen('alerts'), 'apply observer keeps alerts open');
+    assert(pm.isOpen('unified-alerts'), 'apply observer keeps alerts open');
     pm.destroyAll();
 })();
 
@@ -982,7 +982,7 @@ console.log('\n--- Relative Positioning ---');
     // Commander alerts: { x: -296, y: 8, w: 280, h: 320 }
     lm.apply('commander');
     flushRAF();
-    const alerts = pm.getPanel('alerts');
+    const alerts = pm.getPanel('unified-alerts');
     // x: -296 => 1200 + (-296) = 904
     assertClose(alerts.x, 904, 1, 'negative x resolves from right edge (1200 + (-296) = 904)');
     pm.destroyAll();
@@ -1034,7 +1034,7 @@ console.log('\n--- Relative Positioning ---');
     const lm = makeLM(pm);
     lm.apply('commander');
     flushRAF();
-    const alerts = pm.getPanel('alerts');
+    const alerts = pm.getPanel('unified-alerts');
     // x: -296 => 800 + (-296) = 504
     assertClose(alerts.x, 504, 1, 'negative x resolves correctly for 800px container');
     const amy = pm.getPanel('amy');
@@ -1370,7 +1370,7 @@ console.log('\n--- Edge Cases ---');
     assertEq(panelIds.length, 4, 'battle layout defines exactly 4 panels');
     assert(panelIds.includes('amy'), 'battle has amy');
     assert(panelIds.includes('units'), 'battle has units');
-    assert(panelIds.includes('alerts'), 'battle has alerts');
+    assert(panelIds.includes('unified-alerts'), 'battle has alerts');
     assert(panelIds.includes('game'), 'battle has game');
 })();
 
@@ -1378,7 +1378,7 @@ console.log('\n--- Edge Cases ---');
     const observer = LayoutManager.BUILTIN_LAYOUTS.observer;
     const panelIds = Object.keys(observer.panels);
     assertEq(panelIds.length, 1, 'observer layout defines exactly 1 panel');
-    assert(panelIds.includes('alerts'), 'observer has only alerts');
+    assert(panelIds.includes('unified-alerts'), 'observer has only alerts');
 })();
 
 (function testSaveCurrentCapturesClosedPanelState() {
