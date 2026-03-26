@@ -75,7 +75,7 @@ tritium-sc/
 ├── src/                        # ALL Python source code
 │   ├── engine/                 # System infrastructure (reusable, commander-agnostic)
 │   │   ├── commander_protocol.py  # Protocol interface for swappable commanders
-│   │   ├── simulation/        # Battlespace simulation engine (38 files)
+│   │   ├── simulation/        # Battlespace simulation engine (54 files)
 │   │   │   ├── engine.py     # 10Hz tick loop, hostile spawner
 │   │   │   ├── game_mode.py  # Wave-based game progression
 │   │   │   ├── behavior/     # Unit AI (turret, drone, rover, hostile)
@@ -129,7 +129,7 @@ tritium-sc/
 │   └── app/                    # FastAPI backend
 │       ├── main.py            # App entry point, lifespan, boot sequence
 │       ├── config.py          # Pydantic settings
-│       ├── routers/           # 105 API routers + WebSocket + Amy event bridge
+│       ├── routers/           # 104 API routers + WebSocket + Amy event bridge
 │       ├── ai/                # Detection pipeline (YOLO, tracker, embeddings)
 │       ├── zones/             # Zone management and alerting
 │       ├── discovery/         # NVR auto-discovery
@@ -139,18 +139,18 @@ tritium-sc/
 │       ├── index.html         # LEGACY — Original 10-tab SPA
 │       ├── js/                # Modular JavaScript
 │       │   ├── app.js        # Main app, view switching, shortcuts
-│       │   ├── command/       # Command Center (main.js, 98 panels, map, menu-bar)
+│       │   ├── command/       # Command Center (main.js, 113 panels, map, menu-bar)
 │       │   ├── war.js        # War Room — Canvas 2D RTS tactical map
 │       │   └── (amy, assets, input, scenarios, grid, player, zones, targets)
 │       └── css/
 │           ├── cybercore.css # CYBERCORE CSS framework
 │           └── tritium.css   # Custom + Amy + War Room panel styles
-├── tests/                      # ALL tests (668 test files)
-│   ├── engine/                # System infrastructure tests (467 Python files)
+├── tests/                      # ALL tests (781 Python + JS test files)
+│   ├── engine/                # System infrastructure tests (439 Python files)
 │   │   ├── simulation/       # Simulation engine tests (133 files)
 │   │   ├── comms/            # CoT, MQTT, event bus (24 files)
 │   │   ├── tactical/         # Geo, escalation, dossier tests
-│   │   ├── api/              # FastAPI router tests (120 files)
+│   │   ├── api/              # FastAPI router tests (120+ files)
 │   │   ├── nodes/            # Sensor nodes, MQTT, ML (18 files)
 │   │   ├── actions/          # Lua, dispatch, formation tests
 │   │   ├── inference/        # Robot thinker tests
