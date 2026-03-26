@@ -624,10 +624,16 @@ function init() {
     // game:state events — WebSocket delivers state before user gesture,
     // causing "AudioContext not allowed to start" browser warnings.
 
-    // Demo start button — visible when no targets on map, hidden once targets appear
+    // Demo start button — centered on map, visible when no targets, fades when targets appear
     const demoOverlay = document.getElementById('demo-start-overlay');
     const demoBtn = document.getElementById('demo-start-btn');
     if (demoBtn && demoOverlay) {
+        const _fadeDemoOverlay = () => {
+            demoOverlay.style.opacity = '0';
+            demoOverlay.style.pointerEvents = 'none';
+            setTimeout(() => { demoOverlay.classList.add('hidden'); }, 400);
+        };
+
         demoBtn.addEventListener('click', async () => {
             demoBtn.disabled = true;
             demoBtn.textContent = '[ STARTING... ]';
@@ -636,25 +642,25 @@ function init() {
                 const data = await res.json();
                 if (res.ok) {
                     EventBus.emit('toast:show', { message: 'Demo mode started', type: 'info' });
-                    demoOverlay.classList.add('hidden');
+                    _fadeDemoOverlay();
                 } else {
                     EventBus.emit('toast:show', { message: data.error || 'Failed to start demo', type: 'alert' });
+                    demoBtn.disabled = false;
+                    demoBtn.textContent = '[ START DEMO ]';
                 }
             } catch (e) {
                 EventBus.emit('toast:show', { message: 'Demo start failed: ' + e.message, type: 'alert' });
+                demoBtn.disabled = false;
+                demoBtn.textContent = '[ START DEMO ]';
             }
-            demoBtn.disabled = false;
-            demoBtn.textContent = '[ START DEMO ]';
         });
 
-        // Hide demo button once targets appear on the map
+        // Fade demo overlay once targets appear on the map
         TritiumStore.on('units', () => {
-            if (TritiumStore.units.size > 0) {
-                demoOverlay.classList.add('hidden');
-            }
+            if (TritiumStore.units.size > 0) _fadeDemoOverlay();
         });
 
-        // Check demo status — hide button if demo already running
+        // Hide immediately if demo already running (no need to fade on reload)
         fetch('/api/demo/status').then(r => r.ok ? r.json() : {}).then(d => {
             if (d.active) demoOverlay.classList.add('hidden');
         }).catch(() => {});
@@ -702,31 +708,30 @@ function _showWelcomeTooltip() {
     const tip = document.createElement('div');
     tip.id = 'welcome-tooltip';
     tip.style.cssText = `
-        position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(12px); z-index: 10000;
-        max-width: 340px; padding: 16px 20px;
-        background: rgba(10, 10, 20, 0.95);
-        border: 1px solid #00f0ff44;
+        position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(12px); z-index: 10000;
+        max-width: 360px; padding: 14px 20px;
+        background: rgba(10, 10, 20, 0.92);
+        border: 1px solid rgba(0, 240, 255, 0.2);
         border-radius: 6px;
         font-family: 'JetBrains Mono', 'Inter', monospace;
         font-size: 11px; line-height: 1.6;
         color: #c0c0d0;
-        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6), 0 0 12px rgba(0, 240, 255, 0.08);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 12px rgba(0, 240, 255, 0.06);
         opacity: 0;
         transition: opacity 0.4s ease, transform 0.4s ease;
         pointer-events: auto;
     `;
     tip.innerHTML = `
-        <div style="color:#00f0ff;font-weight:bold;font-size:12px;margin-bottom:8px;letter-spacing:0.5px">WELCOME TO TRITIUM</div>
-        <div style="margin-bottom:6px">Click <span style="color:#05ffa1;font-weight:bold">SIM &gt; Start Demo</span> to see targets.</div>
-        <div style="margin-bottom:6px">Press <span style="color:#fcee0a;font-weight:bold">J</span> for city simulation with traffic.</div>
-        <div style="margin-bottom:6px">Click targets on the map to <span style="color:#00f0ff">inspect</span> them.</div>
-        <div style="margin-bottom:10px">Press <span style="color:#fcee0a;font-weight:bold">?</span> for keyboard shortcuts.</div>
+        <div style="color:#00f0ff;font-weight:bold;font-size:11px;margin-bottom:8px;letter-spacing:1.5px">UNIFIED OPERATING PICTURE</div>
+        <div style="margin-bottom:5px;color:#888">Track every target across all sensors. Click <span style="color:#05ffa1;font-weight:bold">START DEMO</span> above to begin.</div>
+        <div style="margin-bottom:5px;color:#888">Click targets on the map to <span style="color:#00f0ff">inspect</span> them.</div>
+        <div style="margin-bottom:8px;color:#888">Open <span style="color:#fcee0a">SIM</span> menu for battles, city sim, and more.</div>
         <button id="welcome-dismiss" style="
-            background: transparent; border: 1px solid #00f0ff44; color: #00f0ff;
+            background: transparent; border: 1px solid rgba(0, 240, 255, 0.2); color: rgba(0, 240, 255, 0.7);
             font-family: 'JetBrains Mono', monospace; font-size: 10px;
-            padding: 4px 12px; border-radius: 3px; cursor: pointer;
+            padding: 3px 12px; border-radius: 3px; cursor: pointer;
             transition: background 0.2s, border-color 0.2s;
-        ">DISMISS</button>
+        ">GOT IT</button>
     `;
     document.body.appendChild(tip);
 
@@ -738,17 +743,23 @@ function _showWelcomeTooltip() {
         });
     });
 
+    let dismissed = false;
     const dismiss = () => {
+        if (dismissed) return;
+        dismissed = true;
         localStorage.setItem(STORAGE_KEY, '1');
         tip.style.opacity = '0';
-        tip.style.transform = 'translateY(12px)';
+        tip.style.transform = 'translateX(-50%) translateY(12px)';
         setTimeout(() => tip.remove(), 400);
     };
 
     tip.querySelector('#welcome-dismiss').addEventListener('click', dismiss);
 
-    // Auto-dismiss after 8 seconds
-    setTimeout(dismiss, 8000);
+    // Auto-dismiss after 12 seconds or when demo starts (targets appear)
+    setTimeout(dismiss, 12000);
+    TritiumStore.on('units', () => {
+        if (TritiumStore.units.size > 0) dismiss();
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -1875,6 +1886,19 @@ function initKeyboard() {
             case 'p':
             case 'P':
                 if (panelManager) panelManager.toggle('battle-stats');
+                break;
+            case 'd':
+            case 'D':
+                // Toggle demo mode (start if idle, stop if running)
+                fetch('/api/demo/status').then(r => r.ok ? r.json() : {}).then(status => {
+                    const endpoint = status.active ? '/api/demo/stop' : '/api/demo/start';
+                    fetch(endpoint, { method: 'POST' }).then(r => r.json()).then(d => {
+                        EventBus.emit('toast:show', {
+                            message: status.active ? 'Demo mode stopped' : 'Demo mode started',
+                            type: 'info',
+                        });
+                    }).catch(() => {});
+                }).catch(() => {});
                 break;
             case 'j':
             case 'J':

@@ -317,11 +317,12 @@ def _handle_sim_sighting_batch(message: dict) -> None:
                 "source": "city_sim",
             })
         elif stype == "detection":
+            pos = item.get("position") or {}
             tracker.update_from_detection({
-                "target_id": item.get("target_id", ""),
-                "class": item.get("class", "unknown"),
+                "class_name": item.get("class", "unknown"),
                 "confidence": item.get("confidence", 0.5),
-                "position": item.get("position"),
+                "center_x": float(pos.get("x", 0)),
+                "center_y": float(pos.get("y", 0)),
                 "source": "city_sim",
             })
 
