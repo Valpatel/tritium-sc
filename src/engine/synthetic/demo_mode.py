@@ -33,6 +33,7 @@ from engine.synthetic.data_generators import (
     MeshtasticNodeGenerator,
     TrilaterationDemoGenerator,
 )
+from engine.synthetic.demo_notifications import DemoNotificationGenerator
 from engine.synthetic.fusion_scenario import FusionScenario
 from engine.synthetic.reid_demo_generator import ReIDDemoGenerator
 from engine.synthetic.rl_training_generator import RLTrainingGenerator
@@ -70,6 +71,10 @@ class DemoController:
          "heading": 180, "scene_type": "street_cam"},
         {"id": "demo-cam-02", "name": "South Lot", "lat": 37.7742, "lng": -122.4200,
          "heading": 45, "scene_type": "bird_eye"},
+        {"id": "demo-cam-03", "name": "East Alley", "lat": 37.7748, "lng": -122.4170,
+         "heading": 270, "scene_type": "street_cam"},
+        {"id": "demo-cam-04", "name": "West Overwatch", "lat": 37.7752, "lng": -122.4210,
+         "heading": 90, "scene_type": "bird_eye"},
     ]
 
     def __init__(
@@ -78,9 +83,9 @@ class DemoController:
         target_tracker: TargetTracker | None = None,
         geofence_engine: GeofenceEngine | None = None,
         camera_feeds_plugin=None,
-        ble_device_count: int = 5,
-        mesh_node_count: int = 3,
-        camera_count: int = 2,
+        ble_device_count: int = 12,
+        mesh_node_count: int = 5,
+        camera_count: int = 4,
     ) -> None:
         self._event_bus = event_bus
         self._target_tracker = target_tracker
@@ -102,6 +107,7 @@ class DemoController:
         self._trilat_demo: TrilaterationDemoGenerator | None = None
         self._reid_demo: ReIDDemoGenerator | None = None
         self._robot_demo: RobotDemoGenerator | None = None
+        self._notif_gen: DemoNotificationGenerator | None = None
 
         # Fleet heartbeat generator for fleet dashboard demo
         self._fleet_hb_thread: threading.Thread | None = None
@@ -213,6 +219,11 @@ class DemoController:
         # shows 4 demo devices with realistic telemetry.
         self._start_fleet_heartbeat_generator()
 
+        # Notification generator — staggered alerts that populate the
+        # notification feed immediately, giving the demo a "lived-in" feel.
+        self._notif_gen = DemoNotificationGenerator(event_bus=self._event_bus)
+        self._notif_gen.start()
+
         self._active = True
 
         # Seed demo assets (cameras, sensors) so the Assets panel has content
@@ -223,11 +234,13 @@ class DemoController:
             "mesh_nodes": self._mesh_node_count,
             "cameras": self._camera_count,
             "fusion_scenario": True,
+            "robots": 3,
+            "notifications": True,
         })
         logger.info(
             f"Demo mode active: {self._ble_device_count} BLE devices, "
             f"{self._mesh_node_count} mesh nodes, {self._camera_count} cameras, "
-            f"fusion scenario running"
+            f"3 robots, notification feed active, fusion scenario running"
         )
 
     def stop(self) -> None:
@@ -272,6 +285,10 @@ class DemoController:
         if self._robot_demo is not None:
             self._robot_demo.stop()
             self._robot_demo = None
+
+        if self._notif_gen is not None:
+            self._notif_gen.stop()
+            self._notif_gen = None
 
         # Stop fleet heartbeat generator
         self._stop_fleet_heartbeat_generator()
@@ -361,6 +378,25 @@ class DemoController:
          "asset_class": "sensor", "home_x": 37.7745, "home_y": -122.4190,
          "height_meters": 2.0, "mounting_type": "wall", "coverage_radius_meters": 8,
          "coverage_cone_angle": 110, "capabilities": ["pir_motion", "alert"]},
+        # Additional cameras (East & West)
+        {"asset_id": "demo-cam-03", "name": "East Alley Camera", "asset_type": "fixed",
+         "asset_class": "observation", "home_x": 37.7748, "home_y": -122.4170,
+         "height_meters": 3.5, "mounting_type": "pole", "coverage_radius_meters": 25,
+         "coverage_cone_angle": 80, "capabilities": ["video", "yolo", "recording"]},
+        {"asset_id": "demo-cam-04", "name": "West Overwatch Camera", "asset_type": "fixed",
+         "asset_class": "observation", "home_x": 37.7752, "home_y": -122.4210,
+         "height_meters": 8.0, "mounting_type": "rooftop", "coverage_radius_meters": 60,
+         "coverage_cone_angle": 150, "capabilities": ["video", "yolo", "recording", "thermal"]},
+        # Acoustic sensor
+        {"asset_id": "demo-acoustic-01", "name": "Acoustic Array North", "asset_type": "fixed",
+         "asset_class": "sensor", "home_x": 37.7758, "home_y": -122.4192,
+         "height_meters": 3.0, "mounting_type": "pole", "coverage_radius_meters": 50,
+         "capabilities": ["acoustic_classification", "gunshot_detection", "vehicle_audio"]},
+        # WiFi probe sensor
+        {"asset_id": "demo-wifi-01", "name": "WiFi Probe Collector", "asset_type": "fixed",
+         "asset_class": "sensor", "home_x": 37.7749, "home_y": -122.4194,
+         "height_meters": 2.5, "mounting_type": "ceiling", "coverage_radius_meters": 30,
+         "capabilities": ["wifi_probe", "ssid_scan", "deauth_detect"]},
     ]
 
     def _seed_demo_assets(self) -> None:
@@ -676,6 +712,15 @@ class DemoController:
                     "interval": 5.0,
                 },
                 "robots": robot_stats.get("robots", []),
+            })
+
+        if self._notif_gen is not None:
+            generators.append({
+                "name": "DemoNotificationGenerator",
+                "running": self._notif_gen.running,
+                "config": {
+                    "interval": 8.0,
+                },
             })
 
         uptime = None

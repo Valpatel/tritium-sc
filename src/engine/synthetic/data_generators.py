@@ -471,20 +471,36 @@ class CameraDetectionGenerator(_BaseGenerator):
             "frame_number": self._tick_count,
         })
 
+    # Detection class weights: (label, probability, speed_range, width, height)
+    _DETECTION_CLASSES: list[tuple[str, float, tuple[float, float], float, float]] = [
+        ("person",     0.40, (0.005, 0.020), 0.05, 0.15),
+        ("vehicle",    0.18, (0.020, 0.060), 0.12, 0.08),
+        ("dog",        0.10, (0.008, 0.025), 0.06, 0.06),
+        ("bicycle",    0.10, (0.012, 0.035), 0.07, 0.08),
+        ("motorcycle", 0.07, (0.025, 0.055), 0.09, 0.07),
+        ("backpack",   0.05, (0.004, 0.012), 0.04, 0.05),
+        ("truck",      0.05, (0.015, 0.040), 0.15, 0.10),
+        ("cat",        0.05, (0.006, 0.018), 0.04, 0.04),
+    ]
+
     def _spawn(self) -> None:
         """Spawn a new tracked object entering from a random edge."""
         self._next_id += 1
         obj_id = f"det-{self._next_id:04d}"
 
-        # 70% person, 30% vehicle
-        if self._rng.random() < 0.7:
-            label = "person"
-            speed = self._rng.uniform(0.005, 0.02)
-            w, h = 0.05, 0.15
-        else:
-            label = "vehicle"
-            speed = self._rng.uniform(0.02, 0.06)
-            w, h = 0.12, 0.08
+        # Weighted random selection from detection classes
+        roll = self._rng.random()
+        cumulative = 0.0
+        label, speed_range, w, h = "person", (0.005, 0.02), 0.05, 0.15
+        for cls_label, prob, spd_range, cls_w, cls_h in self._DETECTION_CLASSES:
+            cumulative += prob
+            if roll < cumulative:
+                label = cls_label
+                speed_range = spd_range
+                w, h = cls_w, cls_h
+                break
+
+        speed = self._rng.uniform(*speed_range)
 
         # Enter from left or right edge
         if self._rng.random() < 0.5:
