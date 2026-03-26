@@ -117,6 +117,7 @@ import { MapLayerSwitcherPanelDef } from './panels/map-layer-switcher.js';
 import { CollaborationHubPanelDef } from './panels/collaboration-hub.js';
 import { IndoorPositioningPanelDef } from './panels/indoor-positioning-panel.js';
 import { UnifiedAlertsPanelDef } from './panels/alerts-panel.js';
+import { TargetDossierPanelDef } from './panels/target-dossier-panel.js';
 import { RadarScopePanelDef } from './panels/radar-scope.js';
 import { SdrWaterfallPanelDef } from './panels/sdr-waterfall.js';
 import { AdsbTablePanelDef } from './panels/adsb-table.js';
@@ -834,6 +835,7 @@ function initPanelSystem(container) {
     panelManager.register(OpsDashboardPanelDef);
     panelManager.register(DossierGroupsPanelDef);
     panelManager.register(DossierTimelinePanelDef);
+    panelManager.register(TargetDossierPanelDef);
     panelManager.register(SetupWizardPanelDef);
     panelManager.register(ActivityFeedPanelDef);
     panelManager.register(MqttInspectorPanelDef);
