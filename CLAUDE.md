@@ -75,7 +75,7 @@ tritium-sc/
 ├── src/                        # ALL Python source code
 │   ├── engine/                 # System infrastructure (reusable, commander-agnostic)
 │   │   ├── commander_protocol.py  # Protocol interface for swappable commanders
-│   │   ├── simulation/        # Battlespace simulation engine (54 files)
+│   │   ├── simulation/        # Battlespace simulation engine
 │   │   │   ├── engine.py     # 10Hz tick loop, hostile spawner
 │   │   │   ├── game_mode.py  # Wave-based game progression
 │   │   │   ├── behavior/     # Unit AI (turret, drone, rover, hostile)
@@ -107,7 +107,7 @@ tritium-sc/
 │   │   │   └── formation_actions.py # Squad formations
 │   │   ├── nodes/             # Distributed sensor nodes
 │   │   ├── audio/             # Audio pipeline (sound effects, library)
-│   │   ├── units/             # Unit type registry (16 types)
+│   │   ├── units/             # Unit type registry (17 types)
 │   │   ├── synthetic/         # Procedural media generation
 │   │   ├── scenarios/         # Behavioral test framework
 │   │   └── layouts/           # Level format JSON files
@@ -129,7 +129,7 @@ tritium-sc/
 │   └── app/                    # FastAPI backend
 │       ├── main.py            # App entry point, lifespan, boot sequence
 │       ├── config.py          # Pydantic settings
-│       ├── routers/           # 104 API routers + WebSocket + Amy event bridge
+│       ├── routers/           # API routers + WebSocket + Amy event bridge
 │       ├── ai/                # Detection pipeline (YOLO, tracker, embeddings)
 │       ├── zones/             # Zone management and alerting
 │       ├── discovery/         # NVR auto-discovery
@@ -139,25 +139,25 @@ tritium-sc/
 │       ├── index.html         # LEGACY — Original 10-tab SPA
 │       ├── js/                # Modular JavaScript
 │       │   ├── app.js        # Main app, view switching, shortcuts
-│       │   ├── command/       # Command Center (main.js, 113 panels, map, menu-bar)
+│       │   ├── command/       # Command Center (main.js, panels, map, menu-bar)
 │       │   ├── war.js        # War Room — Canvas 2D RTS tactical map
 │       │   └── (amy, assets, input, scenarios, grid, player, zones, targets)
 │       └── css/
 │           ├── cybercore.css # CYBERCORE CSS framework
 │           └── tritium.css   # Custom + Amy + War Room panel styles
-├── tests/                      # ALL tests (781 Python + JS test files)
-│   ├── engine/                # System infrastructure tests (439 Python files)
-│   │   ├── simulation/       # Simulation engine tests (133 files)
-│   │   ├── comms/            # CoT, MQTT, event bus (24 files)
+├── tests/                      # ALL tests (Python + JS)
+│   ├── engine/                # System infrastructure tests
+│   │   ├── simulation/       # Simulation engine tests
+│   │   ├── comms/            # CoT, MQTT, event bus
 │   │   ├── tactical/         # Geo, escalation, dossier tests
-│   │   ├── api/              # FastAPI router tests (120+ files)
-│   │   ├── nodes/            # Sensor nodes, MQTT, ML (18 files)
+│   │   ├── api/              # FastAPI router tests
+│   │   ├── nodes/            # Sensor nodes, MQTT, ML
 │   │   ├── actions/          # Lua, dispatch, formation tests
 │   │   ├── inference/        # Robot thinker tests
 │   │   ├── perception/       # Perception, extraction tests
 │   │   ├── units/            # Unit type registry tests
-│   │   ├── synthetic/        # Video, audio generation (20 files)
-│   │   ├── scenarios/        # Behavioral tests (9 files)
+│   │   ├── synthetic/        # Video, audio generation
+│   │   ├── scenarios/        # Behavioral tests
 │   │   ├── audio/            # Audio pipeline tests
 │   │   └── models/           # Data models
 │   ├── amy/                   # Amy personality tests
@@ -166,10 +166,10 @@ tritium-sc/
 │   │   └── api/              # Amy-specific API tests
 │   ├── scenarios/             # Behavioral test scenarios (JSON)
 │   ├── integration/           # 6 server E2E tests (headless, auto-port)
-│   ├── visual/                # 113 visual tests (OpenCV + LLM + Playwright)
-│   ├── js/                    # 113 JS test files (7700+ assertions)
-│   ├── lib/                   # 8 test infrastructure tests
-│   └── ui/                    # 52 UI tests (UX, layout, defects, panels)
+│   ├── visual/                # 117 visual tests (OpenCV + LLM + Playwright)
+│   ├── js/                    # 119 JS test files (7700+ assertions)
+│   ├── lib/                   # Test infrastructure
+│   └── ui/                    # 56 UI tests (UX, layout, defects, panels)
 ├── examples/                   # ALL standalone reference projects
 │   ├── robot-template/        # Reference MQTT robot brain (Python)
 │   ├── ros2-robot/            # ROS2 Humble robot (Nav2 + MQTT bridge)
@@ -181,7 +181,7 @@ tritium-sc/
 │   ├── robot-server/          # Demo robot simulator
 │   └── swarm-drone/           # Demo drone swarm
 ├── assets/                     # Static assets
-│   ├── sfx/                   # Sound effects (67 WAVs, 7 categories)
+│   ├── sfx/                   # Sound effects (75 WAVs, 7 categories)
 │   └── desktop/               # Desktop launcher files (.desktop, .svg)
 ├── scripts/                    # CLI tools + entry points
 ├── docs/                       # Documentation
@@ -228,7 +228,7 @@ tritium-sc/
 | `src/engine/nodes/base.py` | Abstract SensorNode (camera, mic, PTZ, speaker) |
 | `src/engine/nodes/bcc950.py` | BCC950 PTZ camera + mic + speaker node |
 | `src/engine/nodes/mqtt_robot.py` | MQTTSensorNode — wraps MQTT robot as SensorNode |
-| `src/engine/units/` | Unit type registry (16 types, auto-discovery) |
+| `src/engine/units/` | Unit type registry (17 types, auto-discovery) |
 
 **Moved to tritium-lib:** SimulationTarget, CombatSystem, UnitBehaviors, Speaker/TTS, ModelRouter, OllamaFleet, TargetTracker. SC imports these from `tritium_lib.*`.
 
