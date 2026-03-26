@@ -119,6 +119,7 @@ from app.routers.mesh_environment import router as mesh_environment_router
 from app.routers.target_groups import router as target_groups_router
 from app.routers.reid import router as reid_router
 from app.routers.unified_alerts import router as unified_alerts_router
+from app.routers.sitaware import router as sitaware_router
 
 
 # ---------------------------------------------------------------------------
@@ -1022,10 +1023,22 @@ async def lifespan(app: FastAPI):
                 sim_engine.start()
                 app.state.simulation_engine = sim_engine
 
+                # Create a standalone TargetTracker so city-sim sensor bridge
+                # sightings (BLE/WiFi/detection) are ingested even without Amy.
+                headless_tracker = None
+                try:
+                    from tritium_lib.tracking.target_tracker import TargetTracker
+                    headless_tracker = TargetTracker(event_bus=sim_engine.event_bus)
+                    app.state.target_tracker = headless_tracker
+                    logger.info("Standalone TargetTracker created for headless mode")
+                except Exception as e:
+                    logger.warning(f"Could not create headless TargetTracker: {e}")
+
                 # Bridge sim events to WebSocket so the browser canvas renders targets
                 start_headless_event_bridge(
                     sim_engine.event_bus, asyncio.get_event_loop(),
                     simulation_engine=sim_engine,
+                    target_tracker=headless_tracker,
                 )
                 logger.info("Headless simulation engine + event bridge started (no Amy)")
 
@@ -1164,6 +1177,28 @@ async def lifespan(app: FastAPI):
         )
     except Exception as e:
         logger.warning(f"FusionEngine failed to initialize: {e}")
+
+    # SitAwareEngine — unified operating picture capstone
+    try:
+        from tritium_lib.sitaware import SitAwareEngine as _SitAwareEngine
+
+        _sa_fusion = getattr(app.state, "fusion_engine", None)
+        try:
+            _sa_bus = _fusion_bus  # noqa: F821 — set by FusionEngine block above
+        except NameError:
+            _sa_bus = None
+
+        sitaware_engine = _SitAwareEngine(
+            event_bus=_sa_bus,
+            fusion=_sa_fusion,
+        )
+        app.state.sitaware_engine = sitaware_engine
+        logger.info(
+            "SitAwareEngine initialized (fusion=%s)",
+            "wired" if _sa_fusion is not None else "standalone",
+        )
+    except Exception as e:
+        logger.warning(f"SitAwareEngine failed to initialize: {e}")
 
     # Plugin system — discover, configure, and start all plugins
     plugin_manager = _start_plugins(app, amy_instance, sim_engine)
@@ -1445,6 +1480,7 @@ app.include_router(target_activity_heatmap_router)
 app.include_router(readiness_router)
 app.include_router(unified_events_router)
 app.include_router(fusion_dashboard_router)
+app.include_router(sitaware_router)
 app.include_router(collaboration_router)
 app.include_router(forensics_router)
 app.include_router(sensor_health_router)

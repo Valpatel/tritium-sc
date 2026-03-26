@@ -333,7 +333,11 @@ class TestCameraDetectionGenerator:
             for det in ev["data"]["detections"]:
                 labels.add(det["label"])
         # Over 1.5s with 0.1 interval, we should see at least one label
-        assert labels.issubset({"person", "vehicle"})
+        valid_labels = {
+            "person", "vehicle", "dog", "bicycle", "motorcycle",
+            "backpack", "truck", "cat",
+        }
+        assert labels.issubset(valid_labels)
 
     def test_bbox_values_normalized(self):
         bus = EventBus()

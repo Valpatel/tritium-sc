@@ -58,11 +58,14 @@ async def sitaware_updates(
     request: Request,
     since: float = Query(0.0, description="Epoch timestamp — return updates after this time"),
     limit: int = Query(100, ge=1, le=1000, description="Max updates to return"),
+    type: str | None = Query(None, description="Filter by update_type (e.g. alert_fired, target_new)"),
 ):
     """Recent PictureUpdate deltas since a given timestamp.
 
     Used for incremental synchronization: fetch /picture once, then
     poll /updates?since=<picture.timestamp> for changes only.
+
+    Optional ``type`` parameter filters to a single update_type value.
     """
     engine = _get_engine(request)
     if engine is None:
@@ -74,6 +77,8 @@ async def sitaware_updates(
 
     try:
         updates = engine.get_updates_since(since)
+        if type:
+            updates = [u for u in updates if u.update_type.value == type]
         if len(updates) > limit:
             updates = updates[-limit:]
         return {

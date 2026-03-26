@@ -4377,6 +4377,8 @@ function _createUnitMarker(id, unit, lngLat) {
         TritiumStore.set('map.selectedUnitId', id);
         EventBus.emit('unit:selected', { id });
         EventBus.emit('panel:request-open', { id: 'unit-inspector' });
+        // Also notify the target dossier panel (if open, it will update)
+        EventBus.emit('target-dossier:open', { target_id: id });
         // Immediate visual feedback — don't wait for next telemetry cycle
         _onSelectionChanged(id);
     });

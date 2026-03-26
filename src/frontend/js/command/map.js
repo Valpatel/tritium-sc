@@ -4054,6 +4054,8 @@ function _onDblClick(e) {
             }
             // Open the rich target detail modal
             _openTargetDetailModal(hitId, unit);
+            // Also notify the target dossier panel
+            EventBus.emit('target-dossier:open', { target_id: hitId });
         }
     }
 }
@@ -4424,16 +4426,15 @@ function _bindQuickActionButtons(modal, targetId) {
         });
     });
 
-    // DOSSIER button — open dossier panel with target pre-selected
+    // DOSSIER button — open target dossier panel with focused view
     modal.querySelectorAll('[data-action="open-dossier"]').forEach(btn => {
         btn.addEventListener('click', (ev) => {
             ev.preventDefault();
             const tid = btn.dataset.targetId;
             if (window.EventBus) {
-                window.EventBus.emit('panel:request-open', { id: 'dossiers' });
-                // Emit event to load specific target in dossier panel
+                window.EventBus.emit('panel:request-open', { id: 'target-dossier' });
                 setTimeout(() => {
-                    window.EventBus.emit('dossier:load-target', { target_id: tid });
+                    window.EventBus.emit('target-dossier:open', { target_id: tid });
                 }, 200);
             }
             document.getElementById('target-detail-modal')?.remove();

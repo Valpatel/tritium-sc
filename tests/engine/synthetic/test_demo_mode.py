@@ -60,9 +60,9 @@ class TestDemoController:
                 break
         started_events = [e for e in events if e["type"] == "demo:started"]
         assert len(started_events) == 1
-        assert started_events[0]["data"]["ble_devices"] == 5
-        assert started_events[0]["data"]["mesh_nodes"] == 3
-        assert started_events[0]["data"]["cameras"] == 2
+        assert started_events[0]["data"]["ble_devices"] == 12
+        assert started_events[0]["data"]["mesh_nodes"] == 5
+        assert started_events[0]["data"]["cameras"] == 4
 
         ctrl.stop()
 
@@ -109,8 +109,8 @@ class TestDemoController:
         )
         ctrl.start()
         status = ctrl.status()
-        # 1 BLE + 1 Mesh + 1 Camera + 1 Fusion + 1 RL + 1 ReID + 1 Trilat + 1 Robot = 8
-        assert status["generator_count"] == 8
+        # 1 BLE + 1 Mesh + 1 Camera + 1 Fusion + 1 RL + 1 ReID + 1 Trilat + 1 Robot + 1 Notif = 9
+        assert status["generator_count"] == 9
         ctrl.stop()
 
     def test_generators_produce_events(self):
@@ -148,6 +148,7 @@ class TestDemoController:
         assert "BLEScanGenerator" in names
         assert "MeshtasticNodeGenerator" in names
         assert "CameraDetectionGenerator" in names
+        assert "DemoNotificationGenerator" in names
 
         # All should be running
         for g in status["generators"]:

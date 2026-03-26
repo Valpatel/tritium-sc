@@ -905,3 +905,142 @@ class TestTrackerBroadcast:
         # Should not raise
         _start_tracker_broadcast(None, loop)
         loop.close()
+
+
+class TestSimSightingBatch:
+    """Tests for _handle_sim_sighting_batch — city-sim sensor bridge ingestion."""
+
+    def _make_tracker(self):
+        """Create a minimal TargetTracker for testing."""
+        from tritium_lib.tracking.target_tracker import TargetTracker
+        return TargetTracker()
+
+    def test_ble_sighting_ingested(self):
+        """BLE sightings from city-sim should create targets in the tracker."""
+        import app.routers.ws as ws_mod
+        tracker = self._make_tracker()
+        ws_mod._target_tracker = tracker
+        try:
+            ws_mod._handle_sim_sighting_batch({
+                "data": [{
+                    "type": "ble_sighting",
+                    "mac": "AA:BB:CC:00:00:01",
+                    "target_id": "sim_ble_AA:BB:CC:00:00:01",
+                    "rssi": -55,
+                    "device_class": "phone",
+                    "position": {"x": 100.0, "y": 200.0},
+                }]
+            })
+            targets = tracker.get_all()
+            assert len(targets) >= 1, f"Expected at least 1 target, got {len(targets)}"
+            t = targets[0]
+            assert t.source == "ble"
+            assert t.position[0] == 100.0
+            assert t.position[1] == 200.0
+        finally:
+            ws_mod._target_tracker = None
+
+    def test_wifi_sighting_ingested(self):
+        """WiFi sightings should be routed through update_from_ble with wifi_ prefix."""
+        import app.routers.ws as ws_mod
+        tracker = self._make_tracker()
+        ws_mod._target_tracker = tracker
+        try:
+            ws_mod._handle_sim_sighting_batch({
+                "data": [{
+                    "type": "wifi_sighting",
+                    "mac": "CA:FE:01:00:00:01",
+                    "ssid": "Vehicle_car_1",
+                    "rssi": -60,
+                    "position": {"x": 50.0, "y": 75.0},
+                }]
+            })
+            targets = tracker.get_all()
+            assert len(targets) >= 1
+            t = targets[0]
+            assert "wifi_" in t.target_id
+            assert t.position[0] == 50.0
+            assert t.position[1] == 75.0
+        finally:
+            ws_mod._target_tracker = None
+
+    def test_detection_ingested_with_correct_keys(self):
+        """Detection sightings should translate class->class_name and position->{center_x,center_y}."""
+        import app.routers.ws as ws_mod
+        tracker = self._make_tracker()
+        ws_mod._target_tracker = tracker
+        try:
+            ws_mod._handle_sim_sighting_batch({
+                "data": [{
+                    "type": "detection",
+                    "target_id": "sim_det_vehicle_car_1",
+                    "class": "car",
+                    "confidence": 0.92,
+                    "position": {"x": 300.0, "y": 400.0},
+                }]
+            })
+            targets = tracker.get_all()
+            assert len(targets) >= 1, f"Expected at least 1 target, got {len(targets)}"
+            t = targets[0]
+            assert t.position[0] == 300.0, f"Expected x=300, got {t.position[0]}"
+            assert t.position[1] == 400.0, f"Expected y=400, got {t.position[1]}"
+            assert t.classification == "car"
+        finally:
+            ws_mod._target_tracker = None
+
+    def test_no_tracker_no_crash(self):
+        """When _target_tracker is None, batch should be silently dropped."""
+        import app.routers.ws as ws_mod
+        ws_mod._target_tracker = None
+        # Should not raise
+        ws_mod._handle_sim_sighting_batch({
+            "data": [{"type": "ble_sighting", "mac": "AA:BB:CC:00:00:01"}]
+        })
+
+    def test_empty_batch_no_crash(self):
+        """Empty or malformed batch should not crash."""
+        import app.routers.ws as ws_mod
+        tracker = self._make_tracker()
+        ws_mod._target_tracker = tracker
+        try:
+            ws_mod._handle_sim_sighting_batch({})
+            ws_mod._handle_sim_sighting_batch({"data": []})
+            ws_mod._handle_sim_sighting_batch({"data": "not_a_list"})
+        finally:
+            ws_mod._target_tracker = None
+
+    def test_mixed_batch(self):
+        """A batch with BLE, WiFi, and detection items should all be ingested."""
+        import app.routers.ws as ws_mod
+        tracker = self._make_tracker()
+        ws_mod._target_tracker = tracker
+        try:
+            ws_mod._handle_sim_sighting_batch({
+                "data": [
+                    {
+                        "type": "ble_sighting",
+                        "mac": "AA:BB:CC:00:00:02",
+                        "target_id": "sim_ble_test",
+                        "rssi": -45,
+                        "device_class": "smartwatch",
+                        "position": {"x": 10.0, "y": 20.0},
+                    },
+                    {
+                        "type": "wifi_sighting",
+                        "mac": "CA:FE:02:00:00:01",
+                        "ssid": "TestWiFi",
+                        "rssi": -70,
+                        "position": {"x": 30.0, "y": 40.0},
+                    },
+                    {
+                        "type": "detection",
+                        "class": "person",
+                        "confidence": 0.88,
+                        "position": {"x": 50.0, "y": 60.0},
+                    },
+                ]
+            })
+            targets = tracker.get_all()
+            assert len(targets) == 3, f"Expected 3 targets from mixed batch, got {len(targets)}"
+        finally:
+            ws_mod._target_tracker = None

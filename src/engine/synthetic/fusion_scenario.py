@@ -453,15 +453,25 @@ class FusionScenario:
                     f"fusion-{actor.actor_id}", pos
                 )
                 for gev in geo_events:
-                    if gev.event_type == "enter":
-                        self._event_bus.publish("demo:geofence_alert", {
-                            "actor": actor.label,
-                            "actor_id": actor.actor_id,
-                            "zone": gev.zone_name,
-                            "zone_type": gev.zone_type,
-                            "position": list(pos),
-                            "event_type": "enter",
-                        })
+                    action = gev.event_type  # "enter" or "exit"
+                    # Publish demo-specific event for any listeners
+                    self._event_bus.publish("demo:geofence_alert", {
+                        "actor": actor.label,
+                        "actor_id": actor.actor_id,
+                        "zone": gev.zone_name,
+                        "zone_type": gev.zone_type,
+                        "position": list(pos),
+                        "event_type": action,
+                    })
+                    # Also publish as geofence:enter/exit so the
+                    # NotificationManager picks it up and creates
+                    # a real notification in the alert feed.
+                    self._event_bus.publish(f"geofence:{action}", {
+                        "zone_name": gev.zone_name,
+                        "zone_type": gev.zone_type,
+                        "target_id": f"fusion-{actor.actor_id}",
+                        "source": "fusion_scenario",
+                    })
 
             # 4. Build/update dossier state
             self._update_dossier(actor, pos)

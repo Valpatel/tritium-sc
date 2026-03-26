@@ -3138,24 +3138,34 @@ button:disabled:hover {
     50% { box-shadow: 0 0 20px rgba(255, 42, 109, 0.5), 0 0 40px rgba(255, 42, 109, 0.15); }
 }
 
-/* START DEMO overlay */
+/* START DEMO overlay — centered on map for first-boot prominence */
 .demo-start-overlay {
     position: absolute;
-    bottom: 48px;
+    top: 50%;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translate(-50%, -50%);
     z-index: 44;
     pointer-events: auto;
-    transition: opacity 0.3s;
+    transition: opacity 0.4s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
 }
 .demo-start-overlay.hidden { display: none; }
+.demo-start-tagline {
+    font-size: 0.6rem;
+    letter-spacing: 4px;
+    color: rgba(0, 240, 255, 0.45);
+    text-transform: uppercase;
+}
 .demo-start-btn {
-    font-size: 0.85rem;
-    letter-spacing: 3px;
+    font-size: 0.95rem;
+    letter-spacing: 4px;
     color: #05ffa1;
-    border-color: rgba(5, 255, 161, 0.3);
+    border-color: rgba(5, 255, 161, 0.35);
     background: rgba(5, 255, 161, 0.06);
-    padding: 10px 32px;
+    padding: 12px 40px;
     animation: demo-btn-pulse 2.5s ease-in-out infinite;
 }
 .demo-start-btn:hover {
@@ -3163,6 +3173,22 @@ button:disabled:hover {
     box-shadow: 0 0 20px rgba(5, 255, 161, 0.3), 0 0 40px rgba(5, 255, 161, 0.1);
     color: #05ffa1;
     border-color: rgba(5, 255, 161, 0.5);
+}
+.demo-start-hint {
+    font-size: 0.55rem;
+    letter-spacing: 1px;
+    color: rgba(192, 192, 208, 0.4);
+    text-align: center;
+}
+.demo-start-hint kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    border: 1px solid rgba(0, 240, 255, 0.25);
+    border-radius: 3px;
+    background: rgba(0, 240, 255, 0.06);
+    color: rgba(0, 240, 255, 0.6);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.55rem;
 }
 @keyframes demo-btn-pulse {
     0%, 100% { box-shadow: 0 0 10px rgba(5, 255, 161, 0.2); }

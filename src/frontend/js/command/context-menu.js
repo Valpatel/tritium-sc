@@ -382,10 +382,10 @@ function handleAction(action, gamePos, selectedUnitId) {
 
         case 'investigate_target':
             if (selectedUnitId) {
-                // Open dossiers panel and load this target's dossier
-                EventBus.emit('panel:request-open', { id: 'dossiers' });
+                // Open target dossier panel with focused single-target view
+                EventBus.emit('panel:request-open', { id: 'target-dossier' });
                 setTimeout(() => {
-                    EventBus.emit('dossier:load-target', { target_id: selectedUnitId });
+                    EventBus.emit('target-dossier:open', { target_id: selectedUnitId });
                 }, 200);
             }
             break;

@@ -19,13 +19,14 @@ class TagRequest(BaseModel):
 
 
 def _get_tracker(request: Request):
-    """Get target tracker from Amy, or fall back to simulation engine targets."""
+    """Get target tracker from Amy, or fall back to standalone headless tracker."""
     amy = getattr(request.app.state, "amy", None)
     if amy is not None:
         tracker = getattr(amy, "target_tracker", None)
         if tracker is not None:
             return tracker
-    return None
+    # Headless mode: standalone TargetTracker created without Amy
+    return getattr(request.app.state, "target_tracker", None)
 
 
 def _get_sim_engine(request: Request):
