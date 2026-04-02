@@ -10800,7 +10800,7 @@ function _onCamerasChanged(data) {
                 type: 'circle',
                 source: CAMERA_SOURCE_ID,
                 paint: {
-                    'circle-radius': 18,
+                    'circle-radius': 22,
                     'circle-color': 'transparent',
                     'circle-stroke-width': 3,
                     'circle-stroke-color': [
@@ -10819,7 +10819,7 @@ function _onCamerasChanged(data) {
                 type: 'circle',
                 source: CAMERA_SOURCE_ID,
                 paint: {
-                    'circle-radius': 12,
+                    'circle-radius': 16,
                     'circle-color': [
                         'match', ['get', 'status'],
                         'streaming', '#05ffa1',
@@ -10907,9 +10907,9 @@ function _onCamerasChanged(data) {
                 paint: {
                     'fill-color': [
                         'match', ['get', 'status'],
-                        'streaming', 'rgba(0, 240, 255, 0.10)',
-                        'connecting', 'rgba(252, 238, 10, 0.10)',
-                        'rgba(255, 42, 109, 0.08)',
+                        'streaming', 'rgba(0, 240, 255, 0.25)',
+                        'connecting', 'rgba(252, 238, 10, 0.25)',
+                        'rgba(255, 42, 109, 0.20)',
                     ],
                     'fill-opacity': 0.8,
                 },
@@ -10927,8 +10927,8 @@ function _onCamerasChanged(data) {
                         'connecting', '#fcee0a',
                         '#ff2a6d',
                     ],
-                    'line-width': 1.5,
-                    'line-opacity': 0.6,
+                    'line-width': 2,
+                    'line-opacity': 0.8,
                     'line-dasharray': [4, 3],
                 },
             }, CAMERA_LAYER_GLOW); // insert below the glow layer

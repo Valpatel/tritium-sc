@@ -112,6 +112,7 @@ function _viewMenuItems(panelManager) {
         { header: 'Standalone' },
         { id: 'minimap',    shortcut: 'M' },
         { id: 'layers',     shortcut: '' },
+        { id: 'camera-feeds', shortcut: '' },
         { id: 'city-sim',   shortcut: '' },
         { id: 'units',      shortcut: '2' },
         { id: 'unified-alerts', shortcut: '3' },

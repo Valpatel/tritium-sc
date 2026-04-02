@@ -15,8 +15,10 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
+
+from app.auth import require_auth
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +49,7 @@ def _get_reconstructor(request: Request):
 
 
 @router.post("/reconstruct")
-async def reconstruct(request: Request, body: ReconstructRequest):
+async def reconstruct(request: Request, body: ReconstructRequest, _user: dict = Depends(require_auth)):
     """Reconstruct what happened in a time/area window.
 
     Given a time range and optional geographic bounds, queries all stored
@@ -115,7 +117,7 @@ async def list_reconstructions(request: Request):
 
 
 @router.post("/report")
-async def generate_report(request: Request, body: ReportRequest):
+async def generate_report(request: Request, body: ReportRequest, _user: dict = Depends(require_auth)):
     """Generate a structured incident report from a forensic reconstruction.
 
     The report includes timeline, entity list, sensor coverage map,
