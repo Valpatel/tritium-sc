@@ -15,13 +15,12 @@ Endpoints:
     GET  /api/behavior/stats         — behavior analysis statistics
 """
 
-import math
 import time
 from collections import defaultdict
 from threading import Lock
 
 from fastapi import APIRouter
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/behavior", tags=["behavior"])
 

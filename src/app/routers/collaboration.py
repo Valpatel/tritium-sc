@@ -16,7 +16,7 @@ import re
 import time
 import uuid
 from collections import deque
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query
 from loguru import logger

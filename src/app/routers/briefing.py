@@ -19,11 +19,8 @@ from __future__ import annotations
 import time
 from datetime import datetime, timezone
 from html import escape
-from typing import Optional
-
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
-from loguru import logger
 
 router = APIRouter(prefix="/api/briefing", tags=["briefing"])
 

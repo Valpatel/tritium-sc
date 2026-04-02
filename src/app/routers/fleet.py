@@ -17,7 +17,6 @@ import urllib.error
 import urllib.request
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
 
 from app.auth import require_auth
 from tritium_lib.models.correlation import (

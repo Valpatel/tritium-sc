@@ -15,8 +15,6 @@ Endpoints:
 from __future__ import annotations
 
 import time
-from typing import Optional
-
 from fastapi import APIRouter, Depends, Query, Request
 
 from app.auth import require_auth

@@ -15,13 +15,12 @@ import os
 import sqlite3
 import time
 import uuid
-from typing import Any, Optional
+from typing import Optional
 
 import html
 import re
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
 router = APIRouter(prefix="/api/annotations", tags=["annotations"])

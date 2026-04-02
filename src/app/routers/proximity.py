@@ -11,10 +11,10 @@ Provides REST endpoints for proximity monitoring:
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/proximity", tags=["proximity"])
 

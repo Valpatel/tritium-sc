@@ -12,7 +12,6 @@ from __future__ import annotations
 import time
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import JSONResponse
 
 from app.auth import optional_auth
 

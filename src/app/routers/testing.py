@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from engine.testing.report_generator import TestReportGenerator

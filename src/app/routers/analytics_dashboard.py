@@ -26,8 +26,6 @@ from fastapi.responses import JSONResponse
 from tritium_lib.models.analytics_dashboard import (
     DEFAULT_WIDGETS,
     DashboardWidget,
-    WidgetConfig,
-    WidgetType,
 )
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])

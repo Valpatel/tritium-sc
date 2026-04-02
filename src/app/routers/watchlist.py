@@ -18,7 +18,7 @@ from typing import Any, Optional
 import html
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
 from app.auth import require_auth

@@ -22,9 +22,6 @@ POST /api/v1/ontology/actions/{actionType}/apply       — execute typed action
 from __future__ import annotations
 
 import base64
-import hashlib
-import json
-import time
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request

@@ -14,13 +14,11 @@ Endpoints:
 
 from __future__ import annotations
 
-import io
-import json
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import FileResponse
 from loguru import logger
 from pydantic import BaseModel
 

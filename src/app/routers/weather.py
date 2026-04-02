@@ -13,8 +13,6 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Optional
-
 from fastapi import APIRouter, Query
 
 logger = logging.getLogger("weather")

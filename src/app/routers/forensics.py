@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)

@@ -20,7 +20,6 @@ import time
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Query
-from loguru import logger
 
 from app.audit_middleware import get_audit_store
 from app.auth import require_auth

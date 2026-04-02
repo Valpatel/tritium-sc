@@ -9,11 +9,9 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from loguru import logger
-
 from app.config import settings
 from app.zones.manager import ZoneManager
-from app.zones.models import ZoneType, ZoneEventType
+from app.zones.models import ZoneType
 
 router = APIRouter(prefix="/api/zones", tags=["zones"])
 

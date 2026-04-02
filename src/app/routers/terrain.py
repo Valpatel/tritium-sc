@@ -22,11 +22,10 @@ import logging
 import math
 import time
 from pathlib import Path
-from threading import Lock
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
