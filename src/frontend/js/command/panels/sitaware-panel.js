@@ -5,6 +5,8 @@
 // Shows: target count, alert count, threat level, system health summary.
 // Auto-refreshes every 3 seconds from /api/sitaware/picture.
 
+import { _esc } from '/lib/utils.js';
+
 const REFRESH_MS = 3000;
 
 const THREAT_COLORS = {
@@ -119,13 +121,6 @@ function _renderPicture(data) {
     ` : '';
 
     return stats + threatBar + summaryLine + secondary + healthSection;
-}
-
-function _esc(str) {
-    if (!str) return '';
-    const d = document.createElement('div');
-    d.textContent = String(str);
-    return d.innerHTML;
 }
 
 export const SitAwarePanelDef = {

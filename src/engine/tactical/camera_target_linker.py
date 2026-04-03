@@ -21,6 +21,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from tritium_lib.geo import haversine_distance as _haversine_m
+
 logger = logging.getLogger("camera-target-linker")
 
 
@@ -65,16 +67,6 @@ class DetectionLinkRecord:
             "bbox_area": self.bbox_area,
         }
 
-
-def _haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
-    """Haversine distance in meters between two lat/lng points."""
-    R = 6371000  # Earth radius in meters
-    dlat = math.radians(lat2 - lat1)
-    dlng = math.radians(lng2 - lng1)
-    a = (math.sin(dlat / 2) ** 2 +
-         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
-         math.sin(dlng / 2) ** 2)
-    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
 def _bearing_deg(lat1: float, lng1: float, lat2: float, lng2: float) -> float:

@@ -6,24 +6,24 @@ from .ambient import AmbientSpawner
 from .backstory import BackstoryGenerator
 from tritium_lib.sim_engine.behavior.behaviors import UnitBehaviors
 from tritium_lib.sim_engine.combat.combat import CombatSystem, Projectile
-from .comms import Signal, UnitComms
+from tritium_lib.sim_engine.world.comms import Signal, UnitComms
 from tritium_lib.sim_engine.world.cover import CoverObject, CoverSystem
 from .degradation import DegradationSystem
 from .difficulty import DifficultyScaler, WaveRecord
 from .engine import SimulationEngine
 from .fake_robot import FakeRobot, FakeRobotFleet
 from .game_mode import GameMode, InfiniteWaveMode, WaveConfig, WAVE_CONFIGS
-from .hazards import Hazard, HazardManager
-from .intercept import lead_target, predict_intercept, target_velocity, time_to_intercept
+from tritium_lib.sim_engine.world.hazards import Hazard, HazardManager
+from tritium_lib.sim_engine.world.intercept import lead_target, predict_intercept, target_velocity, time_to_intercept
 from tritium_lib.sim_engine.core.inventory import InventoryItem, UnitInventory, ITEM_CATALOG, build_loadout, select_best_weapon
 from .loader import load_layout, load_zones
-from .lod import LODSystem, LODTier, ViewportState
+from tritium_lib.sim_engine.world.lod import LODSystem, LODTier, ViewportState
 from .morale import MoraleSystem
 from .objectives import ObjectiveTracker
 from tritium_lib.sim_engine.core.movement import MovementController, smooth_path
 from tritium_lib.sim_engine.world.grid_pathfinder import MovementProfile, PROFILES, grid_find_path, profile_for_unit, smooth_path as grid_smooth_path
 from tritium_lib.sim_engine.world.pathfinding import plan_path
-from .pursuit import PursuitSystem
+from tritium_lib.sim_engine.world.pursuit import PursuitSystem
 from .replay import ReplayRecorder
 from .scenario import BattleScenario, DefenderConfig, SpawnGroup, WaveDefinition, load_battle_scenario, spread_defenders
 from tritium_lib.sim_engine.world.sensors import SensorDevice, SensorSimulator
@@ -135,4 +135,7 @@ __all__ = [
     "load_cached",
     "build_loadout",
     "select_best_weapon",
+    "LODSystem",
+    "LODTier",
+    "ViewportState",
 ]
