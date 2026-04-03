@@ -664,6 +664,23 @@ function _createMap(mapDiv) {
             }
         });
         EventBus.on('map:flyToMission', _onPanToMission);
+
+        // Re-sync map coordinate reference when backend changes it
+        // (e.g. demo mode sets geo reference to a different neighborhood).
+        // Without this, YOLO and BLE targets may render at wrong positions
+        // if the page loaded before the demo started.
+        EventBus.on('geo:reference-updated', (data) => {
+            if (data && data.lat && data.lng) {
+                _state.geoCenter = { lat: data.lat, lng: data.lng };
+                _coords.setReference(data.lat, data.lng);
+                console.log(`[MAP-ML] Geo reference updated: ${data.lat.toFixed(6)}, ${data.lng.toFixed(6)}`);
+                // Fly the map to the new reference point so targets are visible
+                if (_state.map) {
+                    _state.map.flyTo({ center: [data.lng, data.lat], zoom: 17, duration: 2000 });
+                }
+            }
+        });
+
         EventBus.on('map:centerOnUnit', _onCenterOnUnit);
         EventBus.on('map:marker', _onDropMarker);
         EventBus.on('map:waypoint', _onDropWaypoint);

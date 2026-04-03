@@ -135,6 +135,89 @@ class TestDemoController:
         # Camera generator ticks at 1s, so should have produced events
         assert "detection:camera" in event_types
 
+    def test_camera_detections_create_yolo_targets(self):
+        """Verify Loop 8 step 5: YOLO detections from cameras create targets.
+
+        The camera detection bridge should convert detection:camera events
+        into geo-located YOLO targets in the TargetTracker, and publish
+        them as sim_telemetry_batch for immediate WebSocket delivery.
+        """
+        from tritium_lib.tracking.target_tracker import TargetTracker
+        from tritium_lib.geo import init_reference
+        import queue as _q
+
+        bus = EventBus()
+        tracker = TargetTracker(event_bus=bus)
+        init_reference(37.7749, -122.4194, 10.0)
+
+        ctrl = DemoController(
+            event_bus=bus,
+            target_tracker=tracker,
+            camera_count=2,
+        )
+        q = bus.subscribe()
+        ctrl.start()
+
+        # Wait for camera generators to produce detections and the bridge
+        # to process them into YOLO targets
+        time.sleep(4.0)
+
+        ctrl.stop()
+
+        # Verify YOLO targets exist in the tracker
+        all_targets = tracker.get_all()
+        yolo_targets = [t for t in all_targets if t.source == "yolo"]
+        assert len(yolo_targets) > 0, (
+            "Camera detection bridge should create YOLO targets from "
+            "detection:camera events — Loop 8 step 5 is broken"
+        )
+
+        # Verify YOLO targets have valid geo positions
+        for t in yolo_targets:
+            d = t.to_dict()
+            assert d["lat"] != 0.0 or d["lng"] != 0.0, (
+                f"YOLO target {d['target_id']} has zero lat/lng — "
+                "geo reference may not be initialized"
+            )
+
+        # Verify sim_telemetry_batch events were published for YOLO targets
+        events = []
+        while True:
+            try:
+                events.append(q.get_nowait())
+            except _q.Empty:
+                break
+        batch_events = [
+            e for e in events if e["type"] == "sim_telemetry_batch"
+        ]
+        assert len(batch_events) > 0, (
+            "Camera detection bridge should publish sim_telemetry_batch "
+            "events so YOLO targets reach WebSocket clients immediately"
+        )
+
+    def test_demo_publishes_geo_reference_updated(self):
+        """Verify demo mode notifies frontend of geo reference change."""
+        import queue as _q
+
+        bus = EventBus()
+        ctrl = DemoController(event_bus=bus, camera_count=1)
+        q = bus.subscribe()
+        ctrl.start()
+
+        events = []
+        while True:
+            try:
+                events.append(q.get_nowait())
+            except _q.Empty:
+                break
+
+        geo_events = [e for e in events if e["type"] == "geo_reference_updated"]
+        assert len(geo_events) == 1, "Demo should publish geo_reference_updated"
+        assert geo_events[0]["data"]["lat"] == 37.7749
+        assert geo_events[0]["data"]["lng"] == -122.4194
+
+        ctrl.stop()
+
     def test_status_reports_generators(self):
         ctrl, _ = self._make_controller(
             ble_device_count=5,

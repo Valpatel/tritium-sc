@@ -535,6 +535,14 @@ export class WebSocketManager extends TritiumWebSocket {
                 EventBus.emit('detection', msg.data || msg);
                 break;
 
+            case 'amy_geo_reference_updated':
+            case 'geo_reference_updated':
+                // Backend changed the geo reference (e.g. demo mode started).
+                // Re-sync the map coordinate transform so YOLO targets render
+                // at the correct position instead of using a stale reference.
+                EventBus.emit('geo:reference-updated', msg.data || msg);
+                break;
+
             case 'projectile_fired':
             case 'amy_projectile_fired':
                 // Route through warHandle* so war-events.js audio hooks fire

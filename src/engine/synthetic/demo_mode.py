@@ -136,6 +136,14 @@ class DemoController:
             from engine.tactical.geo import init_reference
             init_reference(37.7749, -122.4194, 10.0)
             logger.info("Geo reference updated to demo neighborhood (37.7749, -122.4194)")
+            # Notify frontend so it re-syncs its coordinate transform.
+            # Without this, the map may use a stale reference point from
+            # initial page load, causing YOLO targets to render off-screen.
+            self._event_bus.publish("geo_reference_updated", {
+                "lat": 37.7749,
+                "lng": -122.4194,
+                "alt": 10.0,
+            })
         except Exception as e:
             logger.debug("Could not update geo reference for demo: %s", e)
 
@@ -495,6 +503,9 @@ class DemoController:
 
         Uses TargetTracker.update_from_camera_detection() which converts
         normalized pixel coords to game coordinates near the camera lat/lng.
+        After updating the tracker, publishes each YOLO target as a
+        sim_telemetry event so the WebSocket bridge broadcasts it to
+        clients immediately (not waiting for the 2-second tracker poll).
         """
         import queue as _queue
 
@@ -526,6 +537,22 @@ class DemoController:
                     )
                 except Exception as e:
                     logger.debug("Camera detection bridge error: %s", e)
+
+            # Publish updated YOLO targets as sim_telemetry so the WS
+            # bridge delivers them to browsers immediately.  Without this,
+            # camera-sourced targets only reach the frontend via the
+            # 2-second tracker broadcast cycle, causing a visible delay
+            # and potential gaps that make Loop 8 step 5 appear broken.
+            try:
+                yolo_targets = [
+                    t for t in self._target_tracker.get_all()
+                    if t.source == "yolo"
+                ]
+                if yolo_targets:
+                    batch = [t.to_dict() for t in yolo_targets]
+                    self._event_bus.publish("sim_telemetry_batch", batch)
+            except Exception:
+                pass
 
     # -- Fleet heartbeat generator for fleet dashboard demo ----------------
 
