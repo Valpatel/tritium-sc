@@ -81,8 +81,8 @@ function _fileMenuItems(layoutManager) {
 
 // Panel categories — group all panels into logical sections
 const PANEL_CATEGORIES = {
-    'Operations':     ['tactical-container', 'ops-dashboard', 'units', 'unit-inspector', 'unified-alerts', 'escalation', 'missions', 'patrol', 'zone-manager', 'minimap', 'layers', 'bookmarks', 'annotations', 'watchlist', 'swarm-coordination', 'convoy', 'fleet-container', 'fleet-dashboard', 'device-manager', 'assets', 'command-history', 'edge-intelligence', 'edge-diagnostics', 'training-dashboard', 'ar-export'],
-    'Intel':          ['intelligence-container', 'search', 'dossiers', 'dossier-groups', 'graph-explorer', 'graphlings', 'timeline', 'target-compare', 'target-merge', 'heatmap', 'automation', 'analytics-panel', 'dwell-monitor', 'behavioral-intelligence', 'reid-matches', 'lpr', 'fusion-dashboard', 'acoustic-intelligence', 'activity-feed', 'trail-export', 'forensics', 'enrichment'],
+    'Operations':     ['tactical-container', 'ops-dashboard', 'units', 'unit-inspector', 'unified-alerts', 'escalation', 'missions', 'patrol', 'zone-manager', 'sitrep', 'minimap', 'layers', 'bookmarks', 'annotations', 'watchlist', 'swarm-coordination', 'convoy', 'fleet-container', 'fleet-dashboard', 'device-manager', 'assets', 'command-history', 'edge-intelligence', 'edge-diagnostics', 'training-dashboard', 'ar-export'],
+    'Intel':          ['intelligence-container', 'search', 'dossiers', 'dossier-groups', 'graph-explorer', 'graphlings', 'timeline', 'target-compare', 'target-merge', 'heatmap', 'automation', 'analytics-panel', 'history-analytics', 'classification-override', 'dwell-monitor', 'behavioral-intelligence', 'reid-matches', 'lpr', 'fusion-dashboard', 'acoustic-intelligence', 'activity-feed', 'trail-export', 'forensics', 'enrichment'],
     'Sensing':        ['sensors-container', 'edge-tracker', 'camera-feeds', 'cameras', 'multi-camera', 'rf-motion', 'hackrf', 'sensors', 'sensor-health', 'wifi-fingerprint', 'indoor-positioning', 'radar-scope', 'sdr-waterfall', 'adsb-table'],
     'Communications': ['comms-container', 'meshtastic', 'tak', 'mqtt-inspector', 'federation', 'audio', 'voice-command', 'notifications', 'notification-prefs'],
     'Commander':      ['commander-container', 'amy', 'amy-conversation'],
@@ -118,6 +118,11 @@ function _viewMenuItems(panelManager) {
         { id: 'unified-alerts', shortcut: '3' },
         { id: 'game',       shortcut: '4' },
         { id: 'search',     shortcut: '7' },
+        { separator: true },
+        { header: 'Tactical' },
+        { id: 'sitrep',    shortcut: '' },
+        { id: 'history-analytics', shortcut: '' },
+        { id: 'classification-override', shortcut: '' },
     ];
 
     for (const entry of menuEntries) {
