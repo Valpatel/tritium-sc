@@ -137,6 +137,8 @@ import { ArExportPanelDef } from './panels/ar-export-panel.js';
 import { SitrepPanelDef } from './panels/sitrep-panel.js';
 import { HistoryAnalyticsPanelDef } from './panels/history-analytics-panel.js';
 import { ClassificationOverridePanelDef } from './panels/classification-override-panel.js';
+import { RlMetricsPanelDef } from './panels/rl-metrics.js';
+import { OntologyExplorerPanelDef } from './panels/ontology-explorer-panel.js';
 import { loadAddons } from './addon-loader.js';
 import { PredictionEllipseManager } from './prediction-ellipses.js';
 import { initScreenshotHotkey } from './panels/map-screenshot.js';
@@ -907,6 +909,8 @@ function initPanelSystem(container) {
     panelManager.register(SitrepPanelDef);
     panelManager.register(HistoryAnalyticsPanelDef);
     panelManager.register(ClassificationOverridePanelDef);
+    panelManager.register(RlMetricsPanelDef);
+    panelManager.register(OntologyExplorerPanelDef);
 
     // Dynamically load addon panels from /api/addons/manifests
     loadAddons(panelManager).catch(err => {

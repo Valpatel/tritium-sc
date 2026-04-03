@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from tritium_lib.intelligence.base_learner import BaseLearner
+from tritium_lib.intelligence.rl_metrics import RLMetrics
 
 logger = logging.getLogger("correlation_learner")
 
@@ -72,6 +73,9 @@ class CorrelationLearner(BaseLearner):
         self._feature_importances: dict[str, float] = {}
         self._best_params: dict[str, Any] = {}
 
+        # RL metrics tracker — used by /api/intelligence/rl-metrics endpoint
+        self._rl_metrics = RLMetrics()
+
         # Try to load existing model
         self.load()
 
@@ -100,6 +104,7 @@ class CorrelationLearner(BaseLearner):
         if not self._sklearn_available:
             return {"success": False, "error": "scikit-learn not available, using static weights"}
 
+        _train_start = time.time()
         try:
             # Get confirmed correlation decisions
             data = self._training_store.get_correlation_data(
@@ -213,6 +218,16 @@ class CorrelationLearner(BaseLearner):
                 accuracy, len(X), best_params,
             )
 
+            # Record training in RL metrics tracker
+            train_duration = time.time() - _train_start
+            self._rl_metrics.record_training(
+                accuracy=accuracy,
+                training_count=len(X),
+                feature_importance=importances,
+                model_name=self.name,
+                duration_s=train_duration,
+            )
+
             return {
                 "success": True,
                 "accuracy": accuracy,
@@ -236,7 +251,14 @@ class CorrelationLearner(BaseLearner):
             (probability, confidence) tuple.
         """
         if self._model is None:
-            return _static_predict(features)
+            probability, confidence = _static_predict(features)
+            # Record prediction in RL metrics (static fallback)
+            self._rl_metrics.record_prediction(
+                predicted_class=1 if probability >= 0.5 else 0,
+                probability=probability,
+                model_name=self.name,
+            )
+            return probability, confidence
 
         try:
             import numpy as np
@@ -245,9 +267,19 @@ class CorrelationLearner(BaseLearner):
             proba = self._model.predict_proba(np.array(X))[0]
             probability = float(proba[1]) if len(proba) > 1 else float(proba[0])
             confidence = min(1.0, abs(probability - 0.5) * 2.0)
+            # Record prediction in RL metrics
+            self._rl_metrics.record_prediction(
+                predicted_class=1 if probability >= 0.5 else 0,
+                probability=probability,
+                model_name=self.name,
+            )
             return probability, confidence
         except Exception:
             return _static_predict(features)
+
+    def record_feedback(self, correct: bool) -> None:
+        """Record feedback on a recent prediction for RL tracking."""
+        self._rl_metrics.record_feedback(correct=correct, model_name=self.name)
 
     def get_scorer(self) -> Any:
         """Return a tritium-lib CorrelationScorer wrapping this model.

@@ -334,12 +334,20 @@ def _template_description(anomaly_type: str, context: dict[str, Any]) -> str:
 
 
 @router.get("/rl-metrics")
-async def rl_metrics(request: Request):
+async def rl_metrics(
+    request: Request,
+    model: Optional[str] = Query(None, description="Filter by model name"),
+    max_points: int = Query(50, ge=1, le=200, description="Max trend data points"),
+):
     """RL training metrics — model accuracy trends, feature importance,
     training data growth, and prediction distribution.
 
     Attempts to load RLMetrics from the correlation learner pipeline.
     Returns a default "no data" response when metrics are unavailable.
+
+    Optional query params:
+        model: filter accuracy trend / feature importance to a specific model
+        max_points: limit trend data points (default 50)
     """
     try:
         from tritium_lib.intelligence.rl_metrics import RLMetrics
@@ -354,11 +362,47 @@ async def rl_metrics(request: Request):
             pass
 
         if rl is not None:
-            return {
+            export = rl.export()
+
+            # If a specific model is requested, include filtered views
+            result: dict[str, Any] = {
                 "status": "running",
                 "available": True,
-                **rl.get_status(),
+                **export["status"],
+                "models_detail": export.get("models_detail", {}),
+                "training_history_size": export.get("training_history_size", 0),
+                "prediction_history_size": export.get("prediction_history_size", 0),
+                "export_timestamp": export.get("export_timestamp", 0),
             }
+
+            if model:
+                result["accuracy_trend"] = rl.get_accuracy_trend(
+                    model_name=model, max_points=max_points,
+                )
+                result["training_growth"] = rl.get_training_data_growth(
+                    model_name=model, max_points=max_points,
+                )
+                result["feature_importance"] = rl.get_feature_importance(
+                    model_name=model,
+                )
+
+            # Also include learner status for the combined view
+            try:
+                from engine.intelligence.correlation_learner import get_correlation_learner
+                lr = get_correlation_learner()
+                lr_status = lr.get_status()
+                result["learner"] = {
+                    "trained": lr_status.get("trained", False),
+                    "accuracy": lr_status.get("accuracy", 0.0),
+                    "training_count": lr_status.get("training_count", 0),
+                    "sklearn_available": lr_status.get("sklearn_available", False),
+                    "feature_names": lr_status.get("feature_names", []),
+                    "best_params": lr_status.get("best_params", {}),
+                }
+            except Exception:
+                pass
+
+            return result
 
         return {
             "status": "stopped",
@@ -367,6 +411,7 @@ async def rl_metrics(request: Request):
             "total_predictions": 0,
             "overall_accuracy": 0.0,
             "models": {},
+            "models_detail": {},
         }
     except Exception as exc:
         logger.error("RL metrics endpoint failed: %s", exc)
