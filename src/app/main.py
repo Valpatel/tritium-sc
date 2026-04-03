@@ -1371,7 +1371,10 @@ elif settings.auth_enabled:
         "restricting to localhost. Set CORS_ALLOWED_ORIGINS for remote access."
     )
 else:
-    # Dev mode (auth disabled) — allow everything
+    # Dev mode (auth disabled) — allow everything.
+    # NOTE: Starlette reflects Origin header when origins=["*"] +
+    # credentials=True, so any site can make credentialed cross-origin
+    # requests.  Acceptable here because auth is disabled (dev mode).
     _cors_origins = ["*"]
 app.add_middleware(
     CORSMiddleware,

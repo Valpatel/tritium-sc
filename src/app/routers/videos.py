@@ -338,10 +338,19 @@ async def get_thumbnail_by_path(path: str, frame: int = 0):
     import cv2
 
     # Sanitize path to prevent directory traversal
-    if ".." in path:
+    if ".." in path or "\x00" in path:
         raise HTTPException(status_code=400, detail="Invalid path")
 
-    video_path = settings.recordings_path / path
+    if path.startswith("/"):
+        raise HTTPException(status_code=400, detail="Invalid path")
+
+    video_path = (settings.recordings_path / path).resolve()
+
+    # Verify resolved path is still within the recordings root
+    recordings_root = settings.recordings_path.resolve()
+    if not video_path.is_relative_to(recordings_root):
+        raise HTTPException(status_code=400, detail="Invalid path")
+
     if not video_path.exists():
         raise HTTPException(status_code=404, detail="Video not found")
 
