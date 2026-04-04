@@ -6,6 +6,20 @@
 // prediction distribution, and training data growth. Fetches from
 // /api/intelligence/rl-metrics endpoint.
 
+/** Escape HTML special characters to prevent XSS in innerHTML contexts. */
+function _escHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+}
+
+/** Escape a value for use inside an HTML attribute (double-quoted). */
+function _escAttr(text) {
+    if (!text) return '';
+    return String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 export const RlMetricsPanelDef = {
     id: 'rl-metrics',
     title: 'RL METRICS',
@@ -260,7 +274,7 @@ export const RlMetricsPanelDef = {
                 const pct = Math.round((Math.abs(val) / maxVal) * 100);
                 const color = val >= 0 ? '#00f0ff' : '#ff2a6d';
                 return `<div class="rl-feat-bar">
-                    <div class="rl-feat-name" title="${name}">${name}</div>
+                    <div class="rl-feat-name" title="${_escAttr(name)}">${_escHtml(name)}</div>
                     <div style="flex:1;background:#12121a;height:10px;border-radius:1px;">
                         <div class="rl-feat-fill" style="width:${pct}%;background:${color};"></div>
                     </div>
