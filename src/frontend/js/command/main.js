@@ -139,6 +139,9 @@ import { HistoryAnalyticsPanelDef } from './panels/history-analytics-panel.js';
 import { ClassificationOverridePanelDef } from './panels/classification-override-panel.js';
 import { RlMetricsPanelDef } from './panels/rl-metrics.js';
 import { OntologyExplorerPanelDef } from './panels/ontology-explorer-panel.js';
+import { MovementAnalyticsPanelDef } from './panels/movement-analytics.js';
+import { SimEngineStatusPanelDef } from './panels/sim-engine-status.js';
+import { SystemInventoryPanelDef } from './panels/system-inventory.js';
 import { loadAddons } from './addon-loader.js';
 import { PredictionEllipseManager } from './prediction-ellipses.js';
 import { initScreenshotHotkey } from './panels/map-screenshot.js';
@@ -933,6 +936,9 @@ function initPanelSystem(container) {
     panelManager.register(ClassificationOverridePanelDef);
     panelManager.register(RlMetricsPanelDef);
     panelManager.register(OntologyExplorerPanelDef);
+    panelManager.register(MovementAnalyticsPanelDef);
+    panelManager.register(SimEngineStatusPanelDef);
+    panelManager.register(SystemInventoryPanelDef);
 
     // Dynamically load addon panels from /api/addons/manifests
     loadAddons(panelManager).catch(err => {

@@ -580,6 +580,11 @@ function _createMap(mapDiv) {
                 }
             }
         });
+        EventBus.on('city-sim:set-color-mode', (mode) => {
+            if (_state.citySim) {
+                _state.citySim.setColorMode(mode);
+            }
+        });
         // Protest lifecycle events → Commander alerts (Amy or any commander plugin)
         EventBus.on('city-sim:protest-phase', (data) => {
             const narratives = {

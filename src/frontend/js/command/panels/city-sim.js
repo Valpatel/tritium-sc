@@ -134,6 +134,15 @@ export const CitySimPanelDef = {
                 </div>
             </div>
 
+            <div class="csim-section">
+                <div class="csim-section-title mono">VEHICLE COLORS</div>
+                <div class="csim-color-modes">
+                    <button class="csim-color-btn csim-color-active" data-color-mode="default">DEFAULT</button>
+                    <button class="csim-color-btn" data-color-mode="speed">SPEED</button>
+                    <button class="csim-color-btn" data-color-mode="purpose">PURPOSE</button>
+                </div>
+            </div>
+
             <div class="csim-actions">
                 <button class="panel-action-btn panel-action-btn-primary" data-action="toggle-sim">START SIM</button>
                 <button class="panel-action-btn" data-action="add-vehicles">+10 CARS</button>
@@ -164,6 +173,17 @@ export const CitySimPanelDef = {
                 max-height: 60px; overflow-y: auto; font-size: 10px; color: #ff2a6d;
                 margin-top: 4px;
             }
+            .csim-color-modes {
+                display: flex; gap: 4px;
+            }
+            .csim-color-btn {
+                flex: 1; padding: 3px 4px; font-size: 9px; font-family: inherit;
+                background: #111; color: #666; border: 1px solid #333; cursor: pointer;
+            }
+            .csim-color-btn:hover { color: #00f0ff; border-color: #00f0ff; }
+            .csim-color-btn.csim-color-active {
+                color: #00f0ff; border-color: #00f0ff; background: #00f0ff11;
+            }
         `;
         el.appendChild(style);
 
@@ -192,6 +212,17 @@ export const CitySimPanelDef = {
                 EventBus.emit('city-sim:load-scenario', e.target.value);
             }
         });
+
+        // Color mode toggle buttons
+        for (const btn of el.querySelectorAll('.csim-color-btn')) {
+            btn.addEventListener('click', () => {
+                const mode = btn.dataset.colorMode;
+                EventBus.emit('city-sim:set-color-mode', mode);
+                for (const b of el.querySelectorAll('.csim-color-btn')) {
+                    b.classList.toggle('csim-color-active', b.dataset.colorMode === mode);
+                }
+            });
+        }
 
         // Clean up any previous interval (prevent leak on reopen)
         if (panel._csimInterval) clearInterval(panel._csimInterval);

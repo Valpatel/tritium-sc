@@ -367,6 +367,11 @@ export function initMap() {
                 }
             }
         }),
+        EventBus.on('city-sim:set-color-mode', (mode) => {
+            if (_state.citySim) {
+                _state.citySim.setColorMode(mode);
+            }
+        }),
         EventBus.on('unit:dispatch-mode', _onDispatchMode),
         EventBus.on('unit:dispatched', _onDispatched),
     );

@@ -476,3 +476,178 @@ class TestCitySimRoutes:
         r2 = client.get("/api/city-sim/demo-city?radius=200&seed=99").json()
         # Different seeds should produce different building counts or layouts
         assert r1["buildings"] != r2["buildings"]
+
+
+# ---------------------------------------------------------------------------
+# Traffic State API (server-side IDM/MOBIL TrafficManager)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestTrafficStateAPI:
+    """Test the /api/city-sim/traffic-state/* endpoints."""
+
+    def _make_app(self):
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent / "plugins"))
+        from city_sim.routes import create_router
+        from city_sim.plugin import CitySimPlugin
+        app = FastAPI()
+        plugin = CitySimPlugin()
+        router = create_router(plugin)
+        app.include_router(router)
+        return app, plugin
+
+    def test_traffic_state_no_manager(self):
+        """GET traffic-state without init returns informational response."""
+        app, _ = self._make_app()
+        client = TestClient(app)
+        resp = client.get("/api/city-sim/traffic-state")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "no_server_sim"
+        assert data["vehicle_count"] == 0
+
+    def test_traffic_state_init(self):
+        """POST init creates a TrafficManager with edges."""
+        app, plugin = self._make_app()
+        client = TestClient(app)
+        resp = client.post("/api/city-sim/traffic-state/init", json={
+            "edges": [
+                {
+                    "edge_id": "e1",
+                    "from_node": "n1",
+                    "to_node": "n2",
+                    "length": 100,
+                    "ax": 0, "az": 0,
+                    "bx": 100, "bz": 0,
+                    "lanes_per_dir": 2,
+                    "road_class": "residential",
+                },
+            ],
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "initialized"
+        assert data["edge_count"] == 1
+        assert hasattr(plugin, "_traffic_manager")
+
+    def test_traffic_state_init_no_edges(self):
+        """Init with empty edges returns 400."""
+        app, _ = self._make_app()
+        client = TestClient(app)
+        resp = client.post("/api/city-sim/traffic-state/init", json={"edges": []})
+        assert resp.status_code == 400
+
+    def test_traffic_state_spawn_and_query(self):
+        """Spawn vehicles and query traffic state."""
+        app, plugin = self._make_app()
+        client = TestClient(app)
+
+        # Init
+        client.post("/api/city-sim/traffic-state/init", json={
+            "edges": [
+                {
+                    "edge_id": "e1",
+                    "from_node": "n1",
+                    "to_node": "n2",
+                    "length": 200,
+                    "ax": 0, "az": 0,
+                    "bx": 200, "bz": 0,
+                    "lanes_per_dir": 1,
+                    "road_class": "primary",
+                },
+            ],
+        })
+
+        # Spawn
+        resp = client.post("/api/city-sim/traffic-state/spawn", json={
+            "edge_id": "e1",
+            "count": 3,
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["spawned"] == 3
+        assert data["total"] == 3
+        assert len(data["vehicle_ids"]) == 3
+
+        # Query state
+        resp = client.get("/api/city-sim/traffic-state")
+        assert resp.status_code == 200
+        state = resp.json()
+        assert state["vehicle_count"] == 3
+        assert len(state["vehicles"]) == 3
+        # Verify enhanced fields
+        v = state["vehicles"][0]
+        assert "braking" in v
+        assert "brakeIntensity" in v
+        assert "laneChanging" in v
+        assert "turnSignal" in v
+        assert "speedRatio" in v
+        assert "desiredSpeed" in v
+
+    def test_traffic_state_tick(self):
+        """Tick advances vehicles."""
+        app, plugin = self._make_app()
+        client = TestClient(app)
+
+        # Init + spawn
+        client.post("/api/city-sim/traffic-state/init", json={
+            "edges": [
+                {
+                    "edge_id": "e1",
+                    "from_node": "n1",
+                    "to_node": "n2",
+                    "length": 500,
+                    "ax": 0, "az": 0,
+                    "bx": 500, "bz": 0,
+                },
+            ],
+        })
+        client.post("/api/city-sim/traffic-state/spawn", json={
+            "edge_id": "e1", "u": 10, "count": 1,
+        })
+
+        # Get initial state
+        before = client.get("/api/city-sim/traffic-state").json()
+        v_before = before["vehicles"][0]
+
+        # Tick 10 steps
+        resp = client.post("/api/city-sim/traffic-state/tick", json={
+            "dt": 0.1, "steps": 10,
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["steps"] == 10
+        assert data["vehicle_count"] == 1
+
+        # Vehicle should have moved
+        after = client.get("/api/city-sim/traffic-state").json()
+        v_after = after["vehicles"][0]
+        assert v_after["speed"] >= v_before["speed"]  # accelerated from stop
+
+    def test_traffic_state_spawn_no_manager(self):
+        """Spawn without init returns 400."""
+        app, _ = self._make_app()
+        client = TestClient(app)
+        resp = client.post("/api/city-sim/traffic-state/spawn", json={"count": 1})
+        assert resp.status_code == 400
+
+    def test_traffic_state_spawn_random_edges(self):
+        """Spawn without edge_id picks random edges."""
+        app, plugin = self._make_app()
+        client = TestClient(app)
+
+        # Init with 3 edges
+        client.post("/api/city-sim/traffic-state/init", json={
+            "edges": [
+                {"edge_id": f"e{i}", "from_node": f"n{i}", "to_node": f"n{i+1}",
+                 "length": 100, "ax": 0, "az": 0, "bx": 100, "bz": 0}
+                for i in range(3)
+            ],
+        })
+
+        resp = client.post("/api/city-sim/traffic-state/spawn", json={"count": 5})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["spawned"] == 5
+        assert data["total"] == 5

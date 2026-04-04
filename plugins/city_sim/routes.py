@@ -222,4 +222,169 @@ def create_router(plugin: "CitySimPlugin") -> APIRouter:
 
         return {"accepted": len(batch)}
 
+    @router.get("/traffic-state")
+    async def get_traffic_state():
+        """Get current traffic state from the Python TrafficManager.
+
+        Returns vehicle positions, speeds, lane info, and IDM/MOBIL state.
+        Used for server-side simulation monitoring, analytics dashboards,
+        and hybrid client/server traffic simulation.
+        """
+        try:
+            from tritium_lib.sim_engine.traffic import TrafficManager  # noqa: F401
+        except ImportError:
+            return JSONResponse(
+                status_code=501,
+                content={"error": "tritium_lib.sim_engine.traffic not available"},
+            )
+
+        mgr = getattr(plugin, "_traffic_manager", None)
+        if mgr is None:
+            return {
+                "status": "no_server_sim",
+                "message": (
+                    "Traffic simulation runs client-side in the browser. "
+                    "Use /api/city-sim/telemetry to receive frontend positions."
+                ),
+                "vehicle_count": 0,
+                "vehicles": [],
+            }
+
+        return mgr.to_dict()
+
+    @router.post("/traffic-state/init")
+    async def init_traffic_state(body: dict):
+        """Initialize a server-side TrafficManager from road edge data.
+
+        Body: { "edges": [{ "edge_id": "...", "from_node": "...",
+                "to_node": "...", "length": 100,
+                "ax": 0, "az": 0, "bx": 100, "bz": 0,
+                "lanes_per_dir": 1, "road_class": "residential" }] }
+        """
+        try:
+            from tritium_lib.sim_engine.traffic import RoadEdge, TrafficManager
+        except ImportError:
+            return JSONResponse(
+                status_code=501,
+                content={
+                    "error": "tritium_lib.sim_engine.traffic not available"
+                },
+            )
+
+        edges_data = body.get("edges", [])
+        if not edges_data:
+            return JSONResponse(
+                status_code=400, content={"error": "no edges provided"}
+            )
+
+        mgr = TrafficManager()
+        for ed in edges_data:
+            edge = RoadEdge(
+                edge_id=ed.get("edge_id", ""),
+                from_node=ed.get("from_node", ""),
+                to_node=ed.get("to_node", ""),
+                length=float(ed.get("length", 100)),
+                ax=float(ed.get("ax", 0)),
+                az=float(ed.get("az", 0)),
+                bx=float(ed.get("bx", 0)),
+                bz=float(ed.get("bz", 0)),
+                lanes_per_dir=int(ed.get("lanes_per_dir", 1)),
+                road_class=ed.get("road_class", "residential"),
+            )
+            mgr.add_edge(edge)
+
+        plugin._traffic_manager = mgr
+        return {
+            "status": "initialized",
+            "edge_count": len(mgr.edges),
+        }
+
+    @router.post("/traffic-state/spawn")
+    async def spawn_traffic_vehicle(body: dict):
+        """Spawn a vehicle in the server-side TrafficManager.
+
+        Body: { "edge_id": "...", "u": 0, "direction": 1,
+                "subtype": "sedan", "count": 1 }
+        """
+        mgr = getattr(plugin, "_traffic_manager", None)
+        if mgr is None:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": (
+                        "TrafficManager not initialized. "
+                        "Call /traffic-state/init first."
+                    )
+                },
+            )
+
+        edge_id = body.get("edge_id")
+        count = body.get("count", 1)
+        spawned = []
+
+        if edge_id:
+            for _ in range(count):
+                try:
+                    car = mgr.spawn_vehicle(
+                        edge_id=edge_id,
+                        u=float(body.get("u", 0)),
+                        direction=int(body.get("direction", 1)),
+                        subtype=body.get("subtype"),
+                    )
+                    spawned.append(car.vehicle_id)
+                except KeyError as e:
+                    return JSONResponse(
+                        status_code=400, content={"error": str(e)}
+                    )
+        else:
+            import random
+
+            edge_ids = list(mgr.edges.keys())
+            if not edge_ids:
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "no edges in manager"},
+                )
+            for _ in range(count):
+                eid = random.choice(edge_ids)
+                edge = mgr.edges[eid]
+                car = mgr.spawn_vehicle(
+                    edge_id=eid,
+                    u=random.random() * edge.length * 0.8,
+                    subtype=body.get("subtype"),
+                )
+                spawned.append(car.vehicle_id)
+
+        return {
+            "spawned": len(spawned),
+            "vehicle_ids": spawned,
+            "total": mgr.vehicle_count,
+        }
+
+    @router.post("/traffic-state/tick")
+    async def tick_traffic(body: dict):
+        """Advance the server-side TrafficManager by dt seconds.
+
+        Body: { "dt": 0.1, "steps": 1 }
+        """
+        mgr = getattr(plugin, "_traffic_manager", None)
+        if mgr is None:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "TrafficManager not initialized"},
+            )
+
+        dt = float(body.get("dt", 0.1))
+        steps = int(body.get("steps", 1))
+        transitioned = []
+        for _ in range(steps):
+            transitioned.extend(mgr.tick(dt))
+
+        return {
+            "steps": steps,
+            "dt": dt,
+            "transitioned": len(transitioned),
+            "vehicle_count": mgr.vehicle_count,
+        }
+
     return router

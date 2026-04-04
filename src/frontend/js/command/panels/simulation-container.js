@@ -24,6 +24,7 @@
 
 import { createTabbedContainer } from './tabbed-container.js';
 import { CitySimPanelDef } from './city-sim.js';
+import { SimEngineStatusPanelDef } from './sim-engine-status.js';
 
 // Self-registering tab modules
 import './tabs/sim-modes-tab.js';
@@ -43,6 +44,18 @@ function createCitySimTab(el) {
     el._mockPanel = mockPanel;
 }
 
+// Re-export sim engine status as a tab
+function createSimEngineTab(el) {
+    const mockPanel = { _seTimer: null };
+    const content = SimEngineStatusPanelDef.create(mockPanel);
+    if (content instanceof HTMLElement) {
+        el.appendChild(content);
+    }
+    // Mount the panel to start fetching data
+    SimEngineStatusPanelDef.mount(el, mockPanel);
+    el._mockPanel = mockPanel;
+}
+
 export const SimulationContainerDef = createTabbedContainer(
     'simulation-container',
     'SIMULATION',
@@ -54,6 +67,16 @@ export const SimulationContainerDef = createTabbedContainer(
             unmount(el) {
                 if (el._mockPanel && CitySimPanelDef.unmount) {
                     CitySimPanelDef.unmount(el._mockPanel);
+                }
+            },
+        },
+        {
+            id: 'sim-engine-tab',
+            title: 'ENGINE',
+            create: createSimEngineTab,
+            unmount(el) {
+                if (el._mockPanel && SimEngineStatusPanelDef.unmount) {
+                    SimEngineStatusPanelDef.unmount(el, el._mockPanel);
                 }
             },
         },
