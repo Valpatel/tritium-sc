@@ -193,6 +193,12 @@ export class WebSocketManager extends TritiumWebSocket {
                 for (const t of targets) {
                     this._updateUnit(t);
                 }
+                // Flush any pending RAF-batched notifications immediately so
+                // that the target-counter (and other subscribers) see the full
+                // unit set from the initial fetch without waiting for the next
+                // animation frame.  Fixes "0 targets" on initial page load
+                // when the counter init runs before the WS fetch completes.
+                TritiumStore.flushNotify();
             }
         } catch (e) {
             console.warn('[WS] State refresh failed:', e);
