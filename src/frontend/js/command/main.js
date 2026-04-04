@@ -249,14 +249,27 @@ function init() {
     });
 
     // Game state updates (header + game over overlay + auto-fog + auto-panels)
+    // Track whether a battle was started in THIS browser session so we don't
+    // show a stale VICTORY/DEFEAT overlay from a previous game on page load.
+    let _battleStartedThisSession = false;
     TritiumStore.on('game.phase', (phase) => {
         // Show/hide game score in header
         const scoreArea = document.getElementById('game-score-area');
         if (scoreArea) scoreArea.hidden = (phase === 'idle' || phase === 'setup' || !phase);
 
-        // Game over overlay
+        // Mark that a battle was started in this session
+        if (phase === 'countdown' || phase === 'active') {
+            _battleStartedThisSession = true;
+        }
+
+        // Game over overlay — only show if the battle ran in this session
         if (phase === 'victory' || phase === 'defeat') {
-            showGameOver(phase);
+            if (_battleStartedThisSession) {
+                showGameOver(phase);
+            } else {
+                // Stale game-over from previous session — auto-reset
+                fetch('/api/game/reset', { method: 'POST' }).catch(() => {});
+            }
         } else if (phase === 'idle' || phase === 'setup') {
             // Dismiss game-over overlay on reset
             const goOverlay = document.getElementById('game-over-overlay');
@@ -267,6 +280,15 @@ function init() {
         // so the operator can see wave/score/elimination stats and kill feed
         if ((phase === 'countdown' || phase === 'active') && panelManager && !panelManager.isOpen('game')) {
             panelManager.open('game');
+        }
+
+        // Auto-enable kill feed during combat so players see eliminations
+        if (phase === 'countdown' || phase === 'active') {
+            const ms = getMapState();
+            if (!ms.showKillFeed) toggleKillFeed();
+        } else if (phase === 'idle' || phase === 'setup') {
+            const ms = getMapState();
+            if (ms.showKillFeed) toggleKillFeed();
         }
 
         // Auto-enable fog of war during battle, disable when idle
