@@ -10892,8 +10892,14 @@ function _onCamerasChanged(data) {
                 },
             });
 
-            // Click to fly and open camera panel
+            // Click to fly and open camera panel (skip if drag just ended)
             _state.map.on('click', CAMERA_LAYER_CIRCLE, (e) => {
+                // After a drag, _cameraDragJustEnded is set briefly to
+                // prevent the click from opening the panel.
+                if (_cameraDragJustEnded) {
+                    _cameraDragJustEnded = false;
+                    return;
+                }
                 if (e.features && e.features.length > 0) {
                     const props = e.features[0].properties;
                     const coords = e.features[0].geometry.coordinates;
@@ -10904,14 +10910,6 @@ function _onCamerasChanged(data) {
                         EventBus.emit('camera:selected', { id: props.id, name: props.name });
                     }, 200);
                 }
-            });
-
-            // Pointer cursor on hover
-            _state.map.on('mouseenter', CAMERA_LAYER_CIRCLE, () => {
-                _state.map.getCanvas().style.cursor = 'pointer';
-            });
-            _state.map.on('mouseleave', CAMERA_LAYER_CIRCLE, () => {
-                _state.map.getCanvas().style.cursor = '';
             });
         }
 
@@ -10960,6 +10958,10 @@ function _onCamerasChanged(data) {
         return;
     }
     console.log(`[MAP-ML] Camera markers rendered: ${cameras.length} marker(s), ${fovFeatures.length} FOV cone(s)`);
+
+    // Store camera data for drag-to-reposition and init drag handlers
+    _storeCamerasForDrag(cameras);
+    _initCameraDrag();
 }
 
 // ── Camera Click-to-Place ───────────────────────────────────────────────
@@ -10994,6 +10996,226 @@ function _onCameraPickLocation(data) {
             _state.map.getCanvas().style.cursor = '';
         }
     }, 30000);
+}
+
+// ── Camera Drag-to-Reposition ─────────────────────────────────────────
+// Allows the user to drag camera markers on the map to reposition them.
+// On dragend the new lat/lng is PATCHed to the camera-feeds plugin API
+// and the FOV cone is updated to match the new position.
+// UX Loop 8, Step 7: drag-to-reposition camera on map.
+
+let _cameraDrag = {
+    active: false,
+    cameraId: null,
+    startLngLat: null,
+    cameras: [],       // last camera list from _onCamerasChanged
+};
+let _cameraDragJustEnded = false;
+
+/**
+ * Store the latest cameras array so drag can update individual features.
+ * Called from _onCamerasChanged after successful render.
+ */
+function _storeCamerasForDrag(cameras) {
+    _cameraDrag.cameras = cameras.map(c => ({ ...c }));
+}
+
+/**
+ * Initialise drag-to-reposition handlers on the camera circle layer.
+ * Called once after the camera layers are first created.
+ */
+let _cameraDragInitialised = false;
+
+function _initCameraDrag() {
+    if (_cameraDragInitialised || !_state.map) return;
+    _cameraDragInitialised = true;
+
+    const canvas = _state.map.getCanvas();
+
+    // ── mousedown on camera circle: start drag ──
+    _state.map.on('mousedown', CAMERA_LAYER_CIRCLE, (e) => {
+        if (!e.features || e.features.length === 0) return;
+
+        // Prevent default map drag (pan)
+        e.preventDefault();
+
+        const feature = e.features[0];
+        const camId = feature.properties.id;
+        const coords = feature.geometry.coordinates;
+
+        _cameraDrag.active = true;
+        _cameraDrag.cameraId = camId;
+        _cameraDrag.startLngLat = { lng: coords[0], lat: coords[1] };
+
+        // Disable map drag interaction while we drag the camera
+        _state.map.dragPan.disable();
+
+        canvas.style.cursor = 'grabbing';
+
+        // Show visual feedback: reduce circle opacity during drag
+        try {
+            _state.map.setPaintProperty(CAMERA_LAYER_CIRCLE, 'circle-opacity', 0.5);
+            _state.map.setPaintProperty(CAMERA_LAYER_GLOW, 'circle-stroke-opacity', 1.0);
+        } catch (_) { /* layer may not exist */ }
+
+        // Add move + up handlers on the map container (not the layer)
+        _state.map.on('mousemove', _onCameraDragMove);
+        document.addEventListener('mouseup', _onCameraDragEnd, { once: true });
+    });
+
+    // Pointer cursor on hover to indicate draggable
+    _state.map.on('mouseenter', CAMERA_LAYER_CIRCLE, () => {
+        if (!_cameraDrag.active) {
+            canvas.style.cursor = 'grab';
+        }
+    });
+    _state.map.on('mouseleave', CAMERA_LAYER_CIRCLE, () => {
+        if (!_cameraDrag.active) {
+            canvas.style.cursor = '';
+        }
+    });
+}
+
+/**
+ * Update camera marker + FOV cone position during drag.
+ */
+function _onCameraDragMove(e) {
+    if (!_cameraDrag.active || !_cameraDrag.cameraId) return;
+
+    const lngLat = e.lngLat;
+    const camId = _cameraDrag.cameraId;
+
+    // Update the stored camera position
+    const cam = _cameraDrag.cameras.find(c => (c.id || c.source_id) === camId);
+    if (cam) {
+        cam.lat = lngLat.lat;
+        cam.lng = lngLat.lng;
+    }
+
+    // Rebuild GeoJSON for camera markers with updated position
+    _updateCameraGeoJSON();
+}
+
+/**
+ * End drag: persist position to backend, re-enable map pan.
+ */
+function _onCameraDragEnd() {
+    if (!_cameraDrag.active) return;
+
+    const camId = _cameraDrag.cameraId;
+    const cam = _cameraDrag.cameras.find(c => (c.id || c.source_id) === camId);
+
+    // Reset state
+    _cameraDrag.active = false;
+    _cameraDrag.cameraId = null;
+    _cameraDrag.startLngLat = null;
+
+    // Suppress the next click event on the camera layer so the drag
+    // does not also open the camera panel.
+    _cameraDragJustEnded = true;
+    setTimeout(() => { _cameraDragJustEnded = false; }, 300);
+
+    // Re-enable map pan
+    if (_state.map) {
+        _state.map.dragPan.enable();
+        _state.map.off('mousemove', _onCameraDragMove);
+        _state.map.getCanvas().style.cursor = '';
+
+        // Restore circle opacity
+        try {
+            _state.map.setPaintProperty(CAMERA_LAYER_CIRCLE, 'circle-opacity', 0.9);
+            _state.map.setPaintProperty(CAMERA_LAYER_GLOW, 'circle-stroke-opacity', 0.5);
+        } catch (_) { /* layer may not exist */ }
+    }
+
+    if (!cam) return;
+
+    // PATCH the new position to the backend
+    const lat = cam.lat;
+    const lng = cam.lng;
+    fetch(`/api/camera-feeds/sources/${encodeURIComponent(camId)}/position`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat, lng }),
+    }).then(resp => {
+        if (resp.ok) {
+            EventBus.emit('toast:show', {
+                message: `Camera repositioned to ${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+                type: 'info',
+            });
+            // Notify the camera-feeds panel so it updates its display
+            EventBus.emit('cameras:changed', { cameras: _cameraDrag.cameras });
+        } else {
+            EventBus.emit('toast:show', {
+                message: 'Failed to save camera position',
+                type: 'alert',
+            });
+            // Revert by re-fetching
+            _fetchCamerasForMap();
+        }
+    }).catch(() => {
+        EventBus.emit('toast:show', {
+            message: 'Network error saving camera position',
+            type: 'alert',
+        });
+        _fetchCamerasForMap();
+    });
+}
+
+/**
+ * Rebuild and set the camera marker + FOV GeoJSON sources from _cameraDrag.cameras.
+ * Used during drag to update positions in real-time.
+ */
+function _updateCameraGeoJSON() {
+    if (!_state.map) return;
+    const cameras = _cameraDrag.cameras.filter(c => c.lat != null && c.lng != null);
+    if (cameras.length === 0) return;
+
+    // Camera point features
+    const geojson = {
+        type: 'FeatureCollection',
+        features: cameras.map(c => ({
+            type: 'Feature',
+            properties: {
+                id: c.id || c.source_id || '',
+                name: c.name || c.id || 'Camera',
+                status: c.status || 'offline',
+            },
+            geometry: {
+                type: 'Point',
+                coordinates: [c.lng, c.lat],
+            },
+        })),
+    };
+
+    // FOV cone polygons
+    const fovFeatures = cameras.map(c => {
+        const heading = c.heading != null ? c.heading : 0;
+        const fovAngle = c.fov_angle || c.coverage_cone_angle || 60;
+        const rangeM = c.fov_range || c.coverage_radius_meters || 30;
+        const coords = _buildFovConePolygon(c.lng, c.lat, heading, fovAngle, rangeM);
+        return {
+            type: 'Feature',
+            properties: {
+                id: c.id || c.source_id || '',
+                status: c.status || 'offline',
+            },
+            geometry: {
+                type: 'Polygon',
+                coordinates: [coords],
+            },
+        };
+    });
+    const fovGeojson = { type: 'FeatureCollection', features: fovFeatures };
+
+    try {
+        const camSrc = _state.map.getSource(CAMERA_SOURCE_ID);
+        if (camSrc) camSrc.setData(geojson);
+        const fovSrc = _state.map.getSource(CAMERA_FOV_SOURCE_ID);
+        if (fovSrc) fovSrc.setData(fovGeojson);
+    } catch (err) {
+        console.warn('[MAP-ML] Camera drag GeoJSON update error:', err.message || err);
+    }
 }
 
 export function resetCamera() {
